@@ -5,7 +5,18 @@
 **Status**: Draft  
 **Input**: User description: "Build Aksel Arcade: a browser-based React playground that lets designers and developers compose UIs using the Aksel Darkside design system without setting up a project. It includes a Codemirror code editor with tabs: JSX & Hooks, an in-page live viewer with responsive modes, an inspect for elements (with name + props), and JSON file import/export of the project."
 
-**UI Design Reference**: https://www.figma.com/design/aPNvetW8NkJI39C3XN9rks/Aksel-Arcade?node-id=4-828&m=dev
+## UI Design Contract
+
+**Figma Design URL**: https://www.figma.com/design/aPNvetW8NkJI39C3XN9rks/Aksel-Arcade?node-id=4-828&m=dev
+
+**⚠️ IMPORTANT - UI Contract Rules**:
+1. **The Figma design is the source of truth** for all UI implementation
+2. When this specification is referenced for implementation, the Figma file MUST be open in the Figma desktop app
+3. If the Figma file is not accessible via MCP, **STOP and ask the user** to open the file before proceeding
+4. Any conflict between text descriptions and Figma design should be resolved in favor of the Figma design
+5. Use Figma MCP tools to extract design context, component structure, and styling details during implementation
+
+**Node ID**: `4-828` (Main design frame)
 
 ## User Scenarios & Testing
 
@@ -123,6 +134,13 @@ A developer wants to write clean, well-formatted code with minimal effort. They 
 
 ## Requirements
 
+### UI Implementation Requirements
+
+- **UI-001**: All UI implementation MUST follow the Figma design specification at node-id=4-828
+- **UI-002**: Before implementation, developers MUST verify the Figma file is open and accessible via Figma MCP
+- **UI-003**: Layout, spacing, colors, typography, and component arrangement MUST match the Figma design exactly
+- **UI-004**: Any ambiguity between specification text and Figma design MUST be resolved by consulting the Figma design as the authoritative source
+
 ### Functional Requirements
 
 - **FR-001**: System MUST run entirely in the browser without requiring a backend server or build process
@@ -182,9 +200,10 @@ A developer wants to write clean, well-formatted code with minimal effort. They 
 
 ### Assumptions
 
+- **The Figma design file (https://www.figma.com/design/aPNvetW8NkJI39C3XN9rks/Aksel-Arcade?node-id=4-828&m=dev) is the definitive UI contract and takes absolute precedence over any text descriptions in this specification**
+- **Implementation requires the Figma desktop app to be open with this file loaded to enable Figma MCP access**
 - The exact npm packages for Aksel Darkside components and tokens will be confirmed during implementation (currently assumed to be `@navikt/ds-css/darkside` and a separate tokens package)
 - Users have modern browsers with support for ES6+, localStorage, postMessage, and iframe sandboxing (Chrome 90+, Firefox 88+, Safari 14+, Edge 90+)
-- The Figma design file (https://www.figma.com/design/aPNvetW8NkJI39C3XN9rks/Aksel-Arcade?node-id=4-828&m=dev) provides the definitive UI layout and takes precedence over text descriptions
 - Users understand basic React and JSX syntax; the application does not provide React tutorials
 - Component snippets will use TypeScript-compatible JSX where applicable
 - The sandboxed iframe will have sufficient permissions to render React components but not access sensitive browser APIs
