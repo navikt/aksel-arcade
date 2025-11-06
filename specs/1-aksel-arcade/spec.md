@@ -18,6 +18,17 @@
 
 **Node ID**: `4-828` (Main design frame)
 
+## Clarifications
+
+### Session 2025-11-06
+
+- Q: What network request policy should apply to the main application (non-sandboxed) context? → A: Block all network requests from both main and sandboxed contexts (fully offline-capable)
+- Q: Which Aksel component categories should be preloaded in the initial release? → A: Core layout + form components (Box, Stack, Grid, Button, TextField, Select, Checkbox, Radio)
+- Q: What should be the maximum project size limit before warning or preventing saves? → A: 5MB (balanced, allows substantial projects)
+- Q: Which in-browser transpiler should be used for JSX evaluation? → A: Babel Standalone (standard, comprehensive, larger bundle ~500KB)
+- Q: What should be the target debounce delay for preview updates during typing? → A: 250ms (balanced, feels real-time)
+- Q: Which deployment platform should be used for hosting Aksel Arcade? → A: GitHub Pages (automatic deployment via GitHub Actions, free for public repos, simplest setup)
+
 ## User Scenarios & Testing
 
 ### User Story 1 - Quick UI Prototyping (Priority: P1)
@@ -143,8 +154,8 @@ A developer wants to write clean, well-formatted code with minimal effort. They 
 
 ### Functional Requirements
 
-- **FR-001**: System MUST run entirely in the browser without requiring a backend server or build process
-- **FR-002**: System MUST preload Aksel Darkside design system tokens and components, specifically `@navikt/ds-css/darkside` (or equivalent package - confirm exact package name) and the Aksel tokens package
+- **FR-001**: System MUST run entirely in the browser without requiring a backend server or build process, and MUST be fully offline-capable with all dependencies bundled at build time
+- **FR-002**: System MUST preload Aksel Darkside design system tokens and components, specifically `@navikt/ds-css/darkside` (or equivalent package - confirm exact package name) and the Aksel tokens package, with the following core component set: layout components (Box, Stack, Grid) and form components (Button, TextField, Select, Checkbox, Radio)
 - **FR-003**: System MUST initialize the Darkside theme via Aksel's ThemeProvider for all rendered components
 - **FR-004**: System MUST provide a CodeMirror-based code editor with two tabs: "JSX" (default) for UI code and "Hooks" for shared state/logic
 - **FR-005**: System MUST support importing hooks from the Hooks tab into the JSX tab using `import { hookName } from './hooks'` syntax
@@ -154,7 +165,7 @@ A developer wants to write clean, well-formatted code with minimal effort. They 
 - **FR-009**: System MUST provide autocomplete for Aksel component names and their props, including suggested values for enumerated props (e.g., variant, size)
 - **FR-010**: System MUST provide live linting feedback in the editor, showing syntax errors and warnings inline
 - **FR-011**: System MUST integrate Prettier for code formatting, triggered by a toolbar button or keyboard shortcut (Ctrl/Cmd+S)
-- **FR-012**: System MUST provide a live preview pane that reflects code changes in real-time with a maximum 500ms debounce delay
+- **FR-012**: System MUST provide a live preview pane that reflects code changes in real-time with a 250ms debounce delay (maximum 500ms for large files)
 - **FR-013**: System MUST provide viewport toggle buttons for Aksel breakpoints: 2XL (1440px), XL (1280px), LG (1024px), MD (768px), SM (480px), XS (320px)
 - **FR-014**: System MUST implement an inspect mode that, when enabled, shows a highlight border and popover on hover containing: component/element name, CSS class, active props, computed color, font, margin, and padding
 - **FR-015**: System MUST allow users to edit the project name in the application header
@@ -162,15 +173,23 @@ A developer wants to write clean, well-formatted code with minimal effort. They 
 - **FR-017**: System MUST auto-save the current project state to localStorage with a 1-second debounce after any code change
 - **FR-018**: System MUST restore the last project state from localStorage when the application loads
 - **FR-019**: System MUST provide a settings menu with an option to switch panel sides (swap editor and preview positions)
-- **FR-020**: System MUST evaluate user code in a sandboxed iframe using an in-browser transpiler (Babel Standalone or Sucrase)
+- **FR-020**: System MUST evaluate user code in a sandboxed iframe using Babel Standalone for in-browser JSX transpilation
 - **FR-021**: System MUST communicate between the main application and the sandboxed iframe using postMessage API
-- **FR-022**: System MUST block access to `window.top`, untrusted `localStorage` access, network requests, and `eval()` within the sandboxed iframe
+- **FR-022**: System MUST block all network requests in both the main application context and the sandboxed iframe, including access to `window.top`, untrusted `localStorage` access, and `eval()` within the sandboxed iframe
 - **FR-023**: System MUST display compile errors and runtime errors in a non-blocking overlay within the preview pane
 - **FR-024**: System MUST implement a resizable split-pane between the editor and preview, allowing users to adjust the width allocation
 - **FR-025**: System MUST apply the Aksel Darkside theme to the entire application UI (editor, toolbar, preview chrome)
 - **FR-026**: System MUST integrate Aksel Stylelint (`@navikt/aksel-stylelint`) for style-specific linting feedback
 - **FR-027**: System MUST display the Aksel Arcade logo and editable project name in the header
 - **FR-028**: System MUST provide keyboard shortcuts for common actions (Undo: Cmd/Ctrl+Z, Redo: Cmd/Ctrl+Shift+Z / Ctrl+Y, Format: Cmd/Ctrl+S)
+- **FR-029**: System MUST enforce a 5MB maximum project size limit, warning users when approaching 4MB and preventing saves that exceed 5MB
+
+### Deployment Requirements
+
+- **DR-001**: Application MUST be deployed to GitHub Pages with automatic deployment via GitHub Actions on merge to main branch
+- **DR-002**: Build process MUST generate a static site with all dependencies bundled (no runtime dependencies on external CDNs)
+- **DR-003**: Deployment MUST serve the application over HTTPS
+- **DR-004**: GitHub Actions workflow MUST run production build, run tests, and deploy only if all checks pass
 
 ### Key Entities
 
@@ -185,7 +204,7 @@ A developer wants to write clean, well-formatted code with minimal effort. They 
 ### Measurable Outcomes
 
 - **SC-001**: Users can create and view a basic Aksel component (e.g., Button) in the preview pane within 30 seconds of opening the application
-- **SC-002**: Code changes in the editor appear in the preview pane within 500ms for files under 1000 lines
+- **SC-002**: Code changes in the editor appear in the preview pane within 250ms for typical files, with a maximum of 500ms for files under 1000 lines
 - **SC-003**: Users can discover and insert any of the preloaded Aksel components using the "Add component" palette in under 10 seconds
 - **SC-004**: Users can successfully export and re-import a project, with all code and settings restored accurately, in under 15 seconds
 - **SC-005**: Users can switch between all 6 viewport sizes (XS to 2XL) with the preview resizing smoothly within 300ms per transition
@@ -195,8 +214,9 @@ A developer wants to write clean, well-formatted code with minimal effort. They 
 - **SC-009**: Autocomplete suggestions appear within 200ms of typing a component name or prop
 - **SC-010**: Security sandbox successfully blocks unauthorized access attempts (window.top, localStorage, network requests) 100% of the time
 - **SC-011**: Error messages in the preview overlay are clear enough that 90% of users can identify and fix syntax errors without external help
-- **SC-012**: Projects persist in localStorage and restore correctly across browser sessions with 100% accuracy for projects under 10MB
+- **SC-012**: Projects persist in localStorage and restore correctly across browser sessions with 100% accuracy for projects under 5MB
 - **SC-013**: Users can create a working counter component using custom hooks (from Hooks tab) and verify state updates in the preview within 2 minutes
+- **SC-014**: Users receive a clear warning when their project size approaches 4MB and are prevented from saving projects exceeding 5MB
 
 ### Assumptions
 
@@ -206,10 +226,11 @@ A developer wants to write clean, well-formatted code with minimal effort. They 
 - Users have modern browsers with support for ES6+, localStorage, postMessage, and iframe sandboxing (Chrome 90+, Firefox 88+, Safari 14+, Edge 90+)
 - Users understand basic React and JSX syntax; the application does not provide React tutorials
 - Component snippets will use TypeScript-compatible JSX where applicable
-- The sandboxed iframe will have sufficient permissions to render React components but not access sensitive browser APIs
+- The sandboxed iframe will use Babel Standalone for JSX transpilation with React preset configured
 - Prettier configuration will follow standard React/JSX conventions unless Aksel provides specific style guidelines
 - Aksel Stylelint rules are available via `@navikt/aksel-stylelint` package
 - The application will be served over HTTPS in production to ensure Content Security Policy compatibility
-- Users expect persistence across sessions but understand that localStorage has storage limits (typically 5-10MB)
-- The "Add component" palette will be populated based on a curated list of commonly used Aksel components, not the entire component library automatically
+- The application will be deployed to GitHub Pages with automatic deployment configured via GitHub Actions
+- Users expect persistence across sessions but understand that localStorage has storage limits (5MB maximum enforced by the application)
+- The "Add component" palette will be populated with the core component set (Box, Stack, Grid, Button, TextField, Select, Checkbox, Radio), with the ability to extend the palette in future releases
 - Inspect mode will display CSS class names and computed styles as they exist in the DOM, which may include Aksel's internal class naming conventions
