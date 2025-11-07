@@ -348,18 +348,480 @@ After extracting design context, compare with `data-model.md`:
 3. **Header actions**: Export JSON, Import JSON, Settings (matches requirements)
 4. **Preview background**: Sunken gray (#ecedef) as specified
 
-### ⚠️ Missing from Design
-1. **Component palette**: "Add" button exists, but no palette UI shown
-2. **Error states**: No compile error or runtime error UI
-3. **Console output**: No console panel visible
-4. **Inspection mode**: Toggle button exists, but no inspection overlay shown
-5. **Loading states**: No spinner or skeleton screens
+### ⚠️ Previously Missing from Main Design
+These components are now documented below:
+1. ✅ **Component palette**: Modal with search and grid layout (node 30:596)
+2. ✅ **Inspection popover**: Popover showing element details (node 30:4151)
+3. ✅ **Loading states**: Use Aksel Loader component (per specification)
+4. ⚠️ **Error states**: No compile/runtime error UI in Figma (implement per data model)
+5. ⚠️ **Console output**: No console panel in Figma (implement per specification)
 
 ### 📋 Implementation Implications
-- Component palette: Modal/drawer pattern (not in main layout)
-- Error/console UI: Likely overlays or bottom panel (responsive design)
-- Inspection overlay: Transparent overlay with highlight boxes (runtime feature)
-- Loading: Inline spinners or skeleton screens (not static design)
+- Component palette: Modal pattern (documented below)
+- Inspection overlay: Popover anchored to hovered element (documented below)
+- Loading: Aksel Loader component with explainer text after 9s
+- Error/console UI: Follow data model specifications (no Figma design available)
+
+---
+
+## Component Palette Modal (Node 30:596)
+
+**Purpose**: Browse and insert Aksel components into code  
+**Trigger**: "Add" button in code header (node 25:104)  
+**Component**: Aksel Modal - https://aksel.nav.no/komponenter/core/modal
+
+### Modal Structure
+
+```
+data-node-id="30:596"
+className="bg-[var(--ax-bg-raised,#ffffff)] border border-[var(--ax-border-neutral-subtleA)] rounded-[12px]"
+Full size modal (responsive width/height)
+```
+
+### Header (Node 94:2316)
+```
+padding: 16px 20px (--ax-space-16, --ax-space-20)
+layout: flex gap-16px items-start justify-between
+```
+
+**Title**: "Add component"
+- Font: Source Sans 3 SemiBold, 24px/32px, weight 650, tracking -0.048px
+- Color: `--ax-text-neutral`
+
+**Close Button** (Node 94:4579):
+- X-mark icon (24×24px)
+- Padding: 4px
+- Rounded: 8px
+
+### Body (Node 94:2324)
+```
+padding: 0 20px 16px 20px
+layout: flex flex-col gap-16px
+```
+
+**Description Text**:
+"Browse and insert Aksel components into your code."
+- Font: Source Sans 3 Regular, 18px/28px
+- Color: `--ax-text-neutral`
+
+### Modal Content (_ComponentModalContent, Node 30:3424)
+
+**Search Field** (Node 30:1075-30:1113):
+- Size: Small
+- Variant: Simple (no label)
+- No search button (icon inside input)
+- Clear button visible when text present
+- Height: 32px
+- Border: 1px solid `--ax-border-neutral`
+- Rounded: 8px
+- Search icon: 20×20px (left side)
+- Placeholder: Empty (user can type component name)
+
+**Toggle Group** (Node 30:1478):
+- Width: Full
+- Height: 32px
+- Border: 1px solid `--ax-border-neutral`
+- Padding: 1px
+- Rounded: 8px
+- Options: "Layout" | **"Components"** (selected)
+- Selected state: `bg-[--ax-bg-neutral-strong-pressed]`, white text
+- Font: Source Sans 3 Regular, 16px/20px, tracking 0.032px
+
+**Card Grid** (Node 30:3333):
+- Layout: 2 columns
+- Gap: 16px (between columns and rows)
+- 4 rows visible (8 cards total in design)
+
+**Component Card** (LinkCard instances):
+```
+Node IDs: 30:1540, 30:3052, 30:3335, 30:3336, 30:3358, 30:3359, 30:3381, 30:3382
+background: var(--ax-bg-raised,#ffffff)
+border: 1px solid var(--ax-border-neutral-subtleA)
+rounded: 12px (--ax-border-radius-xlarge)
+padding: 16px 20px (--ax-space-16, --ax-space-20)
+```
+
+**Card Title**:
+- Text: "Button" (example - varies by component)
+- Font: Source Sans 3 SemiBold, 20px/28px, weight 600, tracking -0.02px
+- Color: `--ax-text-neutral`
+- Underline: Yes (link style)
+
+**Card Description**:
+- Text: "Button lar brukeren utføre en handling." (example)
+- Font: Source Sans 3 Regular, 18px/28px
+- Color: `--ax-text-neutral`
+- Margin-top: 4px
+
+### Behavior Notes
+- Modal should be scrollable if content exceeds viewport height
+- Cards are clickable (insert component code on click)
+- Search filters cards by name/description
+- Toggle switches between Layout and Components tabs
+
+---
+
+## Inspection Popover (Node 30:4151)
+
+**Purpose**: Display element inspection details when hovering over preview elements  
+**Trigger**: Inspection mode enabled (toggle button node 25:158)  
+**Component**: Aksel Popover - https://aksel.nav.no/komponenter/core/popover
+
+### Popover Structure
+
+```
+data-node-id="30:4151"
+width: 480px
+background: var(--ax-bg-raised,#ffffff)
+border: 1px solid var(--ax-border-neutral-subtleA)
+rounded: 12px (--ax-border-radius-xlarge)
+padding: 16px 20px (--ax-space-16, --ax-space-20)
+layout: flex flex-col gap-8px
+```
+
+### Element Label (Node 24:232)
+```
+layout: flex items-start justify-between
+full width
+```
+
+**Left**: Element selector (Label component)
+- Text: "p.aksel-body-long" (example)
+- Font: Source Sans 3 SemiBold, 18px/24px, weight 600
+- Color: `--ax-text-neutral`
+
+**Right**: Dimensions (BodyShort component)
+- Text: "433 x 23" (example - width × height in px)
+- Font: Source Sans 3 Regular, 18px/24px
+- Color: `--ax-text-neutral`
+
+### Properties List (Node 24:343)
+```
+layout: flex flex-col gap-4px
+full width
+```
+
+Each property row (Nodes 24:326, 24:333, 24:338):
+```
+layout: flex items-start justify-between
+full width
+font: Source Sans 3 Regular, 18px/24px
+color: --ax-text-neutral
+```
+
+**Property 1 - Color**:
+- Left: "Color"
+- Right: "--ax-text-neutral" (CSS variable name)
+
+**Property 2 - Font**:
+- Left: "Font"
+- Right: "aksel-body-long--large" (Aksel typography class)
+
+**Property 3 - Margin**:
+- Left: "Margin"
+- Right: "x: --ax-space-28 y: --ax-space-0" (spacing tokens)
+
+### Behavior Notes
+- Popover appears on hover when inspection mode active
+- Positioned near hovered element (anchor point: element bounding box)
+- Shows computed styles from preview iframe
+- Updates dynamically as user hovers different elements
+- Dismissed when inspection mode disabled
+
+---
+
+## Loading States
+
+**Component**: Aksel Loader - https://aksel.nav.no/komponenter/core/loader  
+**Specification Requirement**: Show explainer text if loading exceeds 9 seconds
+
+### Loading Scenarios
+
+1. **Initial App Load**:
+   - Context: Loading Babel Standalone (~500KB bundle)
+   - Loader size: Medium or Large
+   - Position: Center of viewport
+   - Explainer (after 9s): "Loading code transpiler... This may take a moment on slower connections."
+
+2. **Project Import**:
+   - Context: Parsing and validating imported JSON
+   - Loader size: Small
+   - Position: Inline in header (near Import button)
+   - Explainer (after 9s): "Processing large project file..."
+
+3. **Code Transpilation** (if exceeds debounce):
+   - Context: Complex JSX with many components
+   - Loader size: Small
+   - Position: Preview pane (overlay on content)
+   - Explainer (after 9s): "Transpiling large code file..."
+
+### Loader Configuration
+
+```tsx
+import { Loader } from "@navikt/ds-react";
+
+// Example usage
+<Loader
+  size="medium"
+  title="Loading..."
+  transparent={false}
+/>
+
+// With explainer after 9s
+{showExplainer && (
+  <BodyShort className="mt-4">
+    Loading code transpiler... This may take a moment on slower connections.
+  </BodyShort>
+)}
+```
+
+**Design Tokens**:
+- Loader uses Aksel default styling (no custom colors needed)
+- Explainer text: Source Sans 3 Regular, 18px/28px, `--ax-text-neutral`
+
+---
+
+---
+
+## Error Display (Node 31:1719)
+
+**Purpose**: Display compile errors and runtime errors from code execution  
+**Trigger**: Babel transpilation error or runtime exception in sandbox  
+**Component**: Aksel Alert - https://aksel.nav.no/komponenter/core/alert
+
+### Alert Structure
+
+```
+data-node-id="31:1719"
+variant: Error
+size: Medium
+appearance: Panel
+background: var(--ax-bg-danger-moderate,#ffe8f0)
+border: 1px solid var(--ax-border-danger,#e22a49)
+rounded: 12px (--ax-border-radius-xlarge)
+padding: 16px 20px (--ax-space-16, --ax-space-20)
+layout: flex gap-12px items-start
+```
+
+### Content Components
+
+**Icon** (Node 31:1617):
+- Component: X-markOctagon (24×24px)
+- Color: `#e22a49` (error red)
+- Position: Top-left, aligned with text baseline
+- Padding-top: 2px (to align with heading)
+
+**Text Container** (Node 31:1618):
+```
+layout: flex flex-col gap-8px
+color: var(--ax-text-danger,#560000)
+line-height: 28px
+```
+
+**Heading** (Node 31:1595):
+- Text: "Error title" (e.g., "Compile Error", "Runtime Error")
+- Font: Source Sans 3 SemiBold, 20px/28px, weight 600, tracking -0.02px
+- Color: `--ax-text-danger`
+
+**Description** (Node 31:1596):
+- Text: "Detailed error description. Informing the user what to do to fix the error."
+- Font: Source Sans 3 Regular, 18px/28px
+- Color: `--ax-text-danger`
+- Margin-top: 8px
+
+**Close Button** (Optional, Node 31:1622):
+- Icon: X-mark (24×24px, dark red)
+- Padding: 4px
+- Rounded: 8px
+- Position: Top-right corner
+- **Note**: Design shows no close button for errors (persistent until fixed)
+
+### Error Types
+
+**Compile Error** (from Babel):
+```tsx
+<Alert variant="error" size="medium">
+  <Alert.Heading>Compile Error</Alert.Heading>
+  Unexpected token '}' at line 12, column 5
+</Alert>
+```
+
+**Runtime Error** (from Sandbox):
+```tsx
+<Alert variant="error" size="medium">
+  <Alert.Heading>Runtime Error</Alert.Heading>
+  Cannot read property 'onClick' of undefined
+</Alert>
+```
+
+### Positioning
+
+**Location**: Top of preview pane (inside preview wrapper, above iframe)
+- Pushes preview content down (does not overlay)
+- Full width of preview pane
+- Margin-bottom: 8px before preview iframe
+- Scrolls with preview content
+
+**Dismissal**: Errors are **not dismissible** via close button. They disappear when:
+- User fixes the code (auto-clears on successful transpilation)
+- User clicks "Format" to auto-fix syntax errors
+
+---
+
+## Settings Menu (Node 31:2133)
+
+**Purpose**: Provide quick access to theme switching and panel layout  
+**Trigger**: Settings button in header (node 4:961)  
+**Component**: Aksel Dropdown Menu - https://aksel.nav.no/komponenter/core/actionmenu
+
+### Menu Structure
+
+```
+data-node-id="31:2133"
+background: var(--ax-bg-raised,#ffffff)
+border: 1px solid var(--ax-border-neutral-subtleA)
+rounded: 12px (--ax-border-radius-xlarge)
+padding: 8px (--ax-space-8)
+min-width: ~180px (auto-fits content)
+```
+
+### Menu Items
+
+**Header Item** (Node 35:16377):
+```
+padding: 3px 12px 3px 8px
+text: "Settings"
+font: Source Sans 3 Regular, 14px/20px, tracking 0.056px
+color: var(--ax-text-neutral-subtle,#49515e)
+non-interactive (label only)
+```
+
+**Item 1 - Switch Theme** (Node 35:16401):
+```
+padding: 6px 8px (--ax-space-6, --ax-space-8)
+rounded: 8px (--ax-border-radius-large)
+layout: flex gap-8px items-start
+hover: background highlight
+```
+
+- **Icon**: Sun/moon theme icon (13.5×13.5px, positioned -5px left offset)
+- **Label**: "Switch theme"
+- **Font**: Source Sans 3 Regular, 16px/20px, tracking 0.032px
+- **Color**: `--ax-text-neutral`
+- **Action**: Toggle between light and dark theme (future: Aksel Darkside only in v1)
+
+**Item 2 - Swap Panels** (Node 35:16441):
+```
+padding: 6px 8px (--ax-space-6, --ax-space-8)
+rounded: 8px (--ax-border-radius-large)
+layout: flex gap-8px items-start
+hover: background highlight
+```
+
+- **Icon**: Arrows swap icon (13.5×13.5px, positioned -5px left offset)
+- **Label**: "Swap panels"
+- **Font**: Source Sans 3 Regular, 16px/20px, tracking 0.032px
+- **Color**: `--ax-text-neutral`
+- **Action**: Swap editor and preview positions (left ↔ right)
+
+### Behavior Notes
+
+- Menu appears on click of settings button (node 4:961)
+- Positioned below/near settings button (dropdown pattern)
+- Closes on item click or click outside
+- Items have hover state (subtle background highlight)
+- **v1 Scope**: Only 2 menu items (theme switch, panel swap)
+- **Future**: Can add editor settings, storage management, etc.
+
+### Implementation Note
+
+Use Aksel's `Dropdown.Menu` component:
+```tsx
+<Dropdown>
+  <Dropdown.Toggle>
+    {/* Settings button icon */}
+  </Dropdown.Toggle>
+  <Dropdown.Menu>
+    <Dropdown.Menu.GroupedList>
+      <Dropdown.Menu.GroupedList.Heading>
+        Settings
+      </Dropdown.Menu.GroupedList.Heading>
+      <Dropdown.Menu.List>
+        <Dropdown.Menu.List.Item onClick={handleThemeSwitch}>
+          <ThemeIcon /> Switch theme
+        </Dropdown.Menu.List.Item>
+        <Dropdown.Menu.List.Item onClick={handlePanelSwap}>
+          <SwapIcon /> Swap panels
+        </Dropdown.Menu.List.Item>
+      </Dropdown.Menu.List>
+    </Dropdown.Menu.GroupedList>
+  </Dropdown.Menu>
+</Dropdown>
+```
+
+---
+
+## Console Panel (Hidden in v1)
+
+**Purpose**: Capture and display console output from user's code  
+**Status**: ⚠️ **Build backend, hide UI in v1**
+
+**Design Philosophy** (per user guidance):
+> "Let's dial this level of advanced detail down in v1. If you think it's smart to build the feature, that's OK, but hide it until we want to show it. Remember, the app is a playground that lets designers and developers compose UIs, so it must be easy first and advanced if you want."
+
+### Implementation Strategy
+
+**Phase 1 (v1.0 - Hidden)**:
+1. ✅ **Build infrastructure**: Implement console message capture from sandbox
+2. ✅ **Build data model**: `SandboxMessage.type="CONSOLE_LOG"` with `payload.logs[]`
+3. ✅ **Build storage**: Store logs in memory (no UI rendering)
+4. ❌ **Hide UI**: Do not show console panel in interface
+5. 🔧 **Add toggle**: Hidden keyboard shortcut or dev mode to reveal (e.g., `Cmd+Shift+C`)
+
+**Phase 2 (Future - When Needed)**:
+- Reveal console panel UI when advanced users request it
+- Design decision: Bottom panel (resizable) or overlay pattern
+- Add controls: Clear, filter by level, search logs
+
+### Infrastructure (Build in v1)
+
+**From Data Model**:
+```typescript
+type SandboxMessage = {
+  type: 'CONSOLE_LOG'
+  payload: {
+    logs: Array<{
+      level: 'log' | 'warn' | 'error'
+      args: any[]
+      timestamp: number
+    }>
+  }
+}
+```
+
+**Backend Implementation**:
+1. Inject console interceptor in sandbox iframe
+2. Capture `console.log()`, `console.warn()`, `console.error()`
+3. Send messages to parent via postMessage
+4. Store in React state (not rendered)
+5. Expose via hidden debug panel (keyboard shortcut)
+
+**UI Placeholder** (if revealed):
+- Position: Overlay panel (top-right corner, small badge icon)
+- Toggle: Click badge or `Cmd+Shift+C` to expand
+- Minimal design: Simple list, no filtering in v1
+- Hide by default: Do not show unless explicitly toggled
+
+### Rationale
+
+**Why build backend**: Console capture is valuable for debugging user code. Building the infrastructure now prevents future refactoring.
+
+**Why hide UI**: Keeps interface simple and focused on core use case (UI composition). Advanced debugging can be added when user feedback demands it.
+
+**Future considerations**: 
+- Monitor user requests for console access
+- Add when playground is used for more complex prototyping
+- Consider browser DevTools as alternative (users can open DevTools for console)
 
 ---
 

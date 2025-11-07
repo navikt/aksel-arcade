@@ -37,7 +37,8 @@ interface Project {
   lastModified: string;          // ISO 8601 timestamp
 }
 
-type ViewportSize = 'XS' | 'SM' | 'MD' | 'LG' | 'XL' | '2XL';
+// Per Figma design (node 4:555): "Full" | "1440" | "1024" | "480"
+type ViewportSize = 'FULL' | '1440' | '1024' | '480';
 type PanelLayout = 'editor-left' | 'editor-right';
 ```
 
@@ -79,7 +80,7 @@ const createDefaultProject = (): Project => ({
   name: 'Untitled Project',
   jsxCode: '// Start coding here\nimport { Button } from "@navikt/ds-react";\n\nexport default function App() {\n  return <Button>Hello Aksel!</Button>;\n}',
   hooksCode: '// Define custom hooks here\nimport { useState } from "react";',
-  viewportSize: 'LG',
+  viewportSize: '480',  // Per Figma design: 480 is default selected
   panelLayout: 'editor-left',
   version: '1.0.0',
   createdAt: new Date().toISOString(),
@@ -480,33 +481,32 @@ const searchSnippets = (query: string, snippets: ComponentSnippet[]): ComponentS
 
 ### 6. ViewportDefinition
 
-**Description**: Defines responsive breakpoints matching Aksel design system.
+**Description**: Defines responsive breakpoints per Figma design (node 4:555).
 
 **Fields**:
 ```typescript
 interface ViewportDefinition {
   id: ViewportSize;
-  name: string;      // Display name (e.g., "Extra Small")
-  width: number;     // Pixel width
-  label: string;     // Button label (e.g., "XS")
+  name: string;           // Display name (e.g., "Mobile")
+  width: number | null;   // Pixel width (null for FULL = 100% width)
+  label: string;          // Button label (e.g., "480")
 }
 ```
 
-**Predefined Viewports** (from Aksel breakpoints):
+**Predefined Viewports** (from Figma design node 4:555):
 ```typescript
 export const VIEWPORTS: ViewportDefinition[] = [
-  { id: 'XS', name: 'Extra Small', width: 320, label: 'XS' },
-  { id: 'SM', name: 'Small', width: 480, label: 'SM' },
-  { id: 'MD', name: 'Medium', width: 768, label: 'MD' },
-  { id: 'LG', name: 'Large', width: 1024, label: 'LG' },
-  { id: 'XL', name: 'Extra Large', width: 1280, label: 'XL' },
-  { id: '2XL', name: '2X Large', width: 1440, label: '2XL' },
+  { id: 'FULL', name: 'Full Width', width: null, label: 'Full' },  // 100% of preview pane
+  { id: '1440', name: 'Desktop Large', width: 1440, label: '1440' },
+  { id: '1024', name: 'Tablet Landscape', width: 1024, label: '1024' },
+  { id: '480', name: 'Mobile', width: 480, label: '480' },
 ];
 
 // Helper to get viewport width by ID
-export const getViewportWidth = (id: ViewportSize): number => {
+export const getViewportWidth = (id: ViewportSize): number | null => {
   const viewport = VIEWPORTS.find(v => v.id === id);
-  return viewport?.width ?? 1024; // Default to LG if unknown
+  if (viewport?.id === 'FULL') return null; // Null means 100% width
+  return viewport?.width ?? 1024; // Default to 1024 if unknown
 };
 ```
 
