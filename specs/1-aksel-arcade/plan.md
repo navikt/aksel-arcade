@@ -15,8 +15,8 @@ Build a browser-based React playground that enables designers and developers to 
 **Framework**: React 18+ (hooks-based, functional components)  
 **Primary Dependencies**: 
 - `react-codemirror` (@uiw/react-codemirror) - Code editor
-- `@navikt/ds-css/darkside` - NEEDS CLARIFICATION (exact package name)
-- Aksel Darkside tokens package - NEEDS CLARIFICATION (exact package name)
+- `@navikt/ds-css` - Design system CSS (Darkside via `import "@navikt/ds-css/darkside"`)
+- `@navikt/ds-tokens` - Design tokens (colors, spacing, typography)
 - `@navikt/ds-react` - Aksel React components
 - `@babel/standalone` - In-browser JSX transpilation
 - `prettier` - Code formatting

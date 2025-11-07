@@ -37,8 +37,8 @@ interface Project {
   lastModified: string;          // ISO 8601 timestamp
 }
 
-// Per Figma design (node 4:555): "Full" | "1440" | "1024" | "480"
-type ViewportSize = 'FULL' | '1440' | '1024' | '480';
+// Per Figma design (node 36:981) and Aksel breakpoints (https://aksel.nav.no/grunnleggende/styling/brekkpunkter)
+type ViewportSize = '2XL' | 'XL' | 'LG' | 'MD' | 'SM' | 'XS';
 type PanelLayout = 'editor-left' | 'editor-right';
 ```
 
@@ -46,7 +46,7 @@ type PanelLayout = 'editor-left' | 'editor-right';
 - `name`: 1-100 characters, non-empty after trim
 - `jsxCode`: Max 5MB when serialized (see size enforcement)
 - `hooksCode`: Max 5MB when serialized (see size enforcement)
-- `viewportSize`: Must be one of the 6 predefined sizes
+- `viewportSize`: Must be one of the 6 Aksel standard breakpoints (2XL/1440, XL/1280, LG/1024, MD/768, SM/480, XS/320)
 - `panelLayout`: Must be one of the 2 layout options
 - `version`: Semantic versioning (e.g., "1.0.0")
 - `createdAt`: Valid ISO 8601 timestamp, immutable after creation
@@ -80,7 +80,7 @@ const createDefaultProject = (): Project => ({
   name: 'Untitled Project',
   jsxCode: '// Start coding here\nimport { Button } from "@navikt/ds-react";\n\nexport default function App() {\n  return <Button>Hello Aksel!</Button>;\n}',
   hooksCode: '// Define custom hooks here\nimport { useState } from "react";',
-  viewportSize: '480',  // Per Figma design: 480 is default selected
+  viewportSize: 'MD',  // Per Figma design: MD (768px) is default selected
   panelLayout: 'editor-left',
   version: '1.0.0',
   createdAt: new Date().toISOString(),
@@ -481,34 +481,37 @@ const searchSnippets = (query: string, snippets: ComponentSnippet[]): ComponentS
 
 ### 6. ViewportDefinition
 
-**Description**: Defines responsive breakpoints per Figma design (node 4:555).
+**Description**: Defines Aksel standard responsive breakpoints per Figma design (node 36:981) and Aksel documentation (https://aksel.nav.no/grunnleggende/styling/brekkpunkter).
 
 **Fields**:
 ```typescript
 interface ViewportDefinition {
   id: ViewportSize;
   name: string;           // Display name (e.g., "Mobile")
-  width: number | null;   // Pixel width (null for FULL = 100% width)
-  label: string;          // Button label (e.g., "480")
+  width: number;          // Pixel width
+  label: string;          // Button label (e.g., "SM")
 }
 ```
 
-**Predefined Viewports** (from Figma design node 4:555):
+**Aksel Standard Breakpoints** (from Figma design node 36:981):
 ```typescript
 export const VIEWPORTS: ViewportDefinition[] = [
-  { id: 'FULL', name: 'Full Width', width: null, label: 'Full' },  // 100% of preview pane
-  { id: '1440', name: 'Desktop Large', width: 1440, label: '1440' },
-  { id: '1024', name: 'Tablet Landscape', width: 1024, label: '1024' },
-  { id: '480', name: 'Mobile', width: 480, label: '480' },
+  { id: '2XL', name: 'Desktop Extra Large', width: 1440, label: '2XL' },
+  { id: 'XL', name: 'Desktop Large', width: 1280, label: 'XL' },
+  { id: 'LG', name: 'Tablet Landscape', width: 1024, label: 'LG' },
+  { id: 'MD', name: 'Tablet Portrait', width: 768, label: 'MD' },
+  { id: 'SM', name: 'Mobile Large', width: 480, label: 'SM' },
+  { id: 'XS', name: 'Mobile Small', width: 320, label: 'XS' },
 ];
 
 // Helper to get viewport width by ID
-export const getViewportWidth = (id: ViewportSize): number | null => {
+export const getViewportWidth = (id: ViewportSize): number => {
   const viewport = VIEWPORTS.find(v => v.id === id);
-  if (viewport?.id === 'FULL') return null; // Null means 100% width
-  return viewport?.width ?? 1024; // Default to 1024 if unknown
+  return viewport?.width ?? 768; // Default to MD (768px) if unknown
 };
 ```
+
+**Reference**: Aksel breakpoint documentation at https://aksel.nav.no/grunnleggende/styling/brekkpunkter
 
 ---
 
@@ -707,7 +710,7 @@ const ProjectSchema = z.object({
   name: z.string().min(1).max(100),
   jsxCode: z.string(),
   hooksCode: z.string(),
-  viewportSize: z.enum(['XS', 'SM', 'MD', 'LG', 'XL', '2XL']),
+  viewportSize: z.enum(['2XL', 'XL', 'LG', 'MD', 'SM', 'XS']),
   panelLayout: z.enum(['editor-left', 'editor-right']),
   version: z.string().regex(/^\d+\.\d+\.\d+$/),
   createdAt: z.string().datetime(),

@@ -54,13 +54,13 @@ A designer wants to test how their UI layout adapts to different screen sizes us
 
 **Why this priority**: Responsive design is critical for modern web applications, but this requires the basic editor functionality (P1) to be in place first.
 
-**Independent Test**: Can be fully tested by creating a simple responsive layout, clicking viewport size buttons (XS, SM, MD, LG, XL, 2XL), and verifying that the preview pane resizes according to Aksel breakpoints.
+**Independent Test**: Can be fully tested by creating a simple responsive layout, clicking viewport breakpoint buttons (2XL, XL, LG, MD, SM, XS), and verifying that the preview pane resizes according to Aksel standard breakpoints.
 
 **Acceptance Scenarios**:
 
-1. **Given** a user has created a UI in the editor, **When** they click the "SM (480px)" viewport button, **Then** the preview pane resizes to 480px width and the UI adapts accordingly
-2. **Given** a user is viewing their UI at MD breakpoint, **When** they click "XS (320px)", **Then** the preview transitions smoothly to 320px width
-3. **Given** a user switches between viewport sizes, **When** they return to the editor, **Then** their code remains unchanged and the preview maintains the selected viewport size
+1. **Given** a user has created a UI in the editor, **When** they click the "SM (480px)" breakpoint button, **Then** the preview pane resizes to 480px width and the UI adapts accordingly
+2. **Given** a user is viewing their UI at LG (1024px) breakpoint, **When** they click "XS (320px)", **Then** the preview transitions smoothly to 320px width
+3. **Given** a user switches between breakpoint sizes, **When** they return to the editor, **Then** their code remains unchanged and the preview maintains the selected breakpoint size
 
 ---
 
@@ -166,8 +166,8 @@ A developer wants to write clean, well-formatted code with minimal effort. They 
 - **FR-010**: System MUST provide live linting feedback in the editor, showing syntax errors and warnings inline
 - **FR-011**: System MUST integrate Prettier for code formatting, triggered by a toolbar button or keyboard shortcut (Ctrl/Cmd+S)
 - **FR-012**: System MUST provide a live preview pane that reflects code changes in real-time with a 250ms debounce delay (maximum 500ms for large files)
-- **FR-013**: System MUST provide viewport toggle buttons for Aksel breakpoints: 2XL (1440px), XL (1280px), LG (1024px), MD (768px), SM (480px), XS (320px)
-- **FR-014**: System MUST implement an inspect mode that, when enabled, shows a highlight border and popover on hover containing: component/element name, CSS class, active props, computed color, font, margin, and padding
+- **FR-013**: System MUST provide viewport toggle buttons for Aksel standard breakpoints: 2XL (1440px), XL (1280px), LG (1024px), MD (768px), SM (480px), XS (320px) (per Figma design node 36:981 and https://aksel.nav.no/grunnleggende/styling/brekkpunkter)
+- **FR-014**: System MUST implement an inspect mode that, when enabled, shows a highlight border and popover on hover containing: component/element name, CSS class, active props, computed color, font, margin, and padding. Popover MUST be positioned 16px offset from cursor with smart positioning to prevent screen edge overflow (flip above/below or left/right as needed).
 - **FR-015**: System MUST allow users to edit the project name in the application header
 - **FR-016**: System MUST provide Import/Export functionality for project JSON files containing project name, JSX code, Hooks code, and viewport settings
 - **FR-017**: System MUST auto-save the current project state to localStorage with a 1-second debounce after any code change
@@ -176,8 +176,8 @@ A developer wants to write clean, well-formatted code with minimal effort. They 
 - **FR-020**: System MUST evaluate user code in a sandboxed iframe using Babel Standalone for in-browser JSX transpilation
 - **FR-021**: System MUST communicate between the main application and the sandboxed iframe using postMessage API
 - **FR-022**: System MUST block all network requests in both the main application context and the sandboxed iframe, including access to `window.top`, untrusted `localStorage` access, and `eval()` within the sandboxed iframe
-- **FR-023**: System MUST display compile errors and runtime errors in a non-blocking overlay within the preview pane
-- **FR-024**: System MUST implement a resizable split-pane between the editor and preview, allowing users to adjust the width allocation
+- **FR-023**: System MUST display compile errors and runtime errors in a non-blocking overlay within the preview pane. Error overlay MUST be dismissible via close button (X) or clicking outside the overlay, and MUST persist until explicitly dismissed or a new successful render occurs.
+- **FR-024**: System MUST implement a resizable split-pane between the editor and preview, allowing users to adjust the width allocation. System MUST enforce minimum widths of 300px for the editor pane and 320px for the preview pane to maintain usability.
 - **FR-025**: System MUST apply the Aksel Darkside theme to the entire application UI (editor, toolbar, preview chrome)
 - **FR-026**: System MUST integrate Aksel Stylelint (`@navikt/aksel-stylelint`) for style-specific linting feedback
 - **FR-027**: System MUST display the Aksel Arcade logo and editable project name in the header
