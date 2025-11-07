@@ -2,7 +2,7 @@
 
 **Feature Branch**: `1-aksel-arcade`  
 **Created**: November 6, 2025  
-**Status**: Draft  
+**Status**: Approved  
 **Input**: User description: "Build Aksel Arcade: a browser-based React playground that lets designers and developers compose UIs using the Aksel Darkside design system without setting up a project. It includes a Codemirror code editor with tabs: JSX & Hooks, an in-page live viewer with responsive modes, an inspect for elements (with name + props), and JSON file import/export of the project."
 
 ## UI Design Contract
@@ -11,8 +11,8 @@
 
 **⚠️ IMPORTANT - UI Contract Rules**:
 1. **The Figma design is the source of truth** for all UI implementation
-2. When this specification is referenced for implementation, the Figma file MUST be open in the Figma desktop app
-3. If the Figma file is not accessible via MCP, **STOP and ask the user** to open the file before proceeding
+2. When implementing UI components (Phase 3+), the Figma file MUST be open in the Figma desktop app
+3. If the Figma file is not accessible via MCP during UI implementation, **STOP and ask the user** to open the file before proceeding with component work
 4. Any conflict between text descriptions and Figma design should be resolved in favor of the Figma design
 5. Use Figma MCP tools to extract design context, component structure, and styling details during implementation
 
@@ -173,7 +173,7 @@ A developer wants to write clean, well-formatted code with minimal effort. They 
 - **FR-017**: System MUST auto-save the current project state to localStorage with a 1-second debounce after any code change
 - **FR-018**: System MUST restore the last project state from localStorage when the application loads
 - **FR-019**: System MUST provide a settings menu with an option to switch panel sides (swap editor and preview positions)
-- **FR-020**: System MUST evaluate user code in a sandboxed iframe using Babel Standalone for in-browser JSX transpilation
+- **FR-020**: System MUST evaluate user code in a sandboxed iframe using @babel/standalone (npm package) for in-browser JSX transpilation
 - **FR-021**: System MUST communicate between the main application and the sandboxed iframe using postMessage API
 - **FR-022**: System MUST block all network requests in both the main application context and the sandboxed iframe, including access to `window.top`, untrusted `localStorage` access, and `eval()` within the sandboxed iframe
 - **FR-023**: System MUST display compile errors and runtime errors in a non-blocking overlay within the preview pane. Error overlay MUST be dismissible via close button (X) or clicking outside the overlay, and MUST persist until explicitly dismissed or a new successful render occurs.

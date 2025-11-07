@@ -261,9 +261,12 @@
 
 ## Phase 9: Polish & Cross-Cutting Concerns
 
-**Purpose**: Improvements affecting multiple user stories and final production readiness
+**Purpose**: Improvements affecting multiple user stories, final production readiness, and constitution-mandated testing
 
-- [ ] T100 [P] Add editable project name input in AppHeader component with auto-save on change
+- [ ] T100 [P] Test Editor component state management: verify tab switching, undo/redo history, cursor position persistence
+- [ ] T101 [P] Test Preview component: verify viewport resizing, error overlay display/dismissal, iframe communication
+- [ ] T102 [P] Test Sandbox runtime: verify transpilation success/failure, postMessage handling, security boundaries
+- [ ] T103 [P] Add editable project name input in AppHeader component with auto-save on change
 - [ ] T101 [P] Create Settings menu component in src/components/Header/SettingsMenu.tsx with "Swap panel sides" option
 - [ ] T102 Implement panel layout swap: update Project.panelLayout, re-render SplitPane with editor/preview swapped
 - [ ] T103 [P] Add keyboard shortcut documentation modal accessible from Settings menu (Cmd/Ctrl+S, Cmd/Ctrl+Z, etc.)
@@ -274,12 +277,16 @@
 - [ ] T108 [P] Add empty state UI to preview pane when no code is entered (helpful onboarding message)
 - [ ] T109 [P] Add accessibility attributes to all interactive components (ARIA labels, roles, keyboard navigation)
 - [ ] T110 [P] Test keyboard navigation through Component Palette (Arrow keys, Enter, Escape per component-snippets.md)
-- [ ] T111 Configure GitHub Actions workflow in .github/workflows/deploy.yml for automated deployment to GitHub Pages per quickstart.md
-- [ ] T112 [P] Update vite.config.ts with base path for GitHub Pages deployment (base: '/AkselArcade/')
-- [ ] T113 [P] Create README.md with project overview, setup instructions, and link to deployed app
-- [ ] T114 Verify quickstart.md instructions: follow setup steps, ensure all commands work, update as needed
-- [ ] T115 [P] Add performance monitoring: track preview render duration, warn if transpilation exceeds 500ms threshold
-- [ ] T116 Final Constitution Check re-evaluation: verify all principles satisfied, document any watch items resolved
+- [ ] T111 Configure GitHub Actions workflow in .github/workflows/deploy.yml for automated deployment to GitHub Pages per quickstart.md (CRITICAL: requires GitHub repository configuration prerequisites - see T111a-T111d)
+- [ ] T111a [P] Enable GitHub Pages in repository Settings → Pages → Source: "Deploy from a branch" → Branch: gh-pages
+- [ ] T111b [P] Verify GitHub Actions are enabled for the repository (Settings → Actions → Allow all actions)
+- [ ] T111c Update vite.config.ts with base path for GitHub Pages deployment (base: '/AkselArcade/' or actual repo name)
+- [ ] T111d [P] Test production build locally with npm run build && npm run preview to verify base path works before deploying
+- [ ] T112 [P] Create README.md with project overview, setup instructions, and link to deployed app (update with actual GitHub Pages URL after T111 deployment)
+- [ ] T113 Verify quickstart.md instructions: follow setup steps, ensure all commands work, update as needed
+- [ ] T114 [P] Add performance monitoring: track preview render duration, warn if transpilation exceeds 500ms threshold
+- [ ] T115 Final Constitution Check re-evaluation: verify all principles satisfied, document any watch items resolved
+- [ ] T116 [P] Wire WarningNotification component display logic when project size exceeds 4MB threshold (addresses finding C1 from analysis)
 
 ---
 
@@ -373,7 +380,7 @@ With multiple developers:
 
 ## Task Summary
 
-- **Total Tasks**: 121
+- **Total Tasks**: 128 (updated from 125)
 - **Setup Phase**: 13 tasks
 - **Foundational Phase**: 24 tasks (BLOCKING - must complete first)
 - **User Story 1 (P1)**: 21 tasks (MVP)
@@ -382,9 +389,9 @@ With multiple developers:
 - **User Story 3 (P2)**: 9 tasks
 - **User Story 4 (P3)**: 6 tasks
 - **User Story 5 (P3)**: 11 tasks
-- **Polish Phase**: 17 tasks
+- **Polish Phase**: 24 tasks (updated from 21 - added T100-T102 for component tests, T118 for security audit, renumbered remaining tasks)
 
-**Parallel Opportunities**: 42 tasks marked [P] can run in parallel within their phase
+**Parallel Opportunities**: 47 tasks marked [P] can run in parallel within their phase (updated from 44)
 
 **MVP Scope** (Phases 1-3): 58 tasks (Setup + Foundational + US1)
 

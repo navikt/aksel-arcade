@@ -316,6 +316,41 @@ interface InspectionDataMessage {
 }
 ```
 
+**Component Name Extraction Methods**:
+
+The `componentName` field should be extracted using one of these approaches (in priority order):
+
+1. **React Fiber (preferred)**: Access element's `__reactFiber$*` property to read component type name
+   ```typescript
+   function getComponentName(element: HTMLElement): string {
+     const fiberKey = Object.keys(element).find(key => key.startsWith('__reactFiber$'));
+     if (fiberKey) {
+       const fiber = element[fiberKey];
+       const componentType = fiber?.type;
+       if (typeof componentType === 'function') {
+         return componentType.name || 'Anonymous';
+       }
+       if (typeof componentType === 'string') {
+         return componentType; // HTML element like 'div', 'button'
+       }
+     }
+     return element.tagName.toLowerCase();
+   }
+   ```
+
+2. **Display Name (fallback)**: Check for `displayName` property on component
+   ```typescript
+   const displayName = componentType?.displayName;
+   if (displayName) return displayName;
+   ```
+
+3. **Tag Name (fallback)**: Use HTML tag name if React component name unavailable
+   ```typescript
+   return element.tagName.toLowerCase();
+   ```
+
+**Implementation Note**: Fiber keys are versioned (e.g., `__reactFiber$xyz123`), so use dynamic lookup with `startsWith('__reactFiber$')`.
+
 **Example**:
 ```typescript
 // Sandbox sends

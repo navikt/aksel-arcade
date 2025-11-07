@@ -279,6 +279,36 @@ After completing Phase 1 design (data model, contracts, quickstart), all constit
 3. Validate visual implementation against Figma design (use `mcp_figma_get_screenshot` for comparison)
 4. Performance testing in real browsers to validate budgets
 
+### Deployment Strategy
+
+**Development Workflow** (localhost testing):
+1. **Local Development**: Primary development and testing occurs on localhost (`http://localhost:5173/`)
+2. **All features MUST be tested locally** before considering deployment
+3. **Local testing workflow**:
+   - Run `npm run dev` to start Vite development server
+   - Test all user stories and acceptance criteria at `http://localhost:5173/`
+   - Verify responsive viewports, inspect mode, hooks, import/export locally
+   - Run `npm run build && npm run preview` to test production build locally (`http://localhost:4173/`)
+
+**Production Deployment** (GitHub Pages):
+- **Only proceed to GitHub Pages when localhost testing is complete and all features are validated**
+- **Prerequisites before deployment**:
+  1. Enable GitHub Pages in repository settings (Settings → Pages)
+  2. Create GitHub Actions workflow file (`.github/workflows/deploy.yml`)
+  3. Configure `vite.config.ts` with correct `base` path for repository name
+  4. Verify production build works locally with `npm run preview`
+- **Deployment process**: Automatic via GitHub Actions on push to `main` branch
+- **Post-deployment**: Verify deployed site at `https://<username>.github.io/<repo-name>/`
+
+**Configuration Checklist** (required before GitHub Pages deployment):
+- [ ] Repository Settings → Pages → Source set to "Deploy from a branch" → `gh-pages` branch
+- [ ] GitHub Actions enabled for repository
+- [ ] `vite.config.ts` updated with `base: '/<repo-name>/'`
+- [ ] `.github/workflows/deploy.yml` created with build + test + deploy steps
+- [ ] HTTPS serving confirmed (GitHub Pages default)
+
+See `quickstart.md` "Deployment" section for detailed step-by-step instructions.
+
 ### Readiness for Phase 2 (Tasks)
 
 **✅ APPROVED TO PROCEED**
@@ -290,6 +320,7 @@ All prerequisites for Phase 2 task generation met:
 - [x] Quickstart complete (developer onboarding documented)
 - [x] Agent context updated (GitHub Copilot instructions)
 - [x] Constitution re-check passed (all principles satisfied)
+- [x] Deployment strategy documented (localhost → GitHub Pages)
 
 **Next Command**: `/speckit.tasks` to generate implementation task list
 

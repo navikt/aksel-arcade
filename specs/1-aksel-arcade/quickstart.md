@@ -418,20 +418,71 @@ npm run type-check
 
 ## Deployment
 
-### Deploy to GitHub Pages
+### Localhost Testing (REQUIRED FIRST)
 
-**Prerequisites**: GitHub repository with Actions enabled
+**⚠️ CRITICAL: All features MUST be tested locally before deploying to GitHub Pages**
+
+**Localhost Development Workflow**:
+
+1. **Start Development Server**:
+   ```bash
+   npm run dev
+   ```
+   - Application runs at `http://localhost:5173/`
+   - Hot Module Replacement (HMR) enabled for instant updates
+   - All features work in localhost environment
+
+2. **Test All User Stories Locally**:
+   - ✅ US1: Quick UI Prototyping - Create components, verify live preview updates
+   - ✅ US2: Responsive Design - Test all 6 viewport breakpoints (2XL/XL/LG/MD/SM/XS)
+   - ✅ US3: Component Inspection - Enable inspect mode, hover elements
+   - ✅ US4: State Management - Create custom hooks, verify state updates
+   - ✅ US5: Project Persistence - Export/import JSON, verify auto-save
+   - ✅ US6: Code Formatting - Test autocomplete, Prettier, undo/redo
+
+3. **Test Production Build Locally**:
+   ```bash
+   npm run build
+   npm run preview
+   ```
+   - Production build runs at `http://localhost:4173/`
+   - Verify all features work in production mode
+   - Check bundle size in `dist/` directory
+
+4. **Verify Before Deployment**:
+   - [ ] All user stories tested and working
+   - [ ] No console errors in browser DevTools
+   - [ ] Production build completes successfully
+   - [ ] Production preview works at `localhost:4173`
+
+---
+
+### Deploy to GitHub Pages (After Localhost Testing)
+
+**Prerequisites**: GitHub repository with Actions enabled + localhost testing complete
 
 **Steps**:
 
-1. **Update `vite.config.ts`** with base path:
+1. **Configure GitHub Repository** (REQUIRED - must be done before deployment):
+
+   a. **Enable GitHub Pages**:
+      - Go to repository Settings → Pages
+      - Source: "Deploy from a branch"
+      - Branch: `gh-pages` / `/ (root)`
+      
+   b. **Enable GitHub Actions**:
+      - Go to Settings → Actions → General
+      - Actions permissions: "Allow all actions and reusable workflows"
+      - Workflow permissions: "Read and write permissions"
+
+2. **Update `vite.config.ts`** with base path:
    ```typescript
    export default defineConfig({
      base: '/AkselArcade/', // Replace with your repo name
    });
    ```
 
-2. **Create GitHub Actions workflow** (`.github/workflows/deploy.yml`):
+3. **Create GitHub Actions workflow** (`.github/workflows/deploy.yml`):
    ```yaml
    name: Deploy to GitHub Pages
    
@@ -456,21 +507,40 @@ npm run type-check
              publish_dir: ./dist
    ```
 
-3. **Enable GitHub Pages**:
-   - Go to repository Settings → Pages
-   - Source: "Deploy from a branch"
-   - Branch: `gh-pages` / `/ (root)`
+4. **Test Production Build Locally with Base Path** (CRITICAL):
+   ```bash
+   npm run build
+   npm run preview
+   ```
+   - Navigate to `http://localhost:4173/AkselArcade/` (note the base path)
+   - Verify application loads correctly with base path
+   - Test all features work (routing, assets, etc.)
 
-4. **Push to `main`**:
+5. **Push to `main`**:
    ```bash
    git add .
    git commit -m "Setup GitHub Pages deployment"
    git push origin main
    ```
 
-5. **Access deployed site**:
-   - URL: `https://yourusername.github.io/AkselArcade/`
+6. **Verify Deployment**:
+   - GitHub Actions will automatically build and deploy
+   - Check Actions tab for workflow progress
    - Wait 2-3 minutes for first deployment
+   - Access deployed site: `https://yourusername.github.io/AkselArcade/`
+
+7. **Post-Deployment Verification**:
+   - [ ] Site loads at GitHub Pages URL
+   - [ ] All assets load correctly (no 404s in Network tab)
+   - [ ] All user stories work in production environment
+   - [ ] HTTPS serving confirmed (padlock icon in browser)
+
+**Common Deployment Issues**:
+
+- **404 on GitHub Pages URL**: Check `vite.config.ts` base path matches repo name exactly
+- **Assets not loading**: Verify `base` path includes leading and trailing slashes (`/AkselArcade/`)
+- **GitHub Actions failing**: Check workflow YAML syntax, verify Actions are enabled
+- **gh-pages branch not created**: First deployment creates it automatically after successful Actions run
 
 ---
 
