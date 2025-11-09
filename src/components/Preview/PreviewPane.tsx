@@ -16,7 +16,9 @@ export const PreviewPane = () => {
   const [transpiledCode, setTranspiledCode] = useState<string | null>(null)
   const [compileError, setCompileError] = useState<CompileError | null>(null)
   const [runtimeError, setRuntimeError] = useState<RuntimeError | null>(null)
+  const [isInspectMode, setIsInspectMode] = useState(false)
   const debounceTimerRef = useRef<number | undefined>(undefined)
+  const iframeRef = useRef<HTMLIFrameElement | null>(null)
 
   // Transpile code when JSX or hooks code changes (debounced to avoid errors while typing)
   useEffect(() => {
@@ -90,10 +92,17 @@ export const PreviewPane = () => {
     })
   }
 
+  const handleInspectToggle = (enabled: boolean) => {
+    setIsInspectMode(enabled)
+  }
+
   return (
     <div className="preview-pane">
       <div className="preview-pane__header">
-        <InspectMode />
+        <InspectMode 
+          iframeRef={iframeRef}
+          onInspectToggle={handleInspectToggle}
+        />
         <ViewportToggle />
       </div>
 
@@ -107,11 +116,13 @@ export const PreviewPane = () => {
       />
       
       <LivePreview
+        iframeRef={iframeRef}
         transpiledCode={transpiledCode}
         onRenderSuccess={handleRenderSuccess}
         onCompileError={handleCompileError}
         onRuntimeError={handleRuntimeError}
         viewportWidth={project.viewportSize}
+        isInspectMode={isInspectMode}
       />
     </div>
   )

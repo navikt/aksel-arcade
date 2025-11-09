@@ -16,4 +16,8 @@ export interface InspectionData {
 
   // Position (for highlight border)
   boundingRect: DOMRect // Element bounding box
+  
+  // Cursor position (relative to iframe viewport)
+  cursorX: number // Mouse X position in iframe
+  cursorY: number // Mouse Y position in iframe
 }

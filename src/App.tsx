@@ -1,26 +1,79 @@
-import { useContext } from 'react'
+import { useContext, useState, useEffect } from 'react'
 import { AppContext } from './hooks/useProject'
+import { useAutoSave } from './hooks/useAutoSave'
 import { ThemeProvider } from './components/Layout/ThemeProvider'
 import { SplitPane } from './components/Layout/SplitPane'
 import { AppHeader } from './components/Header/AppHeader'
 import { EditorPane } from './components/Editor/EditorPane'
 import { PreviewPane } from './components/Preview/PreviewPane'
+import { WarningNotification } from './components/Header/WarningNotification'
+import { validateProjectSize } from './services/storage'
+import type { Project } from './types/project'
 import './App.css'
 
 function App() {
   const context = useContext(AppContext)
   if (!context) throw new Error('App must be used within AppProvider')
 
-  const { project, updateProject } = context
+  const { project, updateProject, setProject } = context
+
+  // T097: Auto-save integration
+  const { saveStatus, saveError } = useAutoSave(project)
+  
+  // T094, T095, T096: Project size monitoring
+  const [projectSizeBytes, setProjectSizeBytes] = useState(0)
+  const [sizeWarning, setSizeWarning] = useState<string | null>(null)
+
+  useEffect(() => {
+    const sizeStatus = validateProjectSize(project)
+    setProjectSizeBytes(sizeStatus.sizeBytes)
+    
+    // T095: Show warning when > 4MB
+    if (sizeStatus.warning) {
+      setSizeWarning(sizeStatus.warning)
+    } else {
+      setSizeWarning(null)
+    }
+    
+    // T096: Show error if > 5MB (though this should be prevented by save)
+    if (!sizeStatus.valid && sizeStatus.message) {
+      setSizeWarning(sizeStatus.message)
+    }
+  }, [project])
 
   const handleProjectNameChange = (name: string) => {
     updateProject({ name })
   }
 
+  // T092: Handle imported project
+  const handleProjectImported = (importedProject: Project) => {
+    setProject(importedProject)
+  }
+
   return (
     <ThemeProvider>
       <div className="app">
-        <AppHeader projectName={project.name} onProjectNameChange={handleProjectNameChange} />
+        {sizeWarning && (
+          <WarningNotification 
+            message={sizeWarning} 
+            onClose={() => setSizeWarning(null)} 
+          />
+        )}
+        
+        {saveError && (
+          <WarningNotification 
+            message={`Save error: ${saveError}`}
+          />
+        )}
+        
+        <AppHeader 
+          projectName={project.name} 
+          onProjectNameChange={handleProjectNameChange}
+          currentProject={project}
+          onProjectImported={handleProjectImported}
+          saveStatus={saveStatus}
+          projectSizeBytes={projectSizeBytes}
+        />
         
         <SplitPane
           left={<EditorPane />}

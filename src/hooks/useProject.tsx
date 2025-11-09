@@ -1,8 +1,9 @@
-import { createContext, useContext, useState, type ReactNode } from 'react'
+import { createContext, useContext, useState, useEffect, type ReactNode } from 'react'
 import type { Project } from '@/types/project'
 import type { EditorState } from '@/types/editor'
 import type { PreviewState } from '@/types/preview'
 import { createDefaultProject, createDefaultEditorState, createDefaultPreviewState } from '@/utils/projectDefaults'
+import { loadProject } from '@/services/storage'
 import type { ComponentSnippet } from '@/types/snippets'
 
 interface AppState {
@@ -40,7 +41,19 @@ export const useProject = () => {
 }
 
 export const AppProvider = ({ children }: { children: ReactNode }) => {
-  const [project, setProjectState] = useState<Project>(createDefaultProject())
+  // T098: Load project from LocalStorage on initialization
+  const [project, setProjectState] = useState<Project>(() => {
+    const result = loadProject()
+    if (result.error) {
+      console.error('Failed to load project:', result.error)
+      return createDefaultProject()
+    }
+    if (result.migrated) {
+      console.log('Project migrated from version', result.project?.version)
+    }
+    return result.project || createDefaultProject()
+  })
+  
   const [editorState, setEditorState] = useState<EditorState>(createDefaultEditorState())
   const [previewState, setPreviewState] = useState<PreviewState>(createDefaultPreviewState())
   const [isComponentPaletteOpen, setIsComponentPaletteOpen] = useState(false)

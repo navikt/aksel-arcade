@@ -191,15 +191,15 @@
 
 ### Implementation for User Story 3
 
-- [ ] T075 [P] [US3] Create InspectMode component in src/components/Preview/InspectMode.tsx with toggle button
-- [ ] T076 [US3] Send TOGGLE_INSPECT postMessage to SandboxRuntime when inspect mode toggled per sandbox-api.md
-- [ ] T077 [US3] Handle TOGGLE_INSPECT message in SandboxRuntime: attach/remove mousemove listener on iframe document
-- [ ] T078 [US3] Implement extractInspectionData function in SandboxRuntime that reads component name from React Fiber, props, and computed styles per data-model.md
-- [ ] T079 [US3] Send INSPECTION_DATA postMessage to main app on hover (throttled to 16ms for 60fps) per sandbox-api.md
-- [ ] T080 [US3] Create InspectionPopover component in src/components/Preview/InspectionPopover.tsx to display InspectionData
-- [ ] T081 [US3] Display highlight border around hovered element in SandboxRuntime using absolute-positioned div overlay
-- [ ] T082 [US3] Handle INSPECTION_DATA message in LivePreview: update popover position and content based on boundingRect, position 16px offset from cursor with smart edge detection to prevent overflow
-- [ ] T083 [US3] Clear inspection popover when inspect mode disabled or mouse leaves preview area
+- [X] T075 [P] [US3] Create InspectMode component in src/components/Preview/InspectMode.tsx with toggle button
+- [X] T076 [US3] Send TOGGLE_INSPECT postMessage to SandboxRuntime when inspect mode toggled per sandbox-api.md
+- [X] T077 [US3] Handle TOGGLE_INSPECT message in SandboxRuntime: attach/remove mousemove listener on iframe document
+- [X] T078 [US3] Implement extractInspectionData function in SandboxRuntime that reads component name from React Fiber, props, and computed styles per data-model.md
+- [X] T079 [US3] Send INSPECTION_DATA postMessage to main app on hover (throttled to 16ms for 60fps) per sandbox-api.md
+- [X] T080 [US3] Create InspectionPopover component in src/components/Preview/InspectionPopover.tsx to display InspectionData
+- [X] T081 [US3] Display highlight border around hovered element in SandboxRuntime using absolute-positioned div overlay
+- [X] T082 [US3] Handle INSPECTION_DATA message in LivePreview: update popover position and content based on boundingRect, position 16px offset from cursor with smart edge detection to prevent overflow
+- [X] T083 [US3] Clear inspection popover when inspect mode disabled or mouse leaves preview area
 
 **Checkpoint**: User Story 3 complete - Users can inspect elements with detailed component/style information
 
@@ -243,17 +243,17 @@
 
 ### Implementation for User Story 5
 
-- [ ] T090 [P] [US5] Create ProjectControls component in src/components/Header/ProjectControls.tsx with Import/Export buttons
-- [ ] T091 [US5] Implement Export button handler: call exportProject from storage service, trigger JSON download per storage-api.md
-- [ ] T092 [US5] Implement Import button handler: file input, read file, call importProject from storage service, update app state per storage-api.md
-- [ ] T093 [US5] Show confirmation dialog before importing if current project has unsaved changes
-- [ ] T094 [US5] Display project size indicator in UI showing current size vs 5MB limit (e.g., "2.3 MB / 5 MB")
-- [ ] T095 [US5] Show warning notification when project size exceeds 4MB threshold per storage-api.md
-- [ ] T095a [US5] Create WarningNotification component in src/components/Header/WarningNotification.tsx for displaying size warnings (toast/banner style)
-- [ ] T096 [US5] Prevent save and show error if project size exceeds 5MB per storage-api.md
-- [ ] T097 [US5] Integrate useAutoSave hook in App.tsx to auto-save project to LocalStorage with 1s debounce
-- [ ] T098 [US5] Load project from LocalStorage on app initialization in src/App.tsx, fall back to createDefaultProject if none exists
-- [ ] T099 [US5] Display save status indicator in header (idle, saving, saved, error) from useAutoSave hook
+- [X] T090 [P] [US5] Create ProjectControls component in src/components/Header/ProjectControls.tsx with Import/Export buttons
+- [X] T091 [US5] Implement Export button handler: call exportProject from storage service, trigger JSON download per storage-api.md
+- [X] T092 [US5] Implement Import button handler: file input, read file, call importProject from storage service, update app state per storage-api.md
+- [X] T093 [US5] Show confirmation dialog before importing if current project has unsaved changes
+- [X] T094 [US5] Display project size indicator in UI showing current size vs 5MB limit (e.g., "2.3 MB / 5 MB")
+- [X] T095 [US5] Show warning notification when project size exceeds 4MB threshold per storage-api.md
+- [X] T095a [US5] Create WarningNotification component in src/components/Header/WarningNotification.tsx for displaying size warnings (toast/banner style)
+- [X] T096 [US5] Prevent save and show error if project size exceeds 5MB per storage-api.md
+- [X] T097 [US5] Integrate useAutoSave hook in App.tsx to auto-save project to LocalStorage with 1s debounce
+- [X] T098 [US5] Load project from LocalStorage on app initialization in src/App.tsx, fall back to createDefaultProject if none exists
+- [X] T099 [US5] Display save status indicator in header (idle, saving, saved, error) from useAutoSave hook
 
 **Checkpoint**: User Story 5 complete - Users can export, import, auto-save, and restore projects
 

@@ -1,28 +1,36 @@
 import { useRef, useEffect, useState } from 'react'
 import type { MainToSandboxMessage, SandboxToMainMessage } from '@/types/messages'
 import type { ViewportSize } from '@/types/project'
+import type { InspectionData } from '@/types/inspection'
 import { getViewportWidth } from '@/types/viewports'
 import { validateSandboxToMainMessage } from '@/utils/security'
+import { InspectionPopover } from './InspectionPopover'
 import './LivePreview.css'
 
 interface LivePreviewProps {
+  iframeRef: React.RefObject<HTMLIFrameElement | null>
   transpiledCode: string | null
   onRenderSuccess: () => void
   onCompileError: (error: { message: string; line: number | null; column: number | null; stack: string | null }) => void
   onRuntimeError: (error: { message: string; componentStack: string | null; stack: string }) => void
   viewportWidth: ViewportSize
+  isInspectMode: boolean
 }
 
 export const LivePreview = ({
+  iframeRef,
   transpiledCode,
   onRenderSuccess,
   onCompileError,
   onRuntimeError,
   viewportWidth,
+  isInspectMode,
 }: LivePreviewProps) => {
-  const iframeRef = useRef<HTMLIFrameElement>(null)
   const [sandboxReady, setSandboxReady] = useState(false)
   const pendingCodeRef = useRef<string | null>(null)
+  
+  // T082: Inspection state
+  const [inspectionData, setInspectionData] = useState<InspectionData | null>(null)
 
   // Listen for messages from sandbox
   useEffect(() => {
@@ -68,6 +76,16 @@ export const LivePreview = ({
         case 'RUNTIME_ERROR':
           onRuntimeError(message.payload)
           break
+        case 'INSPECTION_DATA':
+          // T082: Update popover position and content
+          if (message.payload) {
+            setInspectionData(message.payload)
+            // Position is based on mouse cursor (will be updated from mouse events)
+          } else {
+            // T083: Clear inspection popover when no element
+            setInspectionData(null)
+          }
+          break
         case 'CONSOLE_LOG':
           // Forward console logs to main console
           console[message.payload.level](...message.payload.args)
@@ -77,7 +95,14 @@ export const LivePreview = ({
 
     window.addEventListener('message', handleMessage)
     return () => window.removeEventListener('message', handleMessage)
-  }, [onRenderSuccess, onCompileError, onRuntimeError])
+  }, [onRenderSuccess, onCompileError, onRuntimeError, iframeRef])
+
+  // T083: Clear inspection popover when inspect mode disabled
+  useEffect(() => {
+    if (!isInspectMode) {
+      setInspectionData(null)
+    }
+  }, [isInspectMode])
 
   // Send code to sandbox when it changes
   useEffect(() => {
@@ -100,7 +125,7 @@ export const LivePreview = ({
 
     console.log('📤 Sending EXECUTE_CODE to sandbox')
     iframeRef.current.contentWindow.postMessage(message, '*')
-  }, [transpiledCode, sandboxReady])
+  }, [transpiledCode, sandboxReady, iframeRef])
 
   // Send viewport update when viewport changes
   useEffect(() => {
@@ -116,7 +141,7 @@ export const LivePreview = ({
 
     console.log(`📤 Sending UPDATE_VIEWPORT to sandbox: ${width}px`)
     iframeRef.current.contentWindow.postMessage(message, '*')
-  }, [viewportWidth, sandboxReady])
+  }, [viewportWidth, sandboxReady, iframeRef])
 
   return (
     <div className="live-preview" data-testid="live-preview">
@@ -128,6 +153,14 @@ export const LivePreview = ({
         title="Live Preview Sandbox"
         data-testid="preview-iframe"
       />
+      
+      {inspectionData && iframeRef.current && (
+        <InspectionPopover
+          data={inspectionData}
+          iframeRef={iframeRef}
+          isVisible={isInspectMode}
+        />
+      )}
     </div>
   )
 }

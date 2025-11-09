@@ -1,0 +1,42 @@
+.project-size-indicator {
+  display: flex;
+  flex-direction: column;
+  gap: var(--a-spacing-1);
+  min-width: 120px;
+}
+
+.project-size-indicator__text {
+  font-size: 0.75rem;
+  color: var(--a-text-subtle);
+  white-space: nowrap;
+}
+
+.project-size-indicator__bar {
+  height: 4px;
+  background: var(--a-surface-neutral-subtle);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.project-size-indicator__fill {
+  height: 100%;
+  background: var(--a-blue-500);
+  transition: width 0.3s ease;
+}
+
+.project-size-indicator--warning .project-size-indicator__fill {
+  background: var(--a-orange-500);
+}
+
+.project-size-indicator--warning .project-size-indicator__text {
+  color: var(--a-orange-600);
+}
+
+.project-size-indicator--error .project-size-indicator__fill {
+  background: var(--a-red-500);
+}
+
+.project-size-indicator--error .project-size-indicator__text {
+  color: var(--a-red-600);
+  font-weight: 600;
+}

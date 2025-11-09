@@ -23,3 +23,10 @@
 .app-header__project-name input {
   font-weight: 600;
 }
+
+.app-header__controls {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-left: auto;
+}

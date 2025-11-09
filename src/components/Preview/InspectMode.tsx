@@ -1,8 +1,14 @@
 import { useState, useContext } from 'react'
 import { AppContext } from '@/hooks/useProject'
+import type { MainToSandboxMessage } from '@/types/messages'
 import './InspectMode.css'
 
-export const InspectMode = () => {
+interface InspectModeProps {
+  iframeRef: React.RefObject<HTMLIFrameElement | null>
+  onInspectToggle?: (enabled: boolean) => void
+}
+
+export const InspectMode = ({ iframeRef, onInspectToggle }: InspectModeProps) => {
   const context = useContext(AppContext)
   if (!context) throw new Error('InspectMode must be used within AppProvider')
 
@@ -12,8 +18,18 @@ export const InspectMode = () => {
     const newMode = !isInspectMode
     setIsInspectMode(newMode)
     
-    // TODO: Send TOGGLE_INSPECT message to sandbox
-    console.log(`Inspect mode: ${newMode ? 'enabled' : 'disabled'}`)
+    // Send TOGGLE_INSPECT message to sandbox (T076)
+    if (iframeRef.current?.contentWindow) {
+      const message: MainToSandboxMessage = {
+        type: 'TOGGLE_INSPECT',
+        payload: { enabled: newMode },
+      }
+      iframeRef.current.contentWindow.postMessage(message, '*')
+      console.log(`📤 Sent TOGGLE_INSPECT: ${newMode ? 'enabled' : 'disabled'}`)
+    }
+    
+    // Notify parent component
+    onInspectToggle?.(newMode)
   }
 
   return (

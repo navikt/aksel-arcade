@@ -75,6 +75,12 @@
         console.error('Ensure Vite dev server is running and allow-same-origin is enabled');
       });
 
+    // Inspection state (T077)
+    let inspectEnabled = false;
+    let highlightOverlay = null;
+    let lastInspectionTime = 0;
+    const INSPECTION_THROTTLE_MS = 16; // ~60fps
+
     // Listen for messages from parent window
     window.addEventListener('message', (event) => {
       // Validate message structure
@@ -93,6 +99,10 @@
             console.log('📐 Updating viewport...');
             updateViewport(message.payload);
             break;
+          case 'TOGGLE_INSPECT':
+            console.log('🔍 Toggling inspect mode...');
+            toggleInspect(message.payload);
+            break;
           case 'CHECK_CSS_VARS':
             checkCSSVariables(message.id);
             break;
@@ -108,6 +118,210 @@
         });
       }
     });
+
+    // T077: Handle TOGGLE_INSPECT message
+    function toggleInspect(payload) {
+      try {
+        console.log('🔍 toggleInspect called with payload:', payload);
+        
+        if (!payload || typeof payload.enabled !== 'boolean') {
+          console.error('❌ Invalid payload for TOGGLE_INSPECT:', payload);
+          return;
+        }
+        
+        inspectEnabled = payload.enabled;
+        
+        if (inspectEnabled) {
+          // Attach mousemove listener
+          document.addEventListener('mousemove', handleInspectMouseMove);
+          console.log('✅ Inspect mode enabled - mousemove listener attached');
+        } else {
+          // Remove mousemove listener and clear highlight
+          document.removeEventListener('mousemove', handleInspectMouseMove);
+          clearHighlight();
+          sendMessage('INSPECTION_DATA', null);
+          console.log('✅ Inspect mode disabled - mousemove listener removed');
+        }
+      } catch (error) {
+        console.error('❌ Error in toggleInspect:', error);
+        sendError('RUNTIME_ERROR', {
+          message: `Inspect toggle error: ${error.message}`,
+          componentStack: null,
+          stack: error.stack || ''
+        });
+      }
+    }
+
+    // T079: Handle mousemove during inspect mode (throttled to 60fps)
+    function handleInspectMouseMove(event) {
+      try {
+        const now = Date.now();
+        if (now - lastInspectionTime < INSPECTION_THROTTLE_MS) return;
+        lastInspectionTime = now;
+
+        const element = document.elementFromPoint(event.clientX, event.clientY);
+        if (!element || element === document.body || element === document.documentElement) {
+          clearHighlight();
+          sendMessage('INSPECTION_DATA', null);
+          return;
+        }
+
+        // T078: Extract inspection data (includes cursor position)
+        const inspectionData = extractInspectionData(element, event.clientX, event.clientY);
+        
+        // Debug: Log inspection data
+        console.log('🔍 Inspection data:', {
+          componentName: inspectionData.componentName,
+          color: inspectionData.color,
+          fontSize: inspectionData.fontSize,
+          hasProps: Object.keys(inspectionData.props || {}).length,
+        });
+        
+        // T081: Display highlight border
+        showHighlight(inspectionData.boundingRect);
+        
+        // T079: Send inspection data to main app
+        sendMessage('INSPECTION_DATA', inspectionData);
+      } catch (error) {
+        console.error('❌ Error in handleInspectMouseMove:', error);
+        // Don't send error to main app - just log and continue
+        // This prevents inspect mode from breaking on edge cases
+      }
+    }
+
+    // T078: Extract component name, props, and computed styles
+    function extractInspectionData(element, cursorX, cursorY) {
+      try {
+        const computedStyle = window.getComputedStyle(element);
+        const rect = element.getBoundingClientRect();
+        
+        // Try to find React component name from Fiber
+        let componentName = element.tagName.toLowerCase();
+        try {
+          const fiberKey = Object.keys(element).find(key => key.startsWith('__reactFiber'));
+          const fiber = fiberKey ? element[fiberKey] : null;
+          const componentType = fiber?.type;
+          
+          if (componentType) {
+            if (typeof componentType === 'function') {
+              componentName = componentType.name || componentType.displayName || 'Anonymous';
+            } else if (typeof componentType === 'string') {
+              componentName = componentType;
+            }
+          }
+        } catch (fiberError) {
+          console.warn('Could not extract React Fiber info:', fiberError);
+          // Continue with tagName as componentName
+        }
+        
+        // Extract React props
+        let props = {};
+        try {
+          const propsKey = Object.keys(element).find(key => key.startsWith('__reactProps'));
+          const rawProps = propsKey ? element[propsKey] : {};
+          props = sanitizeProps(rawProps);
+        } catch (propsError) {
+          console.warn('Could not extract React props:', propsError);
+          // Continue with empty props
+        }
+        
+        return {
+          componentName,
+          tagName: element.tagName.toLowerCase(),
+          cssClass: element.className || '',
+          props,
+          color: computedStyle.color,
+          fontFamily: computedStyle.fontFamily,
+          fontSize: computedStyle.fontSize,
+          margin: computedStyle.margin,
+          padding: computedStyle.padding,
+          boundingRect: {
+            x: rect.x,
+            y: rect.y,
+            width: rect.width,
+            height: rect.height,
+            top: rect.top,
+            right: rect.right,
+            bottom: rect.bottom,
+            left: rect.left,
+          },
+          cursorX: cursorX,
+          cursorY: cursorY,
+        };
+      } catch (error) {
+        console.error('❌ Error in extractInspectionData:', error);
+        // Return minimal safe data
+        return {
+          componentName: 'unknown',
+          tagName: element.tagName.toLowerCase(),
+          cssClass: '',
+          props: {},
+          color: '',
+          fontFamily: '',
+          fontSize: '',
+          margin: '',
+          padding: '',
+          boundingRect: {
+            x: 0, y: 0, width: 0, height: 0,
+            top: 0, right: 0, bottom: 0, left: 0,
+          },
+          cursorX: 0,
+          cursorY: 0,
+        };
+      }
+    }
+
+    // Remove non-serializable props (functions, circular refs)
+    function sanitizeProps(props) {
+      const sanitized = {};
+      for (const [key, value] of Object.entries(props)) {
+        if (typeof value !== 'function' && key !== 'children') {
+          try {
+            JSON.stringify(value); // Test serializability
+            sanitized[key] = value;
+          } catch {
+            sanitized[key] = '[Non-serializable]';
+          }
+        }
+      }
+      return sanitized;
+    }
+
+    // T081: Display highlight border around hovered element
+    function showHighlight(rect) {
+      try {
+        if (!highlightOverlay) {
+          highlightOverlay = document.createElement('div');
+          highlightOverlay.style.position = 'fixed';
+          highlightOverlay.style.border = '2px solid #0067C5';
+          highlightOverlay.style.backgroundColor = 'rgba(0, 103, 197, 0.1)';
+          highlightOverlay.style.pointerEvents = 'none';
+          highlightOverlay.style.zIndex = '9998';
+          highlightOverlay.style.transition = 'all 0.1s ease';
+          document.body.appendChild(highlightOverlay);
+        }
+        
+        highlightOverlay.style.left = `${rect.left}px`;
+        highlightOverlay.style.top = `${rect.top}px`;
+        highlightOverlay.style.width = `${rect.width}px`;
+        highlightOverlay.style.height = `${rect.height}px`;
+        highlightOverlay.style.display = 'block';
+      } catch (error) {
+        console.error('❌ Error in showHighlight:', error);
+        // Don't propagate error - highlight is non-critical
+      }
+    }
+
+    function clearHighlight() {
+      try {
+        if (highlightOverlay) {
+          highlightOverlay.style.display = 'none';
+        }
+      } catch (error) {
+        console.error('❌ Error in clearHighlight:', error);
+        // Don't propagate error
+      }
+    }
 
     function checkCSSVariables(messageId) {
       const root = document.getElementById('root');
