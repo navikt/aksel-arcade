@@ -1,5 +1,7 @@
 import { useRef, useEffect, useState } from 'react'
 import type { MainToSandboxMessage, SandboxToMainMessage } from '@/types/messages'
+import type { ViewportSize } from '@/types/project'
+import { getViewportWidth } from '@/types/viewports'
 import { validateSandboxToMainMessage } from '@/utils/security'
 import './LivePreview.css'
 
@@ -8,6 +10,7 @@ interface LivePreviewProps {
   onRenderSuccess: () => void
   onCompileError: (error: { message: string; line: number | null; column: number | null; stack: string | null }) => void
   onRuntimeError: (error: { message: string; componentStack: string | null; stack: string }) => void
+  viewportWidth: ViewportSize
 }
 
 export const LivePreview = ({
@@ -15,6 +18,7 @@ export const LivePreview = ({
   onRenderSuccess,
   onCompileError,
   onRuntimeError,
+  viewportWidth,
 }: LivePreviewProps) => {
   const iframeRef = useRef<HTMLIFrameElement>(null)
   const [sandboxReady, setSandboxReady] = useState(false)
@@ -97,6 +101,22 @@ export const LivePreview = ({
     console.log('📤 Sending EXECUTE_CODE to sandbox')
     iframeRef.current.contentWindow.postMessage(message, '*')
   }, [transpiledCode, sandboxReady])
+
+  // Send viewport update when viewport changes
+  useEffect(() => {
+    if (!iframeRef.current?.contentWindow || !sandboxReady) {
+      return
+    }
+
+    const width = getViewportWidth(viewportWidth)
+    const message: MainToSandboxMessage = {
+      type: 'UPDATE_VIEWPORT',
+      payload: { width },
+    }
+
+    console.log(`📤 Sending UPDATE_VIEWPORT to sandbox: ${width}px`)
+    iframeRef.current.contentWindow.postMessage(message, '*')
+  }, [viewportWidth, sandboxReady])
 
   return (
     <div className="live-preview" data-testid="live-preview">

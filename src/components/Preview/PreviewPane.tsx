@@ -3,6 +3,8 @@ import { AppContext } from '@/hooks/useProject'
 import { transpileCode } from '@/services/transpiler'
 import { LivePreview } from './LivePreview'
 import { ErrorOverlay } from './ErrorOverlay'
+import { ViewportToggle } from './ViewportToggle'
+import { InspectMode } from './InspectMode'
 import type { CompileError, RuntimeError } from '@/types/preview'
 import './PreviewPane.css'
 
@@ -90,6 +92,11 @@ export const PreviewPane = () => {
 
   return (
     <div className="preview-pane">
+      <div className="preview-pane__header">
+        <InspectMode />
+        <ViewportToggle />
+      </div>
+
       <ErrorOverlay
         compileError={compileError}
         runtimeError={runtimeError}
@@ -104,6 +111,7 @@ export const PreviewPane = () => {
         onRenderSuccess={handleRenderSuccess}
         onCompileError={handleCompileError}
         onRuntimeError={handleRuntimeError}
+        viewportWidth={project.viewportSize}
       />
     </div>
   )

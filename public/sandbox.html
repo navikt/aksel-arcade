@@ -89,6 +89,10 @@
             console.log('🚀 Executing code...');
             executeCode(message.payload);
             break;
+          case 'UPDATE_VIEWPORT':
+            console.log('📐 Updating viewport...');
+            updateViewport(message.payload);
+            break;
           case 'CHECK_CSS_VARS':
             checkCSSVariables(message.id);
             break;
@@ -156,6 +160,20 @@
       };
       
       window.parent.postMessage(result, '*');
+    }
+
+    function updateViewport(payload) {
+      const { width } = payload;
+      const rootElement = document.getElementById('root');
+      
+      if (!rootElement) return;
+      
+      console.log(`📐 Setting viewport width to ${width}px`);
+      
+      // Update the root element width with smooth transition
+      rootElement.style.maxWidth = `${width}px`;
+      rootElement.style.margin = '0 auto';
+      rootElement.style.transition = 'max-width 0.3s ease';
     }
 
     function executeCode(payload) {
