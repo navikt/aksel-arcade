@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline' 'unsafe-eval' https://esm.sh http://localhost:*; style-src 'unsafe-inline' http://localhost:* https://cdn.nav.no; font-src https://cdn.nav.no data:; connect-src https://esm.sh http://localhost:* ws://localhost:*; img-src data: https:;">
+  <title>Sandbox</title>
+  <!-- Aksel Darkside CSS loaded via import in sandboxAksel.ts -->
+  <style>
+    /* NO custom reset - Aksel Darkside provides complete reset.darkside.css via import */
+    #root {
+      padding: 1rem;
+      background: var(--ax-bg);
+    }
+    #root.light {
+      color-scheme: light;
+    }
+    #root.dark {
+      color-scheme: dark;
+    }
+  </style>
+</head>
+<body>
+  <!-- Apply aksel-theme and light classes for Darkside styling -->
+  <!-- data-color activates Darkside color system -->
+  <div id="root" class="aksel-theme light" data-color="accent"></div>
+  
+  <script type="module">
+    // React will be loaded from Vite via sandboxAksel.ts (same instance as Aksel components)
+    let currentRoot = null;
+    let akselLoaded = false;
+    let ThemeComponent = null;
+
+    // Load Aksel + React from Vite dev server with proper CSS import
+    // Following Aksel docs: import "@navikt/ds-css/darkside";
+    import('/src/sandboxAksel.ts')
+      .then((module) => {
+        const { React, createRoot, Theme, AkselComponents } = module;
+        
+        // Make React available globally (same instance as Aksel uses)
+        window.React = React;
+        window.ReactDOM = { createRoot };
+        
+        // Make React hooks available globally (for user code)
+        window.useState = React.useState;
+        window.useEffect = React.useEffect;
+        window.useContext = React.useContext;
+        window.useReducer = React.useReducer;
+        window.useCallback = React.useCallback;
+        window.useMemo = React.useMemo;
+        window.useRef = React.useRef;
+        window.useImperativeHandle = React.useImperativeHandle;
+        window.useLayoutEffect = React.useLayoutEffect;
+        window.useDebugValue = React.useDebugValue;
+        
+        // Store Theme component
+        ThemeComponent = Theme;
+        window.Theme = Theme;
+        
+        // Make all Aksel components available globally
+        window.AkselDS = AkselComponents;
+        Object.keys(AkselComponents).forEach(key => {
+          window[key] = AkselComponents[key];
+        });
+        
+        akselLoaded = true;
+        console.log('✅ Sandbox ready, Aksel + React loaded from Vite:', Object.keys(AkselComponents).length);
+        console.log('✅ React version:', React.version);
+        console.log('✅ Theme component available:', !!ThemeComponent);
+        console.log('✅ Darkside CSS imported via @navikt/ds-css/darkside');
+        window.parent.postMessage({ type: 'SANDBOX_READY' }, '*');
+      })
+      .catch((err) => {
+        console.error('❌ Failed to load from Vite:', err);
+        console.error('Ensure Vite dev server is running and allow-same-origin is enabled');
+      });
+
+    // Listen for messages from parent window
+    window.addEventListener('message', (event) => {
+      // Validate message structure
+      if (!event.data || typeof event.data !== 'object') return;
+      
+      const message = event.data;
+      console.log('📥 Sandbox received message:', message.type);
+
+      try {
+        switch (message.type) {
+          case 'EXECUTE_CODE':
+            console.log('🚀 Executing code...');
+            executeCode(message.payload);
+            break;
+          case 'CHECK_CSS_VARS':
+            checkCSSVariables(message.id);
+            break;
+          default:
+            console.warn('Unknown message type:', message.type);
+        }
+      } catch (error) {
+        console.error('❌ Message handling error:', error);
+        sendError('RUNTIME_ERROR', {
+          message: error.message,
+          componentStack: null,
+          stack: error.stack || ''
+        });
+      }
+    });
+
+    function checkCSSVariables(messageId) {
+      const root = document.getElementById('root');
+      const button = document.querySelector('button');
+      const rootStyles = root ? getComputedStyle(root) : null;
+      const buttonStyles = button ? getComputedStyle(button) : null;
+      
+      // Get ALL CSS custom properties
+      const allCSSVars = [];
+      if (rootStyles) {
+        for (let i = 0; i < rootStyles.length; i++) {
+          const prop = rootStyles[i];
+          if (prop.startsWith('--')) {
+            allCSSVars.push(prop);
+          }
+        }
+      }
+      
+      // Check specifically for --ax and --a prefixes
+      const axVars = allCSSVars.filter(v => v.startsWith('--ax'));
+      const aVars = allCSSVars.filter(v => v.startsWith('--a-') || v.startsWith('--a_'));
+      
+      // Get button attributes
+      const buttonAttrs = {};
+      if (button) {
+        for (let attr of button.attributes) {
+          buttonAttrs[attr.name] = attr.value;
+        }
+      }
+      
+      const result = {
+        id: messageId,
+        result: {
+          rootClasses: root?.className,
+          buttonClasses: button?.className,
+          buttonAttributes: buttonAttrs,
+          buttonExists: !!button,
+          buttonBg: buttonStyles?.backgroundColor,
+          buttonPadding: buttonStyles?.padding,
+          buttonFontSize: buttonStyles?.fontSize,
+          buttonFontFamily: buttonStyles?.fontFamily,
+          totalCSSVars: allCSSVars.length,
+          axVarCount: axVars.length,
+          aVarCount: aVars.length,
+          axVarSample: axVars.slice(0, 5),
+          aVarSample: aVars.slice(0, 5),
+          darksideCSSLoaded: !!document.querySelector('link[href*="darkside"]'),
+          allStylesheets: Array.from(document.styleSheets).map(s => s.href).filter(Boolean)
+        }
+      };
+      
+      window.parent.postMessage(result, '*');
+    }
+
+    function executeCode(payload) {
+      try {
+        const { jsxCode } = payload;
+        
+        console.log('📄 Code length:', jsxCode?.length || 0);
+        
+        if (!jsxCode) {
+          console.log('⏸️ No code to execute, clearing root');
+          clearRoot();
+          return;
+        }
+
+        // Check if Aksel is loaded
+        if (!akselLoaded) {
+          console.warn('⏸️ Aksel not loaded yet, queuing code execution');
+          setTimeout(() => executeCode(payload), 100);
+          return;
+        }
+
+        console.log('🎨 Executing code with all Aksel components from window');
+
+        // Execute the transpiled code with all Aksel components in scope
+        console.log('🔧 Evaluating transpiled code...');
+        
+        // Build component declarations safely
+        const componentDeclarations = window.AkselDS 
+          ? Object.keys(window.AkselDS)
+              .filter(key => typeof window[key] !== 'undefined') // Only include defined components
+              .map(key => `const ${key} = window.${key};`)
+              .join('\n')
+          : '';
+        
+        // Debug: Check if Button is available
+        console.log('🔍 DEBUG: window.Button type:', typeof window.Button);
+        console.log('🔍 DEBUG: window.Button is:', window.Button);
+        console.log('🔍 DEBUG: Component declarations length:', componentDeclarations.split('\n').length);
+        
+        const wrappedCode = `
+          (function() {
+            // Make all Aksel components available
+            ${componentDeclarations}
+            
+            // Make React hooks available
+            const { useState, useEffect, useContext, useReducer, useCallback, useMemo, useRef } = window.React;
+            
+            // Debug log inside eval scope
+            console.log('🔍 Inside eval - Button type:', typeof Button);
+            console.log('🔍 Inside eval - Button is:', Button);
+            
+            ${jsxCode}
+            
+            // Try to find the component
+            if (typeof App !== 'undefined') return App;
+            if (typeof exports !== 'undefined' && exports.default) return exports.default;
+            throw new Error('No component found. Please export default function App() { ... }');
+          })()
+        `;
+        
+        const Component = eval(wrappedCode);
+        console.log('✅ Component evaluated:', typeof Component);
+
+        if (!Component || typeof Component !== 'function') {
+          throw new Error('Invalid component. Make sure to export a React component.');
+        }
+
+        // Render the component
+        console.log('🎨 Rendering component...');
+        renderComponent(Component);
+
+        // Send success message
+        sendMessage('RENDER_SUCCESS', {});
+        console.log('✅ Render success');
+      } catch (error) {
+        console.error('❌ Execution error:', error);
+        sendError('RUNTIME_ERROR', {
+          message: error.message,
+          componentStack: extractComponentStack(error),
+          stack: error.stack || ''
+        });
+      }
+    }
+
+    function renderComponent(Component) {
+      const rootElement = document.getElementById('root');
+      
+      if (!rootElement) {
+        throw new Error('Root element not found');
+      }
+
+      try {
+        // Clear previous root if it exists
+        if (currentRoot) {
+          currentRoot.unmount();
+        }
+
+        // Create new root and render
+        currentRoot = ReactDOM.createRoot(rootElement);
+        
+        // CRITICAL: Wrap component with Theme for Aksel Darkside to work
+        // Per Aksel docs: "må du bruke den nye Theme-komponenten"
+        if (!ThemeComponent) {
+          throw new Error('Theme component not loaded. Make sure Vite dev server is running.');
+        }
+        
+        console.log('🎨 Rendering component wrapped with Aksel Theme (light mode)');
+        const wrappedComponent = React.createElement(
+          ThemeComponent,
+          { theme: 'light' },
+          React.createElement(Component)
+        );
+        
+        currentRoot.render(wrappedComponent);
+        
+        // Debug: Check rendered button after a short delay
+        setTimeout(() => {
+          const button = rootElement.querySelector('button');
+          if (button) {
+            console.log('🔍 DEBUG: Rendered button classes:', button.className);
+            console.log('🔍 DEBUG: Rendered button computed background:', getComputedStyle(button).backgroundColor);
+            console.log('🔍 DEBUG: Rendered button computed color:', getComputedStyle(button).color);
+          }
+        }, 100);
+      } catch (error) {
+        sendError('RUNTIME_ERROR', {
+          message: error.message,
+          componentStack: extractComponentStack(error),
+          stack: error.stack || ''
+        });
+        throw error;
+      }
+    }
+
+    function clearRoot() {
+      if (currentRoot) {
+        currentRoot.unmount();
+        currentRoot = null;
+      }
+      const rootElement = document.getElementById('root');
+      if (rootElement) {
+        rootElement.innerHTML = '';
+      }
+    }
+
+    function sendMessage(type, payload) {
+      window.parent.postMessage({ type, payload }, '*');
+    }
+
+    function sendError(type, payload) {
+      window.parent.postMessage({ type, payload }, '*');
+    }
+
+    function extractLineNumber(error) {
+      const match = error.stack?.match(/:(\d+):\d+/);
+      return match ? parseInt(match[1], 10) - 1 : null; // 0-indexed
+    }
+
+    function extractComponentStack(error) {
+      // Try to extract React component stack if available
+      if (error.componentStack) {
+        return error.componentStack;
+      }
+      return null;
+    }
+
+    // Proxy console methods to send to parent
+    const originalConsole = {
+      log: console.log,
+      warn: console.warn,
+      error: console.error,
+      info: console.info
+    };
+
+    ['log', 'warn', 'error', 'info'].forEach(level => {
+      console[level] = (...args) => {
+        originalConsole[level](...args);
+        sendMessage('CONSOLE_LOG', {
+          level,
+          args: args.map(arg => {
+            try {
+              return typeof arg === 'object' ? JSON.stringify(arg) : String(arg);
+            } catch {
+              return String(arg);
+            }
+          })
+        });
+      };
+    });
+  </script>
+</body>
+</html>

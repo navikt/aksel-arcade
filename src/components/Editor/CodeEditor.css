@@ -1,0 +1,22 @@
+.code-editor {
+  width: 100%;
+  overflow: auto;
+}
+
+.code-editor .cm-editor {
+  height: 100%;
+  font-size: 14px;
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', 'Consolas', 'source-code-pro', monospace;
+}
+
+.code-editor .cm-scroller {
+  overflow: auto;
+}
+
+.code-editor .cm-content {
+  padding: 8px 0;
+}
+
+.code-editor .cm-line {
+  padding: 0 8px;
+}

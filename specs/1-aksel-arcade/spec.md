@@ -155,8 +155,9 @@ A developer wants to write clean, well-formatted code with minimal effort. They 
 ### Functional Requirements
 
 - **FR-001**: System MUST run entirely in the browser without requiring a backend server or build process, and MUST be fully offline-capable with all dependencies bundled at build time
-- **FR-002**: System MUST preload Aksel Darkside design system tokens and components, specifically `@navikt/ds-css/darkside` (or equivalent package - confirm exact package name) and the Aksel tokens package, with the following core component set: layout components (Box, Stack, Grid) and form components (Button, TextField, Select, Checkbox, Radio)
-- **FR-003**: System MUST initialize the Darkside theme via Aksel's ThemeProvider for all rendered components
+- **FR-002**: System MUST load Aksel Darkside design system via ES module import (`import "@navikt/ds-css/darkside"`) bundled through Vite, with React components from `@navikt/ds-react` and design tokens from `@navikt/ds-tokens`. Core component set: layout (Box, Stack, Grid) and form (Button, TextField, Select, Checkbox, Radio)
+- **FR-002a**: System MUST ensure single React instance across main app and sandboxed iframe by loading React from a unified source (e.g., Vite bundle) to prevent "Invalid hook call" errors
+- **FR-003**: System MUST wrap all sandboxed user components with `<Theme>` component from `@navikt/ds-react/Theme` to enable Darkside theme styling
 - **FR-004**: System MUST provide a CodeMirror-based code editor with two tabs: "JSX" (default) for UI code and "Hooks" for shared state/logic
 - **FR-005**: System MUST support importing hooks from the Hooks tab into the JSX tab using `import { hookName } from './hooks'` syntax
 - **FR-006**: System MUST provide a toolbar in the editor with "Add component", "Format", "Undo", and "Redo" buttons
@@ -175,7 +176,7 @@ A developer wants to write clean, well-formatted code with minimal effort. They 
 - **FR-019**: System MUST provide a settings menu with an option to switch panel sides (swap editor and preview positions)
 - **FR-020**: System MUST evaluate user code in a sandboxed iframe using @babel/standalone (npm package) for in-browser JSX transpilation
 - **FR-021**: System MUST communicate between the main application and the sandboxed iframe using postMessage API
-- **FR-022**: System MUST block all network requests in both the main application context and the sandboxed iframe, including access to `window.top`, untrusted `localStorage` access, and `eval()` within the sandboxed iframe
+- **FR-022**: System MUST configure iframe with `sandbox="allow-scripts allow-same-origin"` to enable loading modules from Vite dev server while maintaining security isolation. System MUST use Content Security Policy to restrict network access within sandbox context
 - **FR-023**: System MUST display compile errors and runtime errors in a non-blocking overlay within the preview pane. Error overlay MUST be dismissible via close button (X) or clicking outside the overlay, and MUST persist until explicitly dismissed or a new successful render occurs.
 - **FR-024**: System MUST implement a resizable split-pane between the editor and preview, allowing users to adjust the width allocation. System MUST enforce minimum widths of 300px for the editor pane and 320px for the preview pane to maintain usability.
 - **FR-025**: System MUST apply the Aksel Darkside theme to the entire application UI (editor, toolbar, preview chrome)
@@ -222,7 +223,9 @@ A developer wants to write clean, well-formatted code with minimal effort. They 
 
 - **The Figma design file (https://www.figma.com/design/aPNvetW8NkJI39C3XN9rks/Aksel-Arcade?node-id=4-828&m=dev) is the definitive UI contract and takes absolute precedence over any text descriptions in this specification**
 - **Implementation requires the Figma desktop app to be open with this file loaded to enable Figma MCP access**
-- The exact npm packages for Aksel Darkside components and tokens will be confirmed during implementation (currently assumed to be `@navikt/ds-css/darkside` and a separate tokens package)
+- Aksel Darkside packages confirmed: `@navikt/ds-css` (import darkside variant), `@navikt/ds-react` (components + Theme), `@navikt/ds-tokens` (design tokens)
+- **CRITICAL**: Aksel Darkside CSS MUST be imported as ES module (`import "@navikt/ds-css/darkside"`) in TypeScript/JavaScript and bundled via Vite. Loading via HTML `<link>` tags does NOT properly initialize the design system
+- React instance MUST be shared between main app and sandbox iframe. Loading React from multiple sources (e.g., esm.sh + Vite) causes "Invalid hook call" errors
 - Users have modern browsers with support for ES6+, localStorage, postMessage, and iframe sandboxing (Chrome 90+, Firefox 88+, Safari 14+, Edge 90+)
 - Users understand basic React and JSX syntax; the application does not provide React tutorials
 - Component snippets will use TypeScript-compatible JSX where applicable

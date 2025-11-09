@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Test Theme Import</title>
+  <style>
+    body { padding: 2rem; font-family: monospace; }
+    .log { margin: 0.5rem 0; padding: 0.5rem; background: #f5f5f5; }
+    .error { background: #ffebee; color: #c62828; }
+    .success { background: #e8f5e9; color: #2e7d32; }
+  </style>
+</head>
+<body>
+  <h1>Theme Import Test</h1>
+  <div id="logs"></div>
+
+  <script type="module">
+    const logs = document.getElementById('logs');
+    
+    function log(msg, type = 'log') {
+      const div = document.createElement('div');
+      div.className = `log ${type}`;
+      div.textContent = msg;
+      logs.appendChild(div);
+    }
+
+    log('Starting import test...');
+
+    try {
+      log('Step 1: Importing @navikt/ds-react...');
+      const akselPromise = import('https://esm.sh/@navikt/ds-react@5.18.3');
+      
+      log('Step 2: Importing @navikt/ds-react/Theme...');
+      const themePromise = import('https://esm.sh/@navikt/ds-react@5.18.3/Theme');
+      
+      const [AkselDS, ThemeModule] = await Promise.all([akselPromise, themePromise]);
+      
+      log(`✅ Aksel imported: ${Object.keys(AkselDS).length} exports`, 'success');
+      log(`✅ Theme module imported: ${Object.keys(ThemeModule).length} exports`, 'success');
+      
+      if (ThemeModule.Theme) {
+        log(`✅ Theme component found: ${ThemeModule.Theme.name}`, 'success');
+      } else {
+        log(`❌ Theme component NOT found in ThemeModule`, 'error');
+        log(`Available: ${Object.keys(ThemeModule).join(', ')}`);
+      }
+      
+    } catch (err) {
+      log(`❌ Import failed: ${err.message}`, 'error');
+      log(err.stack, 'error');
+    }
+  </script>
+</body>
+</html>

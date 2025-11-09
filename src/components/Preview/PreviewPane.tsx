@@ -1,0 +1,98 @@
+import { useContext, useEffect, useState } from 'react'
+import { AppContext } from '@/hooks/useProject'
+import { transpileCode } from '@/services/transpiler'
+import { LivePreview } from './LivePreview'
+import { ErrorOverlay } from './ErrorOverlay'
+import type { CompileError, RuntimeError } from '@/types/preview'
+import './PreviewPane.css'
+
+export const PreviewPane = () => {
+  const context = useContext(AppContext)
+  if (!context) throw new Error('PreviewPane must be used within AppProvider')
+
+  const { project, updatePreviewState } = context
+  const [transpiledCode, setTranspiledCode] = useState<string | null>(null)
+  const [compileError, setCompileError] = useState<CompileError | null>(null)
+  const [runtimeError, setRuntimeError] = useState<RuntimeError | null>(null)
+
+  // Transpile code when JSX or hooks code changes
+  useEffect(() => {
+    let isCancelled = false
+
+    transpileCode(project.jsxCode, project.hooksCode)
+      .then((result) => {
+        if (isCancelled) return
+        
+        if (result.success && result.code) {
+          console.log('✅ Transpilation successful')
+          console.log('📝 Transpiled code:', result.code)
+          setTranspiledCode(result.code)
+          setCompileError(null)
+        } else if (result.error) {
+          console.error('❌ Compile error:', result.error)
+          setCompileError(result.error)
+          setTranspiledCode(null)
+        }
+      })
+      .catch((err) => {
+        if (isCancelled) return
+        console.error('❌ Transpilation error:', err)
+        setCompileError({
+          message: err.message || 'Unknown transpilation error',
+          line: null,
+          column: null,
+          stack: null,
+        })
+      })
+
+    return () => {
+      isCancelled = true
+    }
+  }, [project.jsxCode, project.hooksCode])
+
+  const handleRenderSuccess = () => {
+    setRuntimeError(null)
+    updatePreviewState({
+      status: 'idle',
+      lastRenderTime: Date.now(),
+      compileError: null,
+      runtimeError: null,
+    })
+  }
+
+  const handleCompileError = (error: CompileError) => {
+    setCompileError(error)
+    updatePreviewState({
+      status: 'error',
+      compileError: error,
+    })
+  }
+
+  const handleRuntimeError = (error: RuntimeError) => {
+    setRuntimeError(error)
+    updatePreviewState({
+      status: 'error',
+      runtimeError: error,
+    })
+  }
+
+  return (
+    <div className="preview-pane">
+      <ErrorOverlay
+        compileError={compileError}
+        runtimeError={runtimeError}
+        onClose={() => {
+          setCompileError(null)
+          setRuntimeError(null)
+        }}
+      />
+      
+      <LivePreview
+        transpiledCode={transpiledCode}
+        onRenderSuccess={handleRenderSuccess}
+        onCompileError={handleCompileError}
+        onRuntimeError={handleRuntimeError}
+      />
+    </div>
+  )
+}

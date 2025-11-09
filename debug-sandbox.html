@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Debug Sandbox</title>
+  <link rel="stylesheet" href="https://cdn.nav.no/@navikt/ds-css/5.18.3/darkside.min.css">
+</head>
+<body>
+  <div id="root"></div>
+  
+  <script type="module">
+    import React from 'https://esm.sh/react@18.3.1';
+    import ReactDOM from 'https://esm.sh/react-dom@18.3.1';
+    import * as AkselDS from 'https://esm.sh/@navikt/ds-react@5.18.3';
+    
+    window.React = React;
+    window.ReactDOM = ReactDOM;
+    window.AkselDS = AkselDS;
+    
+    // Make all Aksel components globally available
+    Object.keys(AkselDS).forEach(key => {
+      window[key] = AkselDS[key];
+    });
+    
+    console.log('Available Aksel components:', Object.keys(AkselDS));
+    console.log('window.Button:', window.Button);
+    console.log('window.Theme:', window.Theme);
+    
+    // Test rendering a button
+    const testCode = `
+      (function() {
+        const Button = window.Button;
+        const Theme = window.Theme;
+        
+        function App() {
+          return React.createElement(Button, { variant: "primary" }, "Click me");
+        }
+        
+        return App;
+      })()
+    `;
+    
+    try {
+      const Component = eval(testCode);
+      console.log('Component:', Component);
+      
+      const root = ReactDOM.createRoot(document.getElementById('root'));
+      root.render(
+        React.createElement(window.Theme, { variant: 'darkside' },
+          React.createElement(Component)
+        )
+      );
+      
+      console.log('Rendered successfully!');
+    } catch (error) {
+      console.error('Error:', error);
+    }
+  </script>
+</body>
+</html>

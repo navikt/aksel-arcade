@@ -1,0 +1,5 @@
+.preview-pane {
+  position: relative;
+  height: 100%;
+  background: var(--a-surface-subtle);
+}

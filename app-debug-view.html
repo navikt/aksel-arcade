@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>App Debug View</title>
+  <style>
+    body { margin: 0; font-family: monospace; }
+    .split { display: flex; height: 100vh; }
+    .left, .right { flex: 1; padding: 1rem; overflow: auto; }
+    .left { background: #f5f5f5; }
+    iframe { width: 100%; height: calc(100vh - 4rem); border: 2px solid #333; }
+    .logs { background: #1e1e1e; color: #d4d4d4; padding: 1rem; font-size: 11px; max-height: 300px; overflow-y: auto; }
+    h2 { margin: 0 0 1rem 0; }
+    button { margin: 0.5rem 0.5rem 0 0; padding: 0.5rem 1rem; }
+  </style>
+</head>
+<body>
+  <div class="split">
+    <div class="left">
+      <h2>🔍 Debug Panel</h2>
+      <button onclick="checkSandbox()">Check Sandbox State</button>
+      <button onclick="sendTestCode()">Send Test Code</button>
+      <button onclick="clearLogs()">Clear Logs</button>
+      <div class="logs" id="logs">Waiting for messages...</div>
+    </div>
+    <div class="right">
+      <h2>📱 App View</h2>
+      <iframe id="app" src="http://localhost:5173"></iframe>
+    </div>
+  </div>
+
+  <script>
+    const logs = document.getElementById('logs');
+    const app = document.getElementById('app');
+    
+    function log(msg, style = '') {
+      const div = document.createElement('div');
+      div.style.cssText = style;
+      div.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+      logs.appendChild(div);
+      logs.scrollTop = logs.scrollHeight;
+    }
+
+    function clearLogs() {
+      logs.innerHTML = 'Logs cleared.';
+    }
+
+    // Listen to ALL messages
+    window.addEventListener('message', (e) => {
+      const data = e.data;
+      if (typeof data === 'object' && data !== null && data.type) {
+        log(`📩 ${data.type}`, 'color: #4ec9b0;');
+        if (data.payload) {
+          log(`   Payload: ${JSON.stringify(data.payload).substring(0, 100)}`, 'color: #888; padding-left: 20px;');
+        }
+      }
+    });
+
+    function checkSandbox() {
+      log('🔍 Checking sandbox state...', 'color: yellow;');
+      
+      try {
+        const appDoc = app.contentDocument || app.contentWindow.document;
+        const iframe = appDoc.querySelector('iframe[data-testid="preview-iframe"]');
+        
+        if (!iframe) {
+          log('❌ No preview iframe found!', 'color: red;');
+          return;
+        }
+        
+        log('✅ Preview iframe exists', 'color: green;');
+        
+        const sandboxDoc = iframe.contentDocument || iframe.contentWindow.document;
+        const root = sandboxDoc.getElementById('root');
+        
+        if (!root) {
+          log('❌ No root element in sandbox!', 'color: red;');
+          return;
+        }
+        
+        log(`✅ Root element exists`, 'color: green;');
+        log(`   InnerHTML length: ${root.innerHTML.length}`, 'color: #888;');
+        log(`   Content: ${root.innerHTML.substring(0, 200)}...`, 'color: #888;');
+        
+        // Check for Theme wrapper
+        const themeDiv = root.querySelector('.aksel-theme');
+        if (themeDiv) {
+          log(`✅ Theme wrapper found: ${themeDiv.className}`, 'color: green;');
+        } else {
+          log(`❌ No Theme wrapper`, 'color: orange;');
+        }
+        
+        // Check for button
+        const button = root.querySelector('button');
+        if (button) {
+          log(`✅ Button found: "${button.textContent}"`, 'color: green;');
+          log(`   Classes: ${button.className}`, 'color: #888;');
+        } else {
+          log(`❌ No button found`, 'color: orange;');
+        }
+        
+      } catch (err) {
+        log(`❌ Error: ${err.message}`, 'color: red;');
+      }
+    }
+
+    function sendTestCode() {
+      log('📤 This would send test code (not implemented in debug view)', 'color: yellow;');
+    }
+
+    // Auto-check after 3 seconds
+    setTimeout(() => {
+      log('⏰ Auto-checking sandbox state...', 'color: cyan;');
+      checkSandbox();
+    }, 3000);
+
+    // Auto-check every 5 seconds
+    setInterval(() => {
+      checkSandbox();
+    }, 5000);
+  </script>
+</body>
+</html>

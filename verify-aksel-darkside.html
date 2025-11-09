@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Verify Aksel Darkside Components</title>
+  <link rel="stylesheet" href="https://cdn.nav.no/@navikt/ds-css/5.18.3/darkside.min.css">
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: monospace;
+    }
+    #log {
+      position: fixed;
+      top: 0;
+      right: 0;
+      width: 300px;
+      max-height: 100vh;
+      overflow: auto;
+      background: #000;
+      color: #0f0;
+      padding: 10px;
+      font-size: 11px;
+      border-left: 2px solid #0f0;
+      z-index: 9999;
+    }
+    #root {
+      padding: 2rem;
+      padding-right: 320px;
+    }
+  </style>
+</head>
+<body>
+  <div id="log">Loading...</div>
+  <div id="root"></div>
+  
+  <script type="module">
+    const logEl = document.getElementById('log');
+    const log = (msg) => {
+      logEl.innerHTML += msg + '<br>';
+      console.log(msg);
+    };
+    
+    log('1. Loading React...');
+    const React = await import('https://esm.sh/react@18.3.1');
+    const ReactDOM = await import('https://esm.sh/react-dom@18.3.1');
+    window.React = React;
+    window.ReactDOM = ReactDOM;
+    log('✓ React loaded');
+    
+    log('2. Loading Aksel components...');
+    const AkselDS = await import('https://esm.sh/@navikt/ds-react@5.18.3');
+    log('✓ Aksel loaded: ' + Object.keys(AkselDS).length + ' exports');
+    
+    log('3. Loading Theme from subpath...');
+    const ThemeModule = await import('https://esm.sh/@navikt/ds-react@5.18.3/Theme');
+    window.Theme = ThemeModule.Theme;
+    log('✓ Theme loaded: ' + typeof window.Theme);
+    
+    log('4. Making components global...');
+    Object.keys(AkselDS).forEach(key => {
+      window[key] = AkselDS[key];
+    });
+    log('✓ Button: ' + typeof window.Button);
+    log('✓ Stack: ' + typeof window.Stack);
+    log('✓ Box: ' + typeof window.Box);
+    
+    log('5. Simulating transpiled code...');
+    const transpiledCode = `
+function App() {
+  return /*#__PURE__*/React.createElement(Stack, {
+    gap: "4",
+    direction: "column"
+  },
+    /*#__PURE__*/React.createElement(Button, {
+      variant: "primary",
+      size: "medium"
+    }, "Primary Button"),
+    /*#__PURE__*/React.createElement(Button, {
+      variant: "secondary",
+      size: "medium"
+    }, "Secondary Button"),
+    /*#__PURE__*/React.createElement(Button, {
+      variant: "tertiary",
+      size: "medium"
+    }, "Tertiary Button"),
+    /*#__PURE__*/React.createElement(Box, {
+      padding: "4",
+      background: "surface-default"
+    }, "This is a Box component")
+  );
+}`;
+    
+    log('6. Building component declarations...');
+    const componentDeclarations = Object.keys(AkselDS)
+      .filter(key => typeof window[key] !== 'undefined')
+      .map(key => `const ${key} = window.${key};`)
+      .join('\n');
+    log('✓ ' + componentDeclarations.split('\n').length + ' declarations');
+    
+    log('7. Wrapping code in IIFE...');
+    const wrappedCode = `
+      (function() {
+        ${componentDeclarations}
+        
+        ${transpiledCode}
+        
+        if (typeof App !== 'undefined') return App;
+        throw new Error('No App found');
+      })()
+    `;
+    
+    log('8. Evaluating code...');
+    const Component = eval(wrappedCode);
+    log('✓ Component: ' + typeof Component);
+    
+    log('9. Rendering with Theme wrapper...');
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(
+      React.createElement(window.Theme, null,
+        React.createElement(Component)
+      )
+    );
+    log('✓ RENDERED!');
+    log('');
+    log('✅ SUCCESS!');
+    log('Check the preview - you should see:');
+    log('• Styled Aksel buttons (not plain HTML)');
+    log('• Darkside theme colors');
+    log('• Proper spacing with Stack/Box');
+    
+    setTimeout(() => {
+      logEl.style.opacity = '0.5';
+    }, 3000);
+  </script>
+</body>
+</html>

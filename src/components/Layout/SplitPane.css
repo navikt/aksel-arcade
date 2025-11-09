@@ -1,0 +1,28 @@
+.split-pane {
+  display: flex;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.split-pane__left {
+  flex-shrink: 0;
+  overflow: auto;
+  background: var(--a-surface-default);
+}
+
+.split-pane__divider {
+  width: 1px;
+  background: var(--a-border-default);
+  cursor: col-resize;
+  flex-shrink: 0;
+}
+
+.split-pane__divider:hover {
+  background: var(--a-border-strong);
+}
+
+.split-pane__right {
+  flex: 1;
+  overflow: auto;
+  background: var(--a-surface-subtle);
+}

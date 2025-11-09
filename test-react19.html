@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Test React 19</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@navikt/ds-css@7.33.0/dist/darkside/index.min.css">
+</head>
+<body>
+  <div id="root" class="aksel-theme light"></div>
+  
+  <script type="module">
+    import React from 'https://esm.sh/react@19.0.0';
+    import * as ReactDOMClient from 'https://esm.sh/react-dom@19.0.0/client';
+    
+    console.log('React version:', React.version);
+    console.log('ReactDOMClient keys:', Object.keys(ReactDOMClient));
+    console.log('Has createRoot:', typeof ReactDOMClient.createRoot);
+    
+    // Load Aksel
+    import('https://esm.sh/@navikt/ds-react@7.33.0')
+      .then((AkselDS) => {
+        console.log('Aksel loaded, components:', Object.keys(AkselDS).length);
+        
+        const { Button } = AkselDS;
+        const root = ReactDOMClient.createRoot(document.getElementById('root'));
+        
+        root.render(
+          React.createElement(Button, { variant: 'primary' }, 'Test Button')
+        );
+        
+        console.log('Button rendered!');
+        
+        // Check styling after render
+        setTimeout(() => {
+          const button = document.querySelector('button');
+          if (button) {
+            console.log('Button classes:', button.className);
+            console.log('Button background:', getComputedStyle(button).backgroundColor);
+          }
+        }, 500);
+      })
+      .catch(err => console.error('Aksel load error:', err));
+  </script>
+</body>
+</html>

@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Test Theme in Sandbox</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      padding: 2rem;
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+    h1 {
+      margin-bottom: 2rem;
+    }
+    .test-section {
+      margin: 2rem 0;
+      padding: 1.5rem;
+      background: #f5f5f5;
+      border-radius: 8px;
+    }
+    iframe {
+      width: 100%;
+      height: 400px;
+      border: 2px solid #333;
+      background: white;
+    }
+    .info {
+      margin-top: 1rem;
+      padding: 1rem;
+      background: #e8f4ff;
+      border-radius: 4px;
+      font-size: 14px;
+    }
+    .console-output {
+      margin-top: 1rem;
+      padding: 1rem;
+      background: #1e1e1e;
+      color: #d4d4d4;
+      border-radius: 4px;
+      font-family: 'Monaco', 'Courier New', monospace;
+      font-size: 12px;
+      max-height: 200px;
+      overflow-y: auto;
+    }
+    .console-log {
+      color: #4ec9b0;
+    }
+    .console-error {
+      color: #f48771;
+    }
+    button {
+      margin-top: 1rem;
+      padding: 0.5rem 1rem;
+      font-size: 14px;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <h1>🧪 Theme Wrapper Sandbox Test</h1>
+  
+  <div class="test-section">
+    <h2>Sandbox Preview (with Theme wrapper)</h2>
+    <iframe id="sandbox-frame" src="/sandbox.html"></iframe>
+    
+    <button onclick="sendTestCode()">Send Test Code with Button</button>
+    <button onclick="sendMultipleComponents()">Send Multiple Components</button>
+    <button onclick="clearSandbox()">Clear Sandbox</button>
+    
+    <div class="info">
+      <strong>Expected behavior:</strong> Button should have <code>navds-button</code> class and Aksel styling (blue background, rounded corners, etc.)
+    </div>
+    
+    <div class="console-output" id="console">
+      <div>Console output will appear here...</div>
+    </div>
+  </div>
+
+  <script>
+    const consoleDiv = document.getElementById('console');
+    const frame = document.getElementById('sandbox-frame');
+    
+    function log(message, type = 'log') {
+      const div = document.createElement('div');
+      div.className = `console-${type}`;
+      div.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+      consoleDiv.appendChild(div);
+      consoleDiv.scrollTop = consoleDiv.scrollHeight;
+    }
+
+    // Listen for messages from sandbox
+    window.addEventListener('message', (event) => {
+      if (event.data && event.data.type) {
+        log(`📩 Received: ${event.data.type}`, 'log');
+        
+        if (event.data.type === 'SANDBOX_READY') {
+          log('✅ Sandbox is ready!', 'log');
+        } else if (event.data.type === 'RENDER_SUCCESS') {
+          log('✅ Render successful!', 'log');
+          
+          // Inspect the rendered output after a delay
+          setTimeout(() => {
+            inspectRenderedContent();
+          }, 500);
+        } else if (event.data.type === 'RUNTIME_ERROR') {
+          log(`❌ Error: ${event.data.payload.message}`, 'error');
+        } else if (event.data.type === 'CONSOLE_LOG') {
+          const args = event.data.payload.args.join(' ');
+          log(`Console: ${args}`, event.data.payload.level);
+        }
+      }
+    });
+
+    function sendTestCode() {
+      log('📤 Sending test code with Button...', 'log');
+      
+      const jsxCode = `
+function App() {
+  return (
+    <Button variant="primary">Click me</Button>
+  );
+}
+      `.trim();
+      
+      frame.contentWindow.postMessage({
+        type: 'EXECUTE_CODE',
+        payload: { jsxCode }
+      }, '*');
+    }
+
+    function sendMultipleComponents() {
+      log('📤 Sending multiple components...', 'log');
+      
+      const jsxCode = `
+function App() {
+  return (
+    <div>
+      <Heading size="large">Test Heading</Heading>
+      <Button variant="primary">Primary Button</Button>
+      <Button variant="secondary">Secondary Button</Button>
+    </div>
+  );
+}
+      `.trim();
+      
+      frame.contentWindow.postMessage({
+        type: 'EXECUTE_CODE',
+        payload: { jsxCode }
+      }, '*');
+    }
+
+    function clearSandbox() {
+      log('🧹 Clearing sandbox...', 'log');
+      
+      frame.contentWindow.postMessage({
+        type: 'EXECUTE_CODE',
+        payload: { jsxCode: '' }
+      }, '*');
+    }
+
+    function inspectRenderedContent() {
+      try {
+        const sandboxDoc = frame.contentDocument || frame.contentWindow.document;
+        const root = sandboxDoc.getElementById('root');
+        
+        if (!root) {
+          log('❌ Root element not found', 'error');
+          return;
+        }
+        
+        log(`📋 Root innerHTML length: ${root.innerHTML.length}`, 'log');
+        
+        // Check for Theme wrapper
+        const themeDiv = root.querySelector('.aksel-theme');
+        if (themeDiv) {
+          log('✅ Found .aksel-theme div!', 'log');
+          log(`   Classes: ${themeDiv.className}`, 'log');
+        } else {
+          log('❌ No .aksel-theme div found', 'error');
+        }
+        
+        // Check for button
+        const button = root.querySelector('button');
+        if (button) {
+          log('✅ Found button element', 'log');
+          log(`   Classes: ${button.className}`, 'log');
+          log(`   Text: ${button.textContent}`, 'log');
+          
+          const styles = window.getComputedStyle(button);
+          log(`   Background: ${styles.backgroundColor}`, 'log');
+          log(`   Padding: ${styles.padding}`, 'log');
+          log(`   Border-radius: ${styles.borderRadius}`, 'log');
+          
+          if (button.classList.contains('navds-button')) {
+            log('✅ Button has navds-button class!', 'log');
+          } else {
+            log('❌ Button missing navds-button class', 'error');
+            log(`   All classes: ${button.className}`, 'log');
+          }
+        } else {
+          log('❌ No button found', 'error');
+        }
+        
+        // Check for heading
+        const heading = root.querySelector('h1, h2, h3, h4, h5, h6');
+        if (heading) {
+          log(`✅ Found heading: ${heading.tagName}`, 'log');
+          log(`   Classes: ${heading.className}`, 'log');
+        }
+        
+      } catch (err) {
+        log(`❌ Inspection error: ${err.message}`, 'error');
+      }
+    }
+
+    // Auto-send test code after sandbox loads
+    setTimeout(() => {
+      log('🚀 Auto-sending initial test code...', 'log');
+      sendTestCode();
+    }, 2000);
+  </script>
+</body>
+</html>

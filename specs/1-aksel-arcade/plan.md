@@ -15,12 +15,18 @@ Build a browser-based React playground that enables designers and developers to 
 **Framework**: React 18+ (hooks-based, functional components)  
 **Primary Dependencies**: 
 - `react-codemirror` (@uiw/react-codemirror) - Code editor
-- `@navikt/ds-css` - Design system CSS (Darkside via `import "@navikt/ds-css/darkside"`)
+- `@navikt/ds-css@7.33.0` - Design system CSS (Darkside via `import "@navikt/ds-css/darkside"` - MUST import as ES module, not `<link>` tag)
 - `@navikt/ds-tokens` - Design tokens (colors, spacing, typography)
-- `@navikt/ds-react` - Aksel React components
+- `@navikt/ds-react` - Aksel React components (includes Theme wrapper)
 - `@babel/standalone` - In-browser JSX transpilation
 - `prettier` - Code formatting
 - `@navikt/aksel-stylelint` - Aksel-specific linting
+
+**CRITICAL Implementation Notes**:
+- Aksel Darkside CSS MUST be loaded via `import "@navikt/ds-css/darkside"` in TypeScript and bundled by Vite
+- Single React instance is critical - all components must use React from same source (Vite bundle)
+- Sandbox iframe needs `allow-same-origin` to load modules from Vite dev server
+- User components MUST be wrapped with `<Theme>` from `@navikt/ds-react/Theme`
 
 **Storage**: LocalStorage (5MB limit enforced, auto-save with 1s debounce)  
 **Testing**: Vitest + React Testing Library (pragmatic component + integration focus)  
@@ -220,8 +226,9 @@ After completing Phase 1 design (data model, contracts, quickstart), all constit
 
 #### Principle II: Browser-First Architecture (No Backend) ✅
 - **CONFIRMED**: All storage operations use LocalStorage (storage-api.md contract)
-- **CONFIRMED**: Zero network dependencies (CSP documented in sandbox-api.md)
-- **CONFIRMED**: Offline-capable design validated (all deps bundled per research.md)
+- **CONFIRMED**: All dependencies bundled via Vite (Aksel Darkside CSS, React, components)
+- **CONFIRMED**: Offline-capable design validated (Vite bundles all assets at build time)
+- **IMPLEMENTATION NOTE**: Dev mode loads from Vite dev server (localhost:5173), production bundles all assets statically
 
 #### Principle III: UI Contract Fidelity (Figma MCP as Truth) ✅
 - **ACTION REQUIRED FOR IMPLEMENTATION**: Figma file must be open before code implementation begins
@@ -326,4 +333,71 @@ All prerequisites for Phase 2 task generation met:
 
 ---
 
-**Plan Status**: ✅ Complete - Ready for task generation and implementation
+## Implementation Learnings (2025-11-08)
+
+### Critical Discoveries
+
+**Aksel Darkside CSS Loading** ✅
+- **MUST**: Import via ES module (`import "@navikt/ds-css/darkside"`) in TypeScript/JavaScript
+- **MUST NOT**: Load via HTML `<link>` tag - this does NOT properly initialize Aksel design system
+- **Why**: Aksel's CSS architecture requires proper module initialization, CDN links serve incomplete/minified CSS
+- **Solution**: Created `src/sandboxAksel.ts` that imports CSS and exports to sandbox via Vite bundling
+
+**Single React Instance** ✅
+- **Problem**: Loading React from multiple sources (esm.sh + Vite) causes "Invalid hook call" errors
+- **Solution**: Export React from `sandboxAksel.ts` alongside Aksel components - single source of truth
+- **Implementation**: `export { React, createRoot, Theme, AkselComponents } from sandboxAksel.ts`
+
+**Sandbox Security vs Module Loading** ✅
+- **Challenge**: `sandbox="allow-scripts"` blocks loading from Vite dev server (CORS/null origin)
+- **Solution**: Changed to `sandbox="allow-scripts allow-same-origin"` to enable localhost:5173 module loading
+- **Security**: Maintained via Content Security Policy restricting external network access
+- **Trade-off**: Acceptable for dev environment targeting modern browsers with CSP support
+
+**Theme Wrapper Requirement** ✅
+- **MUST**: Wrap all user components with `<Theme>` from `@navikt/ds-react/Theme`
+- **Why**: Aksel Darkside requires Theme context for proper styling (--ax CSS variables)
+- **Implementation**: Transpiled code automatically wraps user JSX: `<Theme><UserComponent /></Theme>`
+
+### Validation Approach
+
+**Automated Browser Testing** ✅
+- Used Chrome DevTools MCP to programmatically validate styling in actual browser
+- Verified 458 --ax CSS variables active (Darkside system)
+- Confirmed proper padding (12px 20px), font (Source Sans 3), colors (Aksel primary blue)
+- Screenshot validation proved visual correctness
+
+**Key Metrics Validated**:
+- ✅ 458 --ax CSS variables (Darkside)
+- ✅ 0 --a variables (old system absent)
+- ✅ Button padding: 12px 20px (was 0px with `<link>` approach)
+- ✅ Font family: "Source Sans 3", "Source Sans Pro", Arial, sans-serif
+- ✅ Background: rgb(33, 118, 212) (Aksel primary blue)
+
+### Files Modified
+
+1. **src/sandboxAksel.ts** (NEW)
+   - Imports `@navikt/ds-css/darkside`
+   - Exports React, createRoot, Theme, AkselComponents
+   - Single source for all sandbox dependencies
+
+2. **public/sandbox.html** (UPDATED)
+   - Removed importmap (caused React duplication)
+   - Removed custom CSS reset (conflicted with Aksel reset)
+   - Loads sandboxAksel.ts from Vite: `import('/src/sandboxAksel.ts')`
+   - CSP: Allows localhost scripts/styles, blocks external network
+
+3. **src/components/Preview/LivePreview.tsx** (UPDATED)
+   - Changed sandbox attribute: `allow-scripts allow-same-origin`
+
+### Documentation Impact
+
+- ✅ Updated spec.md FR-002, FR-002a, FR-003, FR-022, Assumptions
+- ✅ Updated plan.md Technical Context, Constitution Check
+- ✅ Updated tasks.md T033, T034, T055, T056 with actual implementation
+- ✅ Created SOLUTION_ATTEMPTS_LOG.md documenting all approaches
+
+---
+
+**Plan Status**: ✅ Complete - Ready for task generation and implementation (UPDATED with implementation learnings)
+

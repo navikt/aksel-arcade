@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Verify Aksel Theme Import</title>
+  <link rel="stylesheet" href="https://cdn.nav.no/@navikt/ds-css/5.18.3/darkside.min.css">
+  <style>
+    body { padding: 2rem; font-family: sans-serif; }
+    .result { margin: 1rem 0; padding: 1rem; background: #f5f5f5; border-radius: 4px; }
+    .success { background: #d4edda; color: #155724; }
+    .error { background: #f8d7da; color: #721c24; }
+  </style>
+</head>
+<body>
+  <h1>Aksel Theme Component Verification</h1>
+  <div id="results"></div>
+
+  <script type="module">
+    const resultsDiv = document.getElementById('results');
+    
+    function addResult(message, isSuccess = true) {
+      const div = document.createElement('div');
+      div.className = `result ${isSuccess ? 'success' : 'error'}`;
+      div.textContent = message;
+      resultsDiv.appendChild(div);
+    }
+
+    try {
+      addResult('⏳ Loading Aksel from ESM...', true);
+      
+      const akselModule = await import('https://esm.sh/@navikt/ds-react@5.18.3');
+      
+      addResult(`✅ Aksel module loaded`, true);
+      addResult(`📦 Total exports: ${Object.keys(akselModule).length}`, true);
+      
+      // Check for Theme
+      if (akselModule.Theme) {
+        addResult(`✅ Theme component found!`, true);
+        addResult(`   Type: ${typeof akselModule.Theme}`, true);
+        addResult(`   Name: ${akselModule.Theme.name}`, true);
+      } else {
+        addResult(`❌ Theme component NOT found`, false);
+      }
+      
+      // List all exports
+      const exports = Object.keys(akselModule).sort();
+      addResult(`\n📋 All Aksel exports (${exports.length} total):`, true);
+      
+      // Show first 50 exports
+      exports.slice(0, 50).forEach(key => {
+        const div = document.createElement('div');
+        div.style.fontSize = '12px';
+        div.style.marginLeft = '2rem';
+        div.textContent = `- ${key}`;
+        resultsDiv.appendChild(div);
+      });
+      
+      if (exports.length > 50) {
+        addResult(`... and ${exports.length - 50} more`, true);
+      }
+      
+      // Check for Theme specifically in different casings
+      const themeVariants = ['Theme', 'theme', 'THEME'];
+      themeVariants.forEach(variant => {
+        if (akselModule[variant]) {
+          addResult(`✅ Found ${variant}: ${typeof akselModule[variant]}`, true);
+        }
+      });
+      
+    } catch (error) {
+      addResult(`❌ Error: ${error.message}`, false);
+      console.error(error);
+    }
+  </script>
+</body>
+</html>

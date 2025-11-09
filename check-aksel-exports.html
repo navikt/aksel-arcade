@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Check Theme Export</title>
+</head>
+<body>
+  <h1>Checking Aksel exports...</h1>
+  <div id="output"></div>
+  
+  <script type="module">
+    const output = document.getElementById('output');
+    const log = (msg) => {
+      output.innerHTML += msg + '<br>';
+      console.log(msg);
+    };
+    
+    log('Loading @navikt/ds-react...');
+    const AkselDS = await import('https://esm.sh/@navikt/ds-react@5.18.3');
+    
+    log('Exports: ' + Object.keys(AkselDS).length);
+    log('');
+    log('Looking for Theme...');
+    log('Theme in exports: ' + ('Theme' in AkselDS));
+    log('typeof Theme: ' + typeof AkselDS.Theme);
+    log('');
+    log('Looking for common components:');
+    log('Button: ' + ('Button' in AkselDS));
+    log('Box: ' + ('Box' in AkselDS));
+    log('Stack: ' + ('Stack' in AkselDS));
+    log('');
+    log('All exports (first 20):');
+    Object.keys(AkselDS).slice(0, 20).forEach(key => {
+      log(`  - ${key}`);
+    });
+  </script>
+</body>
+</html>

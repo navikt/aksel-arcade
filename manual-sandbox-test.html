@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Manual Test - Sandbox Loading</title>
+  <style>
+    body { margin: 0; padding: 20px; background: #1a1a1a; color: #fff; font-family: monospace; }
+    iframe { width: 100%; height: 500px; border: 2px solid #0f0; background: #000; }
+    #status { padding: 10px; background: #000; border: 1px solid #333; margin-bottom: 10px; }
+  </style>
+</head>
+<body>
+  <div id="status">Waiting for sandbox...</div>
+  <iframe id="sandbox" src="/sandbox.html"></iframe>
+  
+  <script>
+    const status = document.getElementById('status');
+    const iframe = document.getElementById('sandbox');
+    
+    let messageCount = 0;
+    
+    window.addEventListener('message', (event) => {
+      if (event.source !== iframe.contentWindow) return;
+      
+      messageCount++;
+      status.innerHTML += `<br>[${messageCount}] ${event.data.type || 'Unknown'}: ${JSON.stringify(event.data).substring(0, 100)}`;
+      
+      if (event.data.type === 'SANDBOX_READY') {
+        status.innerHTML += '<br><strong style="color: #0f0">✓ SANDBOX READY!</strong>';
+        
+        // Send test code
+        setTimeout(() => {
+          const testCode = `function App() {
+  return /*#__PURE__*/React.createElement(Button, {
+    variant: "primary"
+  }, "Click me");
+}`;
+          
+          status.innerHTML += '<br>Sending test code...';
+          iframe.contentWindow.postMessage({
+            type: 'EXECUTE_CODE',
+            payload: { jsxCode: testCode, hooksCode: '' }
+          }, '*');
+        }, 1000);
+      }
+      
+      if (event.data.type === 'RENDER_SUCCESS') {
+        status.innerHTML += '<br><strong style="color: #0f0">✓ RENDER SUCCESS!</strong>';
+      }
+      
+      if (event.data.type === 'RUNTIME_ERROR') {
+        status.innerHTML += '<br><strong style="color: #f00">✗ ERROR: ' + event.data.payload.message + '</strong>';
+      }
+    });
+    
+    setTimeout(() => {
+      if (messageCount === 0) {
+        status.innerHTML += '<br><strong style="color: #f00">✗ No messages received from sandbox!</strong>';
+      }
+    }, 5000);
+  </script>
+</body>
+</html>

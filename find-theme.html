@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Find Theme Component</title>
+  <link rel="stylesheet" href="https://cdn.nav.no/@navikt/ds-css/5.18.3/darkside.min.css">
+  <style>
+    body { padding: 2rem; font-family: monospace; }
+    pre { background: #f5f5f5; padding: 1rem; overflow-x: auto; }
+  </style>
+</head>
+<body>
+  <h1>Where is Theme?</h1>
+  <div id="output"></div>
+
+  <script type="module">
+    import React from 'https://esm.sh/react@18.3.1';
+    import ReactDOM from 'https://esm.sh/react-dom@18.3.1/client';
+    
+    const output = document.getElementById('output');
+    
+    async function test() {
+      output.innerHTML += '<h2>Test 1: Main package</h2>';
+      
+      try {
+        const mainPkg = await import('https://esm.sh/@navikt/ds-react@5.18.3');
+        const keys = Object.keys(mainPkg);
+        
+        output.innerHTML += `<p>Total exports: ${keys.length}</p>`;
+        
+        // Search for Theme
+        const themeExports = keys.filter(k => k.toLowerCase().includes('theme'));
+        output.innerHTML += `<p>Theme-related exports: ${themeExports.join(', ') || 'NONE'}</p>`;
+        
+        // Check if Theme exists
+        if (mainPkg.Theme) {
+          output.innerHTML += `<p style="color: green;">✅ Theme found in main package!</p>`;
+          output.innerHTML += `<p>Type: ${typeof mainPkg.Theme}</p>`;
+          
+          // Try rendering
+          const root = ReactDOM.createRoot(document.createElement('div'));
+          const { Button } = mainPkg;
+          
+          try {
+            root.render(
+              React.createElement(mainPkg.Theme, null,
+                React.createElement(Button, null, 'Test')
+              )
+            );
+            output.innerHTML += `<p style="color: green;">✅ Theme renders successfully!</p>`;
+          } catch (err) {
+            output.innerHTML += `<p style="color: red;">❌ Theme render error: ${err.message}</p>`;
+          }
+        } else {
+          output.innerHTML += `<p style="color: red;">❌ Theme NOT in main package</p>`;
+        }
+        
+      } catch (err) {
+        output.innerHTML += `<p style="color: red;">Error: ${err.message}</p>`;
+      }
+      
+      output.innerHTML += '<h2>Test 2: Subpath /Theme</h2>';
+      
+      try {
+        const themePkg = await import('https://esm.sh/@navikt/ds-react@5.18.3/Theme');
+        output.innerHTML += `<p>Theme subpath exports: ${Object.keys(themePkg).join(', ')}</p>`;
+        
+        if (themePkg.Theme) {
+          output.innerHTML += `<p style="color: green;">✅ Theme found in subpath!</p>`;
+        }
+      } catch (err) {
+        output.innerHTML += `<p style="color: red;">Subpath error: ${err.message}</p>`;
+      }
+    }
+    
+    test();
+  </script>
+</body>
+</html>

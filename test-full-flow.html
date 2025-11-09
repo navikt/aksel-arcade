@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Test Full Flow</title>
+  <link rel="stylesheet" href="https://cdn.nav.no/@navikt/ds-css/5.18.3/darkside.min.css">
+  <style>
+    body { font-family: monospace; padding: 20px; background: #1a1a1a; color: #fff; }
+    #log { white-space: pre-wrap; margin-top: 20px; padding: 10px; background: #000; border: 1px solid #333; }
+    #root { margin-top: 20px; padding: 20px; background: #2a2a2a; border: 1px solid #444; }
+  </style>
+</head>
+<body>
+  <h1>Full Flow Test</h1>
+  <div id="log"></div>
+  <div id="root"></div>
+  
+  <script type="module">
+    const log = (msg) => {
+      console.log(msg);
+      document.getElementById('log').textContent += msg + '\n';
+    };
+    
+    log('1. Loading React...');
+    const React = await import('https://esm.sh/react@18.3.1');
+    const ReactDOM = await import('https://esm.sh/react-dom@18.3.1');
+    window.React = React;
+    window.ReactDOM = ReactDOM;
+    log('✅ React loaded');
+    
+    log('2. Loading Aksel...');
+    const AkselDS = await import('https://esm.sh/@navikt/ds-react@5.18.3');
+    window.AkselDS = AkselDS;
+    log('✅ Aksel loaded, components: ' + Object.keys(AkselDS).length);
+    
+    log('3. Making components global...');
+    Object.keys(AkselDS).forEach(key => {
+      window[key] = AkselDS[key];
+    });
+    log('✅ Components global');
+    log('   window.Button: ' + typeof window.Button);
+    log('   window.Theme: ' + typeof window.Theme);
+    
+    log('4. EXACT transpiled code from transpiler test:');
+    const transpiledCode = `function App() {
+  return /*#__PURE__*/React.createElement(Button, {
+    variant: "primary"
+  }, "Click me");
+}`;
+    log(transpiledCode);
+    
+    log('5. Building component declarations...');
+    const componentDeclarations = Object.keys(AkselDS)
+      .filter(key => typeof window[key] !== 'undefined')
+      .map(key => `const ${key} = window.${key};`)
+      .join('\n');
+    log('✅ Declarations: ' + componentDeclarations.split('\n').length + ' lines');
+    log('   First 3: ' + componentDeclarations.split('\n').slice(0, 3).join(', '));
+    
+    log('6. Wrapping code...');
+    const wrappedCode = `
+      (function() {
+        ${componentDeclarations}
+        
+        const { useState, useEffect, useContext, useReducer, useCallback, useMemo, useRef } = window.React;
+        
+        ${transpiledCode}
+        
+        if (typeof App !== 'undefined') return App;
+        throw new Error('No component found');
+      })()
+    `;
+    
+    log('7. Evaluating...');
+    try {
+      const Component = eval(wrappedCode);
+      log('✅ Component: ' + typeof Component);
+      
+      log('8. Rendering...');
+      const root = ReactDOM.createRoot(document.getElementById('root'));
+      root.render(
+        React.createElement(window.Theme, { variant: 'darkside' },
+          React.createElement(Component)
+        )
+      );
+      log('✅ RENDERED SUCCESSFULLY!');
+      log('');
+      log('Check the preview below - should see a styled Aksel button:');
+    } catch (error) {
+      log('❌ ERROR: ' + error.message);
+      log(error.stack);
+    }
+  </script>
+</body>
+</html>

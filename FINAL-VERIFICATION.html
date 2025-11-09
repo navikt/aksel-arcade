@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>FINAL VERIFICATION - Aksel Dark side Without Theme Component</title>
+  <link rel="stylesheet" href="https://cdn.nav.no/@navikt/ds-css/5.18.3/darkside.min.css">
+  <style>
+    body { margin: 0; padding: 20px; background: #1a1a1a; font-family: monospace; }
+    #result { padding: 20px; margin: 20px 0; border: 2px solid #0f0; }
+    .pass { color: #0f0; }
+    .fail { color: #f00; }
+    pre { background: #000; color: #fff; padding: 10px; overflow-x: auto; }
+  </style>
+</head>
+<body>
+  <h1 style="color: #fff;">Final Verification Test</h1>
+  <div id="log" style="color: #0f0; margin: 20px 0;"></div>
+  <div id="root"></div>
+  <div id="result"></div>
+  
+  <script type="module">
+    const log = document.getElementById('log');
+    const result = document.getElementById('result');
+    const addLog = (msg) => {
+      log.innerHTML += msg + '<br>';
+      console.log(msg);
+    };
+    
+    addLog('Loading React...');
+    const React = await import('https://esm.sh/react@18.3.1');
+    const ReactDOM = await import('https://esm.sh/react-dom@18.3.1');
+    
+    addLog('Loading Aksel (WITHOUT Theme component)...');
+    const AkselDS = await import('https://esm.sh/@navikt/ds-react@5.18.3');
+    
+    addLog('Making components global...');
+    Object.keys(AkselDS).forEach(key => {
+      window[key] = AkselDS[key];
+    });
+    
+    addLog('✓ Setup complete');
+    addLog('');
+    addLog('Test: Render Button without Theme wrapper');
+    
+    // Simulate exact sandbox flow WITHOUT Theme
+    const transpiledCode = `function App() {
+  return /*#__PURE__*/React.createElement(Button, {
+    variant: "primary",
+    size: "medium"
+  }, "Primary Button");
+}`;
+    
+    const componentDeclarations = Object.keys(AkselDS)
+      .filter(key => typeof window[key] !== 'undefined')
+      .map(key => `const ${key} = window.${key};`)
+      .join('\n');
+    
+    const wrappedCode = `
+      (function() {
+        ${componentDeclarations}
+        ${transpiledCode}
+        if (typeof App !== 'undefined') return App;
+        throw new Error('No App');
+      })()
+    `;
+    
+    const Component = eval(wrappedCode);
+    
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    
+    // Render WITHOUT Theme wrapper
+    root.render(React.createElement(Component));
+    
+    addLog('✓ Rendered!');
+    addLog('');
+    
+    // Verify styling
+    setTimeout(() => {
+      const button = document.querySelector('button');
+      if (!button) {
+        result.innerHTML = '<h2 class="fail">❌ FAIL: No button found</h2>';
+        return;
+      }
+      
+      const hasAkselClass = button.className.includes('navds-button');
+      const hasPrimaryVariant = button.className.includes('navds-button--primary');
+      const styles = window.getComputedStyle(button);
+      const bgColor = styles.backgroundColor;
+      const textColor = styles.color;
+      
+      result.innerHTML = `
+        <h2>Verification Results:</h2>
+        <p class="${hasAkselClass ? 'pass' : 'fail'}">
+          ${hasAkselClass ? '✓' : '✗'} Has Aksel class: ${hasAkselClass}
+        </p>
+        <p class="${hasPrimaryVariant ? 'pass' : 'fail'}">
+          ${hasPrimaryVariant ? '✓' : '✗'} Has primary variant: ${hasPrimaryVariant}
+        </p>
+        <p class="pass">Background color: ${bgColor}</p>
+        <p class="pass">Text color: ${textColor}</p>
+        <p class="pass">Font: ${styles.fontFamily}</p>
+        
+        <h3 class="${hasAkselClass && hasPrimaryVariant ? 'pass' : 'fail'}">
+          ${hasAkselClass && hasPrimaryVariant ? '✅ PASS' : '❌ FAIL'}
+        </h3>
+        
+        <pre>Full class list:\n${button.className}</pre>
+      `;
+      
+      addLog(hasAkselClass && hasPrimaryVariant ? '✅ TEST PASSED' : '❌ TEST FAILED');
+    }, 500);
+  </script>
+</body>
+</html>

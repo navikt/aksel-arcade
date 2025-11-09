@@ -1,0 +1,25 @@
+.app-header {
+  display: flex;
+  align-items: center;
+  gap: 2rem;
+  padding: 1rem 1.5rem;
+  background: var(--a-surface-default);
+  border-bottom: 2px solid var(--a-border-strong);
+}
+
+.app-header__logo {
+  margin: 0;
+  font-weight: 700;
+  background: linear-gradient(135deg, #0067c5 0%, #0049a3 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.app-header__project-name {
+  max-width: 300px;
+}
+
+.app-header__project-name input {
+  font-weight: 600;
+}

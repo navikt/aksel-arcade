@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Direct Sandbox Test</title>
+  <style>
+    body { margin: 0; padding: 0; }
+    #container { display: flex; height: 100vh; }
+    #controls { width: 300px; padding: 20px; background: #1a1a1a; color: #fff; font-family: monospace; font-size: 12px; }
+    #preview { flex: 1; }
+    iframe { width: 100%; height: 100%; border: none; }
+    button { padding: 10px; margin: 5px 0; width: 100%; background: #0f0; border: none; cursor: pointer; }
+    #status { margin: 10px 0; padding: 10px; background: #000; border: 1px solid #333; max-height: 400px; overflow: auto; }
+  </style>
+</head>
+<body>
+  <div id="container">
+    <div id="controls">
+      <h3>Direct Sandbox Test</h3>
+      <button id="sendCode">Send Test Code</button>
+      <button id="clearIframe">Reload Iframe</button>
+      <div id="status">Waiting...</div>
+    </div>
+    <div id="preview">
+      <iframe id="sandbox" src="/sandbox.html"></iframe>
+    </div>
+  </div>
+  
+  <script>
+    const status = document.getElementById('status');
+    const iframe = document.getElementById('sandbox');
+    const sendCodeBtn = document.getElementById('sendCode');
+    const clearBtn = document.getElementById('clearIframe');
+    
+    let messageLog = [];
+    
+    const addLog = (msg) => {
+      const timestamp = new Date().toLocaleTimeString();
+      messageLog.push(`[${timestamp}] ${msg}`);
+      status.innerHTML = messageLog.slice(-20).join('<br>');
+    };
+    
+    window.addEventListener('message', (event) => {
+      if (event.source !== iframe.contentWindow) return;
+      
+      addLog(`◀ ${event.data.type || 'Unknown'}`);
+      
+      if (event.data.type === 'CONSOLE_LOG') {
+        addLog(`  └ Console: ${event.data.payload.args.join(' ')}`);
+      }
+    });
+    
+    sendCodeBtn.addEventListener('click', () => {
+      const testCode = `function App() {
+  return /*#__PURE__*/React.createElement(Button, {
+    variant: "primary",
+    size: "medium"
+  }, "Test Button");
+}`;
+      
+      addLog('▶ Sending EXECUTE_CODE');
+      iframe.contentWindow.postMessage({
+        type: 'EXECUTE_CODE',
+        payload: { jsxCode: testCode, hooksCode: '' }
+      }, '*');
+    });
+    
+    clearBtn.addEventListener('click', () => {
+      addLog('🔄 Reloading iframe...');
+      iframe.src = iframe.src;
+    });
+    
+    addLog('Ready. Click "Send Test Code" to test.');
+  </script>
+</body>
+</html>
