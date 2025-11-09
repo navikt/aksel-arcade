@@ -1,6 +1,6 @@
-import { useContext } from 'react'
+import { useContext, useRef } from 'react'
 import { AppContext } from '@/hooks/useProject'
-import { CodeEditor } from './CodeEditor'
+import { CodeEditor, type CodeEditorRef } from './CodeEditor'
 import { EditorTabs } from './EditorTabs'
 import { EditorToolbar } from './EditorToolbar'
 import { ComponentPalette } from './ComponentPalette'
@@ -13,6 +13,9 @@ export const EditorPane = () => {
   if (!context) throw new Error('EditorPane must be used within AppProvider')
 
   const { project, editorState, isComponentPaletteOpen, updateProject, updateEditorState, insertSnippet, toggleComponentPalette } = context
+  
+  // Ref for the currently active editor to access undo/redo
+  const editorRef = useRef<CodeEditorRef>(null)
 
   const currentTab = editorState.activeTab
   const currentContent = currentTab === 'JSX' ? project.jsxCode : project.hooksCode
@@ -52,20 +55,36 @@ export const EditorPane = () => {
     }
   }
 
+  const handleUndo = () => {
+    editorRef.current?.undo()
+  }
+
+  const handleRedo = () => {
+    editorRef.current?.redo()
+  }
+
+  // For now, we always enable undo/redo buttons
+  // CodeMirror's history system handles the actual state
+  // TODO: Track CodeMirror's history state for precise button enabling
+  const canUndo = true
+  const canRedo = true
+
   return (
     <div className="editor-pane">
       <EditorTabs activeTab={currentTab} onTabChange={handleTabChange} />
       
       <EditorToolbar
-        canUndo={editorState.jsxHistory.past.length > 0 || editorState.hooksHistory.past.length > 0}
-        canRedo={editorState.jsxHistory.future.length > 0 || editorState.hooksHistory.future.length > 0}
+        canUndo={canUndo}
+        canRedo={canRedo}
         onAddComponent={() => toggleComponentPalette()}
         onFormat={handleFormat}
-        onUndo={() => console.log('Undo')}
-        onRedo={() => console.log('Redo')}
+        onUndo={handleUndo}
+        onRedo={handleRedo}
       />
 
       <CodeEditor 
+        ref={editorRef}
+        key={currentTab}
         value={currentContent} 
         onChange={handleCodeChange}
         onCursorChange={handleCursorChange}

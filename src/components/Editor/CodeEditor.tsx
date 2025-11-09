@@ -2,8 +2,18 @@ import CodeMirror from '@uiw/react-codemirror'
 import { javascript } from '@codemirror/lang-javascript'
 import { autocompletion, type CompletionContext, type CompletionResult } from '@codemirror/autocomplete'
 import { keymap } from '@codemirror/view'
+import { undo, redo } from '@codemirror/commands'
+import { linter, type Diagnostic } from '@codemirror/lint'
+import { forwardRef, useImperativeHandle, useRef } from 'react'
+import type { ReactCodeMirrorRef } from '@uiw/react-codemirror'
 import { AKSEL_SNIPPETS } from '@/services/componentLibrary'
+import * as Babel from '@babel/standalone'
 import './CodeEditor.css'
+
+export interface CodeEditorRef {
+  undo: () => void
+  redo: () => void
+}
 
 interface CodeEditorProps {
   value: string
@@ -15,7 +25,53 @@ interface CodeEditorProps {
   height?: string
 }
 
-export const CodeEditor = ({
+// Create JSX linter using Babel for syntax validation
+const jsxLinter = linter((view) => {
+  const diagnostics: Diagnostic[] = []
+  const code = view.state.doc.toString()
+
+  // Wrap in default export component for validation
+  const wrappedCode = `
+import { Button, TextField, Select, Checkbox, Radio, Box, Stack, Grid } from '@navikt/ds-react'
+
+function App() {
+  return (
+    <>
+${code}
+    </>
+  );
+}
+
+export default App;
+`
+
+  try {
+    Babel.transform(wrappedCode, {
+      presets: ['react', 'typescript'],
+      filename: 'app.tsx',
+    })
+  } catch (error: unknown) {
+    if (error && typeof error === 'object' && 'loc' in error) {
+      const babelError = error as { loc?: { line: number; column: number }; message?: string }
+      if (babelError.loc) {
+        // Adjust line number to account for wrapper (subtract 5 lines)
+        const actualLine = Math.max(0, babelError.loc.line - 6)
+        const pos = view.state.doc.line(actualLine + 1).from + (babelError.loc.column || 0)
+        
+        diagnostics.push({
+          from: pos,
+          to: pos,
+          severity: 'error',
+          message: babelError.message?.split('\n')[0] || 'Syntax error',
+        })
+      }
+    }
+  }
+
+  return diagnostics
+})
+
+export const CodeEditor = forwardRef<CodeEditorRef, CodeEditorProps>(({
   value,
   onChange,
   onCursorChange,
@@ -23,7 +79,25 @@ export const CodeEditor = ({
   language = 'jsx',
   readOnly = false,
   height = '100%',
-}: CodeEditorProps) => {
+}, ref) => {
+  const editorRef = useRef<ReactCodeMirrorRef>(null)
+
+  // Expose undo/redo methods via ref
+  useImperativeHandle(ref, () => ({
+    undo: () => {
+      const view = editorRef.current?.view
+      if (view) {
+        undo(view)
+      }
+    },
+    redo: () => {
+      const view = editorRef.current?.view
+      if (view) {
+        redo(view)
+      }
+    },
+  }))
+
   // Custom keymap for formatting
   // Cmd/Ctrl+S hijacked from browser save, Alt+Shift+F as alternative
   const customKeymap = keymap.of([
@@ -121,12 +195,14 @@ export const CodeEditor = ({
   return (
     <div className="code-editor" style={{ height }}>
       <CodeMirror
+        ref={editorRef}
         value={value}
         height={height}
         extensions={[
           javascript({ jsx: language === 'jsx', typescript: true }),
           autocompletion({ override: [akselCompletion], activateOnTyping: true }),
           customKeymap,
+          jsxLinter,
         ]}
         onChange={onChange}
         onUpdate={(update) => {
@@ -170,4 +246,6 @@ export const CodeEditor = ({
       />
     </div>
   )
-}
+})
+
+CodeEditor.displayName = 'CodeEditor'
