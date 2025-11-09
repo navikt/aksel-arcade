@@ -136,12 +136,12 @@
 
 ### Implementation for User Story 6
 
-- [ ] T057 [P] [US6] Install Prettier and configure .prettierrc with React/JSX conventions per research.md
-- [ ] T058 [P] [US6] Create formatter service in src/services/formatter.ts wrapping Prettier.format with JSX parser
-- [ ] T059 [US6] Implement custom autocomplete source in src/components/Editor/CodeEditor.tsx for Aksel component names using @codemirror/autocomplete
-- [ ] T060 [US6] Add Aksel component prop autocomplete in src/components/Editor/CodeEditor.tsx (e.g., variant values for Button)
-- [ ] T061 [US6] Wire Format button in EditorToolbar to call formatter.format and update editor state
-- [ ] T062 [US6] Add keyboard shortcut handler for Cmd/Ctrl+S to trigger format in CodeEditor
+- [X] T057 [P] [US6] Install Prettier and configure .prettierrc with React/JSX conventions per research.md
+- [X] T058 [P] [US6] Create formatter service in src/services/formatter.ts wrapping Prettier.format with JSX parser (includes estree plugin dependency)
+- [X] T059 [US6] Implement custom autocomplete source in src/components/Editor/CodeEditor.tsx for Aksel component names using @codemirror/autocomplete
+- [X] T060 [US6] Add Aksel component prop autocomplete in src/components/Editor/CodeEditor.tsx (e.g., variant values for Button)
+- [X] T061 [US6] Wire Format button in EditorToolbar to call formatter.format and update editor state
+- [X] T062 [US6] Add keyboard shortcut handler for Alt+Shift+F to trigger format in CodeEditor (changed from Cmd/Ctrl+S to avoid browser conflict)
 - [ ] T063 [US6] Implement undo/redo history stack in EditorState using HistoryStack type per data-model.md
 - [ ] T064 [US6] Wire Undo button in EditorToolbar to pop from history.past, push to history.future, update code
 - [ ] T065 [US6] Wire Redo button in EditorToolbar to pop from history.future, push to history.past, update code

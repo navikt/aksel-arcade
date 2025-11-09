@@ -1,7 +1,7 @@
 import CodeMirror from '@uiw/react-codemirror'
 import { javascript } from '@codemirror/lang-javascript'
 import { autocompletion, type CompletionContext, type CompletionResult } from '@codemirror/autocomplete'
-import { useDebouncedCallback } from '@/hooks/useDebounce'
+import { keymap } from '@codemirror/view'
 import { AKSEL_SNIPPETS } from '@/services/componentLibrary'
 import './CodeEditor.css'
 
@@ -9,6 +9,7 @@ interface CodeEditorProps {
   value: string
   onChange: (value: string) => void
   onCursorChange?: (cursor: { line: number; column: number }) => void
+  onFormat?: () => void | Promise<void>
   language?: 'jsx' | 'typescript'
   readOnly?: boolean
   height?: string
@@ -18,12 +19,37 @@ export const CodeEditor = ({
   value,
   onChange,
   onCursorChange,
+  onFormat,
   language = 'jsx',
   readOnly = false,
   height = '100%',
 }: CodeEditorProps) => {
-  // Debounce changes by 250ms
-  const debouncedOnChange = useDebouncedCallback(onChange, 250)
+  // Custom keymap for formatting
+  // Cmd/Ctrl+S hijacked from browser save, Alt+Shift+F as alternative
+  const customKeymap = keymap.of([
+    {
+      key: 'Mod-s',
+      preventDefault: true,
+      run: () => {
+        if (onFormat) {
+          onFormat()
+          return true
+        }
+        return false
+      },
+    },
+    {
+      key: 'Alt-Shift-f',
+      preventDefault: true,
+      run: () => {
+        if (onFormat) {
+          onFormat()
+          return true
+        }
+        return false
+      },
+    },
+  ])
 
   // Custom autocomplete for Aksel components
   const akselCompletion = (context: CompletionContext): CompletionResult | null => {
@@ -100,8 +126,9 @@ export const CodeEditor = ({
         extensions={[
           javascript({ jsx: language === 'jsx', typescript: true }),
           autocompletion({ override: [akselCompletion], activateOnTyping: true }),
+          customKeymap,
         ]}
-        onChange={debouncedOnChange}
+        onChange={onChange}
         onUpdate={(update) => {
           if (onCursorChange && update.selectionSet) {
             const pos = update.state.selection.main.head

@@ -39,13 +39,14 @@ export const transpileCode = async (
       processedJsxCode = processedJsxCode.replace(/export\s+default\s+/g, 'const App = ')
     } else {
       // Designer mode: auto-wrap bare JSX in component structure
-      // Check if there are multiple root JSX elements by counting top-level opening tags
+      // Check if there are multiple root JSX elements by counting lines starting with <
       const trimmedJsx = cleanJsxCode.trim()
-      const hasMultipleRoots = trimmedJsx.split('\n').filter(line => line.trim().match(/^<[A-Z]/)).length > 1
+      const rootElementMatches = trimmedJsx.match(/^\s*</gm) // Lines starting with <
+      const hasMultipleRoots = rootElementMatches && rootElementMatches.length > 1
       
       if (hasMultipleRoots) {
-        // Wrap in fragment if multiple root elements
-        processedJsxCode = `function App() {\n  return (\n    <>\n      ${cleanJsxCode}\n    </>\n  );\n}`
+        // Wrap in fragment if multiple root elements (Fragment is invisible to user but needed for execution)
+        processedJsxCode = `function App() {\n  return (\n    <>\n${cleanJsxCode}\n    </>\n  );\n}`
       } else {
         // Single root element
         processedJsxCode = `function App() {\n  return (\n    ${cleanJsxCode}\n  );\n}`

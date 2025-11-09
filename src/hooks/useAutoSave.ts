@@ -13,7 +13,9 @@ export const useAutoSave = (project: Project) => {
   const [saveError, setSaveError] = useState<string | null>(null)
 
   useEffect(() => {
-    clearTimeout(timeoutRef.current)
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current)
+    }
     setSaveStatus('idle')
 
     // Debounce by 1 second
@@ -39,7 +41,11 @@ export const useAutoSave = (project: Project) => {
       }
     }, 1000)
 
-    return () => clearTimeout(timeoutRef.current)
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current)
+      }
+    }
   }, [project])
 
   return { saveStatus, saveError }

@@ -30,11 +30,11 @@ export const useDebouncedCallback = <T extends (...args: Parameters<T>) => Retur
 
   useEffect(() => {
     return () => {
-      if (timeoutRef.current) {
+      if (timeoutRef.current !== undefined) {
         clearTimeout(timeoutRef.current)
       }
     }
-  }, [])
+  }, [callback, delay])
 
   return ((...args: Parameters<T>) => {
     if (timeoutRef.current) {

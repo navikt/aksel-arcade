@@ -4,7 +4,7 @@ import './EditorToolbar.css'
 
 interface EditorToolbarProps {
   onAddComponent: () => void
-  onFormat?: () => void
+  onFormat?: () => void | Promise<void>
   onUndo?: () => void
   onRedo?: () => void
   canUndo?: boolean

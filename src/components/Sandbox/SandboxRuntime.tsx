@@ -1,8 +1,6 @@
 // This component runs inside the sandboxed iframe (public/sandbox.html)
 // It receives transpiled code via postMessage and renders it to the DOM
 
-import React from 'react'
-
 // This file is meant to be loaded in the sandbox iframe
 // For now, we'll keep the sandbox logic in public/sandbox.html
 // This is a placeholder for future refactoring

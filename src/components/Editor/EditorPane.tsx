@@ -5,6 +5,7 @@ import { EditorTabs } from './EditorTabs'
 import { EditorToolbar } from './EditorToolbar'
 import { ComponentPalette } from './ComponentPalette'
 import type { ComponentSnippet } from '@/types/snippets'
+import { formatCode } from '@/services/formatter'
 import './EditorPane.css'
 
 export const EditorPane = () => {
@@ -40,6 +41,17 @@ export const EditorPane = () => {
     insertSnippet(snippet)
   }
 
+  const handleFormat = async () => {
+    try {
+      const formatted = await formatCode(currentContent, { parser: 'babel' })
+      console.log('✅ Format successful!')
+      handleCodeChange(formatted)
+    } catch {
+      // Silently ignore format errors - invalid syntax expected while editing
+      console.log('Format skipped - invalid syntax (expected while editing)')
+    }
+  }
+
   return (
     <div className="editor-pane">
       <EditorTabs activeTab={currentTab} onTabChange={handleTabChange} />
@@ -48,10 +60,7 @@ export const EditorPane = () => {
         canUndo={editorState.jsxHistory.past.length > 0 || editorState.hooksHistory.past.length > 0}
         canRedo={editorState.jsxHistory.future.length > 0 || editorState.hooksHistory.future.length > 0}
         onAddComponent={() => toggleComponentPalette()}
-        onFormat={() => {
-          // Format will be handled by CodeEditor internally via Prettier
-          console.log('Format triggered')
-        }}
+        onFormat={handleFormat}
         onUndo={() => console.log('Undo')}
         onRedo={() => console.log('Redo')}
       />
@@ -60,6 +69,7 @@ export const EditorPane = () => {
         value={currentContent} 
         onChange={handleCodeChange}
         onCursorChange={handleCursorChange}
+        onFormat={handleFormat}
       />
 
       {isComponentPaletteOpen && (

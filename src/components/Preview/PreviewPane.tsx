@@ -1,4 +1,4 @@
-import { useContext, useEffect, useState } from 'react'
+import { useContext, useEffect, useState, useRef } from 'react'
 import { AppContext } from '@/hooks/useProject'
 import { transpileCode } from '@/services/transpiler'
 import { LivePreview } from './LivePreview'
@@ -14,39 +14,51 @@ export const PreviewPane = () => {
   const [transpiledCode, setTranspiledCode] = useState<string | null>(null)
   const [compileError, setCompileError] = useState<CompileError | null>(null)
   const [runtimeError, setRuntimeError] = useState<RuntimeError | null>(null)
+  const debounceTimerRef = useRef<number | undefined>(undefined)
 
-  // Transpile code when JSX or hooks code changes
+  // Transpile code when JSX or hooks code changes (debounced to avoid errors while typing)
   useEffect(() => {
     let isCancelled = false
 
-    transpileCode(project.jsxCode, project.hooksCode)
-      .then((result) => {
-        if (isCancelled) return
-        
-        if (result.success && result.code) {
-          console.log('✅ Transpilation successful')
-          console.log('📝 Transpiled code:', result.code)
-          setTranspiledCode(result.code)
-          setCompileError(null)
-        } else if (result.error) {
-          console.error('❌ Compile error:', result.error)
-          setCompileError(result.error)
-          setTranspiledCode(null)
-        }
-      })
-      .catch((err) => {
-        if (isCancelled) return
-        console.error('❌ Transpilation error:', err)
-        setCompileError({
-          message: err.message || 'Unknown transpilation error',
-          line: null,
-          column: null,
-          stack: null,
+    // Clear previous timer
+    if (debounceTimerRef.current !== undefined) {
+      clearTimeout(debounceTimerRef.current)
+    }
+
+    // Debounce transpilation by 500ms to avoid showing errors while typing
+    debounceTimerRef.current = window.setTimeout(() => {
+      transpileCode(project.jsxCode, project.hooksCode)
+        .then((result) => {
+          if (isCancelled) return
+          
+          if (result.success && result.code) {
+            console.log('✅ Transpilation successful')
+            console.log('📝 Transpiled code:', result.code)
+            setTranspiledCode(result.code)
+            setCompileError(null)
+          } else if (result.error) {
+            console.error('❌ Compile error:', result.error)
+            setCompileError(result.error)
+            setTranspiledCode(null)
+          }
         })
-      })
+        .catch((err) => {
+          if (isCancelled) return
+          console.error('❌ Transpilation error:', err)
+          setCompileError({
+            message: err.message || 'Unknown transpilation error',
+            line: null,
+            column: null,
+            stack: null,
+          })
+        })
+    }, 500)
 
     return () => {
       isCancelled = true
+      if (debounceTimerRef.current !== undefined) {
+        clearTimeout(debounceTimerRef.current)
+      }
     }
   }, [project.jsxCode, project.hooksCode])
 
