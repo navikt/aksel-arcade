@@ -1,11 +1,11 @@
 import CodeMirror from '@uiw/react-codemirror'
 import { javascript } from '@codemirror/lang-javascript'
-import { autocompletion, startCompletion, type CompletionContext, type CompletionResult } from '@codemirror/autocomplete'
+import { autocompletion, startCompletion, completionStatus, type CompletionContext, type CompletionResult } from '@codemirror/autocomplete'
 import { ViewPlugin, type EditorView, type ViewUpdate } from '@codemirror/view'
 import { keymap } from '@codemirror/view'
 import { undo, redo } from '@codemirror/commands'
 import { linter, type Diagnostic } from '@codemirror/lint'
-import { forwardRef, useImperativeHandle, useRef } from 'react'
+import { forwardRef, useImperativeHandle, useRef, useMemo } from 'react'
 import type { ReactCodeMirrorRef } from '@uiw/react-codemirror'
 import { AKSEL_SNIPPETS } from '@/services/componentLibrary'
 import { getComponentProps, getPropValues, getPropDefinition } from '@/services/akselMetadata'
@@ -51,6 +51,7 @@ function isCursorInPropValue(view: EditorView, pos: number): boolean {
 const cursorInQuotesPlugin = ViewPlugin.fromClass(class {
   private lastPos: number = -1
   private completionTimeout: number | null = null
+  private lastTriggerTime: number = 0
   
   update(update: ViewUpdate) {
     // Only check on selection changes (cursor movement)
@@ -68,10 +69,24 @@ const cursorInQuotesPlugin = ViewPlugin.fromClass(class {
       this.completionTimeout = null
     }
     
+    // Check if autocomplete is already open - if so, don't re-trigger
+    const status = completionStatus(update.state)
+    if (status === 'active') {
+      return
+    }
+    
+    // Prevent re-triggering too quickly (within 500ms of last trigger)
+    // This prevents the plugin from interfering with autocomplete navigation
+    const now = Date.now()
+    if (now - this.lastTriggerTime < 500) {
+      return
+    }
+    
     // Check if cursor is inside prop value quotes
     if (isCursorInPropValue(update.view, pos)) {
       // Defer startCompletion to next tick to avoid calling during view update
       this.completionTimeout = window.setTimeout(() => {
+        this.lastTriggerTime = Date.now()
         startCompletion(update.view)
         this.completionTimeout = null
       }, 0)
@@ -173,37 +188,42 @@ export const CodeEditor = forwardRef<CodeEditorRef, CodeEditorProps>(({
     },
   }))
 
-  // Custom keymap for formatting
-  // Cmd/Ctrl+S hijacked from browser save, Alt+Shift+F as alternative
-  const customKeymap = keymap.of([
-    {
-      key: 'Mod-s',
-      preventDefault: true,
-      run: () => {
-        if (onFormat) {
-          onFormat()
-          return true
-        }
-        return false
+  // Memoize extensions to prevent CodeMirror from reinitializing on every render
+  // This fixes the autocomplete focus snapping bug caused by extension recreation
+  const extensions = useMemo(() => {
+    // Custom keymap for formatting
+    // Cmd/Ctrl+S hijacked from browser save, Alt+Shift+F as alternative
+    const customKeymap = keymap.of([
+      {
+        key: 'Mod-s',
+        preventDefault: true,
+        run: () => {
+          if (onFormat) {
+            onFormat()
+            return true
+          }
+          return false
+        },
       },
-    },
-    {
-      key: 'Alt-Shift-f',
-      preventDefault: true,
-      run: () => {
-        if (onFormat) {
-          onFormat()
-          return true
-        }
-        return false
+      {
+        key: 'Alt-Shift-f',
+        preventDefault: true,
+        run: () => {
+          if (onFormat) {
+            onFormat()
+            return true
+          }
+          return false
+        },
       },
-    },
-  ])
+    ])
 
-  // Custom autocomplete for Aksel components, props, and prop values
-  const akselCompletion = (context: CompletionContext): CompletionResult | null => {
+    // Custom autocomplete for Aksel components, props, and prop values
+    const akselCompletion = (context: CompletionContext): CompletionResult | null => {
+    console.log('[akselCompletion] Called at pos:', context.pos)
     const line = context.state.doc.lineAt(context.pos)
     const textBeforeCursor = line.text.slice(0, context.pos - line.from)
+    console.log('[akselCompletion] Text before cursor:', textBeforeCursor)
     
     // 1. Match prop values: e.g., <Button variant="|" or size="m|" or variant="d|"
     // Support component names with dots like Page.Block
@@ -230,6 +250,7 @@ export const CodeEditor = forwardRef<CodeEditorRef, CodeEditorProps>(({
             from: valueStart,
             options,
             filter: false, // Disable default filtering since we handle it
+            validFor: /^[\w-]*$/, // Keep results valid while typing word characters or hyphens
           }
         }
       }
@@ -265,6 +286,7 @@ export const CodeEditor = forwardRef<CodeEditorRef, CodeEditorProps>(({
           return {
             from: propStart,
             options,
+            validFor: /^\w*$/, // Keep results valid while typing word characters
           }
         }
       }
@@ -290,7 +312,7 @@ export const CodeEditor = forwardRef<CodeEditorRef, CodeEditorProps>(({
           label: snippet.name,
           type: 'class',
           detail: snippet.description,
-          info: snippet.template,
+          // info: snippet.template, // DISABLED: Testing if preview popover causes focus snapping
           apply: template, // Apply the parsed template without leading <
         }
       }).filter(opt => 
@@ -299,10 +321,13 @@ export const CodeEditor = forwardRef<CodeEditorRef, CodeEditorProps>(({
       )
 
       if (options.length > 0) {
-        return {
+        const result = {
           from: beforeLt.from + 1, // Start after the < character (keep user's <)
           options,
+          validFor: /^[\w.]*$/, // Keep results valid while typing word characters or dots
         }
+        console.log('[akselCompletion] Returning component completions:', options.length, 'items')
+        return result
       }
     }
 
@@ -317,7 +342,7 @@ export const CodeEditor = forwardRef<CodeEditorRef, CodeEditorProps>(({
           label: snippet.name,
           type: 'class',
           detail: snippet.description,
-          info: snippet.template,
+          // info: snippet.template, // DISABLED: Testing if preview popover causes focus snapping
           apply: template,
         }
       }).filter(opt => 
@@ -328,12 +353,29 @@ export const CodeEditor = forwardRef<CodeEditorRef, CodeEditorProps>(({
         return {
           from: word.from,
           options,
+          validFor: /^\w*$/, // Keep results valid while typing word characters
         }
       }
     }
 
-    return null
-  }
+      console.log('[akselCompletion] No match - returning null')
+      return null
+    }
+
+    // Return the extensions array
+    return [
+      javascript({ jsx: language === 'jsx', typescript: true }),
+      autocompletion({ 
+        override: [akselCompletion], 
+        activateOnTyping: true,
+        // Auto-trigger on specific characters
+        activateOnCompletion: () => true,
+      }),
+      cursorInQuotesPlugin,
+      customKeymap,
+      jsxLinter,
+    ]
+  }, [language, onFormat]) // Memoize based on language and onFormat
 
   return (
     <div className="code-editor" style={{ height }}>
@@ -341,18 +383,7 @@ export const CodeEditor = forwardRef<CodeEditorRef, CodeEditorProps>(({
         ref={editorRef}
         value={value}
         height={height}
-        extensions={[
-          javascript({ jsx: language === 'jsx', typescript: true }),
-          autocompletion({ 
-            override: [akselCompletion], 
-            activateOnTyping: true,
-            // Auto-trigger on specific characters
-            activateOnCompletion: () => true,
-          }),
-          cursorInQuotesPlugin,
-          customKeymap,
-          jsxLinter,
-        ]}
+        extensions={extensions}
         onChange={onChange}
         onUpdate={(update) => {
           if (onCursorChange && update.selectionSet) {
@@ -379,7 +410,7 @@ export const CodeEditor = forwardRef<CodeEditorRef, CodeEditorProps>(({
           syntaxHighlighting: true,
           bracketMatching: true,
           closeBrackets: true,
-          autocompletion: true,
+          autocompletion: false, // Disabled - we configure it manually in extensions
           rectangularSelection: true,
           crosshairCursor: true,
           highlightActiveLine: true,
