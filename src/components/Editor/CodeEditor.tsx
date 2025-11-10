@@ -1,12 +1,14 @@
 import CodeMirror from '@uiw/react-codemirror'
 import { javascript } from '@codemirror/lang-javascript'
-import { autocompletion, type CompletionContext, type CompletionResult } from '@codemirror/autocomplete'
+import { autocompletion, startCompletion, type CompletionContext, type CompletionResult } from '@codemirror/autocomplete'
+import { ViewPlugin, type EditorView, type ViewUpdate } from '@codemirror/view'
 import { keymap } from '@codemirror/view'
 import { undo, redo } from '@codemirror/commands'
 import { linter, type Diagnostic } from '@codemirror/lint'
 import { forwardRef, useImperativeHandle, useRef } from 'react'
 import type { ReactCodeMirrorRef } from '@uiw/react-codemirror'
 import { AKSEL_SNIPPETS } from '@/services/componentLibrary'
+import { getComponentProps, getPropValues, getPropDefinition } from '@/services/akselMetadata'
 import * as Babel from '@babel/standalone'
 import './CodeEditor.css'
 
@@ -24,6 +26,64 @@ interface CodeEditorProps {
   readOnly?: boolean
   height?: string
 }
+
+// Helper to detect if cursor is inside quotes of a prop value
+function isCursorInPropValue(view: EditorView, pos: number): boolean {
+  const line = view.state.doc.lineAt(pos)
+  const textBeforeCursor = line.text.slice(0, pos - line.from)
+  const textAfterCursor = line.text.slice(pos - line.from)
+  
+  // Check if cursor is between quotes: prop="...cursor..." or prop='...cursor...'
+  // Match: <Component prop="text before cursor
+  const beforeMatch = textBeforeCursor.match(/<\w+[^>]*\s+\w+=["']([^"']*)$/)
+  if (!beforeMatch) return false
+  
+  // Check that there's a closing quote after cursor (or end of prop value typing)
+  // We're inside quotes if we haven't hit the closing quote yet
+  const afterMatch = textAfterCursor.match(/^[^"']*["']/)
+  
+  // Inside quotes if: we have opening quote before AND (closing quote after OR still typing)
+  return beforeMatch !== null && (afterMatch !== null || textAfterCursor.length === 0 || !textAfterCursor.includes('>'))
+}
+
+// ViewPlugin to trigger autocomplete when cursor enters prop value quotes
+const cursorInQuotesPlugin = ViewPlugin.fromClass(class {
+  private lastPos: number = -1
+  private completionTimeout: number | null = null
+  
+  update(update: ViewUpdate) {
+    // Only check on selection changes (cursor movement)
+    if (!update.selectionSet) return
+    
+    const pos = update.state.selection.main.head
+    
+    // Skip if cursor hasn't actually moved to a different position
+    if (pos === this.lastPos) return
+    this.lastPos = pos
+    
+    // Clear any pending completion trigger
+    if (this.completionTimeout !== null) {
+      window.clearTimeout(this.completionTimeout)
+      this.completionTimeout = null
+    }
+    
+    // Check if cursor is inside prop value quotes
+    if (isCursorInPropValue(update.view, pos)) {
+      // Defer startCompletion to next tick to avoid calling during view update
+      this.completionTimeout = window.setTimeout(() => {
+        startCompletion(update.view)
+        this.completionTimeout = null
+      }, 0)
+    }
+  }
+  
+  destroy() {
+    // Clean up timeout on plugin destruction
+    if (this.completionTimeout !== null) {
+      window.clearTimeout(this.completionTimeout)
+    }
+  }
+})
 
 // Create JSX linter using Babel for syntax validation
 const jsxLinter = linter((view) => {
@@ -54,16 +114,30 @@ export default App;
     if (error && typeof error === 'object' && 'loc' in error) {
       const babelError = error as { loc?: { line: number; column: number }; message?: string }
       if (babelError.loc) {
-        // Adjust line number to account for wrapper (subtract 5 lines)
+        // Adjust line number to account for wrapper (subtract 6 lines)
         const actualLine = Math.max(0, babelError.loc.line - 6)
-        const pos = view.state.doc.line(actualLine + 1).from + (babelError.loc.column || 0)
+        const lineCount = view.state.doc.lines
         
-        diagnostics.push({
-          from: pos,
-          to: pos,
-          severity: 'error',
-          message: babelError.message?.split('\n')[0] || 'Syntax error',
-        })
+        // Ensure we don't try to access invalid line numbers
+        if (actualLine < lineCount) {
+          const pos = view.state.doc.line(actualLine + 1).from + (babelError.loc.column || 0)
+          
+          diagnostics.push({
+            from: pos,
+            to: pos,
+            severity: 'error',
+            message: babelError.message?.split('\n')[0] || 'Syntax error',
+          })
+        } else {
+          // If line is out of bounds, just report at end of document
+          const lastLine = view.state.doc.line(lineCount)
+          diagnostics.push({
+            from: lastLine.from,
+            to: lastLine.to,
+            severity: 'error',
+            message: babelError.message?.split('\n')[0] || 'Syntax error',
+          })
+        }
       }
     }
   }
@@ -125,11 +199,76 @@ export const CodeEditor = forwardRef<CodeEditorRef, CodeEditorProps>(({
     },
   ])
 
-  // Custom autocomplete for Aksel components
+  // Custom autocomplete for Aksel components, props, and prop values
   const akselCompletion = (context: CompletionContext): CompletionResult | null => {
-    // Match < followed by word characters (for JSX tags)
-    const beforeLt = context.matchBefore(/<\w*/)
+    const line = context.state.doc.lineAt(context.pos)
+    const textBeforeCursor = line.text.slice(0, context.pos - line.from)
     
+    // 1. Match prop values: e.g., <Button variant="|" or size="m|" or variant="d|"
+    // This matches when typing inside quotes OR when cursor is right after opening quote
+    const propValueMatch = textBeforeCursor.match(/<(\w+)[^>]*\s+(\w+)=["']([^"']*)$/)
+    if (propValueMatch) {
+      const [, componentName, propName, partialValue] = propValueMatch
+      const values = getPropValues(componentName, propName)
+      
+      if (values.length > 0) {
+        const propDef = getPropDefinition(componentName, propName)
+        const options = values
+          .filter((val) => val.toLowerCase().startsWith(partialValue.toLowerCase()))
+          .map((val) => ({
+            label: val,
+            type: 'value',
+            detail: propDef?.description || `${propName} value`,
+            apply: val,
+          }))
+        
+        if (options.length > 0) {
+          const valueStart = context.pos - partialValue.length
+          return {
+            from: valueStart,
+            options,
+            filter: false, // Disable default filtering since we handle it
+          }
+        }
+      }
+    }
+    
+    // 2. Match props after component name: e.g., <Button | or <Button v|
+    const propMatch = textBeforeCursor.match(/<(\w+)(?:\s+\w+(?:=["'][^"']*["'])?\s*)*\s+(\w*)$/)
+    if (propMatch) {
+      const [, componentName, partialProp] = propMatch
+      const props = getComponentProps(componentName)
+      
+      if (props.length > 0) {
+        const options = props
+          .filter((prop) => prop.toLowerCase().startsWith(partialProp.toLowerCase()))
+          .map((prop) => {
+            const propDef = getPropDefinition(componentName, prop)
+            const hasValues = propDef?.values && propDef.values.length > 0
+            
+            return {
+              label: prop,
+              type: 'property',
+              detail: propDef?.description || `${componentName} prop`,
+              // If prop has enum values, add ="..." template, otherwise just add prop name
+              apply: hasValues ? `${prop}=""` : prop,
+              // Move cursor inside quotes if we added them
+              boost: propDef?.required ? 10 : 0,
+            }
+          })
+        
+        if (options.length > 0) {
+          const propStart = context.pos - partialProp.length
+          return {
+            from: propStart,
+            options,
+          }
+        }
+      }
+    }
+    
+    // 3. Match < followed by word characters (for JSX component tags)
+    const beforeLt = context.matchBefore(/<\w*/)
     if (beforeLt) {
       const query = beforeLt.text.slice(1) // Remove the <
       
@@ -163,7 +302,7 @@ export const CodeEditor = forwardRef<CodeEditorRef, CodeEditorProps>(({
       }
     }
 
-    // Also match word at cursor (for non-JSX context)
+    // 4. Also match word at cursor (for non-JSX context)
     const word = context.matchBefore(/\w+/)
     if (word && word.text.length > 0) {
       const options = AKSEL_SNIPPETS.map((snippet) => {
@@ -200,7 +339,13 @@ export const CodeEditor = forwardRef<CodeEditorRef, CodeEditorProps>(({
         height={height}
         extensions={[
           javascript({ jsx: language === 'jsx', typescript: true }),
-          autocompletion({ override: [akselCompletion], activateOnTyping: true }),
+          autocompletion({ 
+            override: [akselCompletion], 
+            activateOnTyping: true,
+            // Auto-trigger on specific characters
+            activateOnCompletion: () => true,
+          }),
+          cursorInQuotesPlugin,
           customKeymap,
           jsxLinter,
         ]}

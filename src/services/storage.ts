@@ -260,9 +260,8 @@ export const clearStorage = (): void => {
 const createDefaultProject = (): Project => ({
   id: crypto.randomUUID(),
   name: 'Untitled Project',
-  jsxCode:
-    '// Start coding here\nimport { Button } from "@navikt/ds-react";\n\nexport default function App() {\n  return <Button>Hello Aksel!</Button>;\n}',
-  hooksCode: '// Define custom hooks here\nimport { useState } from "react";',
+  jsxCode: '<Button variant="primary" size="medium">Button text</Button>',
+  hooksCode: '// Define custom hooks here\n// Example:\n// export const useCounter = () => {\n//   const [count, setCount] = useState(0);\n//   return { count, increment: () => setCount(c => c + 1) };\n// };',
   viewportSize: 'MD',
   panelLayout: 'editor-left',
   version: '1.0.0',
@@ -270,7 +269,7 @@ const createDefaultProject = (): Project => ({
   lastModified: new Date().toISOString(),
 })
 
-const validateProjectSchema = (project: unknown): asserts project is Project => {
+const validateProjectSchema: (project: unknown) => asserts project is Project = (project) => {
   if (!project || typeof project !== 'object') {
     throw new Error('Project must be an object')
   }

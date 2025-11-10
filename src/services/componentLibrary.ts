@@ -34,7 +34,7 @@ export const AKSEL_SNIPPETS: ComponentSnippet[] = [
     name: 'Button',
     category: 'component',
     keywords: ['button', 'click', 'action', 'submit', 'primary', 'cta'],
-    template: '<Button variant="primary" size="medium">${1:Button text}</Button>',
+    template: '<Button variant="primary">${1:Button text}</Button>',
     description: 'Action button with variants',
     import: "import { Button } from '@navikt/ds-react';",
   },

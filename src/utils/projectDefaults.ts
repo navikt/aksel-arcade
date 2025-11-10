@@ -5,23 +5,8 @@ import type { PreviewState } from '@/types/preview'
 export const createDefaultProject = (): Project => ({
   id: crypto.randomUUID(),
   name: 'Untitled Project',
-  jsxCode: `export default function App() {
-  const { count, increment } = useCounter();
-
-  return (
-    <Stack direction="column" gap="4">
-      <Heading size="large">Counter: {count}</Heading>
-      <Button variant="primary" onClick={increment}>Increment</Button>
-    </Stack>
-  );
-}`,
-  hooksCode: `export const useCounter = () => {
-  const [count, setCount] = useState(0);
-  return {
-    count,
-    increment: () => setCount(c => c + 1)
-  };
-};`,
+  jsxCode: '<Button variant="primary">Button text</Button>',
+  hooksCode: '// Define custom hooks here\n// Example:\n// export const useCounter = () => {\n//   const [count, setCount] = useState(0);\n//   return { count, increment: () => setCount(c => c + 1) };\n// };',
   viewportSize: 'MD',
   panelLayout: 'editor-left',
   version: '1.0.0',
