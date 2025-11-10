@@ -35,7 +35,8 @@ function isCursorInPropValue(view: EditorView, pos: number): boolean {
   
   // Check if cursor is between quotes: prop="...cursor..." or prop='...cursor...'
   // Match: <Component prop="text before cursor
-  const beforeMatch = textBeforeCursor.match(/<\w+[^>]*\s+\w+=["']([^"']*)$/)
+  // Support component names with dots like Page.Block
+  const beforeMatch = textBeforeCursor.match(/<[\w.]+[^>]*\s+\w+=["']([^"']*)$/)
   if (!beforeMatch) return false
   
   // Check that there's a closing quote after cursor (or end of prop value typing)
@@ -205,8 +206,9 @@ export const CodeEditor = forwardRef<CodeEditorRef, CodeEditorProps>(({
     const textBeforeCursor = line.text.slice(0, context.pos - line.from)
     
     // 1. Match prop values: e.g., <Button variant="|" or size="m|" or variant="d|"
+    // Support component names with dots like Page.Block
     // This matches when typing inside quotes OR when cursor is right after opening quote
-    const propValueMatch = textBeforeCursor.match(/<(\w+)[^>]*\s+(\w+)=["']([^"']*)$/)
+    const propValueMatch = textBeforeCursor.match(/<([\w.]+)[^>]*\s+(\w+)=["']([^"']*)$/)
     if (propValueMatch) {
       const [, componentName, propName, partialValue] = propValueMatch
       const values = getPropValues(componentName, propName)
@@ -234,7 +236,8 @@ export const CodeEditor = forwardRef<CodeEditorRef, CodeEditorProps>(({
     }
     
     // 2. Match props after component name: e.g., <Button | or <Button v|
-    const propMatch = textBeforeCursor.match(/<(\w+)(?:\s+\w+(?:=["'][^"']*["'])?\s*)*\s+(\w*)$/)
+    // Support component names with dots like Page.Block
+    const propMatch = textBeforeCursor.match(/<([\w.]+)(?:\s+\w+(?:=["'][^"']*["'])?\s*)*\s+(\w*)$/)
     if (propMatch) {
       const [, componentName, partialProp] = propMatch
       const props = getComponentProps(componentName)
@@ -268,7 +271,8 @@ export const CodeEditor = forwardRef<CodeEditorRef, CodeEditorProps>(({
     }
     
     // 3. Match < followed by word characters (for JSX component tags)
-    const beforeLt = context.matchBefore(/<\w*/)
+    // Support component names with dots like Page.Block
+    const beforeLt = context.matchBefore(/<[\w.]*/)
     if (beforeLt) {
       const query = beforeLt.text.slice(1) // Remove the <
       
