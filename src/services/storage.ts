@@ -1,4 +1,5 @@
 import type { Project, ProjectSizeStatus } from '@/types/project'
+import { AKSEL_METADATA, AI_INSTRUCTIONS, extractUsedComponents } from '@/data/akselMetadata'
 
 const STORAGE_KEY = 'aksel-arcade:project'
 const MAX_PROJECT_SIZE_BYTES = 5 * 1024 * 1024 // 5MB
@@ -178,8 +179,46 @@ export const loadProject = (): LoadResult => {
   }
 }
 
-export const exportProject = (project: Project): void => {
-  const json = JSON.stringify(project, null, 2)
+export const exportProject = (project: Project, includeAIMeta = true): void => {
+  // Build export data with AI metadata
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const exportData: any = {
+    // Core project data (always included)
+    version: project.version,
+    id: project.id,
+    name: project.name,
+    createdAt: project.createdAt,
+    lastModified: project.lastModified,
+    code: {
+      jsxCode: project.jsxCode,
+      hooksCode: project.hooksCode,
+    },
+    ui: {
+      viewportSize: project.viewportSize,
+      panelLayout: project.panelLayout,
+    },
+  }
+
+  // Add AI enrichment metadata (optional)
+  if (includeAIMeta) {
+    const usedComponents = extractUsedComponents(project.jsxCode)
+
+    exportData.meta = {
+      designSystem: AKSEL_METADATA.designSystem,
+      designSystemVersion: AKSEL_METADATA.designSystemVersion,
+      framework: AKSEL_METADATA.framework,
+      runtime: AKSEL_METADATA.runtime,
+      packages: AKSEL_METADATA.packages,
+      setup: AKSEL_METADATA.setup,
+      tokens: AKSEL_METADATA.tokens,
+      breakpoints: AKSEL_METADATA.breakpoints,
+      documentation: AKSEL_METADATA.documentation,
+      usedComponents,
+      aiInstructions: AI_INSTRUCTIONS,
+    }
+  }
+
+  const json = JSON.stringify(exportData, null, 2)
   const blob = new Blob([json], { type: 'application/json' })
   const url = URL.createObjectURL(blob)
 
@@ -211,21 +250,43 @@ export const importProject = async (file: File): Promise<ImportResult> => {
       }
     }
 
-    // Validate and migrate
+    // Extract project data from new or old format
     let project: Project
     try {
-      if (
-        imported &&
-        typeof imported === 'object' &&
-        'version' in imported &&
-        imported.version !== CURRENT_VERSION
-      ) {
-        project = migrateProject(imported)
-      } else {
-        project = imported as Project
-      }
+      if (imported && typeof imported === 'object') {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const obj = imported as Record<string, any>
 
-      validateProjectSchema(project)
+        // New format with nested structure
+        if ('code' in obj && 'ui' in obj) {
+          project = {
+            version: obj.version || CURRENT_VERSION,
+            id: obj.id,
+            name: obj.name,
+            jsxCode: obj.code.jsxCode,
+            hooksCode: obj.code.hooksCode,
+            viewportSize: obj.ui.viewportSize,
+            panelLayout: obj.ui.panelLayout,
+            createdAt: obj.createdAt,
+            lastModified: obj.lastModified,
+          }
+          // Note: obj.meta is completely ignored ✅
+        }
+        // Old flat format (backward compatibility)
+        else if ('jsxCode' in obj && 'hooksCode' in obj) {
+          if (obj.version !== CURRENT_VERSION) {
+            project = migrateProject(obj)
+          } else {
+            project = obj as Project
+          }
+        } else {
+          throw new Error('Unrecognized project format')
+        }
+
+        validateProjectSchema(project)
+      } else {
+        throw new Error('Invalid project data')
+      }
     } catch (error) {
       return {
         project: null,
