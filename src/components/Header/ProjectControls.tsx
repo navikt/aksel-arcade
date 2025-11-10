@@ -1,6 +1,6 @@
 import { useRef } from 'react'
 import { Button } from '@navikt/ds-react'
-import { UploadIcon, DownloadIcon } from '@navikt/aksel-icons'
+import { UploadIcon, DownloadIcon, CogIcon } from '@navikt/aksel-icons'
 import type { Project } from '@/types/project'
 import { exportProject, importProject } from '@/services/storage'
 import './ProjectControls.css'
@@ -60,22 +60,30 @@ export const ProjectControls = ({
   return (
     <div className="project-controls">
       <Button
-        variant="secondary"
+        variant="tertiary"
         size="small"
-        onClick={handleImportClick}
-        icon={<UploadIcon aria-hidden />}
+        onClick={handleExport}
+        icon={<DownloadIcon title="Export project" fontSize="1rem" />}
       >
-        Import
+        Export json
       </Button>
 
       <Button
-        variant="secondary"
+        variant="tertiary"
         size="small"
-        onClick={handleExport}
-        icon={<DownloadIcon aria-hidden />}
+        onClick={handleImportClick}
+        icon={<UploadIcon title="Import project" fontSize="1rem" />}
       >
-        Export
+        Import json
       </Button>
+
+      <Button
+        variant="tertiary-neutral"
+        size="xsmall"
+        icon={<CogIcon title="Settings" fontSize="1.5rem" />}
+        onClick={() => console.log('Settings clicked')}
+        aria-label="Settings"
+      />
 
       <input
         ref={fileInputRef}
