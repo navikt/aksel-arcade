@@ -36,7 +36,8 @@ function isCursorInPropValue(view: EditorView, pos: number): boolean {
   // Check if cursor is between quotes: prop="...cursor..." or prop='...cursor...'
   // Match: <Component prop="text before cursor
   // Support component names with dots like Page.Block
-  const beforeMatch = textBeforeCursor.match(/<[\w.]+[^>]*\s+\w+=["']([^"']*)$/)
+  // Support prop names with hyphens like data-color
+  const beforeMatch = textBeforeCursor.match(/<[\w.]+[^>]*\s+[\w-]+=["']([^"']*)$/)
   if (!beforeMatch) return false
   
   // Check that there's a closing quote after cursor (or end of prop value typing)
@@ -220,15 +221,14 @@ export const CodeEditor = forwardRef<CodeEditorRef, CodeEditorProps>(({
 
     // Custom autocomplete for Aksel components, props, and prop values
     const akselCompletion = (context: CompletionContext): CompletionResult | null => {
-    console.log('[akselCompletion] Called at pos:', context.pos)
     const line = context.state.doc.lineAt(context.pos)
     const textBeforeCursor = line.text.slice(0, context.pos - line.from)
-    console.log('[akselCompletion] Text before cursor:', textBeforeCursor)
     
     // 1. Match prop values: e.g., <Button variant="|" or size="m|" or variant="d|"
     // Support component names with dots like Page.Block
+    // Support prop names with hyphens like data-color
     // This matches when typing inside quotes OR when cursor is right after opening quote
-    const propValueMatch = textBeforeCursor.match(/<([\w.]+)[^>]*\s+(\w+)=["']([^"']*)$/)
+    const propValueMatch = textBeforeCursor.match(/<([\w.]+)[^>]*\s+([\w-]+)=["']([^"']*)$/)
     if (propValueMatch) {
       const [, componentName, propName, partialValue] = propValueMatch
       const values = getPropValues(componentName, propName)
@@ -258,7 +258,8 @@ export const CodeEditor = forwardRef<CodeEditorRef, CodeEditorProps>(({
     
     // 2. Match props after component name: e.g., <Button | or <Button v|
     // Support component names with dots like Page.Block
-    const propMatch = textBeforeCursor.match(/<([\w.]+)(?:\s+\w+(?:=["'][^"']*["'])?\s*)*\s+(\w*)$/)
+    // Support prop names with hyphens like data-color
+    const propMatch = textBeforeCursor.match(/<([\w.]+)(?:\s+[\w-]+(?:=["'][^"']*["'])?\s*)*\s+([\w-]*)$/)
     if (propMatch) {
       const [, componentName, partialProp] = propMatch
       const props = getComponentProps(componentName)
@@ -286,7 +287,7 @@ export const CodeEditor = forwardRef<CodeEditorRef, CodeEditorProps>(({
           return {
             from: propStart,
             options,
-            validFor: /^\w*$/, // Keep results valid while typing word characters
+            validFor: /^[\w-]*$/, // Keep results valid while typing word characters or hyphens
           }
         }
       }
@@ -358,7 +359,6 @@ export const CodeEditor = forwardRef<CodeEditorRef, CodeEditorProps>(({
       }
     }
 
-      console.log('[akselCompletion] No match - returning null')
       return null
     }
 
@@ -368,7 +368,7 @@ export const CodeEditor = forwardRef<CodeEditorRef, CodeEditorProps>(({
       autocompletion({ 
         override: [akselCompletion], 
         activateOnTyping: true,
-        // Auto-trigger on specific characters
+        // Auto-trigger completion after selecting an option
         activateOnCompletion: () => true,
       }),
       cursorInQuotesPlugin,

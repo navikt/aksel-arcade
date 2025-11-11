@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Debug textColor</title>
+  <link rel="stylesheet" href="http://localhost:5173/node_modules/@navikt/ds-css/dist/darkside/index.css">
+  <script type="module">
+    import { Heading, BodyLong } from 'http://localhost:5173/node_modules/@navikt/ds-react/esm/index.js';
+    import React from 'http://localhost:5173/node_modules/react/index.js';
+    import { createRoot } from 'http://localhost:5173/node_modules/react-dom/client.js';
+    
+    // Test 1: with --ax prefix
+    const Test1 = React.createElement(Heading, { 
+      level: '1', 
+      textColor: '--ax-text-accent-subtle' 
+    }, 'Test with --ax prefix');
+    
+    // Test 2: without prefix
+    const Test2 = React.createElement(Heading, { 
+      level: '1', 
+      textColor: 'accent-subtle' 
+    }, 'Test without prefix');
+    
+    // Test 3: check what textColor values are valid
+    console.log('Testing textColor prop values...');
+    
+    const root = createRoot(document.getElementById('root'));
+    root.render(React.createElement('div', null, Test1, Test2));
+  </script>
+</head>
+<body>
+  <div id="root"></div>
+</body>
+</html>

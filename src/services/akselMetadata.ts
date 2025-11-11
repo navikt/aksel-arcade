@@ -25,6 +25,270 @@ export interface ComponentMetadata {
   description: string
 }
 
+/**
+ * Aksel Darkside spacing scale tokens
+ * Based on: https://aksel.nav.no/grunnleggende/styling/design-tokens
+ */
+const SPACING_TOKENS = [
+  'space-0',   // 0rem
+  'space-1',   // 0.0625rem
+  'space-2',   // 0.125rem
+  'space-4',   // 0.25rem
+  'space-6',   // 0.375rem
+  'space-8',   // 0.5rem
+  'space-12',  // 0.75rem
+  'space-16',  // 1rem
+  'space-20',  // 1.25rem
+  'space-24',  // 1.5rem
+  'space-28',  // 1.75rem
+  'space-32',  // 2rem
+  'space-36',  // 2.25rem
+  'space-40',  // 2.5rem
+  'space-44',  // 2.75rem
+  'space-48',  // 3rem
+  'space-56',  // 3.5rem
+  'space-64',  // 4rem
+  'space-72',  // 4.5rem
+  'space-80',  // 5rem
+  'space-96',  // 6rem
+  'space-128', // 8rem
+]
+
+const SPACING_TOKENS_WITH_AUTO = [...SPACING_TOKENS, 'auto']
+
+/**
+ * Aksel Darkside background color tokens (--ax prefix)
+ * Based on: https://aksel.nav.no/grunnleggende/styling/design-tokens
+ */
+const BACKGROUND_TOKENS = [
+  // Root
+  '--ax-bg-default',
+  '--ax-bg-input',
+  '--ax-bg-raised',
+  '--ax-bg-sunken',
+  '--ax-bg-overlay',
+  // Neutral
+  '--ax-bg-neutral-soft',
+  '--ax-bg-neutral-softA',
+  '--ax-bg-neutral-moderate',
+  '--ax-bg-neutral-moderateA',
+  '--ax-bg-neutral-moderate-hover',
+  '--ax-bg-neutral-moderate-hoverA',
+  '--ax-bg-neutral-moderate-pressed',
+  '--ax-bg-neutral-moderate-pressedA',
+  '--ax-bg-neutral-strong',
+  '--ax-bg-neutral-strong-hover',
+  '--ax-bg-neutral-strong-pressed',
+  // Accent
+  '--ax-bg-accent-soft',
+  '--ax-bg-accent-softA',
+  '--ax-bg-accent-moderate',
+  '--ax-bg-accent-moderateA',
+  '--ax-bg-accent-moderate-hover',
+  '--ax-bg-accent-moderate-hoverA',
+  '--ax-bg-accent-moderate-pressed',
+  '--ax-bg-accent-moderate-pressedA',
+  '--ax-bg-accent-strong',
+  '--ax-bg-accent-strong-hover',
+  '--ax-bg-accent-strong-pressed',
+  // Success
+  '--ax-bg-success-soft',
+  '--ax-bg-success-softA',
+  '--ax-bg-success-moderate',
+  '--ax-bg-success-moderateA',
+  '--ax-bg-success-moderate-hover',
+  '--ax-bg-success-moderate-hoverA',
+  '--ax-bg-success-moderate-pressed',
+  '--ax-bg-success-moderate-pressedA',
+  '--ax-bg-success-strong',
+  '--ax-bg-success-strong-hover',
+  '--ax-bg-success-strong-pressed',
+  // Warning
+  '--ax-bg-warning-soft',
+  '--ax-bg-warning-softA',
+  '--ax-bg-warning-moderate',
+  '--ax-bg-warning-moderateA',
+  '--ax-bg-warning-moderate-hover',
+  '--ax-bg-warning-moderate-hoverA',
+  '--ax-bg-warning-moderate-pressed',
+  '--ax-bg-warning-moderate-pressedA',
+  '--ax-bg-warning-strong',
+  '--ax-bg-warning-strong-hover',
+  '--ax-bg-warning-strong-pressed',
+  // Danger
+  '--ax-bg-danger-soft',
+  '--ax-bg-danger-softA',
+  '--ax-bg-danger-moderate',
+  '--ax-bg-danger-moderateA',
+  '--ax-bg-danger-moderate-hover',
+  '--ax-bg-danger-moderate-hoverA',
+  '--ax-bg-danger-moderate-pressed',
+  '--ax-bg-danger-moderate-pressedA',
+  '--ax-bg-danger-strong',
+  '--ax-bg-danger-strong-hover',
+  '--ax-bg-danger-strong-pressed',
+  // Info
+  '--ax-bg-info-soft',
+  '--ax-bg-info-softA',
+  '--ax-bg-info-moderate',
+  '--ax-bg-info-moderateA',
+  '--ax-bg-info-moderate-hover',
+  '--ax-bg-info-moderate-hoverA',
+  '--ax-bg-info-moderate-pressed',
+  '--ax-bg-info-moderate-pressedA',
+  '--ax-bg-info-strong',
+  '--ax-bg-info-strong-hover',
+  '--ax-bg-info-strong-pressed',
+  // Brand magenta
+  '--ax-bg-brand-magenta-soft',
+  '--ax-bg-brand-magenta-softA',
+  '--ax-bg-brand-magenta-moderate',
+  '--ax-bg-brand-magenta-moderateA',
+  '--ax-bg-brand-magenta-moderate-hover',
+  '--ax-bg-brand-magenta-moderate-hoverA',
+  '--ax-bg-brand-magenta-moderate-pressed',
+  '--ax-bg-brand-magenta-moderate-pressedA',
+  '--ax-bg-brand-magenta-strong',
+  '--ax-bg-brand-magenta-strong-hover',
+  '--ax-bg-brand-magenta-strong-pressed',
+  // Brand beige
+  '--ax-bg-brand-beige-soft',
+  '--ax-bg-brand-beige-softA',
+  '--ax-bg-brand-beige-moderate',
+  '--ax-bg-brand-beige-moderateA',
+  '--ax-bg-brand-beige-moderate-hover',
+  '--ax-bg-brand-beige-moderate-hoverA',
+  '--ax-bg-brand-beige-moderate-pressed',
+  '--ax-bg-brand-beige-moderate-pressedA',
+  '--ax-bg-brand-beige-strong',
+  '--ax-bg-brand-beige-strong-hover',
+  '--ax-bg-brand-beige-strong-pressed',
+  // Brand blue
+  '--ax-bg-brand-blue-soft',
+  '--ax-bg-brand-blue-softA',
+  '--ax-bg-brand-blue-moderate',
+  '--ax-bg-brand-blue-moderateA',
+  '--ax-bg-brand-blue-moderate-hover',
+  '--ax-bg-brand-blue-moderate-hoverA',
+  '--ax-bg-brand-blue-moderate-pressed',
+  '--ax-bg-brand-blue-moderate-pressedA',
+  '--ax-bg-brand-blue-strong',
+  '--ax-bg-brand-blue-strong-hover',
+  '--ax-bg-brand-blue-strong-pressed',
+  // Meta lime
+  '--ax-bg-meta-lime-soft',
+  '--ax-bg-meta-lime-softA',
+  '--ax-bg-meta-lime-moderate',
+  '--ax-bg-meta-lime-moderateA',
+  '--ax-bg-meta-lime-moderate-hover',
+  '--ax-bg-meta-lime-moderate-hoverA',
+  '--ax-bg-meta-lime-moderate-pressed',
+  '--ax-bg-meta-lime-moderate-pressedA',
+  '--ax-bg-meta-lime-strong',
+  '--ax-bg-meta-lime-strong-hover',
+  '--ax-bg-meta-lime-strong-pressed',
+  // Meta purple
+  '--ax-bg-meta-purple-soft',
+  '--ax-bg-meta-purple-softA',
+  '--ax-bg-meta-purple-moderate',
+  '--ax-bg-meta-purple-moderateA',
+  '--ax-bg-meta-purple-moderate-hover',
+  '--ax-bg-meta-purple-moderate-hoverA',
+  '--ax-bg-meta-purple-moderate-pressed',
+  '--ax-bg-meta-purple-moderate-pressedA',
+  '--ax-bg-meta-purple-strong',
+  '--ax-bg-meta-purple-strong-hover',
+  '--ax-bg-meta-purple-strong-pressed',
+]
+
+/**
+ * Aksel Darkside text color intensity values for textColor prop
+ * Based on: https://aksel.nav.no/grunnleggende/styling/design-tokens
+ */
+const TEXT_COLOR_INTENSITY = ['default', 'subtle', 'decoration', 'contrast']
+
+/**
+ * Aksel Darkside color types for data-color attribute
+ * Used in combination with textColor to define the final text color
+ */
+const DATA_COLOR_VALUES = [
+  'neutral',
+  'accent',
+  'success',
+  'warning',
+  'danger',
+  'info',
+  'brand-magenta',
+  'brand-beige',
+  'brand-blue',
+  'meta-lime',
+  'meta-purple',
+]
+
+/**
+ * Aksel Darkside border color tokens (--ax prefix)
+ * Based on: https://aksel.nav.no/grunnleggende/styling/design-tokens
+ */
+const BORDER_COLOR_TOKENS = [
+  // Root
+  '--ax-border-focus',
+  // Neutral
+  '--ax-border-neutral',
+  '--ax-border-neutral-subtle',
+  '--ax-border-neutral-subtleA',
+  '--ax-border-neutral-strong',
+  // Accent
+  '--ax-border-accent',
+  '--ax-border-accent-subtle',
+  '--ax-border-accent-subtleA',
+  '--ax-border-accent-strong',
+  // Success
+  '--ax-border-success',
+  '--ax-border-success-subtle',
+  '--ax-border-success-subtleA',
+  '--ax-border-success-strong',
+  // Warning
+  '--ax-border-warning',
+  '--ax-border-warning-subtle',
+  '--ax-border-warning-subtleA',
+  '--ax-border-warning-strong',
+  // Danger
+  '--ax-border-danger',
+  '--ax-border-danger-subtle',
+  '--ax-border-danger-subtleA',
+  '--ax-border-danger-strong',
+  // Info
+  '--ax-border-info',
+  '--ax-border-info-subtle',
+  '--ax-border-info-subtleA',
+  '--ax-border-info-strong',
+  // Brand magenta
+  '--ax-border-brand-magenta',
+  '--ax-border-brand-magenta-subtle',
+  '--ax-border-brand-magenta-subtleA',
+  '--ax-border-brand-magenta-strong',
+  // Brand beige
+  '--ax-border-brand-beige',
+  '--ax-border-brand-beige-subtle',
+  '--ax-border-brand-beige-subtleA',
+  '--ax-border-brand-beige-strong',
+  // Brand blue
+  '--ax-border-brand-blue',
+  '--ax-border-brand-blue-subtle',
+  '--ax-border-brand-blue-subtleA',
+  '--ax-border-brand-blue-strong',
+  // Meta lime
+  '--ax-border-meta-lime',
+  '--ax-border-meta-lime-subtle',
+  '--ax-border-meta-lime-subtleA',
+  '--ax-border-meta-lime-strong',
+  // Meta purple
+  '--ax-border-meta-purple',
+  '--ax-border-meta-purple-subtle',
+  '--ax-border-meta-purple-subtleA',
+  '--ax-border-meta-purple-strong',
+]
+
 export const AKSEL_COMPONENTS: Record<string, ComponentMetadata> = {
   Button: {
     name: 'Button',
@@ -293,50 +557,185 @@ export const AKSEL_COMPONENTS: Record<string, ComponentMetadata> = {
       {
         name: 'padding',
         type: 'string',
-        values: ['0', '1', '2', '3', '4', '5', '6', '7', '8', '10', '12', '16', '20', '24', '32'],
-        description: 'Padding using design tokens',
-      },
-      {
-        name: 'paddingBlock',
-        type: 'string',
-        values: ['0', '1', '2', '3', '4', '5', '6', '7', '8', '10', '12', '16', '20', '24', '32'],
-        description: 'Vertical padding',
+        values: SPACING_TOKENS,
+        description: 'Padding around children',
       },
       {
         name: 'paddingInline',
         type: 'string',
-        values: ['0', '1', '2', '3', '4', '5', '6', '7', '8', '10', '12', '16', '20', '24', '32'],
-        description: 'Horizontal padding',
+        values: SPACING_TOKENS,
+        description: 'Horizontal padding around children',
+      },
+      {
+        name: 'paddingBlock',
+        type: 'string',
+        values: SPACING_TOKENS,
+        description: 'Vertical padding around children',
+      },
+      {
+        name: 'margin',
+        type: 'string',
+        values: SPACING_TOKENS,
+        description: 'Margin around element',
+      },
+      {
+        name: 'marginInline',
+        type: 'string',
+        values: SPACING_TOKENS_WITH_AUTO,
+        description: 'Horizontal margin around element',
+      },
+      {
+        name: 'marginBlock',
+        type: 'string',
+        values: SPACING_TOKENS_WITH_AUTO,
+        description: 'Vertical margin around element',
       },
       {
         name: 'background',
         type: 'string',
-        values: ['surface-default', 'surface-subtle', 'surface-neutral-subtle'],
-        description: 'Background color',
-      },
-      {
-        name: 'borderRadius',
-        type: 'string',
-        values: ['small', 'medium', 'large', 'xlarge', 'full'],
-        description: 'Border radius',
-      },
-      {
-        name: 'borderWidth',
-        type: 'string',
-        values: ['1', '2'],
-        description: 'Border width',
+        values: BACKGROUND_TOKENS,
+        description: 'CSS background-color property (accepts background/surface color token)',
       },
       {
         name: 'borderColor',
         type: 'string',
-        values: ['border-default', 'border-subtle', 'border-strong'],
-        description: 'Border color',
+        values: BORDER_COLOR_TOKENS,
+        description: 'CSS border-color property (accepts border color token)',
+      },
+      {
+        name: 'borderRadius',
+        type: 'string',
+        values: ['0', '2', '4', '6', '8', '12', '16', '20', '24', 'full'],
+        description: 'CSS border-radius property',
+      },
+      {
+        name: 'borderWidth',
+        type: 'string',
+        values: ['0', '1', '2', '3', '4', '5'],
+        description: 'CSS border-width property (no border if not set)',
       },
       {
         name: 'shadow',
         type: 'string',
-        values: ['xsmall', 'small', 'medium', 'large', 'xlarge'],
-        description: 'Box shadow',
+        values: ['dialog'],
+        description: 'Shadow on box (accepts shadow token)',
+      },
+      {
+        name: 'width',
+        type: 'string',
+        description: 'CSS width',
+      },
+      {
+        name: 'minWidth',
+        type: 'string',
+        description: 'CSS min-width',
+      },
+      {
+        name: 'maxWidth',
+        type: 'string',
+        description: 'CSS max-width',
+      },
+      {
+        name: 'height',
+        type: 'string',
+        description: 'CSS height',
+      },
+      {
+        name: 'minHeight',
+        type: 'string',
+        description: 'CSS min-height',
+      },
+      {
+        name: 'maxHeight',
+        type: 'string',
+        description: 'CSS max-height',
+      },
+      {
+        name: 'position',
+        type: 'string',
+        values: ['static', 'relative', 'absolute', 'fixed', 'sticky'],
+        description: 'CSS position',
+      },
+      {
+        name: 'inset',
+        type: 'string',
+        values: SPACING_TOKENS,
+        description: 'CSS inset',
+      },
+      {
+        name: 'top',
+        type: 'string',
+        values: SPACING_TOKENS,
+        description: 'CSS top',
+      },
+      {
+        name: 'right',
+        type: 'string',
+        values: SPACING_TOKENS,
+        description: 'CSS right',
+      },
+      {
+        name: 'bottom',
+        type: 'string',
+        values: SPACING_TOKENS,
+        description: 'CSS bottom',
+      },
+      {
+        name: 'left',
+        type: 'string',
+        values: SPACING_TOKENS,
+        description: 'CSS left',
+      },
+      {
+        name: 'overflow',
+        type: 'string',
+        values: ['auto', 'visible', 'hidden', 'clip', 'scroll'],
+        description: 'CSS overflow',
+      },
+      {
+        name: 'overflowX',
+        type: 'string',
+        values: ['auto', 'visible', 'hidden', 'clip', 'scroll'],
+        description: 'CSS overflow-x',
+      },
+      {
+        name: 'overflowY',
+        type: 'string',
+        values: ['auto', 'visible', 'hidden', 'clip', 'scroll'],
+        description: 'CSS overflow-y',
+      },
+      {
+        name: 'flexBasis',
+        type: 'string',
+        description: 'CSS flex-basis',
+      },
+      {
+        name: 'flexShrink',
+        type: 'string',
+        values: ['0', '1'],
+        description: 'CSS flex-shrink',
+      },
+      {
+        name: 'flexGrow',
+        type: 'string',
+        values: ['0', '1'],
+        description: 'CSS flex-grow',
+      },
+      {
+        name: 'gridColumn',
+        type: 'string',
+        description: 'CSS grid-column',
+      },
+      {
+        name: 'asChild',
+        type: 'boolean',
+        values: ['true', 'false'],
+        description: 'Merge with child element',
+      },
+      {
+        name: 'as',
+        type: 'string',
+        description: 'HTML element to render as',
       },
     ],
   },
@@ -348,7 +747,7 @@ export const AKSEL_COMPONENTS: Record<string, ComponentMetadata> = {
       {
         name: 'gap',
         type: 'string',
-        values: ['0', '1', '2', '3', '4', '5', '6', '7', '8', '10', '12', '16', '20', '24', '32'],
+        values: SPACING_TOKENS,
         description: 'Gap between items',
       },
       {
@@ -390,7 +789,7 @@ export const AKSEL_COMPONENTS: Record<string, ComponentMetadata> = {
       {
         name: 'gap',
         type: 'string',
-        values: ['0', '1', '2', '3', '4', '5', '6', '7', '8', '10', '12', '16', '20', '24', '32'],
+        values: SPACING_TOKENS,
         description: 'Gap between items',
       },
     ],
@@ -467,7 +866,7 @@ export const AKSEL_COMPONENTS: Record<string, ComponentMetadata> = {
       {
         name: 'gap',
         type: 'string',
-        values: ['0', '1', '2', '3', '4', '5', '6', '7', '8', '10', '12', '16', '20', '24', '32'],
+        values: SPACING_TOKENS,
         description: 'Gap between grid items',
       },
       {
@@ -486,7 +885,7 @@ export const AKSEL_COMPONENTS: Record<string, ComponentMetadata> = {
       {
         name: 'gap',
         type: 'string',
-        values: ['0', '1', '2', '3', '4', '5', '6', '7', '8', '10', '12', '16', '20', '24', '32'],
+        values: SPACING_TOKENS,
         description: 'Space between items',
       },
       {
@@ -507,6 +906,159 @@ export const AKSEL_COMPONENTS: Record<string, ComponentMetadata> = {
         values: ['true', 'false'],
         description: 'Enable flex-wrap',
       },
+      {
+        name: 'padding',
+        type: 'string',
+        values: SPACING_TOKENS,
+        description: 'Padding around children',
+      },
+      {
+        name: 'paddingInline',
+        type: 'string',
+        values: SPACING_TOKENS,
+        description: 'Horizontal padding',
+      },
+      {
+        name: 'paddingBlock',
+        type: 'string',
+        values: SPACING_TOKENS,
+        description: 'Vertical padding',
+      },
+      {
+        name: 'margin',
+        type: 'string',
+        values: SPACING_TOKENS_WITH_AUTO,
+        description: 'Margin around element',
+      },
+      {
+        name: 'marginInline',
+        type: 'string',
+        values: SPACING_TOKENS_WITH_AUTO,
+        description: 'Horizontal margin',
+      },
+      {
+        name: 'marginBlock',
+        type: 'string',
+        values: SPACING_TOKENS_WITH_AUTO,
+        description: 'Vertical margin',
+      },
+      {
+        name: 'width',
+        type: 'string',
+        description: 'CSS width (e.g., "100%", "300px", "50vw")',
+      },
+      {
+        name: 'minWidth',
+        type: 'string',
+        description: 'CSS min-width',
+      },
+      {
+        name: 'maxWidth',
+        type: 'string',
+        description: 'CSS max-width',
+      },
+      {
+        name: 'height',
+        type: 'string',
+        description: 'CSS height',
+      },
+      {
+        name: 'minHeight',
+        type: 'string',
+        description: 'CSS min-height',
+      },
+      {
+        name: 'maxHeight',
+        type: 'string',
+        description: 'CSS max-height',
+      },
+      {
+        name: 'position',
+        type: 'string',
+        values: ['static', 'relative', 'absolute', 'fixed', 'sticky'],
+        description: 'CSS position',
+      },
+      {
+        name: 'inset',
+        type: 'string',
+        values: SPACING_TOKENS,
+        description: 'CSS inset property',
+      },
+      {
+        name: 'top',
+        type: 'string',
+        values: SPACING_TOKENS,
+        description: 'CSS top',
+      },
+      {
+        name: 'right',
+        type: 'string',
+        values: SPACING_TOKENS,
+        description: 'CSS right',
+      },
+      {
+        name: 'bottom',
+        type: 'string',
+        values: SPACING_TOKENS,
+        description: 'CSS bottom',
+      },
+      {
+        name: 'left',
+        type: 'string',
+        values: SPACING_TOKENS,
+        description: 'CSS left',
+      },
+      {
+        name: 'overflow',
+        type: 'string',
+        values: ['hidden', 'auto', 'visible', 'clip', 'scroll'],
+        description: 'CSS overflow',
+      },
+      {
+        name: 'overflowX',
+        type: 'string',
+        values: ['hidden', 'auto', 'visible', 'clip', 'scroll'],
+        description: 'CSS overflow-x',
+      },
+      {
+        name: 'overflowY',
+        type: 'string',
+        values: ['hidden', 'auto', 'visible', 'clip', 'scroll'],
+        description: 'CSS overflow-y',
+      },
+      {
+        name: 'flexBasis',
+        type: 'string',
+        description: 'CSS flex-basis',
+      },
+      {
+        name: 'flexShrink',
+        type: 'string',
+        values: ['0', '1'],
+        description: 'CSS flex-shrink',
+      },
+      {
+        name: 'flexGrow',
+        type: 'string',
+        values: ['0', '1'],
+        description: 'CSS flex-grow',
+      },
+      {
+        name: 'gridColumn',
+        type: 'string',
+        description: 'CSS grid-column',
+      },
+      {
+        name: 'asChild',
+        type: 'boolean',
+        values: ['true', 'false'],
+        description: 'Merge with child element',
+      },
+      {
+        name: 'as',
+        type: 'string',
+        description: 'HTML element to render as',
+      },
     ],
   },
 
@@ -517,7 +1069,7 @@ export const AKSEL_COMPONENTS: Record<string, ComponentMetadata> = {
       {
         name: 'gap',
         type: 'string',
-        values: ['0', '1', '2', '3', '4', '5', '6', '7', '8', '10', '12', '16', '20', '24', '32'],
+        values: SPACING_TOKENS,
         description: 'Space between items',
       },
       {
@@ -531,6 +1083,159 @@ export const AKSEL_COMPONENTS: Record<string, ComponentMetadata> = {
         type: 'string',
         values: ['start', 'center', 'end', 'space-around', 'space-between', 'space-evenly'],
         description: 'Vertical alignment',
+      },
+      {
+        name: 'padding',
+        type: 'string',
+        values: SPACING_TOKENS,
+        description: 'Padding around children',
+      },
+      {
+        name: 'paddingInline',
+        type: 'string',
+        values: SPACING_TOKENS,
+        description: 'Horizontal padding',
+      },
+      {
+        name: 'paddingBlock',
+        type: 'string',
+        values: SPACING_TOKENS,
+        description: 'Vertical padding',
+      },
+      {
+        name: 'margin',
+        type: 'string',
+        values: SPACING_TOKENS_WITH_AUTO,
+        description: 'Margin around element',
+      },
+      {
+        name: 'marginInline',
+        type: 'string',
+        values: SPACING_TOKENS_WITH_AUTO,
+        description: 'Horizontal margin',
+      },
+      {
+        name: 'marginBlock',
+        type: 'string',
+        values: SPACING_TOKENS_WITH_AUTO,
+        description: 'Vertical margin',
+      },
+      {
+        name: 'width',
+        type: 'string',
+        description: 'CSS width (e.g., "100%", "300px", "50vw")',
+      },
+      {
+        name: 'minWidth',
+        type: 'string',
+        description: 'CSS min-width',
+      },
+      {
+        name: 'maxWidth',
+        type: 'string',
+        description: 'CSS max-width',
+      },
+      {
+        name: 'height',
+        type: 'string',
+        description: 'CSS height',
+      },
+      {
+        name: 'minHeight',
+        type: 'string',
+        description: 'CSS min-height',
+      },
+      {
+        name: 'maxHeight',
+        type: 'string',
+        description: 'CSS max-height',
+      },
+      {
+        name: 'position',
+        type: 'string',
+        values: ['static', 'relative', 'absolute', 'fixed', 'sticky'],
+        description: 'CSS position',
+      },
+      {
+        name: 'inset',
+        type: 'string',
+        values: SPACING_TOKENS,
+        description: 'CSS inset property',
+      },
+      {
+        name: 'top',
+        type: 'string',
+        values: SPACING_TOKENS,
+        description: 'CSS top',
+      },
+      {
+        name: 'right',
+        type: 'string',
+        values: SPACING_TOKENS,
+        description: 'CSS right',
+      },
+      {
+        name: 'bottom',
+        type: 'string',
+        values: SPACING_TOKENS,
+        description: 'CSS bottom',
+      },
+      {
+        name: 'left',
+        type: 'string',
+        values: SPACING_TOKENS,
+        description: 'CSS left',
+      },
+      {
+        name: 'overflow',
+        type: 'string',
+        values: ['hidden', 'auto', 'visible', 'clip', 'scroll'],
+        description: 'CSS overflow',
+      },
+      {
+        name: 'overflowX',
+        type: 'string',
+        values: ['hidden', 'auto', 'visible', 'clip', 'scroll'],
+        description: 'CSS overflow-x',
+      },
+      {
+        name: 'overflowY',
+        type: 'string',
+        values: ['hidden', 'auto', 'visible', 'clip', 'scroll'],
+        description: 'CSS overflow-y',
+      },
+      {
+        name: 'flexBasis',
+        type: 'string',
+        description: 'CSS flex-basis',
+      },
+      {
+        name: 'flexShrink',
+        type: 'string',
+        values: ['0', '1'],
+        description: 'CSS flex-shrink',
+      },
+      {
+        name: 'flexGrow',
+        type: 'string',
+        values: ['0', '1'],
+        description: 'CSS flex-grow',
+      },
+      {
+        name: 'gridColumn',
+        type: 'string',
+        description: 'CSS grid-column',
+      },
+      {
+        name: 'asChild',
+        type: 'boolean',
+        values: ['true', 'false'],
+        description: 'Merge with child element',
+      },
+      {
+        name: 'as',
+        type: 'string',
+        description: 'HTML element to render as',
       },
     ],
   },
@@ -592,13 +1297,13 @@ export const AKSEL_COMPONENTS: Record<string, ComponentMetadata> = {
       {
         name: 'marginInline',
         type: 'string',
-        values: ['0', '1', '2', '3', '4', '5', '6', '7', '8', '10', '12', '16', '20', '24', '32'],
+        values: SPACING_TOKENS,
         description: 'Horizontal bleed amount',
       },
       {
         name: 'marginBlock',
         type: 'string',
-        values: ['0', '1', '2', '3', '4', '5', '6', '7', '8', '10', '12', '16', '20', '24', '32'],
+        values: SPACING_TOKENS,
         description: 'Vertical bleed amount',
       },
       {
@@ -1524,6 +2229,18 @@ export const AKSEL_COMPONENTS: Record<string, ComponentMetadata> = {
         values: ['true', 'false'],
         description: 'Add bottom margin',
       },
+      {
+        name: 'textColor',
+        type: 'string',
+        values: TEXT_COLOR_INTENSITY,
+        description: 'Text color intensity (use with data-color prop to define full color)',
+      },
+      {
+        name: 'data-color',
+        type: 'string',
+        values: DATA_COLOR_VALUES,
+        description: 'Color type (use with textColor prop to define full color)',
+      },
     ],
   },
 
@@ -1548,6 +2265,18 @@ export const AKSEL_COMPONENTS: Record<string, ComponentMetadata> = {
         type: 'string',
         values: ['regular', 'semibold'],
         description: 'Font weight',
+      },
+      {
+        name: 'textColor',
+        type: 'string',
+        values: TEXT_COLOR_INTENSITY,
+        description: 'Text color intensity (use with data-color prop to define full color)',
+      },
+      {
+        name: 'data-color',
+        type: 'string',
+        values: DATA_COLOR_VALUES,
+        description: 'Color type (use with textColor prop to define full color)',
       },
     ],
   },
@@ -1574,6 +2303,18 @@ export const AKSEL_COMPONENTS: Record<string, ComponentMetadata> = {
         values: ['regular', 'semibold'],
         description: 'Font weight',
       },
+      {
+        name: 'textColor',
+        type: 'string',
+        values: TEXT_COLOR_INTENSITY,
+        description: 'Text color intensity (use with data-color prop to define full color)',
+      },
+      {
+        name: 'data-color',
+        type: 'string',
+        values: DATA_COLOR_VALUES,
+        description: 'Color type (use with textColor prop to define full color)',
+      },
     ],
   },
 
@@ -1597,6 +2338,18 @@ export const AKSEL_COMPONENTS: Record<string, ComponentMetadata> = {
         name: 'as',
         type: 'string',
         description: 'HTML element to render',
+      },
+      {
+        name: 'textColor',
+        type: 'string',
+        values: TEXT_COLOR_INTENSITY,
+        description: 'Text color intensity (use with data-color prop to define full color)',
+      },
+      {
+        name: 'data-color',
+        type: 'string',
+        values: DATA_COLOR_VALUES,
+        description: 'Color type (use with textColor prop to define full color)',
       },
     ],
   },
@@ -1623,6 +2376,18 @@ export const AKSEL_COMPONENTS: Record<string, ComponentMetadata> = {
         values: ['true', 'false'],
         description: 'Transform to uppercase',
       },
+      {
+        name: 'textColor',
+        type: 'string',
+        values: TEXT_COLOR_INTENSITY,
+        description: 'Text color intensity (use with data-color prop to define full color)',
+      },
+      {
+        name: 'data-color',
+        type: 'string',
+        values: DATA_COLOR_VALUES,
+        description: 'Color type (use with textColor prop to define full color)',
+      },
     ],
   },
 
@@ -1641,6 +2406,18 @@ export const AKSEL_COMPONENTS: Record<string, ComponentMetadata> = {
         type: 'boolean',
         values: ['true', 'false'],
         description: 'Add bottom margin',
+      },
+      {
+        name: 'textColor',
+        type: 'string',
+        values: TEXT_COLOR_INTENSITY,
+        description: 'Text color intensity (use with data-color prop to define full color)',
+      },
+      {
+        name: 'data-color',
+        type: 'string',
+        values: DATA_COLOR_VALUES,
+        description: 'Color type (use with textColor prop to define full color)',
       },
     ],
   },

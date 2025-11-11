@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Text Color Props - Usage Guide</title>
+  <style>
+    body { font-family: system-ui; padding: 2rem; max-width: 900px; margin: 0 auto; }
+    pre { background: #f5f5f5; padding: 1rem; border-radius: 4px; overflow-x: auto; }
+    code { background: #f5f5f5; padding: 0.2rem 0.4rem; border-radius: 3px; }
+    .example { margin: 2rem 0; border-left: 3px solid #0067C5; padding-left: 1rem; }
+    table { border-collapse: collapse; width: 100%; margin: 1rem 0; }
+    th, td { border: 1px solid #ddd; padding: 0.5rem; text-align: left; }
+    th { background: #f5f5f5; }
+  </style>
+</head>
+<body>
+  <h1>✅ Text Color Props - Fixed!</h1>
+  
+  <h2>How Text Colors Work in Aksel Darkside</h2>
+  <p>Text colors are defined by <strong>TWO props working together</strong>:</p>
+  
+  <table>
+    <tr>
+      <th>Prop</th>
+      <th>Purpose</th>
+      <th>Values</th>
+    </tr>
+    <tr>
+      <td><code>textColor</code></td>
+      <td>Controls the intensity/variant</td>
+      <td><code>default</code>, <code>subtle</code>, <code>decoration</code>, <code>contrast</code></td>
+    </tr>
+    <tr>
+      <td><code>data-color</code></td>
+      <td>Controls the color type</td>
+      <td><code>neutral</code>, <code>accent</code>, <code>success</code>, <code>warning</code>, <code>danger</code>, <code>info</code>, <code>brand-magenta</code>, <code>brand-beige</code>, <code>brand-blue</code>, <code>meta-lime</code>, <code>meta-purple</code></td>
+    </tr>
+  </table>
+
+  <div class="example">
+    <h3>Example 1: Accent Color with Subtle Intensity</h3>
+    <pre><code>&lt;Heading 
+  level="1" 
+  textColor="subtle" 
+  data-color="accent"
+&gt;
+  Accent Subtle Heading
+&lt;/Heading&gt;</code></pre>
+    <p>This renders text with <code>--ax-text-accent-subtle</code> color</p>
+  </div>
+
+  <div class="example">
+    <h3>Example 2: Brand Magenta with Default Intensity</h3>
+    <pre><code>&lt;BodyLong 
+  textColor="default" 
+  data-color="brand-magenta"
+&gt;
+  Brand magenta body text
+&lt;/BodyLong&gt;</code></pre>
+    <p>This renders text with <code>--ax-text-brand-magenta</code> color</p>
+  </div>
+
+  <div class="example">
+    <h3>Example 3: Complete Color Palette Demo</h3>
+    <pre><code>export default function App() {
+  return (
+    &lt;VStack gap="space-16" padding="space-24"&gt;
+      &lt;Heading 
+        level="2" 
+        textColor="default" 
+        data-color="accent"
+      &gt;
+        Accent Heading (default intensity)
+      &lt;/Heading&gt;
+      
+      &lt;BodyLong 
+        textColor="subtle" 
+        data-color="success"
+      &gt;
+        Success body text with subtle intensity
+      &lt;/BodyLong&gt;
+      
+      &lt;BodyShort 
+        textColor="default" 
+        data-color="warning"
+      &gt;
+        Warning short text
+      &lt;/BodyShort&gt;
+      
+      &lt;Label 
+        textColor="subtle" 
+        data-color="info"
+      &gt;
+        Info label (subtle)
+      &lt;/Label&gt;
+      
+      &lt;Detail 
+        textColor="default" 
+        data-color="brand-magenta"
+      &gt;
+        Brand magenta detail text
+      &lt;/Detail&gt;
+      
+      &lt;ErrorMessage 
+        textColor="default" 
+        data-color="danger"
+      &gt;
+        Danger error message
+      &lt;/ErrorMessage&gt;
+    &lt;/VStack&gt;
+  )
+}</code></pre>
+  </div>
+
+  <h2>All Available Combinations</h2>
+  <p>You can combine any <code>textColor</code> intensity with any <code>data-color</code> type:</p>
+  <ul>
+    <li><code>textColor="default" data-color="accent"</code> → <code>--ax-text-accent</code></li>
+    <li><code>textColor="subtle" data-color="accent"</code> → <code>--ax-text-accent-subtle</code></li>
+    <li><code>textColor="decoration" data-color="accent"</code> → <code>--ax-text-accent-decoration</code></li>
+    <li><code>textColor="contrast" data-color="accent"</code> → <code>--ax-text-accent-contrast</code></li>
+  </ul>
+
+  <h2>Autocomplete Support</h2>
+  <p>✅ Both <code>textColor</code> and <code>data-color</code> props now have full autocomplete support</p>
+  <p>✅ Available on: <code>Heading</code>, <code>BodyLong</code>, <code>BodyShort</code>, <code>Label</code>, <code>Detail</code>, <code>ErrorMessage</code></p>
+
+  <h2>Test Your Code Again</h2>
+  <p>Update your previous code from:</p>
+  <pre><code>&lt;Heading size="medium" textColor="--ax-text-accent-subtle"&gt;
+  Aksel Arcade
+&lt;/Heading&gt;</code></pre>
+
+  <p>To:</p>
+  <pre><code>&lt;Heading 
+  size="medium" 
+  textColor="subtle" 
+  data-color="accent"
+&gt;
+  Aksel Arcade
+&lt;/Heading&gt;</code></pre>
+
+  <p>✅ Now the text color should work correctly!</p>
+</body>
+</html>

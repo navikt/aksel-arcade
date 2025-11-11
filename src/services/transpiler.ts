@@ -17,15 +17,17 @@ export const transpileCode = async (
   try {
     const babel = await loadBabel()
 
-    // Remove all import statements - components will be available globally in sandbox
+    // Remove all import statements - components and icons will be available globally in sandbox
     // Also remove imports from './hooks' since we're combining the code
     const cleanJsxCode = jsxCode
       .replace(/import\s+.*?from\s+['"]@navikt\/ds-react['"]\s*;?\n?/g, '')
+      .replace(/import\s+.*?from\s+['"]@navikt\/aksel-icons['"]\s*;?\n?/g, '')
       .replace(/import\s+.*?from\s+['"]react['"]\s*;?\n?/g, '')
       .replace(/import\s+.*?from\s+['"]\.(\/hooks)?['"]\s*;?\n?/g, '')
     
     const cleanHooksCode = hooksCode
       .replace(/import\s+.*?from\s+['"]@navikt\/ds-react['"]\s*;?\n?/g, '')
+      .replace(/import\s+.*?from\s+['"]@navikt\/aksel-icons['"]\s*;?\n?/g, '')
       .replace(/import\s+.*?from\s+['"]react['"]\s*;?\n?/g, '')
 
     // Smart wrapping: detect if user provided component structure

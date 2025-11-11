@@ -19,4 +19,7 @@ import { Theme } from '@navikt/ds-react/Theme';
 // Import all Aksel components
 import * as AkselComponents from '@navikt/ds-react';
 
-export { React, createRoot, Theme, AkselComponents };
+// Import all Aksel icons
+import * as AkselIcons from '@navikt/aksel-icons';
+
+export { React, createRoot, Theme, AkselComponents, AkselIcons };

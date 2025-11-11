@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Verify textColor Prop - Aksel Arcade</title>
+</head>
+<body>
+  <h1>TextColor Prop Verification Test</h1>
+  <p>To verify the textColor prop was added correctly:</p>
+  
+  <ol>
+    <li>Open Aksel Arcade in the browser (http://localhost:5173)</li>
+    <li>In the code editor, start typing any of these components:
+      <ul>
+        <li><code>&lt;Heading level="1" textColor="</code></li>
+        <li><code>&lt;BodyLong textColor="</code></li>
+        <li><code>&lt;BodyShort textColor="</code></li>
+        <li><code>&lt;Label textColor="</code></li>
+        <li><code>&lt;Detail textColor="</code></li>
+        <li><code>&lt;ErrorMessage textColor="</code></li>
+      </ul>
+    </li>
+    <li>After typing <code>textColor="</code>, autocomplete should show all text color tokens</li>
+    <li>Verify the following tokens are available:
+      <ul>
+        <li>--ax-text-logo</li>
+        <li>--ax-text-neutral</li>
+        <li>--ax-text-neutral-subtle</li>
+        <li>--ax-text-neutral-decoration</li>
+        <li>--ax-text-neutral-contrast</li>
+        <li>--ax-text-accent</li>
+        <li>--ax-text-accent-subtle</li>
+        <li>--ax-text-accent-decoration</li>
+        <li>--ax-text-accent-contrast</li>
+        <li>--ax-text-success</li>
+        <li>--ax-text-success-subtle</li>
+        <li>--ax-text-success-decoration</li>
+        <li>--ax-text-success-contrast</li>
+        <li>--ax-text-warning</li>
+        <li>--ax-text-warning-subtle</li>
+        <li>--ax-text-warning-decoration</li>
+        <li>--ax-text-warning-contrast</li>
+        <li>--ax-text-danger</li>
+        <li>--ax-text-danger-subtle</li>
+        <li>--ax-text-danger-decoration</li>
+        <li>--ax-text-danger-contrast</li>
+        <li>--ax-text-info</li>
+        <li>--ax-text-info-subtle</li>
+        <li>--ax-text-info-decoration</li>
+        <li>--ax-text-info-contrast</li>
+        <li>--ax-text-brand-magenta</li>
+        <li>--ax-text-brand-magenta-subtle</li>
+        <li>--ax-text-brand-magenta-decoration</li>
+        <li>--ax-text-brand-magenta-contrast</li>
+        <li>--ax-text-brand-beige</li>
+        <li>--ax-text-brand-beige-subtle</li>
+        <li>--ax-text-brand-beige-decoration</li>
+        <li>--ax-text-brand-beige-contrast</li>
+        <li>--ax-text-brand-blue</li>
+        <li>--ax-text-brand-blue-subtle</li>
+        <li>--ax-text-brand-blue-decoration</li>
+        <li>--ax-text-brand-blue-contrast</li>
+        <li>--ax-text-meta-lime</li>
+        <li>--ax-text-meta-lime-subtle</li>
+        <li>--ax-text-meta-lime-decoration</li>
+        <li>--ax-text-meta-lime-contrast</li>
+        <li>--ax-text-meta-purple</li>
+        <li>--ax-text-meta-purple-subtle</li>
+        <li>--ax-text-meta-purple-decoration</li>
+        <li>--ax-text-meta-purple-contrast</li>
+      </ul>
+    </li>
+  </ol>
+
+  <h2>Test Code Example</h2>
+  <p>Try this code in the editor:</p>
+  <pre><code>&lt;VStack gap="space-16"&gt;
+  &lt;Heading level="1" textColor="--ax-text-brand-magenta"&gt;
+    Magenta Heading
+  &lt;/Heading&gt;
+  &lt;BodyLong textColor="--ax-text-success"&gt;
+    Success colored body text
+  &lt;/BodyLong&gt;
+  &lt;BodyShort textColor="--ax-text-warning-subtle"&gt;
+    Warning subtle text
+  &lt;/BodyShort&gt;
+  &lt;Label textColor="--ax-text-accent"&gt;
+    Accent label
+  &lt;/Label&gt;
+  &lt;Detail textColor="--ax-text-info-subtle"&gt;
+    Info detail text
+  &lt;/Detail&gt;
+  &lt;ErrorMessage textColor="--ax-text-danger"&gt;
+    Danger error message
+  &lt;/ErrorMessage&gt;
+&lt;/VStack&gt;</code></pre>
+
+  <h2>Expected Behavior</h2>
+  <ul>
+    <li>✅ Autocomplete shows <code>textColor</code> prop for all 6 typography components</li>
+    <li>✅ Autocomplete shows all 44 text color tokens when typing the prop value</li>
+    <li>✅ Text renders with the specified color in the preview pane</li>
+  </ul>
+</body>
+</html>

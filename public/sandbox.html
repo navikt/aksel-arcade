@@ -18,6 +18,25 @@
     #root.dark {
       color-scheme: dark;
     }
+    
+    /* FIX: Missing Aksel textColor variants - decoration and contrast */
+    /* These CSS classes are used by Heading, BodyLong, BodyShort, Label, Detail, etc. */
+    /* The CSS variables exist (--ax-text-decoration, --ax-text-contrast) but the classes are missing in Aksel 7.33.1 */
+    .aksel-typo--color-decoration {
+      color: var(--ax-text-neutral-decoration);
+    }
+    
+    .aksel-typo--color-decoration[data-color] {
+      color: var(--ax-text-decoration);
+    }
+    
+    .aksel-typo--color-contrast {
+      color: var(--ax-text-neutral-contrast);
+    }
+    
+    .aksel-typo--color-contrast[data-color] {
+      color: var(--ax-text-contrast);
+    }
   </style>
 </head>
 <body>
@@ -35,7 +54,7 @@
     // Following Aksel docs: import "@navikt/ds-css/darkside";
     import('/src/sandboxAksel.ts')
       .then((module) => {
-        const { React, createRoot, Theme, AkselComponents } = module;
+        const { React, createRoot, Theme, AkselComponents, AkselIcons } = module;
         
         // Make React available globally (same instance as Aksel uses)
         window.React = React;
@@ -63,8 +82,15 @@
           window[key] = AkselComponents[key];
         });
         
+        // Make all Aksel icons available globally
+        window.AkselIcons = AkselIcons;
+        Object.keys(AkselIcons).forEach(key => {
+          window[key] = AkselIcons[key];
+        });
+        
         akselLoaded = true;
-        console.log('✅ Sandbox ready, Aksel + React loaded from Vite:', Object.keys(AkselComponents).length);
+        console.log('✅ Sandbox ready, Aksel + React loaded from Vite:', Object.keys(AkselComponents).length, 'components');
+        console.log('✅ Aksel icons loaded:', Object.keys(AkselIcons).length, 'icons');
         console.log('✅ React version:', React.version);
         console.log('✅ Theme component available:', !!ThemeComponent);
         console.log('✅ Darkside CSS imported via @navikt/ds-css/darkside');
@@ -409,9 +435,9 @@
           return;
         }
 
-        console.log('🎨 Executing code with all Aksel components from window');
+        console.log('🎨 Executing code with all Aksel components and icons from window');
 
-        // Execute the transpiled code with all Aksel components in scope
+        // Execute the transpiled code with all Aksel components and icons in scope
         console.log('🔧 Evaluating transpiled code...');
         
         // Build component declarations safely
@@ -422,15 +448,27 @@
               .join('\n')
           : '';
         
-        // Debug: Check if Button is available
+        // Build icon declarations safely
+        const iconDeclarations = window.AkselIcons
+          ? Object.keys(window.AkselIcons)
+              .filter(key => typeof window[key] !== 'undefined') // Only include defined icons
+              .map(key => `const ${key} = window.${key};`)
+              .join('\n')
+          : '';
+        
+        // Debug: Check if Button and PencilIcon are available
         console.log('🔍 DEBUG: window.Button type:', typeof window.Button);
-        console.log('🔍 DEBUG: window.Button is:', window.Button);
-        console.log('🔍 DEBUG: Component declarations length:', componentDeclarations.split('\n').length);
+        console.log('🔍 DEBUG: window.PencilIcon type:', typeof window.PencilIcon);
+        console.log('🔍 DEBUG: Component declarations count:', componentDeclarations.split('\n').length);
+        console.log('🔍 DEBUG: Icon declarations count:', iconDeclarations.split('\n').length);
         
         const wrappedCode = `
           (function() {
             // Make all Aksel components available
             ${componentDeclarations}
+            
+            // Make all Aksel icons available
+            ${iconDeclarations}
             
             // Make React hooks available
             const { useState, useEffect, useContext, useReducer, useCallback, useMemo, useRef } = window.React;

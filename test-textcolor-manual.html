@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Test textColor Prop - Aksel Arcade</title>
+</head>
+<body>
+  <h1>Testing textColor Prop with Aksel Darkside</h1>
+  
+  <h2>Manual Test Instructions</h2>
+  <p>Open <a href="http://localhost:5173" target="_blank">http://localhost:5173</a></p>
+  
+  <h3>Test Code 1: Simple Heading with textColor</h3>
+  <pre><code>export default function App() {
+  return (
+    &lt;VStack gap="space-16"&gt;
+      &lt;Heading level="1" textColor="--ax-text-brand-magenta"&gt;
+        Magenta Heading
+      &lt;/Heading&gt;
+      &lt;Heading level="2" textColor="--ax-text-accent"&gt;
+        Accent Heading
+      &lt;/Heading&gt;
+      &lt;Heading level="3" textColor="--ax-text-success"&gt;
+        Success Heading
+      &lt;/Heading&gt;
+    &lt;/VStack&gt;
+  )
+}</code></pre>
+
+  <h3>Test Code 2: All Typography Components</h3>
+  <pre><code>export default function App() {
+  return (
+    &lt;VStack gap="space-16" padding="space-24"&gt;
+      &lt;Heading level="1" textColor="--ax-text-brand-magenta"&gt;
+        Brand Magenta Heading
+      &lt;/Heading&gt;
+      
+      &lt;BodyLong textColor="--ax-text-success"&gt;
+        This is a success colored body text using textColor prop with --ax-text-success token.
+      &lt;/BodyLong&gt;
+      
+      &lt;BodyShort textColor="--ax-text-warning"&gt;
+        This is a warning colored short text using --ax-text-warning token.
+      &lt;/BodyShort&gt;
+      
+      &lt;Label textColor="--ax-text-accent"&gt;
+        Accent Label Text
+      &lt;/Label&gt;
+      
+      &lt;Detail textColor="--ax-text-info"&gt;
+        Info detail text with --ax-text-info token
+      &lt;/Detail&gt;
+      
+      &lt;ErrorMessage textColor="--ax-text-danger"&gt;
+        Danger error message with --ax-text-danger token
+      &lt;/ErrorMessage&gt;
+    &lt;/VStack&gt;
+  )
+}</code></pre>
+
+  <h3>Test Code 3: All Color Variants</h3>
+  <pre><code>export default function App() {
+  return (
+    &lt;VStack gap="space-8" padding="space-24"&gt;
+      &lt;Heading level="3"&gt;Testing All Text Color Tokens&lt;/Heading&gt;
+      
+      &lt;BodyShort textColor="--ax-text-neutral"&gt;neutral&lt;/BodyShort&gt;
+      &lt;BodyShort textColor="--ax-text-neutral-subtle"&gt;neutral-subtle&lt;/BodyShort&gt;
+      &lt;BodyShort textColor="--ax-text-accent"&gt;accent&lt;/BodyShort&gt;
+      &lt;BodyShort textColor="--ax-text-accent-subtle"&gt;accent-subtle&lt;/BodyShort&gt;
+      &lt;BodyShort textColor="--ax-text-success"&gt;success&lt;/BodyShort&gt;
+      &lt;BodyShort textColor="--ax-text-success-subtle"&gt;success-subtle&lt;/BodyShort&gt;
+      &lt;BodyShort textColor="--ax-text-warning"&gt;warning&lt;/BodyShort&gt;
+      &lt;BodyShort textColor="--ax-text-warning-subtle"&gt;warning-subtle&lt;/BodyShort&gt;
+      &lt;BodyShort textColor="--ax-text-danger"&gt;danger&lt;/BodyShort&gt;
+      &lt;BodyShort textColor="--ax-text-danger-subtle"&gt;danger-subtle&lt;/BodyShort&gt;
+      &lt;BodyShort textColor="--ax-text-info"&gt;info&lt;/BodyShort&gt;
+      &lt;BodyShort textColor="--ax-text-info-subtle"&gt;info-subtle&lt;/BodyShort&gt;
+      &lt;BodyShort textColor="--ax-text-brand-magenta"&gt;brand-magenta&lt;/BodyShort&gt;
+      &lt;BodyShort textColor="--ax-text-brand-beige"&gt;brand-beige&lt;/BodyShort&gt;
+      &lt;BodyShort textColor="--ax-text-brand-blue"&gt;brand-blue&lt;/BodyShort&gt;
+      &lt;BodyShort textColor="--ax-text-meta-lime"&gt;meta-lime&lt;/BodyShort&gt;
+      &lt;BodyShort textColor="--ax-text-meta-purple"&gt;meta-purple&lt;/BodyShort&gt;
+    &lt;/VStack&gt;
+  )
+}</code></pre>
+
+  <h2>Expected Results</h2>
+  <ul>
+    <li>✅ textColor prop appears in autocomplete for Heading, BodyLong, BodyShort, Label, Detail, ErrorMessage</li>
+    <li>✅ When typing textColor=", autocomplete shows all 44 Darkside text color tokens</li>
+    <li>✅ Text colors actually change in the preview pane</li>
+    <li>❌ If colors don't change, the issue is likely that Aksel doesn't support the textColor prop with CSS variable values</li>
+  </ul>
+
+  <h2>Debugging Steps</h2>
+  <ol>
+    <li>Open browser DevTools Console</li>
+    <li>Check for any errors related to textColor prop</li>
+    <li>Inspect the rendered HTML element</li>
+    <li>Check if the textColor prop is being applied as an attribute or style</li>
+    <li>Verify the computed styles show the correct color value</li>
+  </ol>
+</body>
+</html>
