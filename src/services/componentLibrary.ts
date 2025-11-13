@@ -48,12 +48,12 @@ export const AKSEL_SNIPPETS: ComponentSnippet[] = [
     import: "import { VStack } from '@navikt/ds-react';",
   },
   {
-    id: 'box',
-    name: 'Box',
+    id: 'box-new',
+    name: 'Box.New',
     category: 'layout',
-    keywords: ['box', 'container', 'layout', 'padding', 'wrapper'],
-    template: '<Box padding="4">\n  ${1:Content}\n</Box>',
-    description: 'Layout container with spacing control',
+    keywords: ['box', 'container', 'layout', 'padding', 'wrapper', 'darkside', 'border', 'shadow'],
+    template: '<Box.New padding="4">\n  ${1:Content}\n</Box.New>',
+    description: 'Layout container with Darkside support (borderColor, background, shadow)',
     import: "import { Box } from '@navikt/ds-react';",
   },
   {

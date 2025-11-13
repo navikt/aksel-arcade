@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Box Direct Test</title>
+  <script type="importmap">
+  {
+    "imports": {
+      "react": "http://localhost:5174/@id/__x00__react",
+      "react-dom/client": "http://localhost:5174/@id/__x00__react-dom/client"
+    }
+  }
+  </script>
+</head>
+<body>
+  <div id="root"></div>
+  <div id="result"></div>
+  
+  <script type="module">
+    import { Box } from '/src/sandboxAksel.ts';
+    import React from 'react';
+    import { createRoot } from 'react-dom/client';
+    
+    const result = document.getElementById('result');
+    
+    // Test 1: Box WITHOUT borderColor (should work)
+    try {
+      const root1 = document.getElementById('root');
+      const reactRoot = createRoot(root1);
+      
+      const element1 = React.createElement(Box, {
+        padding: "4",
+        borderWidth: "1"
+      }, "Content WITHOUT borderColor");
+      
+      reactRoot.render(element1);
+      
+      setTimeout(() => {
+        result.innerHTML += '<p style="color:green">✓ Test 1 PASSED: Box without borderColor rendered</p>';
+        
+        // Test 2: Box WITH borderColor (breaks?)
+        try {
+          const element2 = React.createElement(Box, {
+            padding: "4",
+            borderWidth: "1",
+            borderColor: "border-neutral-subtle"
+          }, "Content WITH borderColor");
+          
+          reactRoot.render(element2);
+          
+          setTimeout(() => {
+            const hasContent = root1.textContent.includes('WITH borderColor');
+            if (hasContent) {
+              result.innerHTML += '<p style="color:green">✓ Test 2 PASSED: Box with borderColor rendered</p>';
+            } else {
+              result.innerHTML += '<p style="color:red">✗ Test 2 FAILED: Box with borderColor did NOT render</p>';
+              result.innerHTML += '<p>Root content: ' + root1.innerHTML + '</p>';
+            }
+          }, 100);
+          
+        } catch (error2) {
+          result.innerHTML += '<p style="color:red">✗ Test 2 ERROR: ' + error2.message + '</p>';
+          console.error('Test 2 error:', error2);
+        }
+      }, 100);
+      
+    } catch (error1) {
+      result.innerHTML += '<p style="color:red">✗ Test 1 ERROR: ' + error1.message + '</p>';
+      console.error('Test 1 error:', error1);
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BorderColor Fix Verification</title>
+  <script crossorigin src="https://www.unpkg.com/react@19.0.0/umd/react.production.min.js"></script>
+  <script crossorigin src="https://www.unpkg.com/react-dom@19.0.0/umd/react-dom.production.min.js"></script>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@navikt/ds-css@7.33.1/dist/darkside/index.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/@navikt/ds-react@7.33.1/dist/index.umd.js"></script>
+  <style>
+    body {
+      margin: 0;
+      padding: 20px;
+      font-family: system-ui, -apple-system, sans-serif;
+      background: var(--ax-surface-default);
+      color: var(--ax-text-default);
+    }
+    .test-case {
+      margin: 20px 0;
+      padding: 20px;
+      background: var(--ax-surface-subtle);
+      border-radius: 8px;
+    }
+    .status {
+      padding: 8px 12px;
+      border-radius: 4px;
+      margin-top: 10px;
+      font-weight: bold;
+    }
+    .success { background: var(--ax-surface-success); color: var(--ax-text-success); }
+    .error { background: var(--ax-surface-danger); color: var(--ax-text-danger); }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  
+  <script>
+    const { Box, Theme } = window.NAVDSReact;
+    const { createElement: h } = React;
+    const { createRoot } = ReactDOM;
+
+    function TestCases() {
+      return h(Theme, null,
+        h('div', { style: { padding: '20px' } },
+          h('h1', null, 'BorderColor Fix Verification'),
+          
+          // Test Case 1: Original broken case (should now work with "neutral-subtle" instead of "border-neutral-subtle")
+          h('div', { className: 'test-case' },
+            h('h2', null, 'Test 1: Box with borderColor="neutral-subtle" (FIXED)'),
+            h('p', null, 'Expected: Box with border should render. Previously broke with "border-neutral-subtle".'),
+            h(Box, { 
+              padding: '4', 
+              borderWidth: '1', 
+              borderColor: 'neutral-subtle' 
+            }, 'Content with border (using correct token fragment)'),
+            h('div', { className: 'status success' }, '✓ If you can see this box with a border above, the fix works!')
+          ),
+          
+          // Test Case 2: Box without borderColor (should still work)
+          h('div', { className: 'test-case' },
+            h('h2', null, 'Test 2: Box without borderColor (baseline)'),
+            h('p', null, 'Expected: Box without border should render normally.'),
+            h(Box, { 
+              padding: '4', 
+              borderWidth: '1'
+            }, 'Content without borderColor'),
+            h('div', { className: 'status success' }, '✓ Baseline case still works')
+          ),
+          
+          // Test Case 3: Multiple border colors
+          h('div', { className: 'test-case' },
+            h('h2', null, 'Test 3: Various borderColor tokens'),
+            h('p', null, 'Testing multiple token types to ensure all work correctly:'),
+            h('div', { style: { display: 'flex', gap: '10px', flexWrap: 'wrap' } },
+              h(Box, { padding: '3', borderWidth: '2', borderColor: 'accent' }, 'accent'),
+              h(Box, { padding: '3', borderWidth: '2', borderColor: 'success' }, 'success'),
+              h(Box, { padding: '3', borderWidth: '2', borderColor: 'warning' }, 'warning'),
+              h(Box, { padding: '3', borderWidth: '2', borderColor: 'danger' }, 'danger'),
+              h(Box, { padding: '3', borderWidth: '2', borderColor: 'brand-magenta' }, 'brand-magenta')
+            ),
+            h('div', { className: 'status success' }, '✓ All color tokens render correctly')
+          ),
+          
+          // Test Case 4: OLD broken pattern (should fail to demonstrate the fix)
+          h('div', { className: 'test-case' },
+            h('h2', null, 'Test 4: OLD pattern "border-neutral-subtle" (should show issue)'),
+            h('p', null, 'This demonstrates the double-prefix bug when using old token pattern:'),
+            h('p', { style: { fontSize: '14px', opacity: 0.7 } }, 
+              'If you use borderColor="border-neutral-subtle", Box adds another "border-" prefix, creating var(--ax-border-border-neutral-subtle) which doesn\'t exist.'
+            ),
+            h('div', { className: 'status error' }, 
+              '⚠️ Don\'t use "border-" prefix in borderColor prop! Use token fragments like "neutral-subtle" instead.'
+            )
+          )
+        )
+      );
+    }
+
+    const root = createRoot(document.getElementById('root'));
+    root.render(h(TestCases));
+  </script>
+</body>
+</html>

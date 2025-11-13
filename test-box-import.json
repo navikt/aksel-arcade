@@ -1,0 +1,7 @@
+{
+  "version": "1.0.0",
+  "name": "Box Border Color Test",
+  "jsxCode": "<Box borderWidth=\"0 0 1 0\" borderColor=\"border-neutral\">Hello</Box>",
+  "hooksCode": "",
+  "viewport": "desktop-xl"
+}
