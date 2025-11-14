@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Test Border Radius Values</title>
+  <link rel="stylesheet" href="https://cdn.nav.no/aksel/@navikt/ds-css/7.25.0/darkside.css">
+  <script crossorigin src="https://unpkg.com/react@19/umd/react.development.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@19/umd/react-dom.development.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel" data-type="module">
+    import { Box, Theme } from 'https://esm.sh/@navikt/ds-react@7.25.0?bundle';
+
+    const { useState } = React;
+
+    function TestApp() {
+      const [radiusValue, setRadiusValue] = useState('radius-2');
+
+      const testValues = [
+        'radius-2',
+        'radius-4', 
+        'radius-8',
+        'radius-12',
+        'radius-full',
+        // Test if these also work
+        '2',
+        '4',
+        '8',
+        '12',
+        'full'
+      ];
+
+      return (
+        <Theme>
+          <div style={{ padding: '20px' }}>
+            <h1>Border Radius Value Test</h1>
+            
+            <div style={{ marginBottom: '20px' }}>
+              <label>Select radius value: </label>
+              <select value={radiusValue} onChange={(e) => setRadiusValue(e.target.value)}>
+                {testValues.map(val => (
+                  <option key={val} value={val}>{val}</option>
+                ))}
+              </select>
+            </div>
+
+            <Box
+              borderRadius={radiusValue}
+              borderWidth="2"
+              borderColor="neutral"
+              padding="space-24"
+              background="neutral-soft"
+            >
+              <h2>Test Box with borderRadius="{radiusValue}"</h2>
+              <p>Check the browser DevTools to see the actual CSS applied.</p>
+              <p>Inspect this Box element and look at the border-radius property.</p>
+            </Box>
+
+            <div style={{ marginTop: '40px', padding: '20px', background: '#f5f5f5' }}>
+              <h3>Available CSS Custom Properties:</h3>
+              <ul>
+                <li>--ax-radius-2: {getComputedStyle(document.documentElement).getPropertyValue('--ax-radius-2') || 'NOT FOUND'}</li>
+                <li>--ax-radius-4: {getComputedStyle(document.documentElement).getPropertyValue('--ax-radius-4') || 'NOT FOUND'}</li>
+                <li>--ax-radius-8: {getComputedStyle(document.documentElement).getPropertyValue('--ax-radius-8') || 'NOT FOUND'}</li>
+                <li>--ax-radius-12: {getComputedStyle(document.documentElement).getPropertyValue('--ax-radius-12') || 'NOT FOUND'}</li>
+                <li>--ax-radius-full: {getComputedStyle(document.documentElement).getPropertyValue('--ax-radius-full') || 'NOT FOUND'}</li>
+              </ul>
+            </div>
+          </div>
+        </Theme>
+      );
+    }
+
+    ReactDOM.render(<TestApp />, document.getElementById('root'));
+  </script>
+</body>
+</html>

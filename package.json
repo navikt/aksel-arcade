@@ -28,7 +28,8 @@
     "@uiw/react-codemirror": "^4.25.3",
     "prettier": "^3.6.2",
     "react": "^19.2.0",
-    "react-dom": "^19.2.0"
+    "react-dom": "^19.2.0",
+    "react-resizable-panels": "^3.0.6"
   },
   "devDependencies": {
     "@eslint/js": "^9.13.0",

@@ -613,8 +613,8 @@ export const AKSEL_COMPONENTS: Record<string, ComponentMetadata> = {
       {
         name: 'borderRadius',
         type: 'string',
-        values: ['0', '2', '4', '6', '8', '12', '16', '20', '24', 'full'],
-        description: 'CSS border-radius property',
+        values: ['2', '4', '8', '12', 'full'],
+        description: 'Border radius value (component adds radius- prefix automatically to create --ax-radius-X token)',
       },
       {
         name: 'borderWidth',
@@ -803,8 +803,8 @@ export const AKSEL_COMPONENTS: Record<string, ComponentMetadata> = {
       {
         name: 'borderRadius',
         type: 'string',
-        values: ['0', '2', '4', '6', '8', '12', '16', '20', '24', 'full'],
-        description: 'CSS border-radius property',
+        values: ['2', '4', '8', '12', 'full'],
+        description: 'Border radius value (component adds radius- prefix automatically to create --ax-radius-X token)',
       },
       {
         name: 'borderWidth',

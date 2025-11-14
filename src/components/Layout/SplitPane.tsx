@@ -1,4 +1,5 @@
 import { type ReactNode } from 'react'
+import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels'
 import './SplitPane.css'
 
 interface SplitPaneProps {
@@ -16,18 +17,30 @@ export const SplitPane = ({
   minLeftWidth = 300,
   minRightWidth = 320,
 }: SplitPaneProps) => {
-  // For now, using a simple fixed split - will add resize functionality in Phase 3
-  const leftWidth = Math.max(minLeftWidth, (window.innerWidth * defaultLeftWidth) / 100)
+  // Convert pixel sizes to percentages for react-resizable-panels
+  // Note: This is approximate - the library handles responsive resizing internally
+  const defaultLeftPercent = defaultLeftWidth
+  
+  // Calculate min sizes as percentages (approximate, based on typical viewport)
+  const minLeftPercent = (minLeftWidth / window.innerWidth) * 100
+  const minRightPercent = (minRightWidth / window.innerWidth) * 100
 
   return (
-    <div className="split-pane">
-      <div className="split-pane__left" style={{ width: `${leftWidth}px`, minWidth: `${minLeftWidth}px` }}>
+    <PanelGroup direction="horizontal" className="split-pane">
+      <Panel 
+        defaultSize={defaultLeftPercent} 
+        minSize={minLeftPercent}
+        className="split-pane__left"
+      >
         {left}
-      </div>
-      <div className="split-pane__divider" />
-      <div className="split-pane__right" style={{ minWidth: `${minRightWidth}px` }}>
+      </Panel>
+      <PanelResizeHandle className="split-pane__divider" />
+      <Panel 
+        minSize={minRightPercent}
+        className="split-pane__right"
+      >
         {right}
-      </div>
-    </div>
+      </Panel>
+    </PanelGroup>
   )
 }
