@@ -54,6 +54,8 @@
 
 /* Right panel */
 .split-pane__right {
-  overflow: auto;
+  overflow: hidden; /* Prevent outer scroll - iframe should handle internal scrolling */
   background: var(--a-surface-subtle);
+  display: flex;
+  flex-direction: column;
 }

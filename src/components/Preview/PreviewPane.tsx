@@ -115,13 +115,13 @@ export const PreviewPane = () => {
         </BoxNew>
       </HStack>
 
-      <VStack asChild style={{ flexGrow: 1, height: '100%' }}>
+      <VStack asChild style={{ flex: 1, minHeight: 0 }}>
         <BoxNew 
           data-name="Preview" 
           paddingBlock="space-16" 
           paddingInline="space-16" 
           background="sunken"
-          style={{ display: 'flex', flexDirection: 'column', height: '100%' }}
+          style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}
         >
           <ErrorOverlay
             compileError={compileError}
