@@ -1,7 +1,8 @@
 import { useRef } from 'react'
-import { Heading, Detail, Button, HStack, VStack, ProgressBar, BoxNew } from '@navikt/ds-react'
-import { PencilIcon, FileExportIcon, FileImportIcon, CogIcon } from '@navikt/aksel-icons'
+import { Heading, Detail, Button, HStack, VStack, ProgressBar, BoxNew, ActionMenu } from '@navikt/ds-react'
+import { PencilIcon, FileExportIcon, FileImportIcon, CogIcon, MoonIcon, SunIcon, ArrowsSquarepathIcon } from '@navikt/aksel-icons'
 import { SaveStatusIndicator } from './SaveStatusIndicator'
+import { useSettings } from '@/contexts/SettingsContext'
 import type { Project } from '@/types/project'
 import type { SaveStatus } from '@/hooks/useAutoSave'
 import { exportProject, importProject } from '@/services/storage'
@@ -43,6 +44,7 @@ export const AppHeader = ({
 }: AppHeaderProps) => {
   const MAX_PROJECT_SIZE = 5 * 1024 * 1024 // 5MB
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const { theme, panelOrder, toggleTheme, togglePanelOrder } = useSettings()
 
   const formatMB = (bytes: number): number => bytes / (1024 * 1024)
   const sizeMB = formatMB(projectSizeBytes)
@@ -142,12 +144,34 @@ export const AppHeader = ({
           >
             Import
           </Button>
-          <Button 
-            variant="tertiary-neutral" 
-            size="small" 
-            icon={<CogIcon title="Settings" />}
-            onClick={() => console.log('Settings clicked')}
-          />
+          <ActionMenu>
+            <ActionMenu.Trigger>
+              <Button 
+                variant="tertiary-neutral" 
+                size="small" 
+                icon={<CogIcon title="Settings" />}
+              />
+            </ActionMenu.Trigger>
+            <ActionMenu.Content>
+              <ActionMenu.Group label="Theme">
+                <ActionMenu.Item
+                  icon={theme === 'dark' ? <SunIcon aria-hidden /> : <MoonIcon aria-hidden />}
+                  onSelect={toggleTheme}
+                >
+                  Switch to {theme === 'dark' ? 'light' : 'dark'} mode
+                </ActionMenu.Item>
+              </ActionMenu.Group>
+              <ActionMenu.Divider />
+              <ActionMenu.Group label="Layout">
+                <ActionMenu.Item
+                  icon={<ArrowsSquarepathIcon aria-hidden />}
+                  onSelect={togglePanelOrder}
+                >
+                  Swap panel order
+                </ActionMenu.Item>
+              </ActionMenu.Group>
+            </ActionMenu.Content>
+          </ActionMenu>
         </HStack>
 
         <input

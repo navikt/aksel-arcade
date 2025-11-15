@@ -1,15 +1,16 @@
 import { type ReactNode } from 'react'
 import { Theme } from '@navikt/ds-react/Theme'
+import { useSettings } from '@/contexts/SettingsContext'
 
 interface ThemeProviderProps {
   children: ReactNode
 }
 
 export const ThemeProvider = ({ children }: ThemeProviderProps) => {
-  // Aksel Darkside Theme component
-  // Default to dark mode - can be made configurable later
+  const { theme } = useSettings()
+  
   return (
-    <Theme theme="dark" hasBackground={true}>
+    <Theme theme={theme} hasBackground={true}>
       {children}
     </Theme>
   )

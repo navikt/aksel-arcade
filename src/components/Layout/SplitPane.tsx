@@ -1,5 +1,6 @@
 import { type ReactNode } from 'react'
 import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels'
+import { useSettings } from '@/contexts/SettingsContext'
 import './SplitPane.css'
 
 interface SplitPaneProps {
@@ -17,6 +18,12 @@ export const SplitPane = ({
   minLeftWidth = 20,
   minRightWidth = 20,
 }: SplitPaneProps) => {
+  const { panelOrder } = useSettings()
+  
+  // Swap panels based on panelOrder setting
+  const firstPanel = panelOrder === 'code-left' ? left : right
+  const secondPanel = panelOrder === 'code-left' ? right : left
+  
   return (
     <PanelGroup direction="horizontal" className="split-pane">
       <Panel 
@@ -24,14 +31,14 @@ export const SplitPane = ({
         minSize={minLeftWidth}
         className="split-pane__left"
       >
-        {left}
+        {firstPanel}
       </Panel>
       <PanelResizeHandle className="split-pane__divider" />
       <Panel 
         minSize={minRightWidth}
         className="split-pane__right"
       >
-        {right}
+        {secondPanel}
       </Panel>
     </PanelGroup>
   )

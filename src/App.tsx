@@ -2,6 +2,7 @@ import { useContext, useState, useEffect } from 'react'
 import { Page } from '@navikt/ds-react'
 import { AppContext } from './hooks/useProject'
 import { useAutoSave } from './hooks/useAutoSave'
+import { SettingsProvider } from './contexts/SettingsContext'
 import { ThemeProvider } from './components/Layout/ThemeProvider'
 import { AppHeader } from './components/Header/AppHeader'
 import { EditorPane } from './components/Editor/EditorPane'
@@ -52,41 +53,43 @@ function App() {
   }
 
   return (
-    <ThemeProvider>
-      <Page.Block gutters={false} style={{ width: '100%', height: '100vh' }}>
-        {sizeWarning && (
-          <WarningNotification 
-            message={sizeWarning} 
-            onClose={() => setSizeWarning(null)} 
+    <SettingsProvider>
+      <ThemeProvider>
+        <Page.Block gutters={false} style={{ width: '100%', height: '100vh' }}>
+          {sizeWarning && (
+            <WarningNotification 
+              message={sizeWarning} 
+              onClose={() => setSizeWarning(null)} 
+            />
+          )}
+          
+          {saveError && (
+            <WarningNotification 
+              message={`Save error: ${saveError}`}
+            />
+          )}
+          
+          <AppHeader 
+            projectName={project.name} 
+            onProjectNameChange={handleProjectNameChange}
+            currentProject={project}
+            onProjectImported={handleProjectImported}
+            saveStatus={saveStatus}
+            projectSizeBytes={projectSizeBytes}
           />
-        )}
-        
-        {saveError && (
-          <WarningNotification 
-            message={`Save error: ${saveError}`}
-          />
-        )}
-        
-        <AppHeader 
-          projectName={project.name} 
-          onProjectNameChange={handleProjectNameChange}
-          currentProject={project}
-          onProjectImported={handleProjectImported}
-          saveStatus={saveStatus}
-          projectSizeBytes={projectSizeBytes}
-        />
-        
-        <div style={{ height: 'calc(100vh - 60px)', width: '100%' }}>
-          <SplitPane
-            left={<EditorPane />}
-            right={<PreviewPane />}
-            defaultLeftWidth={50}
-            minLeftWidth={20}
-            minRightWidth={20}
-          />
-        </div>
-      </Page.Block>
-    </ThemeProvider>
+          
+          <div style={{ height: 'calc(100vh - 60px)', width: '100%' }}>
+            <SplitPane
+              left={<EditorPane />}
+              right={<PreviewPane />}
+              defaultLeftWidth={50}
+              minLeftWidth={20}
+              minRightWidth={20}
+            />
+          </div>
+        </Page.Block>
+      </ThemeProvider>
+    </SettingsProvider>
   )
 }
 
