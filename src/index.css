@@ -19,4 +19,31 @@ body {
   height: 100%;
 }
 
+/* Scrollbar Styling */
+/* Webkit browsers (Chrome, Safari, Edge) */
+::-webkit-scrollbar {
+  width: 8px; /* thin scrollbar */
+  height: 8px; /* thin scrollbar */
+  background: transparent;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--ax-text-neutral-decoration);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--ax-text-neutral-decoration);
+  opacity: 0.8;
+}
+
+/* Firefox */
+* {
+  scrollbar-color: var(--ax-text-neutral-decoration) transparent;
+  scrollbar-width: thin;
+}
 

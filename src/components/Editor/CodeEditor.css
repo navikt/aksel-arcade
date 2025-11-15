@@ -25,6 +25,7 @@
   overflow: auto;
   flex: 1; /* Allow it to grow but respect parent constraints */
   min-height: 0; /* CRITICAL: Allows flex child to shrink below content size */
+  scrollbar-gutter: stable;
 }
 
 .code-editor .cm-content {

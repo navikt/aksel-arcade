@@ -106,7 +106,6 @@ export const EditorPane = () => {
       <BoxNew
         data-name="Code editor"
         style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}
-        padding="4"
         borderWidth="0 1 0 0"
         borderColor="neutral-subtleA"
       >

@@ -26,7 +26,6 @@
     
     /* NO custom reset - Aksel Darkside provides complete reset.darkside.css via import */
     #root {
-      padding: 1rem;
       width: 100%;
       box-sizing: border-box;
       /* maxWidth will be set dynamically via updateViewport to simulate device widths */
@@ -62,6 +61,34 @@
     
     .aksel-typo--color-contrast[data-color] {
       color: var(--ax-text-contrast);
+    }
+    
+    /* Scrollbar Styling - Match main app */
+    /* Webkit browsers (Chrome, Safari, Edge) */
+    ::-webkit-scrollbar {
+      width: 8px; /* thin scrollbar */
+      height: 8px; /* thin scrollbar */
+      background: transparent;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: var(--ax-text-neutral-decoration);
+      border-radius: 4px;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+      background: var(--ax-text-neutral-decoration);
+      opacity: 0.8;
+    }
+
+    /* Firefox */
+    * {
+      scrollbar-color: var(--ax-text-neutral-decoration) transparent;
+      scrollbar-width: thin;
     }
   </style>
 </head>
