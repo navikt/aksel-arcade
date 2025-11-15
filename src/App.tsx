@@ -1,12 +1,13 @@
 import { useContext, useState, useEffect } from 'react'
+import { Page } from '@navikt/ds-react'
 import { AppContext } from './hooks/useProject'
 import { useAutoSave } from './hooks/useAutoSave'
 import { ThemeProvider } from './components/Layout/ThemeProvider'
-import { SplitPane } from './components/Layout/SplitPane'
 import { AppHeader } from './components/Header/AppHeader'
 import { EditorPane } from './components/Editor/EditorPane'
 import { PreviewPane } from './components/Preview/PreviewPane'
 import { WarningNotification } from './components/Header/WarningNotification'
+import { SplitPane } from './components/Layout/SplitPane'
 import { validateProjectSize } from './services/storage'
 import type { Project } from './types/project'
 import './App.css'
@@ -52,7 +53,7 @@ function App() {
 
   return (
     <ThemeProvider>
-      <div className="app">
+      <Page.Block gutters={false} style={{ width: '100%', height: '100vh' }}>
         {sizeWarning && (
           <WarningNotification 
             message={sizeWarning} 
@@ -75,14 +76,16 @@ function App() {
           projectSizeBytes={projectSizeBytes}
         />
         
-        <SplitPane
-          left={<EditorPane />}
-          right={<PreviewPane />}
-          defaultLeftWidth={50}
-          minLeftWidth={300}
-          minRightWidth={320}
-        />
-      </div>
+        <div style={{ height: 'calc(100vh - 60px)', width: '100%' }}>
+          <SplitPane
+            left={<EditorPane />}
+            right={<PreviewPane />}
+            defaultLeftWidth={50}
+            minLeftWidth={20}
+            minRightWidth={20}
+          />
+        </div>
+      </Page.Block>
     </ThemeProvider>
   )
 }

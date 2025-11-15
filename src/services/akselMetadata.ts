@@ -748,8 +748,8 @@ export const AKSEL_COMPONENTS: Record<string, ComponentMetadata> = {
     ],
   },
 
-  'Box.New': {
-    name: 'Box.New',
+  'BoxNew': {
+    name: 'BoxNew',
     description: 'Layout container with spacing control and Darkside support (borderColor, background, shadow)',
     props: [
       {

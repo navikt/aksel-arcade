@@ -1,16 +1,30 @@
 .code-editor {
   width: 100%;
-  overflow: auto;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  min-height: 0; /* CRITICAL: Allows flex children to shrink below content size */
 }
 
 .code-editor .cm-editor {
-  height: 100%;
+  flex: 1;
   font-size: 14px;
   font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', 'Consolas', 'source-code-pro', monospace;
+  min-height: 0; /* CRITICAL: Allows flex children to shrink below content size */
+}
+
+/* Fix: cm-theme wrapper must participate in flex layout */
+.code-editor .cm-theme {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0; /* CRITICAL: Allows flex children to shrink below content size */
 }
 
 .code-editor .cm-scroller {
   overflow: auto;
+  flex: 1; /* Allow it to grow but respect parent constraints */
+  min-height: 0; /* CRITICAL: Allows flex child to shrink below content size */
 }
 
 .code-editor .cm-content {

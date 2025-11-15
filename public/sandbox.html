@@ -7,16 +7,35 @@
   <title>Sandbox</title>
   <!-- Aksel Darkside CSS loaded via import in sandboxAksel.ts -->
   <style>
+    /* Set iframe canvas color to match preview container background */
+    html {
+      /* Use dark color-scheme to get dark canvas instead of default white */
+      color-scheme: dark;
+      /* Explicitly set background to match preview container */
+      background: #070d0d !important;
+    }
+    
+    body {
+      background: transparent !important;
+    }
+    
     /* NO custom reset - Aksel Darkside provides complete reset.darkside.css via import */
     #root {
       padding: 1rem;
-      background: var(--ax-bg);
     }
     #root.light {
       color-scheme: light;
     }
     #root.dark {
       color-scheme: dark;
+    }
+    
+    /* FIX: Theme component should only wrap content, not fill parent width */
+    /* This ensures the viewport width constraint only affects user's code */
+    #root > .aksel-theme {
+      background: transparent !important;
+      display: inline-block;
+      width: auto;
     }
     
     /* FIX: Missing Aksel textColor variants - decoration and contrast */

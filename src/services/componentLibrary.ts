@@ -49,12 +49,12 @@ export const AKSEL_SNIPPETS: ComponentSnippet[] = [
   },
   {
     id: 'box-new',
-    name: 'Box.New',
+    name: 'BoxNew',
     category: 'layout',
     keywords: ['box', 'container', 'layout', 'padding', 'wrapper', 'darkside', 'border', 'shadow'],
-    template: '<Box.New padding="4">\n  ${1:Content}\n</Box.New>',
+    template: '<BoxNew padding="4">\n  ${1:Content}\n</BoxNew>',
     description: 'Layout container with Darkside support (borderColor, background, shadow)',
-    import: "import { Box } from '@navikt/ds-react';",
+    import: "import { BoxNew } from '@navikt/ds-react';",
   },
   {
     id: 'stack',

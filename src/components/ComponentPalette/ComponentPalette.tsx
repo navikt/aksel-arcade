@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { Modal, Tabs, TextField, VStack, HStack, Box, Heading, BodyShort } from '@navikt/ds-react';
+import { Modal, Tabs, TextField, VStack, HStack, BoxNew, Heading, BodyShort } from '@navikt/ds-react';
 import { MagnifyingGlassIcon } from '@navikt/aksel-icons';
 import { ComponentMetadata, getComponentsByCategory, searchComponents } from '../../data/akselComponents';
 import './ComponentPalette.css';
@@ -72,9 +72,9 @@ export const ComponentPalette = ({ open, onClose, onInsertComponent }: Component
           {/* Component Grid */}
           <div className="component-grid">
             {filteredComponents.length === 0 ? (
-              <Box padding="space-8" className="no-results">
+              <BoxNew padding="space-8" className="no-results">
                 <BodyShort>No components found matching "{searchQuery}"</BodyShort>
-              </Box>
+              </BoxNew>
             ) : (
               filteredComponents.map((component) => (
                 <ComponentCard
@@ -98,12 +98,12 @@ interface ComponentCardProps {
 
 const ComponentCard = ({ component, onInsert }: ComponentCardProps) => {
   return (
-    <Box
+    <BoxNew
       className="component-card"
       padding="3"
       borderRadius="medium"
       borderWidth="1"
-      borderColor="border-subtle"
+      borderColor="neutral-subtleA"
       onClick={() => onInsert(component)}
       role="button"
       tabIndex={0}
@@ -140,6 +140,6 @@ const ComponentCard = ({ component, onInsert }: ComponentCardProps) => {
           )}
         </div>
       </VStack>
-    </Box>
+    </BoxNew>
   );
 };

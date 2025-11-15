@@ -1,5 +1,5 @@
-import { Button } from '@navikt/ds-react'
-import { PlusIcon } from '@navikt/aksel-icons'
+import { Button, HStack } from '@navikt/ds-react'
+import { PlusIcon, CodeIcon, ArrowUndoIcon, ArrowRedoIcon } from '@navikt/aksel-icons'
 import './EditorToolbar.css'
 
 interface EditorToolbarProps {
@@ -20,35 +20,46 @@ export const EditorToolbar = ({
   canRedo = false,
 }: EditorToolbarProps) => {
   return (
-    <div className="editor-toolbar">
+    <HStack data-name="Right group" gap="space-12" align="center">
       <Button
-        variant="secondary"
+        variant="primary-neutral"
         size="small"
         icon={<PlusIcon aria-hidden />}
         onClick={onAddComponent}
       >
-        Add Component
+        Add
       </Button>
 
-      <div className="editor-toolbar__spacer" />
-
       {onFormat && (
-        <Button variant="tertiary" size="small" onClick={onFormat}>
+        <Button 
+          variant="tertiary-neutral" 
+          size="small" 
+          icon={<CodeIcon aria-hidden />}
+          onClick={onFormat}
+        >
           Format
         </Button>
       )}
 
       {onUndo && (
-        <Button variant="tertiary" size="small" onClick={onUndo} disabled={!canUndo}>
-          Undo
-        </Button>
+        <Button 
+          variant="tertiary-neutral" 
+          size="small" 
+          icon={<ArrowUndoIcon title="Undo" />}
+          onClick={onUndo} 
+          disabled={!canUndo}
+        />
       )}
 
       {onRedo && (
-        <Button variant="tertiary" size="small" onClick={onRedo} disabled={!canRedo}>
-          Redo
-        </Button>
+        <Button 
+          variant="tertiary-neutral" 
+          size="small" 
+          icon={<ArrowRedoIcon title="Redo" />}
+          onClick={onRedo} 
+          disabled={!canRedo}
+        />
       )}
-    </div>
+    </HStack>
   )
 }

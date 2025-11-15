@@ -1,42 +1,54 @@
 /* Container for react-resizable-panels */
 .split-pane {
-  height: 100vh;
+  height: 100%;
   width: 100%;
 }
 
 /* Left panel */
 .split-pane__left {
-  overflow: auto;
+  overflow: visible;
   background: var(--a-surface-default);
+  display: flex;
+  flex-direction: column;
 }
 
 /* Resize handle (divider) */
 .split-pane__divider {
-  width: 8px;
+  width: 0;
   position: relative;
   cursor: col-resize;
-  background: transparent;
-  transition: background-color 0.2s;
 }
 
 .split-pane__divider::before {
   content: '';
   position: absolute;
-  left: 50%;
+  left: -4px;
+  top: 0;
+  bottom: 0;
+  width: 8px;
+  background: transparent;
+  transition: background-color 0.2s;
+}
+
+.split-pane__divider::after {
+  content: '';
+  position: absolute;
+  left: 0;
   top: 0;
   bottom: 0;
   width: 1px;
   background: var(--a-border-default);
-  transform: translateX(-50%);
+  transform: translateX(-0.5px);
   transition: background-color 0.2s;
+  pointer-events: none;
 }
 
-.split-pane__divider:hover::before,
-.split-pane__divider[data-resize-handle-active]::before {
+.split-pane__divider:hover::after,
+.split-pane__divider[data-resize-handle-active]::after {
   background: var(--a-border-strong);
 }
 
-.split-pane__divider:hover {
+.split-pane__divider:hover::before {
   background: var(--a-surface-hover);
 }
 

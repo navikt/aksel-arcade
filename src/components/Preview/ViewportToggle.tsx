@@ -1,4 +1,5 @@
 import { useContext } from 'react'
+import { ToggleGroup } from '@navikt/ds-react'
 import { AppContext } from '@/hooks/useProject'
 import { VIEWPORTS } from '@/types/viewports'
 import type { ViewportSize } from '@/types/project'
@@ -10,27 +11,26 @@ export const ViewportToggle = () => {
 
   const { project, updateProject } = context
 
-  const handleViewportChange = (viewportId: ViewportSize) => {
-    updateProject({ viewportSize: viewportId })
+  const handleViewportChange = (value: string) => {
+    updateProject({ viewportSize: value as ViewportSize })
   }
 
   return (
-    <div className="viewport-toggle" role="group" aria-label="Viewport size selector">
+    <ToggleGroup 
+      size="small" 
+      value={project.viewportSize} 
+      onChange={handleViewportChange}
+      variant="neutral"
+    >
       {VIEWPORTS.map((viewport) => (
-        <button
-          key={viewport.id}
-          type="button"
-          className={`viewport-toggle__button ${
-            project.viewportSize === viewport.id ? 'viewport-toggle__button--active' : ''
-          }`}
-          onClick={() => handleViewportChange(viewport.id)}
+        <ToggleGroup.Item 
+          key={viewport.id} 
+          value={viewport.id}
           aria-label={`${viewport.name} (${viewport.width}px)`}
-          aria-pressed={project.viewportSize === viewport.id}
-          title={`${viewport.name} (${viewport.width}px)`}
         >
           {viewport.label}
-        </button>
+        </ToggleGroup.Item>
       ))}
-    </div>
+    </ToggleGroup>
   )
 }

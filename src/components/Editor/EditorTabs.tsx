@@ -1,4 +1,4 @@
-import { Tabs } from '@navikt/ds-react'
+import { ToggleGroup } from '@navikt/ds-react'
 import type { EditorTab } from '@/types/editor'
 import './EditorTabs.css'
 
@@ -9,13 +9,14 @@ interface EditorTabsProps {
 
 export const EditorTabs = ({ activeTab, onTabChange }: EditorTabsProps) => {
   return (
-    <div className="editor-tabs">
-      <Tabs value={activeTab} onChange={(value) => onTabChange(value as EditorTab)}>
-        <Tabs.List>
-          <Tabs.Tab value="JSX" label="JSX" />
-          <Tabs.Tab value="Hooks" label="Hooks" />
-        </Tabs.List>
-      </Tabs>
-    </div>
+    <ToggleGroup 
+      size="small" 
+      value={activeTab} 
+      onChange={(value) => onTabChange(value as EditorTab)}
+      variant="neutral"
+    >
+      <ToggleGroup.Item value="JSX">JSX</ToggleGroup.Item>
+      <ToggleGroup.Item value="Hooks">Hooks</ToggleGroup.Item>
+    </ToggleGroup>
   )
 }

@@ -1,4 +1,6 @@
 import { useState, useContext } from 'react'
+import { Button } from '@navikt/ds-react'
+import { FileSearchIcon } from '@navikt/aksel-icons'
 import { AppContext } from '@/hooks/useProject'
 import type { MainToSandboxMessage } from '@/types/messages'
 import './InspectMode.css'
@@ -33,32 +35,13 @@ export const InspectMode = ({ iframeRef, onInspectToggle }: InspectModeProps) =>
   }
 
   return (
-    <button
-      type="button"
-      className={`inspect-mode-toggle ${isInspectMode ? 'inspect-mode-toggle--active' : ''}`}
+    <Button
+      variant="tertiary-neutral"
+      size="small"
+      icon={<FileSearchIcon title={isInspectMode ? 'Disable inspect mode' : 'Enable inspect mode'} />}
       onClick={handleToggle}
       aria-label={isInspectMode ? 'Disable inspect mode' : 'Enable inspect mode'}
       aria-pressed={isInspectMode}
-      title={isInspectMode ? 'Disable inspect mode' : 'Enable inspect mode'}
-    >
-      {/* Pointer/cursor icon */}
-      <svg
-        width="17"
-        height="17"
-        viewBox="0 0 17 17"
-        fill="none"
-        xmlns="http://www.w3.org/2000/svg"
-        aria-hidden="true"
-      >
-        <path
-          d="M2.5 2.5L14.5 8.5L8.5 10.5L6.5 14.5L2.5 2.5Z"
-          stroke="currentColor"
-          strokeWidth="1.5"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          fill="none"
-        />
-      </svg>
-    </button>
+    />
   )
 }

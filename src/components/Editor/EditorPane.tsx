@@ -1,4 +1,5 @@
 import { useContext, useRef } from 'react'
+import { HStack, BoxNew } from '@navikt/ds-react'
 import { AppContext } from '@/hooks/useProject'
 import { CodeEditor, type CodeEditorRef } from './CodeEditor'
 import { EditorTabs } from './EditorTabs'
@@ -81,26 +82,43 @@ export const EditorPane = () => {
   const canRedo = true
 
   return (
-    <div className="editor-pane">
-      <EditorTabs activeTab={currentTab} onTabChange={handleTabChange} />
-      
-      <EditorToolbar
-        canUndo={canUndo}
-        canRedo={canRedo}
-        onAddComponent={() => toggleComponentPalette()}
-        onFormat={handleFormat}
-        onUndo={handleUndo}
-        onRedo={handleRedo}
-      />
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+      <BoxNew
+        data-name="Code Header"
+        borderWidth="0 1 1 0"
+        borderColor="neutral-subtleA"
+        paddingInline="space-20"
+        paddingBlock="space-8"
+      >
+        <HStack justify="space-between">
+          <EditorTabs activeTab={currentTab} onTabChange={handleTabChange} />
+          <EditorToolbar
+            canUndo={canUndo}
+            canRedo={canRedo}
+            onAddComponent={() => toggleComponentPalette()}
+            onFormat={handleFormat}
+            onUndo={handleUndo}
+            onRedo={handleRedo}
+          />
+        </HStack>
+      </BoxNew>
 
-      <CodeEditor 
-        ref={editorRef}
-        key={currentTab}
-        value={currentContent} 
-        onChange={handleCodeChange}
-        onCursorChange={handleCursorChange}
-        onFormat={handleFormat}
-      />
+      <BoxNew
+        data-name="Code editor"
+        style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}
+        padding="4"
+        borderWidth="0 1 0 0"
+        borderColor="neutral-subtleA"
+      >
+        <CodeEditor 
+          ref={editorRef}
+          key={currentTab}
+          value={currentContent} 
+          onChange={handleCodeChange}
+          onCursorChange={handleCursorChange}
+          onFormat={handleFormat}
+        />
+      </BoxNew>
 
       <ComponentPalette
         open={isComponentPaletteOpen}

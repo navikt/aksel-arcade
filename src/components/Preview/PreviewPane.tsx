@@ -1,4 +1,5 @@
 import { useContext, useEffect, useState, useRef } from 'react'
+import { HStack, VStack, BoxNew } from '@navikt/ds-react'
 import { AppContext } from '@/hooks/useProject'
 import { transpileCode } from '@/services/transpiler'
 import { LivePreview } from './LivePreview'
@@ -97,33 +98,51 @@ export const PreviewPane = () => {
   }
 
   return (
-    <div className="preview-pane">
-      <div className="preview-pane__header">
-        <InspectMode 
-          iframeRef={iframeRef}
-          onInspectToggle={handleInspectToggle}
-        />
-        <ViewportToggle />
-      </div>
+    <>
+      <HStack gap="space-12" justify="end" align="center" asChild>
+        <BoxNew
+          data-name="Preview Header"
+          borderWidth="0 0 1 0"
+          borderColor="neutral-subtleA"
+          paddingInline="space-20"
+          paddingBlock="space-8"
+        >
+          <InspectMode 
+            iframeRef={iframeRef}
+            onInspectToggle={handleInspectToggle}
+          />
+          <ViewportToggle />
+        </BoxNew>
+      </HStack>
 
-      <ErrorOverlay
-        compileError={compileError}
-        runtimeError={runtimeError}
-        onClose={() => {
-          setCompileError(null)
-          setRuntimeError(null)
-        }}
-      />
-      
-      <LivePreview
-        iframeRef={iframeRef}
-        transpiledCode={transpiledCode}
-        onRenderSuccess={handleRenderSuccess}
-        onCompileError={handleCompileError}
-        onRuntimeError={handleRuntimeError}
-        viewportWidth={project.viewportSize}
-        isInspectMode={isInspectMode}
-      />
-    </div>
+      <VStack asChild style={{ flexGrow: 1, height: '100%' }}>
+        <BoxNew 
+          data-name="Preview" 
+          paddingBlock="space-16" 
+          paddingInline="space-16" 
+          background="sunken"
+          style={{ display: 'flex', flexDirection: 'column', height: '100%' }}
+        >
+          <ErrorOverlay
+            compileError={compileError}
+            runtimeError={runtimeError}
+            onClose={() => {
+              setCompileError(null)
+              setRuntimeError(null)
+            }}
+          />
+          
+          <LivePreview
+            iframeRef={iframeRef}
+            transpiledCode={transpiledCode}
+            onRenderSuccess={handleRenderSuccess}
+            onCompileError={handleCompileError}
+            onRuntimeError={handleRuntimeError}
+            viewportWidth={project.viewportSize}
+            isInspectMode={isInspectMode}
+          />
+        </BoxNew>
+      </VStack>
+    </>
   )
 }

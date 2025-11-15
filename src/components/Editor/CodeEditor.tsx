@@ -1,16 +1,43 @@
 import CodeMirror from '@uiw/react-codemirror'
+import { createTheme } from '@uiw/codemirror-themes'
 import { javascript } from '@codemirror/lang-javascript'
 import { autocompletion, startCompletion, completionStatus, type CompletionContext, type CompletionResult } from '@codemirror/autocomplete'
 import { ViewPlugin, type EditorView, type ViewUpdate } from '@codemirror/view'
 import { keymap } from '@codemirror/view'
 import { undo, redo } from '@codemirror/commands'
 import { linter, type Diagnostic } from '@codemirror/lint'
+import { tags as t } from '@lezer/highlight'
 import { forwardRef, useImperativeHandle, useRef, useMemo } from 'react'
 import type { ReactCodeMirrorRef } from '@uiw/react-codemirror'
 import { AKSEL_SNIPPETS } from '@/services/componentLibrary'
 import { getComponentProps, getPropValues, getPropDefinition } from '@/services/akselMetadata'
 import * as Babel from '@babel/standalone'
 import './CodeEditor.css'
+
+// Custom Aksel Darkside theme for CodeMirror
+const akselDarksideTheme = createTheme({
+  theme: 'dark',
+  settings: {
+    background: 'var(--ax-bg-default)',
+    backgroundImage: '',
+    foreground: 'var(--ax-text-neutral)',
+    caret: 'var(--ax-text-neutral-decoration)',
+    selection: 'var(--ax-bg-brand-magenta-moderate-hover)',
+    selectionMatch: 'var(--ax-bg-brand-beige-moderate-hover)',
+    gutterBackground: 'var(--ax-bg-neutral-soft)',
+    gutterForeground: 'var(--ax-text-neutral)',
+    gutterBorder: 'var(--ax-border-neutral-subtleA)',
+    gutterActiveForeground: 'var(--ax-text-brand-magenta-subtle)',
+    lineHighlight: 'var(--ax-bg-neutral-softA)',
+  },
+  styles: [
+    { tag: t.comment, color: 'var(--ax-text-success-decoration)' },
+    { tag: t.definition(t.typeName), color: 'var(--ax-text-meta-purple-subtle)' },
+    { tag: t.typeName, color: 'var(--ax-text-meta-purple-subtle)' },
+    { tag: t.tagName, color: 'var(--ax-text-brand-blue-subtle)' },
+    { tag: t.variableName, color: 'var(--ax-text-warning-subtle)' },
+  ],
+})
 
 export interface CodeEditorRef {
   undo: () => void
@@ -24,7 +51,6 @@ interface CodeEditorProps {
   onFormat?: () => void | Promise<void>
   language?: 'jsx' | 'typescript'
   readOnly?: boolean
-  height?: string
 }
 
 // Helper to detect if cursor is inside quotes of a prop value
@@ -169,7 +195,6 @@ export const CodeEditor = forwardRef<CodeEditorRef, CodeEditorProps>(({
   onFormat,
   language = 'jsx',
   readOnly = false,
-  height = '100%',
 }, ref) => {
   const editorRef = useRef<ReactCodeMirrorRef>(null)
 
@@ -378,11 +403,10 @@ export const CodeEditor = forwardRef<CodeEditorRef, CodeEditorProps>(({
   }, [language, onFormat]) // Memoize based on language and onFormat
 
   return (
-    <div className="code-editor" style={{ height }}>
+    <div className="code-editor">
       <CodeMirror
         ref={editorRef}
         value={value}
-        height={height}
         extensions={extensions}
         onChange={onChange}
         onUpdate={(update) => {
@@ -396,7 +420,7 @@ export const CodeEditor = forwardRef<CodeEditorRef, CodeEditorProps>(({
           }
         }}
         readOnly={readOnly}
-        theme="dark"
+        theme={akselDarksideTheme}
         basicSetup={{
           lineNumbers: true,
           highlightActiveLineGutter: true,
