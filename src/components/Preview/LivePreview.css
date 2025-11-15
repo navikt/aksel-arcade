@@ -3,7 +3,7 @@
   flex: 1;
   position: relative;
   background: var(--a-surface-subtle);
-  overflow: hidden;
+  overflow: auto;
 }
 
 .live-preview__iframe {
@@ -11,4 +11,5 @@
   height: 100%;
   border: none;
   background: transparent;
+  display: block;
 }

@@ -17,11 +17,16 @@
     
     body {
       background: transparent !important;
+      width: 100%;
     }
     
     /* NO custom reset - Aksel Darkside provides complete reset.darkside.css via import */
     #root {
       padding: 1rem;
+      width: 100%;
+      box-sizing: border-box;
+      /* maxWidth will be set dynamically via updateViewport to simulate device widths */
+      /* margin: 0 auto will center the content when maxWidth < container width */
     }
     #root.light {
       color-scheme: light;
@@ -30,12 +35,10 @@
       color-scheme: dark;
     }
     
-    /* FIX: Theme component should only wrap content, not fill parent width */
-    /* This ensures the viewport width constraint only affects user's code */
+    /* FIX: Theme component should fill root width */
     #root > .aksel-theme {
       background: transparent !important;
-      display: inline-block;
-      width: auto;
+      width: 100%;
     }
     
     /* FIX: Missing Aksel textColor variants - decoration and contrast */
