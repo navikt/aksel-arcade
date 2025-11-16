@@ -2,7 +2,7 @@ import { createContext, useContext, useState, type ReactNode } from 'react'
 import type { Project } from '@/types/project'
 import type { EditorState } from '@/types/editor'
 import type { PreviewState } from '@/types/preview'
-import { createDefaultProject, createDefaultEditorState, createDefaultPreviewState } from '@/utils/projectDefaults'
+import { createDefaultProject, createDefaultEditorState, createDefaultPreviewState, FORM_SUMMARY_JSX_CODE } from '@/utils/projectDefaults'
 import { loadProject } from '@/services/storage'
 import type { ComponentSnippet } from '@/types/snippets'
 
@@ -28,6 +28,7 @@ interface AppState {
   toggleSettings: () => void
   insertSnippet: (snippet: ComponentSnippet) => void
   resetToIntro: () => void
+  loadFormSummaryTemplate: () => void
 }
 
 const AppContext = createContext<AppState | null>(null)
@@ -129,6 +130,24 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     }
   }
 
+  const loadFormSummaryTemplate = () => {
+    const confirmed = window.confirm(
+      'Load form summary page template? This will replace your current code.'
+    )
+    if (confirmed) {
+      // Clear any potential storage conflicts by updating project cleanly
+      setProjectState({
+        ...project,
+        jsxCode: FORM_SUMMARY_JSX_CODE,
+        hooksCode: '', // Empty hooks for template
+        lastModified: new Date().toISOString(),
+      })
+      // Reset editor state to JSX tab
+      setEditorState(createDefaultEditorState())
+      console.log('✅ Form summary template loaded successfully')
+    }
+  }
+
   const value: AppState = {
     project,
     editorState,
@@ -144,6 +163,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     toggleSettings,
     insertSnippet,
     resetToIntro,
+    loadFormSummaryTemplate,
   }
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>

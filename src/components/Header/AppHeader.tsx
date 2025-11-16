@@ -34,6 +34,7 @@ interface AppHeaderProps {
   projectSizeBytes: number
   onResetToIntro: () => void
   onClearStorage: () => void
+  onLoadFormSummaryTemplate: () => void
 }
 
 export const AppHeader = ({
@@ -45,6 +46,7 @@ export const AppHeader = ({
   projectSizeBytes,
   onResetToIntro,
   onClearStorage,
+  onLoadFormSummaryTemplate,
 }: AppHeaderProps) => {
   const MAX_PROJECT_SIZE = 5 * 1024 * 1024 // 5MB
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -172,6 +174,14 @@ export const AppHeader = ({
                   onSelect={togglePanelOrder}
                 >
                   Swap panel order
+                </ActionMenu.Item>
+              </ActionMenu.Group>
+              <ActionMenu.Divider />
+              <ActionMenu.Group label="Templates">
+                <ActionMenu.Item
+                  onSelect={onLoadFormSummaryTemplate}
+                >
+                  Oppsummeringsside for søknadsdialoger
                 </ActionMenu.Item>
               </ActionMenu.Group>
               <ActionMenu.Divider />
