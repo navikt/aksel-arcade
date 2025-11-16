@@ -7,6 +7,7 @@ export type MainToSandboxMessage =
   | { type: 'UPDATE_VIEWPORT'; payload: { width: number } }
   | { type: 'TOGGLE_INSPECT'; payload: { enabled: boolean } }
   | { type: 'GET_INSPECTION_DATA'; payload: { x: number; y: number } }
+  | { type: 'UPDATE_THEME'; payload: { theme: 'light' | 'dark' } }
 
 // Sandbox → Main messages
 export type SandboxToMainMessage =

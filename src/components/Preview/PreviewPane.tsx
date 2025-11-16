@@ -6,6 +6,7 @@ import { LivePreview } from './LivePreview'
 import { ErrorOverlay } from './ErrorOverlay'
 import { ViewportToggle } from './ViewportToggle'
 import { InspectMode } from './InspectMode'
+import { ThemeToggle } from './ThemeToggle'
 import type { CompileError, RuntimeError } from '@/types/preview'
 import './PreviewPane.css'
 
@@ -18,6 +19,7 @@ export const PreviewPane = () => {
   const [compileError, setCompileError] = useState<CompileError | null>(null)
   const [runtimeError, setRuntimeError] = useState<RuntimeError | null>(null)
   const [isInspectMode, setIsInspectMode] = useState(false)
+  const [previewTheme, setPreviewTheme] = useState<'light' | 'dark'>('light')
   const debounceTimerRef = useRef<number | undefined>(undefined)
   const iframeRef = useRef<HTMLIFrameElement | null>(null)
 
@@ -97,6 +99,10 @@ export const PreviewPane = () => {
     setIsInspectMode(enabled)
   }
 
+  const handleThemeChange = (theme: 'light' | 'dark') => {
+    setPreviewTheme(theme)
+  }
+
   return (
     <>
       <HStack gap="space-12" justify="end" align="center" asChild>
@@ -107,6 +113,10 @@ export const PreviewPane = () => {
           paddingInline="space-20"
           paddingBlock="space-8"
         >
+          <ThemeToggle
+            iframeRef={iframeRef}
+            onThemeChange={handleThemeChange}
+          />
           <InspectMode 
             iframeRef={iframeRef}
             onInspectToggle={handleInspectToggle}
@@ -121,6 +131,7 @@ export const PreviewPane = () => {
           paddingBlock="space-16" 
           paddingInline="space-16" 
           background="sunken"
+          className={previewTheme}
           style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}
         >
           <ErrorOverlay

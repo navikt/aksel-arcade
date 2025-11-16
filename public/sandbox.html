@@ -9,10 +9,10 @@
   <style>
     /* Set iframe canvas color to match preview container background */
     html {
-      /* Use dark color-scheme to get dark canvas instead of default white */
-      color-scheme: dark;
-      /* Explicitly set background to match preview container */
-      background: #070d0d !important;
+      /* Color-scheme will be set dynamically by updateTheme function */
+      color-scheme: light;
+      /* Use Aksel Darkside sunken background variable (adapts to theme) */
+      background: var(--ax-bg-sunken);
       /* Enable scrolling when content overflows */
       overflow: auto;
       height: 100%;
@@ -93,8 +93,13 @@
   </style>
 </head>
 <body>
-  <!-- Apply aksel-theme and light classes for Darkside styling -->
+  <!-- Apply aksel-theme and light classes for Darkside styling to both html and root -->
   <!-- data-color activates Darkside color system -->
+  <script>
+    // Set initial theme classes on html element for background
+    document.documentElement.className = 'aksel-theme light';
+    document.documentElement.setAttribute('data-color', 'accent');
+  </script>
   <div id="root" class="aksel-theme light" data-color="accent"></div>
   
   <script type="module">
@@ -102,6 +107,7 @@
     let currentRoot = null;
     let akselLoaded = false;
     let ThemeComponent = null;
+    let lastComponent = null;
 
     // Load Aksel + React from Vite dev server with proper CSS import
     // Following Aksel docs: import "@navikt/ds-css/darkside";
@@ -159,6 +165,9 @@
     let highlightOverlay = null;
     let lastInspectionTime = 0;
     const INSPECTION_THROTTLE_MS = 16; // ~60fps
+    
+    // Theme state
+    let currentTheme = 'light';
 
     // Listen for messages from parent window
     window.addEventListener('message', (event) => {
@@ -181,6 +190,10 @@
           case 'TOGGLE_INSPECT':
             console.log('🔍 Toggling inspect mode...');
             toggleInspect(message.payload);
+            break;
+          case 'UPDATE_THEME':
+            console.log('🎨 Updating theme...');
+            updateTheme(message.payload);
             break;
           case 'CHECK_CSS_VARS':
             checkCSSVariables(message.id);
@@ -469,6 +482,46 @@
       rootElement.style.transition = 'max-width 0.3s ease';
     }
 
+    function updateTheme(payload) {
+      try {
+        const { theme } = payload;
+        
+        if (!theme || (theme !== 'light' && theme !== 'dark')) {
+          console.error('❌ Invalid theme:', theme);
+          return;
+        }
+        
+        console.log(`🎨 Updating theme to ${theme}`);
+        currentTheme = theme;
+        
+        // Update html element classes and color-scheme for background
+        document.documentElement.className = `aksel-theme ${theme}`;
+        document.documentElement.setAttribute('data-color', 'accent');
+        document.documentElement.style.colorScheme = theme;
+        
+        // Update root element classes and color-scheme
+        const rootElement = document.getElementById('root');
+        if (rootElement) {
+          rootElement.className = `aksel-theme ${theme}`;
+          rootElement.style.colorScheme = theme;
+        }
+        
+        // Re-render current component with new theme if exists
+        if (currentRoot && lastComponent) {
+          console.log('🔄 Re-rendering with new theme...');
+          renderComponent(lastComponent);
+          sendMessage('THEME_UPDATED', { theme });
+        }
+      } catch (error) {
+        console.error('❌ Error in updateTheme:', error);
+        sendError('RUNTIME_ERROR', {
+          message: `Theme update error: ${error.message}`,
+          componentStack: null,
+          stack: error.stack || ''
+        });
+      }
+    }
+
     function executeCode(payload) {
       try {
         const { jsxCode } = payload;
@@ -546,6 +599,9 @@
           throw new Error('Invalid component. Make sure to export a React component.');
         }
 
+        // Store component for re-rendering on theme change
+        lastComponent = Component;
+        
         // Render the component
         console.log('🎨 Rendering component...');
         renderComponent(Component);
@@ -585,10 +641,10 @@
           throw new Error('Theme component not loaded. Make sure Vite dev server is running.');
         }
         
-        console.log('🎨 Rendering component wrapped with Aksel Theme (light mode)');
+        console.log(`🎨 Rendering component wrapped with Aksel Theme (${currentTheme} mode)`);
         const wrappedComponent = React.createElement(
           ThemeComponent,
-          { theme: 'light' },
+          { theme: currentTheme },
           React.createElement(Component)
         );
         
@@ -618,6 +674,7 @@
         currentRoot.unmount();
         currentRoot = null;
       }
+      lastComponent = null;
       const rootElement = document.getElementById('root');
       if (rootElement) {
         rootElement.innerHTML = '';
