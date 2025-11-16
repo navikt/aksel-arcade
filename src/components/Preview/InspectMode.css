@@ -1,39 +1,12 @@
-/* Inspect Mode Toggle Button - Matches Figma node 25:158 */
+/* Inspect Mode Toggle Button - Active State Styling */
 
-.inspect-mode-toggle {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 24px;
-  height: 24px;
-  padding: 2px;
-  border: none;
-  border-radius: var(--ax-border-radius-large, 8px);
-  background: transparent;
-  color: var(--ax-text-neutral, #202733);
-  cursor: pointer;
-  transition: all 0.15s ease;
+/* Target the Aksel Button when aria-pressed is true to match ToggleGroup active styling */
+.inspect-mode-button[aria-pressed="true"] {
+  background-color: var(--a-surface-action-subtle-active, rgb(165, 172, 182)) !important;
+  color: var(--a-text-on-action, rgb(0, 0, 0)) !important;
 }
 
-.inspect-mode-toggle:hover:not(.inspect-mode-toggle--active) {
-  background: var(--ax-bg-neutral-subtle-hover, rgba(0, 0, 0, 0.04));
-}
-
-.inspect-mode-toggle:active:not(.inspect-mode-toggle--active) {
-  background: var(--ax-bg-neutral-subtle-pressed, rgba(0, 0, 0, 0.08));
-}
-
-.inspect-mode-toggle--active {
-  background: var(--ax-bg-neutral-strong-pressed, #49515e);
-  color: var(--a-text-neutral-contrast, #ffffff);
-}
-
-.inspect-mode-toggle:focus-visible {
-  outline: 2px solid var(--ax-border-focus, #0067c5);
-  outline-offset: 2px;
-}
-
-.inspect-mode-toggle svg {
-  width: 16.667px;
-  height: 16.667px;
+/* Hover state when not active */
+.inspect-mode-button[aria-pressed="false"]:hover {
+  background-color: var(--a-surface-neutral-subtle-hover, rgba(0, 0, 0, 0.04)) !important;
 }

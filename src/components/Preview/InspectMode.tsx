@@ -42,6 +42,7 @@ export const InspectMode = ({ iframeRef, onInspectToggle }: InspectModeProps) =>
       onClick={handleToggle}
       aria-label={isInspectMode ? 'Disable inspect mode' : 'Enable inspect mode'}
       aria-pressed={isInspectMode}
+      className="inspect-mode-button"
     />
   )
 }
