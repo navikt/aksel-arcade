@@ -20,7 +20,7 @@ export const ThemeToggle = ({ iframeRef, onThemeChange }: ThemeToggleProps) => {
           type: 'UPDATE_THEME',
           payload: { theme },
         }
-        iframeRef.current.contentWindow.postMessage(message, '*')
+        iframeRef.current.contentWindow.postMessage(message, window.location.origin)
         console.log(`📤 Sent preview theme to sandbox: ${theme}`)
         return true
       }
@@ -45,7 +45,7 @@ export const ThemeToggle = ({ iframeRef, onThemeChange }: ThemeToggleProps) => {
         type: 'UPDATE_THEME',
         payload: { theme: newTheme },
       }
-      iframeRef.current.contentWindow.postMessage(message, '*')
+      iframeRef.current.contentWindow.postMessage(message, window.location.origin)
       console.log(`📤 Sent UPDATE_THEME: ${newTheme}`)
     }
     

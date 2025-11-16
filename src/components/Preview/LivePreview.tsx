@@ -54,7 +54,7 @@ export const LivePreview = ({
             payload: { jsxCode: pendingCodeRef.current, hooksCode: '' },
           }
           console.log('📤 Sending pending code to sandbox')
-          iframeRef.current.contentWindow.postMessage(message, '*')
+          iframeRef.current.contentWindow.postMessage(message, window.location.origin)
           pendingCodeRef.current = null
         }
         return
@@ -126,7 +126,7 @@ export const LivePreview = ({
     }
 
     console.log('📤 Sending EXECUTE_CODE to sandbox')
-    iframeRef.current.contentWindow.postMessage(message, '*')
+    iframeRef.current.contentWindow.postMessage(message, window.location.origin)
   }, [transpiledCode, sandboxReady, iframeRef])
 
   // Send viewport update when viewport changes
@@ -142,7 +142,7 @@ export const LivePreview = ({
     }
 
     console.log(`📤 Sending UPDATE_VIEWPORT to sandbox: ${width}px`)
-    iframeRef.current.contentWindow.postMessage(message, '*')
+    iframeRef.current.contentWindow.postMessage(message, window.location.origin)
   }, [viewportWidth, sandboxReady, iframeRef])
 
   // Send theme update when theme changes
@@ -157,7 +157,7 @@ export const LivePreview = ({
     }
 
     console.log(`📤 Sending UPDATE_THEME to sandbox: ${theme}`)
-    iframeRef.current.contentWindow.postMessage(message, '*')
+    iframeRef.current.contentWindow.postMessage(message, window.location.origin)
   }, [theme, sandboxReady, iframeRef])
 
   return (

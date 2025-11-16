@@ -1,4 +1,8 @@
 import { createContext, useContext, useState, type ReactNode } from 'react'
+
+/* eslint-disable react-refresh/only-export-components */
+// Context providers intentionally export both context and hooks
+
 import type { Project } from '@/types/project'
 import type { EditorState } from '@/types/editor'
 import type { PreviewState } from '@/types/preview'

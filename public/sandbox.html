@@ -3,8 +3,27 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline' 'unsafe-eval' https://esm.sh http://localhost:*; style-src 'unsafe-inline' http://localhost:* https://cdn.nav.no; font-src https://cdn.nav.no data:; connect-src https://esm.sh http://localhost:* ws://localhost:*; img-src data: https:;">
   <title>Sandbox</title>
+  <!-- Content Security Policy: Inline script sets appropriate CSP based on environment -->
+  <script>
+    // Detect if running in development (localhost) or production
+    const isDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+    
+    // Development CSP: Allow localhost for Vite HMR
+    const devCSP = "default-src 'none'; script-src 'unsafe-inline' 'unsafe-eval' http://localhost:* https://localhost:*; style-src 'unsafe-inline' http://localhost:* https://localhost:* https://cdn.nav.no; font-src https://cdn.nav.no data:; connect-src http://localhost:* https://localhost:* ws://localhost:* wss://localhost:*; img-src data: https:;"
+    
+    // Production CSP: Strict, only allow required CDN resources
+    // Note: 'unsafe-eval' is required for user code execution (playground feature)
+    const prodCSP = "default-src 'none'; script-src 'unsafe-inline' 'unsafe-eval'; style-src 'unsafe-inline' https://cdn.nav.no; font-src https://cdn.nav.no data:; connect-src https://cdn.nav.no; img-src data: https:;"
+    
+    // Apply appropriate CSP
+    const meta = document.createElement('meta')
+    meta.httpEquiv = 'Content-Security-Policy'
+    meta.content = isDev ? devCSP : prodCSP
+    document.head.appendChild(meta)
+    
+    console.log('🔒 CSP applied:', isDev ? 'Development' : 'Production')
+  </script>
   <!-- Aksel Darkside CSS loaded via import in sandboxAksel.ts -->
   <style>
     /* Set iframe canvas color to match preview container background */
@@ -168,7 +187,7 @@
         console.log('✅ React version:', React.version);
         console.log('✅ Theme component available:', !!ThemeComponent);
         console.log('✅ Darkside CSS imported via @navikt/ds-css/darkside');
-        window.parent.postMessage({ type: 'SANDBOX_READY' }, '*');
+        window.parent.postMessage({ type: 'SANDBOX_READY' }, window.location.origin);
       })
       .catch((err) => {
         console.error('❌ Failed to load from Vite:', err);
@@ -186,6 +205,12 @@
 
     // Listen for messages from parent window
     window.addEventListener('message', (event) => {
+      // Security: Validate origin (same-origin only)
+      if (event.origin !== window.location.origin) {
+        console.warn('❌ Rejected message from unauthorized origin:', event.origin)
+        return
+      }
+      
       // Validate message structure
       if (!event.data || typeof event.data !== 'object') return;
       
@@ -480,7 +505,7 @@
         }
       };
       
-      window.parent.postMessage(result, '*');
+      window.parent.postMessage(result, window.location.origin);
     }
 
     function updateViewport(payload) {
@@ -722,11 +747,11 @@
     }
 
     function sendMessage(type, payload) {
-      window.parent.postMessage({ type, payload }, '*');
+      window.parent.postMessage({ type, payload }, window.location.origin);
     }
 
     function sendError(type, payload) {
-      window.parent.postMessage({ type, payload }, '*');
+      window.parent.postMessage({ type, payload }, window.location.origin);
     }
 
     function extractLineNumber(error) {

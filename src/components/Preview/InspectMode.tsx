@@ -26,7 +26,7 @@ export const InspectMode = ({ iframeRef, onInspectToggle }: InspectModeProps) =>
         type: 'TOGGLE_INSPECT',
         payload: { enabled: newMode },
       }
-      iframeRef.current.contentWindow.postMessage(message, '*')
+      iframeRef.current.contentWindow.postMessage(message, window.location.origin)
       console.log(`📤 Sent TOGGLE_INSPECT: ${newMode ? 'enabled' : 'disabled'}`)
     }
     
