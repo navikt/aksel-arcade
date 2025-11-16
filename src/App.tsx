@@ -9,7 +9,7 @@ import { EditorPane } from './components/Editor/EditorPane'
 import { PreviewPane } from './components/Preview/PreviewPane'
 import { WarningNotification } from './components/Header/WarningNotification'
 import { SplitPane } from './components/Layout/SplitPane'
-import { validateProjectSize } from './services/storage'
+import { validateProjectSize, clearStorage } from './services/storage'
 import type { Project } from './types/project'
 import './App.css'
 
@@ -52,6 +52,19 @@ function App() {
     setProject(importedProject)
   }
 
+  // Handle clear storage - preserves current editor content
+  const handleClearStorage = () => {
+    const confirmed = window.confirm(
+      'Clear stored data? Your current editor content will be preserved but not saved until you make changes.'
+    )
+    if (confirmed) {
+      // Clear storage while keeping current project in memory
+      clearStorage()
+      // Note: Project remains in memory, user can continue working
+      // Next auto-save will re-save the project to clean storage
+    }
+  }
+
   return (
     <SettingsProvider>
       <ThemeProvider>
@@ -77,6 +90,7 @@ function App() {
             saveStatus={saveStatus}
             projectSizeBytes={projectSizeBytes}
             onResetToIntro={resetToIntro}
+            onClearStorage={handleClearStorage}
           />
           
           <div style={{ height: 'calc(100vh - 60px)', width: '100%' }}>

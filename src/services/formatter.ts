@@ -73,11 +73,9 @@ function stripFragmentWrapper(code: string): string {
   )
   
   // Dedent all lines by removing common indentation
-  // Also collapse consecutive blank lines to single blank line
   const dedented = contentLines
     .map(line => (line.trim().length === 0 ? '' : line.slice(minIndent)))
     .join('\n')
-    .replace(/\n\n+/g, '\n') // Collapse multiple blank lines to single newline (no blank lines)
     .trim()
   
   return dedented
@@ -125,14 +123,15 @@ export async function formatCode(code: string, options: FormatOptions = {}): Pro
     // Prettier may format it as either:
     // 1. return (...multiline JSX...)
     // 2. return <SingleLineJSX />
-    const withParens = formatted.match(/return \(\s*([\s\S]*?)\s*\)/m)
+    // Use greedy matching to capture all content up to the final closing paren/brace
+    const withParens = formatted.match(/return \(\s*([\s\S]+)\s*\)\s*\n?\s*\}/m)
     if (withParens && withParens[1]) {
       const extracted = withParens[1].trim()
       // Remove Fragment wrapper if present (we added it for formatting only)
       return stripFragmentWrapper(extracted)
     }
 
-    const withoutParens = formatted.match(/return\s+([\s\S]*?)(?:\n}|$)/m)
+    const withoutParens = formatted.match(/return\s+([\s\S]+?)(?:\n\})/m)
     if (withoutParens && withoutParens[1]) {
       const extracted = withoutParens[1].trim()
       // Remove Fragment wrapper if present (we added it for formatting only)
