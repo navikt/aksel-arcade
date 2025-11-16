@@ -34,8 +34,9 @@ const akselDarksideTheme = createTheme({
     { tag: t.comment, color: 'var(--ax-text-success-decoration)' },
     { tag: t.definition(t.typeName), color: 'var(--ax-text-meta-purple-subtle)' },
     { tag: t.typeName, color: 'var(--ax-text-meta-purple-subtle)' },
-    { tag: t.tagName, color: 'var(--ax-text-brand-blue-subtle)' },
+    { tag: t.tagName, color: 'var(--ax-text-accent-subtle)' },
     { tag: t.variableName, color: 'var(--ax-text-warning-subtle)' },
+    { tag: t.propertyName, color: 'var(--ax-text-warning-subtle)' },
   ],
 })
 
