@@ -1,0 +1,38 @@
+.app-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--ax-space-8) var(--ax-space-20);
+  background: var(--ax-bg-default);
+  border-bottom: 1px solid var(--ax-border-neutral-subtleA);
+}
+
+.app-header__left {
+  display: flex;
+  align-items: center;
+  gap: var(--ax-space-32);
+}
+
+.app-header__title-wrapper {
+  display: flex;
+  align-items: center;
+  gap: var(--ax-space-8);
+}
+
+.app-header__title {
+  margin: 0;
+  color: var(--ax-text-brand-blue-subtle);
+}
+
+.app-header__project-name-wrapper {
+  display: flex;
+  align-items: center;
+  gap: var(--ax-space-6);
+  max-width: 300px;
+}
+
+.app-header__controls {
+  display: flex;
+  align-items: center;
+  gap: var(--ax-space-12);
+}

@@ -1,0 +1,61 @@
+/* Container for react-resizable-panels */
+.split-pane {
+  height: 100%;
+  width: 100%;
+}
+
+/* Left panel */
+.split-pane__left {
+  overflow: visible;
+  background: var(--a-surface-default);
+  display: flex;
+  flex-direction: column;
+}
+
+/* Resize handle (divider) */
+.split-pane__divider {
+  width: 0;
+  position: relative;
+  cursor: col-resize;
+}
+
+.split-pane__divider::before {
+  content: '';
+  position: absolute;
+  left: -4px;
+  top: 0;
+  bottom: 0;
+  width: 8px;
+  background: transparent;
+  transition: background-color 0.2s;
+}
+
+.split-pane__divider::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: var(--a-border-default);
+  transform: translateX(-0.5px);
+  transition: background-color 0.2s;
+  pointer-events: none;
+}
+
+.split-pane__divider:hover::after,
+.split-pane__divider[data-resize-handle-active]::after {
+  background: var(--a-border-strong);
+}
+
+.split-pane__divider:hover::before {
+  background: var(--a-surface-hover);
+}
+
+/* Right panel */
+.split-pane__right {
+  overflow: hidden; /* Prevent outer scroll - iframe should handle internal scrolling */
+  background: var(--a-surface-subtle);
+  display: flex;
+  flex-direction: column;
+}

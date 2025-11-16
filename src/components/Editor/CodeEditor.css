@@ -1,0 +1,52 @@
+.code-editor {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  min-height: 0; /* CRITICAL: Allows flex children to shrink below content size */
+}
+
+.code-editor .cm-editor {
+  flex: 1;
+  font-size: 14px;
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', 'Consolas', 'source-code-pro', monospace;
+  min-height: 0; /* CRITICAL: Allows flex children to shrink below content size */
+}
+
+/* Fix: cm-theme wrapper must participate in flex layout */
+.code-editor .cm-theme {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0; /* CRITICAL: Allows flex children to shrink below content size */
+}
+
+.code-editor .cm-scroller {
+  overflow: auto;
+  flex: 1; /* Allow it to grow but respect parent constraints */
+  min-height: 0; /* CRITICAL: Allows flex child to shrink below content size */
+  scrollbar-gutter: stable;
+}
+
+.code-editor .cm-content {
+  padding: 8px 0;
+}
+
+.code-editor .cm-line {
+  padding: 0 8px;
+}
+
+/* Matching bracket/tag highlighting */
+.code-editor .cm-matchingBracket {
+  background-color: var(--ax-bg-brand-magenta-moderate-hover);
+  color: var(--ax-text-brand-magenta-subtle);
+  outline: 1px solid var(--ax-border-brand-magenta-subtle);
+  border-radius: 2px;
+}
+
+.code-editor .cm-nonmatchingBracket {
+  background-color: var(--ax-bg-danger-moderate);
+  color: var(--ax-text-danger-subtle);
+  outline: 1px solid var(--ax-border-danger-subtle);
+  border-radius: 2px;
+}

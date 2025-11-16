@@ -1,0 +1,9 @@
+.warning-notification {
+  position: fixed;
+  top: var(--a-spacing-4);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10000;
+  max-width: 600px;
+  width: 90%;
+}

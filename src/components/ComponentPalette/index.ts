@@ -1,0 +1,1 @@
+export { ComponentPalette } from './ComponentPalette';

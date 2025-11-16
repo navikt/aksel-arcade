@@ -1,0 +1,795 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sandbox</title>
+  <!-- Content Security Policy: Inline script sets appropriate CSP based on environment -->
+  <script>
+    // Detect if running in development (localhost) or production
+    const isDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+    
+    // Development CSP: Allow localhost for Vite HMR
+    const devCSP = "default-src 'none'; script-src 'unsafe-inline' 'unsafe-eval' http://localhost:* https://localhost:*; style-src 'unsafe-inline' http://localhost:* https://localhost:* https://cdn.nav.no; font-src https://cdn.nav.no data:; connect-src http://localhost:* https://localhost:* ws://localhost:* wss://localhost:*; img-src data: https:;"
+    
+    // Production CSP: Strict, only allow required CDN resources
+    // Note: 'unsafe-eval' is required for user code execution (playground feature)
+    const prodCSP = "default-src 'none'; script-src 'unsafe-inline' 'unsafe-eval'; style-src 'unsafe-inline' https://cdn.nav.no; font-src https://cdn.nav.no data:; connect-src https://cdn.nav.no; img-src data: https:;"
+    
+    // Apply appropriate CSP
+    const meta = document.createElement('meta')
+    meta.httpEquiv = 'Content-Security-Policy'
+    meta.content = isDev ? devCSP : prodCSP
+    document.head.appendChild(meta)
+    
+    console.log('🔒 CSP applied:', isDev ? 'Development' : 'Production')
+  </script>
+  <!-- Aksel Darkside CSS loaded via import in sandboxAksel.ts -->
+  <style>
+    /* Set iframe canvas color to match preview container background */
+    html {
+      /* Color-scheme will be set dynamically by updateTheme function */
+      /* Initial: dark (matches main app default) */
+      color-scheme: dark;
+      /* Use Aksel Darkside sunken background variable (adapts to theme) */
+      background: var(--ax-bg-sunken);
+      /* Enable scrolling when content overflows */
+      overflow: auto;
+      height: 100%;
+    }
+    
+    body {
+      background: transparent !important;
+      width: 100%;
+      min-height: 100%;
+    }
+    
+    /* NO custom reset - Aksel Darkside provides complete reset.darkside.css via import */
+    #root {
+      width: 100%;
+      box-sizing: border-box;
+      /* maxWidth will be set dynamically via updateViewport to simulate device widths */
+      /* margin: 0 auto will center the content when maxWidth < container width */
+    }
+    #root.light {
+      color-scheme: light;
+    }
+    #root.dark {
+      color-scheme: dark;
+    }
+    
+    /* FIX: Theme component should fill root width */
+    #root > .aksel-theme {
+      background: transparent !important;
+      width: 100%;
+    }
+    
+    /* FIX: Missing Aksel textColor variants - decoration and contrast */
+    /* These CSS classes are used by Heading, BodyLong, BodyShort, Label, Detail, etc. */
+    /* The CSS variables exist (--ax-text-decoration, --ax-text-contrast) but the classes are missing in Aksel 7.33.1 */
+    .aksel-typo--color-decoration {
+      color: var(--ax-text-neutral-decoration);
+    }
+    
+    .aksel-typo--color-decoration[data-color] {
+      color: var(--ax-text-decoration);
+    }
+    
+    .aksel-typo--color-contrast {
+      color: var(--ax-text-neutral-contrast);
+    }
+    
+    .aksel-typo--color-contrast[data-color] {
+      color: var(--ax-text-contrast);
+    }
+    
+    /* Scrollbar Styling - Match main app */
+    /* Webkit browsers (Chrome, Safari, Edge) */
+    ::-webkit-scrollbar {
+      width: 8px; /* thin scrollbar */
+      height: 8px; /* thin scrollbar */
+      background: transparent;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: var(--ax-text-neutral-decoration);
+      border-radius: 4px;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+      background: var(--ax-text-neutral-decoration);
+      opacity: 0.8;
+    }
+
+    /* Firefox */
+    * {
+      scrollbar-color: var(--ax-text-neutral-decoration) transparent;
+      scrollbar-width: thin;
+    }
+    
+    /* CRITICAL FIX: Force Alert text to use correct color in light mode */
+    /* Aksel Alert component should handle this, but explicitly ensure it */
+    html.light .aksel-alert,
+    html.light .aksel-alert .aksel-body-long,
+    html.light .aksel-alert .aksel-alert__wrapper {
+      color: var(--ax-text-neutral) !important;
+    }
+    
+    html.dark .aksel-alert,
+    html.dark .aksel-alert .aksel-body-long,
+    html.dark .aksel-alert .aksel-alert__wrapper {
+      color: var(--ax-text-neutral) !important;
+    }
+  </style>
+</head>
+<body>
+  <!-- Apply aksel-theme and light classes for Darkside styling to both html and root -->
+  <!-- data-color activates Darkside color system -->
+  <script>
+    // Set initial theme classes on html element for background (matches main app default: dark)
+    document.documentElement.className = 'aksel-theme dark';
+    document.documentElement.setAttribute('data-color', 'accent');
+  </script>
+  <div id="root" class="aksel-theme dark" data-color="accent"></div>
+  
+  <script type="module">
+    // React will be loaded from Vite via sandboxAksel.ts (same instance as Aksel components)
+    let currentRoot = null;
+    let akselLoaded = false;
+    let ThemeComponent = null;
+    let lastComponent = null;
+
+    // Load Aksel + React from Vite dev server with proper CSS import
+    // Following Aksel docs: import "@navikt/ds-css/darkside";
+    import('/src/sandboxAksel.ts')
+      .then((module) => {
+        const { React, createRoot, Theme, AkselComponents, AkselIcons } = module;
+        
+        // Make React available globally (same instance as Aksel uses)
+        window.React = React;
+        window.ReactDOM = { createRoot };
+        
+        // Make React hooks available globally (for user code)
+        window.useState = React.useState;
+        window.useEffect = React.useEffect;
+        window.useContext = React.useContext;
+        window.useReducer = React.useReducer;
+        window.useCallback = React.useCallback;
+        window.useMemo = React.useMemo;
+        window.useRef = React.useRef;
+        window.useImperativeHandle = React.useImperativeHandle;
+        window.useLayoutEffect = React.useLayoutEffect;
+        window.useDebugValue = React.useDebugValue;
+        
+        // Store Theme component
+        ThemeComponent = Theme;
+        window.Theme = Theme;
+        
+        // Make all Aksel components available globally
+        window.AkselDS = AkselComponents;
+        Object.keys(AkselComponents).forEach(key => {
+          window[key] = AkselComponents[key];
+        });
+        
+        // Make all Aksel icons available globally
+        window.AkselIcons = AkselIcons;
+        Object.keys(AkselIcons).forEach(key => {
+          window[key] = AkselIcons[key];
+        });
+        
+        akselLoaded = true;
+        console.log('✅ Sandbox ready, Aksel + React loaded from Vite:', Object.keys(AkselComponents).length, 'components');
+        console.log('✅ Aksel icons loaded:', Object.keys(AkselIcons).length, 'icons');
+        console.log('✅ React version:', React.version);
+        console.log('✅ Theme component available:', !!ThemeComponent);
+        console.log('✅ Darkside CSS imported via @navikt/ds-css/darkside');
+        window.parent.postMessage({ type: 'SANDBOX_READY' }, window.location.origin);
+      })
+      .catch((err) => {
+        console.error('❌ Failed to load from Vite:', err);
+        console.error('Ensure Vite dev server is running and allow-same-origin is enabled');
+      });
+
+    // Inspection state (T077)
+    let inspectEnabled = false;
+    let highlightOverlay = null;
+    let lastInspectionTime = 0;
+    const INSPECTION_THROTTLE_MS = 16; // ~60fps
+    
+    // Theme state - matches main app default (dark)
+    let currentTheme = 'dark';
+
+    // Listen for messages from parent window
+    window.addEventListener('message', (event) => {
+      // Security: Validate origin (same-origin only)
+      if (event.origin !== window.location.origin) {
+        console.warn('❌ Rejected message from unauthorized origin:', event.origin)
+        return
+      }
+      
+      // Validate message structure
+      if (!event.data || typeof event.data !== 'object') return;
+      
+      const message = event.data;
+      console.log('📥 Sandbox received message:', message.type);
+
+      try {
+        switch (message.type) {
+          case 'EXECUTE_CODE':
+            console.log('🚀 Executing code...');
+            executeCode(message.payload);
+            break;
+          case 'UPDATE_VIEWPORT':
+            console.log('📐 Updating viewport...');
+            updateViewport(message.payload);
+            break;
+          case 'TOGGLE_INSPECT':
+            console.log('🔍 Toggling inspect mode...');
+            toggleInspect(message.payload);
+            break;
+          case 'UPDATE_THEME':
+            console.log('🎨 Updating theme...');
+            updateTheme(message.payload);
+            break;
+          case 'CHECK_CSS_VARS':
+            checkCSSVariables(message.id);
+            break;
+          default:
+            console.warn('Unknown message type:', message.type);
+        }
+      } catch (error) {
+        console.error('❌ Message handling error:', error);
+        sendError('RUNTIME_ERROR', {
+          message: error.message,
+          componentStack: null,
+          stack: error.stack || ''
+        });
+      }
+    });
+
+    // T077: Handle TOGGLE_INSPECT message
+    function toggleInspect(payload) {
+      try {
+        console.log('🔍 toggleInspect called with payload:', payload);
+        
+        if (!payload || typeof payload.enabled !== 'boolean') {
+          console.error('❌ Invalid payload for TOGGLE_INSPECT:', payload);
+          return;
+        }
+        
+        inspectEnabled = payload.enabled;
+        
+        if (inspectEnabled) {
+          // Attach mousemove listener
+          document.addEventListener('mousemove', handleInspectMouseMove);
+          console.log('✅ Inspect mode enabled - mousemove listener attached');
+        } else {
+          // Remove mousemove listener and clear highlight
+          document.removeEventListener('mousemove', handleInspectMouseMove);
+          clearHighlight();
+          sendMessage('INSPECTION_DATA', null);
+          console.log('✅ Inspect mode disabled - mousemove listener removed');
+        }
+      } catch (error) {
+        console.error('❌ Error in toggleInspect:', error);
+        sendError('RUNTIME_ERROR', {
+          message: `Inspect toggle error: ${error.message}`,
+          componentStack: null,
+          stack: error.stack || ''
+        });
+      }
+    }
+
+    // T079: Handle mousemove during inspect mode (throttled to 60fps)
+    function handleInspectMouseMove(event) {
+      try {
+        const now = Date.now();
+        if (now - lastInspectionTime < INSPECTION_THROTTLE_MS) return;
+        lastInspectionTime = now;
+
+        const element = document.elementFromPoint(event.clientX, event.clientY);
+        if (!element || element === document.body || element === document.documentElement) {
+          clearHighlight();
+          sendMessage('INSPECTION_DATA', null);
+          return;
+        }
+
+        // T078: Extract inspection data (includes cursor position)
+        const inspectionData = extractInspectionData(element, event.clientX, event.clientY);
+        
+        // Debug: Log inspection data
+        console.log('🔍 Inspection data:', {
+          componentName: inspectionData.componentName,
+          color: inspectionData.color,
+          fontSize: inspectionData.fontSize,
+          hasProps: Object.keys(inspectionData.props || {}).length,
+        });
+        
+        // T081: Display highlight border
+        showHighlight(inspectionData.boundingRect);
+        
+        // T079: Send inspection data to main app
+        sendMessage('INSPECTION_DATA', inspectionData);
+      } catch (error) {
+        console.error('❌ Error in handleInspectMouseMove:', error);
+        // Don't send error to main app - just log and continue
+        // This prevents inspect mode from breaking on edge cases
+      }
+    }
+
+    // T078: Extract component name, props, and computed styles
+    function extractInspectionData(element, cursorX, cursorY) {
+      try {
+        const computedStyle = window.getComputedStyle(element);
+        const rect = element.getBoundingClientRect();
+        
+        // Try to find React component name from Fiber
+        let componentName = element.tagName.toLowerCase();
+        try {
+          const fiberKey = Object.keys(element).find(key => key.startsWith('__reactFiber'));
+          const fiber = fiberKey ? element[fiberKey] : null;
+          const componentType = fiber?.type;
+          
+          if (componentType) {
+            if (typeof componentType === 'function') {
+              componentName = componentType.name || componentType.displayName || 'Anonymous';
+            } else if (typeof componentType === 'string') {
+              componentName = componentType;
+            }
+          }
+        } catch (fiberError) {
+          console.warn('Could not extract React Fiber info:', fiberError);
+          // Continue with tagName as componentName
+        }
+        
+        // Extract React props
+        let props = {};
+        try {
+          const propsKey = Object.keys(element).find(key => key.startsWith('__reactProps'));
+          const rawProps = propsKey ? element[propsKey] : {};
+          props = sanitizeProps(rawProps);
+        } catch (propsError) {
+          console.warn('Could not extract React props:', propsError);
+          // Continue with empty props
+        }
+        
+        return {
+          componentName,
+          tagName: element.tagName.toLowerCase(),
+          cssClass: element.className || '',
+          props,
+          color: computedStyle.color,
+          fontFamily: computedStyle.fontFamily,
+          fontSize: computedStyle.fontSize,
+          margin: computedStyle.margin,
+          padding: computedStyle.padding,
+          boundingRect: {
+            x: rect.x,
+            y: rect.y,
+            width: rect.width,
+            height: rect.height,
+            top: rect.top,
+            right: rect.right,
+            bottom: rect.bottom,
+            left: rect.left,
+          },
+          cursorX: cursorX,
+          cursorY: cursorY,
+        };
+      } catch (error) {
+        console.error('❌ Error in extractInspectionData:', error);
+        // Return minimal safe data
+        return {
+          componentName: 'unknown',
+          tagName: element.tagName.toLowerCase(),
+          cssClass: '',
+          props: {},
+          color: '',
+          fontFamily: '',
+          fontSize: '',
+          margin: '',
+          padding: '',
+          boundingRect: {
+            x: 0, y: 0, width: 0, height: 0,
+            top: 0, right: 0, bottom: 0, left: 0,
+          },
+          cursorX: 0,
+          cursorY: 0,
+        };
+      }
+    }
+
+    // Remove non-serializable props (functions, circular refs)
+    function sanitizeProps(props) {
+      const sanitized = {};
+      for (const [key, value] of Object.entries(props)) {
+        if (typeof value !== 'function' && key !== 'children') {
+          try {
+            JSON.stringify(value); // Test serializability
+            sanitized[key] = value;
+          } catch {
+            sanitized[key] = '[Non-serializable]';
+          }
+        }
+      }
+      return sanitized;
+    }
+
+    // T081: Display highlight border around hovered element
+    function showHighlight(rect) {
+      try {
+        if (!highlightOverlay) {
+          highlightOverlay = document.createElement('div');
+          highlightOverlay.style.position = 'fixed';
+          highlightOverlay.style.border = '2px solid #0067C5';
+          highlightOverlay.style.backgroundColor = 'rgba(0, 103, 197, 0.1)';
+          highlightOverlay.style.pointerEvents = 'none';
+          highlightOverlay.style.zIndex = '9998';
+          highlightOverlay.style.transition = 'all 0.1s ease';
+          document.body.appendChild(highlightOverlay);
+        }
+        
+        highlightOverlay.style.left = `${rect.left}px`;
+        highlightOverlay.style.top = `${rect.top}px`;
+        highlightOverlay.style.width = `${rect.width}px`;
+        highlightOverlay.style.height = `${rect.height}px`;
+        highlightOverlay.style.display = 'block';
+      } catch (error) {
+        console.error('❌ Error in showHighlight:', error);
+        // Don't propagate error - highlight is non-critical
+      }
+    }
+
+    function clearHighlight() {
+      try {
+        if (highlightOverlay) {
+          highlightOverlay.style.display = 'none';
+        }
+      } catch (error) {
+        console.error('❌ Error in clearHighlight:', error);
+        // Don't propagate error
+      }
+    }
+
+    function checkCSSVariables(messageId) {
+      const root = document.getElementById('root');
+      const button = document.querySelector('button');
+      const rootStyles = root ? getComputedStyle(root) : null;
+      const buttonStyles = button ? getComputedStyle(button) : null;
+      
+      // Get ALL CSS custom properties
+      const allCSSVars = [];
+      if (rootStyles) {
+        for (let i = 0; i < rootStyles.length; i++) {
+          const prop = rootStyles[i];
+          if (prop.startsWith('--')) {
+            allCSSVars.push(prop);
+          }
+        }
+      }
+      
+      // Check specifically for --ax and --a prefixes
+      const axVars = allCSSVars.filter(v => v.startsWith('--ax'));
+      const aVars = allCSSVars.filter(v => v.startsWith('--a-') || v.startsWith('--a_'));
+      
+      // Get button attributes
+      const buttonAttrs = {};
+      if (button) {
+        for (let attr of button.attributes) {
+          buttonAttrs[attr.name] = attr.value;
+        }
+      }
+      
+      const result = {
+        id: messageId,
+        result: {
+          rootClasses: root?.className,
+          buttonClasses: button?.className,
+          buttonAttributes: buttonAttrs,
+          buttonExists: !!button,
+          buttonBg: buttonStyles?.backgroundColor,
+          buttonPadding: buttonStyles?.padding,
+          buttonFontSize: buttonStyles?.fontSize,
+          buttonFontFamily: buttonStyles?.fontFamily,
+          totalCSSVars: allCSSVars.length,
+          axVarCount: axVars.length,
+          aVarCount: aVars.length,
+          axVarSample: axVars.slice(0, 5),
+          aVarSample: aVars.slice(0, 5),
+          darksideCSSLoaded: !!document.querySelector('link[href*="darkside"]'),
+          allStylesheets: Array.from(document.styleSheets).map(s => s.href).filter(Boolean)
+        }
+      };
+      
+      window.parent.postMessage(result, window.location.origin);
+    }
+
+    function updateViewport(payload) {
+      const { width } = payload;
+      const rootElement = document.getElementById('root');
+      
+      if (!rootElement) return;
+      
+      console.log(`📐 Setting viewport width to ${width}px`);
+      
+      // Update the root element width with smooth transition
+      rootElement.style.maxWidth = `${width}px`;
+      rootElement.style.margin = '0 auto';
+      rootElement.style.transition = 'max-width 0.3s ease';
+    }
+
+    function updateTheme(payload) {
+      try {
+        const { theme } = payload;
+        
+        if (!theme || (theme !== 'light' && theme !== 'dark')) {
+          console.error('❌ Invalid theme:', theme);
+          return;
+        }
+        
+        console.log(`🎨 Updating theme to ${theme}`);
+        currentTheme = theme;
+        
+        // Update html element classes and color-scheme for background
+        document.documentElement.className = `aksel-theme ${theme}`;
+        document.documentElement.setAttribute('data-color', 'accent');
+        document.documentElement.style.colorScheme = theme;
+        
+        // Update root element classes and color-scheme
+        const rootElement = document.getElementById('root');
+        if (rootElement) {
+          rootElement.className = `aksel-theme ${theme}`;
+          rootElement.style.colorScheme = theme;
+        }
+        
+        // Re-render current component with new theme if exists
+        if (currentRoot && lastComponent) {
+          console.log('🔄 Re-rendering with new theme...');
+          renderComponent(lastComponent);
+          sendMessage('THEME_UPDATED', { theme });
+        }
+      } catch (error) {
+        console.error('❌ Error in updateTheme:', error);
+        sendError('RUNTIME_ERROR', {
+          message: `Theme update error: ${error.message}`,
+          componentStack: null,
+          stack: error.stack || ''
+        });
+      }
+    }
+
+    function executeCode(payload) {
+      try {
+        const { jsxCode } = payload;
+        
+        console.log('📄 Code length:', jsxCode?.length || 0);
+        
+        if (!jsxCode) {
+          console.log('⏸️ No code to execute, clearing root');
+          clearRoot();
+          return;
+        }
+
+        // Check if Aksel is loaded
+        if (!akselLoaded) {
+          console.warn('⏸️ Aksel not loaded yet, queuing code execution');
+          setTimeout(() => executeCode(payload), 100);
+          return;
+        }
+
+        console.log('🎨 Executing code with all Aksel components and icons from window');
+
+        // Execute the transpiled code with all Aksel components and icons in scope
+        console.log('🔧 Evaluating transpiled code...');
+        
+        // Build component declarations safely
+        const componentDeclarations = window.AkselDS 
+          ? Object.keys(window.AkselDS)
+              .filter(key => typeof window[key] !== 'undefined') // Only include defined components
+              .map(key => `const ${key} = window.${key};`)
+              .join('\n')
+          : '';
+        
+        // Build icon declarations safely
+        const iconDeclarations = window.AkselIcons
+          ? Object.keys(window.AkselIcons)
+              .filter(key => typeof window[key] !== 'undefined') // Only include defined icons
+              .map(key => `const ${key} = window.${key};`)
+              .join('\n')
+          : '';
+        
+        // Debug: Check if Button and PencilIcon are available
+        console.log('🔍 DEBUG: window.Button type:', typeof window.Button);
+        console.log('🔍 DEBUG: window.PencilIcon type:', typeof window.PencilIcon);
+        console.log('🔍 DEBUG: Component declarations count:', componentDeclarations.split('\n').length);
+        console.log('🔍 DEBUG: Icon declarations count:', iconDeclarations.split('\n').length);
+        
+        const wrappedCode = `
+          (function() {
+            // Make all Aksel components available
+            ${componentDeclarations}
+            
+            // Make all Aksel icons available
+            ${iconDeclarations}
+            
+            // Make React hooks available
+            const { useState, useEffect, useContext, useReducer, useCallback, useMemo, useRef } = window.React;
+            
+            // Debug log inside eval scope
+            console.log('🔍 Inside eval - Button type:', typeof Button);
+            console.log('🔍 Inside eval - Button is:', Button);
+            
+            ${jsxCode}
+            
+            // Try to find the component
+            if (typeof App !== 'undefined') return App;
+            if (typeof exports !== 'undefined' && exports.default) return exports.default;
+            throw new Error('No component found. Please export default function App() { ... }');
+          })()
+        `;
+        
+        const Component = eval(wrappedCode);
+        console.log('✅ Component evaluated:', typeof Component);
+
+        if (!Component || typeof Component !== 'function') {
+          throw new Error('Invalid component. Make sure to export a React component.');
+        }
+
+        // Store component for re-rendering on theme change
+        lastComponent = Component;
+        
+        // Render the component
+        console.log('🎨 Rendering component...');
+        renderComponent(Component);
+
+        // Send success message
+        sendMessage('RENDER_SUCCESS', {});
+        console.log('✅ Render success');
+      } catch (error) {
+        console.error('❌ Execution error:', error);
+        sendError('RUNTIME_ERROR', {
+          message: error.message,
+          componentStack: extractComponentStack(error),
+          stack: error.stack || ''
+        });
+      }
+    }
+
+    function renderComponent(Component) {
+      const rootElement = document.getElementById('root');
+      
+      if (!rootElement) {
+        throw new Error('Root element not found');
+      }
+
+      try {
+        // Clear previous root if it exists
+        if (currentRoot) {
+          currentRoot.unmount();
+        }
+
+        // Create new root and render
+        currentRoot = ReactDOM.createRoot(rootElement);
+        
+        // CRITICAL: Wrap component with Theme for Aksel Darkside to work
+        // Per Aksel docs: "må du bruke den nye Theme-komponenten"
+        if (!ThemeComponent) {
+          throw new Error('Theme component not loaded. Make sure Vite dev server is running.');
+        }
+        
+        console.log(`🎨 Rendering component wrapped with Aksel Theme (${currentTheme} mode)`);
+        
+        // CRITICAL FIX: Ensure theme is explicitly 'light' or 'dark', never undefined
+        const themeValue = currentTheme === 'dark' ? 'dark' : 'light';
+        console.log(`🔍 DEBUG: currentTheme variable = "${currentTheme}"`);
+        console.log(`🔍 DEBUG: Theme value being passed to Theme component: "${themeValue}"`);
+        console.log(`🔍 DEBUG: Theme component props:`, { theme: themeValue });
+        
+        const wrappedComponent = React.createElement(
+          ThemeComponent,
+          { theme: themeValue },
+          React.createElement(Component)
+        );
+        
+        console.log(`🔍 DEBUG: Created Theme element:`, wrappedComponent);
+        
+        currentRoot.render(wrappedComponent);
+        
+        // Debug: Check rendered elements and theme after a short delay
+        setTimeout(() => {
+          // Check theme wrapper
+          const themeWrapper = rootElement.querySelector('.aksel-theme');
+          if (themeWrapper) {
+            console.log('🔍 DEBUG: Theme wrapper classes:', themeWrapper.className);
+            console.log('🔍 DEBUG: Theme wrapper color-scheme:', getComputedStyle(themeWrapper).colorScheme);
+          }
+          
+          // Check Alert component
+          const alert = rootElement.querySelector('[class*="aksel-alert"]');
+          if (alert) {
+            console.log('🔍 DEBUG: Alert classes:', alert.className);
+            console.log('🔍 DEBUG: Alert computed color:', getComputedStyle(alert).color);
+            console.log('🔍 DEBUG: Alert computed background:', getComputedStyle(alert).backgroundColor);
+            console.log('🔍 DEBUG: Alert color-scheme:', getComputedStyle(alert).colorScheme);
+          }
+          
+          // Check any button
+          const button = rootElement.querySelector('button');
+          if (button) {
+            console.log('🔍 DEBUG: Button classes:', button.className);
+            console.log('🔍 DEBUG: Button computed color:', getComputedStyle(button).color);
+          }
+        }, 100);
+      } catch (error) {
+        sendError('RUNTIME_ERROR', {
+          message: error.message,
+          componentStack: extractComponentStack(error),
+          stack: error.stack || ''
+        });
+        throw error;
+      }
+    }
+
+    function clearRoot() {
+      if (currentRoot) {
+        currentRoot.unmount();
+        currentRoot = null;
+      }
+      lastComponent = null;
+      const rootElement = document.getElementById('root');
+      if (rootElement) {
+        rootElement.innerHTML = '';
+      }
+    }
+
+    function sendMessage(type, payload) {
+      window.parent.postMessage({ type, payload }, window.location.origin);
+    }
+
+    function sendError(type, payload) {
+      window.parent.postMessage({ type, payload }, window.location.origin);
+    }
+
+    function extractLineNumber(error) {
+      const match = error.stack?.match(/:(\d+):\d+/);
+      return match ? parseInt(match[1], 10) - 1 : null; // 0-indexed
+    }
+
+    function extractComponentStack(error) {
+      // Try to extract React component stack if available
+      if (error.componentStack) {
+        return error.componentStack;
+      }
+      return null;
+    }
+
+    // Proxy console methods to send to parent
+    const originalConsole = {
+      log: console.log,
+      warn: console.warn,
+      error: console.error,
+      info: console.info
+    };
+
+    ['log', 'warn', 'error', 'info'].forEach(level => {
+      console[level] = (...args) => {
+        originalConsole[level](...args);
+        sendMessage('CONSOLE_LOG', {
+          level,
+          args: args.map(arg => {
+            try {
+              return typeof arg === 'object' ? JSON.stringify(arg) : String(arg);
+            } catch {
+              return String(arg);
+            }
+          })
+        });
+      };
+    });
+  </script>
+</body>
+</html>
