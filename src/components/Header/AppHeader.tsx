@@ -44,7 +44,7 @@ export const AppHeader = ({
 }: AppHeaderProps) => {
   const MAX_PROJECT_SIZE = 5 * 1024 * 1024 // 5MB
   const fileInputRef = useRef<HTMLInputElement>(null)
-  const { theme, panelOrder, toggleTheme, togglePanelOrder } = useSettings()
+  const { theme, toggleTheme, togglePanelOrder } = useSettings()
 
   const formatMB = (bytes: number): number => bytes / (1024 * 1024)
   const sizeMB = formatMB(projectSizeBytes)

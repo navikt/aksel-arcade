@@ -15,6 +15,7 @@ interface LivePreviewProps {
   onRuntimeError: (error: { message: string; componentStack: string | null; stack: string }) => void
   viewportWidth: ViewportSize
   isInspectMode: boolean
+  theme: 'light' | 'dark'
 }
 
 export const LivePreview = ({
@@ -25,6 +26,7 @@ export const LivePreview = ({
   onRuntimeError,
   viewportWidth,
   isInspectMode,
+  theme,
 }: LivePreviewProps) => {
   const [sandboxReady, setSandboxReady] = useState(false)
   const pendingCodeRef = useRef<string | null>(null)
@@ -142,6 +144,21 @@ export const LivePreview = ({
     console.log(`📤 Sending UPDATE_VIEWPORT to sandbox: ${width}px`)
     iframeRef.current.contentWindow.postMessage(message, '*')
   }, [viewportWidth, sandboxReady, iframeRef])
+
+  // Send theme update when theme changes
+  useEffect(() => {
+    if (!iframeRef.current?.contentWindow || !sandboxReady) {
+      return
+    }
+
+    const message: MainToSandboxMessage = {
+      type: 'UPDATE_THEME',
+      payload: { theme },
+    }
+
+    console.log(`📤 Sending UPDATE_THEME to sandbox: ${theme}`)
+    iframeRef.current.contentWindow.postMessage(message, '*')
+  }, [theme, sandboxReady, iframeRef])
 
   return (
     <div className="live-preview" data-testid="live-preview">

@@ -1,12 +1,11 @@
 import { useContext, useEffect, useState, useRef } from 'react'
-import { HStack, VStack, BoxNew, Button } from '@navikt/ds-react'
-import { XMarkIcon } from '@navikt/aksel-icons'
+import { HStack, VStack, BoxNew, Alert } from '@navikt/ds-react'
 import { AppContext } from '@/hooks/useProject'
 import { transpileCode } from '@/services/transpiler'
+import { useSettings } from '@/contexts/SettingsContext'
 import { LivePreview } from './LivePreview'
 import { ViewportToggle } from './ViewportToggle'
 import { InspectMode } from './InspectMode'
-import { ThemeToggle } from './ThemeToggle'
 import type { CompileError, RuntimeError } from '@/types/preview'
 import './PreviewPane.css'
 
@@ -15,11 +14,11 @@ export const PreviewPane = () => {
   if (!context) throw new Error('PreviewPane must be used within AppProvider')
 
   const { project, updatePreviewState } = context
+  const { theme } = useSettings() // Use centralized theme from Settings
   const [transpiledCode, setTranspiledCode] = useState<string | null>(null)
   const [compileError, setCompileError] = useState<CompileError | null>(null)
   const [runtimeError, setRuntimeError] = useState<RuntimeError | null>(null)
   const [isInspectMode, setIsInspectMode] = useState(false)
-  const [previewTheme, setPreviewTheme] = useState<'light' | 'dark'>('light')
   const debounceTimerRef = useRef<number | undefined>(undefined)
   const iframeRef = useRef<HTMLIFrameElement | null>(null)
 
@@ -99,10 +98,6 @@ export const PreviewPane = () => {
     setIsInspectMode(enabled)
   }
 
-  const handleThemeChange = (theme: 'light' | 'dark') => {
-    setPreviewTheme(theme)
-  }
-
   return (
     <>
       <HStack gap="space-12" justify="end" align="center" asChild>
@@ -113,10 +108,6 @@ export const PreviewPane = () => {
           paddingInline="space-20"
           paddingBlock="space-8"
         >
-          <ThemeToggle
-            iframeRef={iframeRef}
-            onThemeChange={handleThemeChange}
-          />
           <InspectMode 
             iframeRef={iframeRef}
             onInspectToggle={handleInspectToggle}
@@ -131,74 +122,59 @@ export const PreviewPane = () => {
           paddingBlock="space-16" 
           paddingInline="space-16" 
           background="sunken"
-          className={previewTheme}
+          className={theme}
           style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, position: 'relative' }}
         >
-          {/* Error Display - Simple and Direct */}
+          {/* Error Display - Using Aksel Alert */}
           {(compileError || runtimeError) && (
-            <BoxNew
-              borderWidth="1"
-              borderColor="danger-moderate"
-              paddingBlock="space-12"
-              paddingInline="space-16"
-              style={{
-                position: 'absolute',
-                top: '16px',
-                left: '16px',
-                right: '16px',
-                zIndex: 1000,
-                borderRadius: 'var(--ax-radius-8)',
-                background: 'var(--ax-bg-raised)',
-              }}
-            >
-              <HStack gap="space-12" justify="space-between" align="start">
-                <VStack gap="space-4" style={{ flex: 1 }}>
-                  <strong style={{ color: 'var(--ax-text-neutral)', fontSize: '1rem' }}>
-                    {compileError ? 'Compile Error' : 'Runtime Error'}
-                    {compileError && compileError.line !== null && ` (line ${(compileError.line || 0) + 1})`}
-                  </strong>
-                  <pre style={{
-                    margin: 0,
-                    color: 'var(--ax-text-neutral)',
-                    fontFamily: 'Monaco, Menlo, Consolas, monospace',
-                    fontSize: '0.875rem',
-                    whiteSpace: 'pre-wrap',
-                    wordBreak: 'break-word',
-                  }}>
-                    {(compileError || runtimeError)?.message}
-                  </pre>
-                  {runtimeError?.componentStack && (
-                    <details style={{ marginTop: '8px', color: 'var(--ax-text-neutral)' }}>
-                      <summary style={{ cursor: 'pointer', fontWeight: 600 }}>
-                        Component Stack
-                      </summary>
-                      <pre style={{
-                        marginTop: '8px',
-                        padding: '8px',
-                        background: 'rgba(0, 0, 0, 0.1)',
-                        borderRadius: 'var(--ax-radius-4)',
-                        fontSize: '0.75rem',
-                        overflowX: 'auto',
-                      }}>
-                        {runtimeError.componentStack}
-                      </pre>
-                    </details>
-                  )}
-                </VStack>
-                <Button
-                  variant="tertiary"
-                  size="small"
-                  icon={<XMarkIcon aria-hidden />}
-                  onClick={() => {
-                    setCompileError(null)
-                    setRuntimeError(null)
-                  }}
-                  style={{ flexShrink: 0 }}
-                >
-                  Close
-                </Button>
-              </HStack>
-            </BoxNew>
+            <div style={{
+              position: 'absolute',
+              top: '16px',
+              left: '16px',
+              right: '16px',
+              zIndex: 1000,
+            }}>
+              <Alert
+                variant="error"
+                closeButton
+                onClose={() => {
+                  setCompileError(null)
+                  setRuntimeError(null)
+                }}
+              >
+                <strong>
+                  {compileError ? 'Compile Error' : 'Runtime Error'}
+                  {compileError && compileError.line !== null && ` (line ${(compileError.line || 0) + 1})`}
+                </strong>
+                <pre style={{
+                  marginTop: '0.5rem',
+                  marginBottom: 0,
+                  fontFamily: 'Monaco, Menlo, Consolas, monospace',
+                  fontSize: '0.875rem',
+                  whiteSpace: 'pre-wrap',
+                  wordBreak: 'break-word',
+                }}>
+                  {(compileError || runtimeError)?.message}
+                </pre>
+                {runtimeError?.componentStack && (
+                  <details style={{ marginTop: '0.75rem' }}>
+                    <summary style={{ cursor: 'pointer', fontWeight: 600 }}>
+                      Component Stack
+                    </summary>
+                    <pre style={{
+                      marginTop: '0.5rem',
+                      padding: '0.5rem',
+                      background: 'var(--ax-bg-neutral-moderate)',
+                      borderRadius: 'var(--ax-radius-4)',
+                      fontSize: '0.75rem',
+                      overflowX: 'auto',
+                    }}>
+                      {runtimeError.componentStack}
+                    </pre>
+                  </details>
+                )}
+              </Alert>
+            </div>
           )}
 
           <LivePreview
@@ -209,6 +185,7 @@ export const PreviewPane = () => {
             onRuntimeError={handleRuntimeError}
             viewportWidth={project.viewportSize}
             isInspectMode={isInspectMode}
+            theme={theme}
           />
         </BoxNew>
       </VStack>

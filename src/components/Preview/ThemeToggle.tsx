@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Button } from '@navikt/ds-react'
 import { SunIcon, MoonIcon } from '@navikt/aksel-icons'
-import { useSettings } from '@/contexts/SettingsContext'
 import type { MainToSandboxMessage } from '@/types/messages'
 
 interface ThemeToggleProps {
