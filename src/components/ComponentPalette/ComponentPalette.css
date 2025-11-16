@@ -1,10 +1,26 @@
 .component-palette-modal {
-  max-width: 800px;
+  max-width: 500px !important;
+  width: 500px !important;
 }
 
-.component-palette-modal .aksel-modal__body {
+.component-palette-body {
   min-height: 400px;
   max-height: 600px;
+  overflow: hidden !important;
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+.component-palette-content {
+  flex: 1;
+  min-height: 0;
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+.component-grid-wrapper {
+  flex: 1;
+  min-height: 0;
   overflow-y: auto;
   scrollbar-gutter: stable;
 }
@@ -13,7 +29,6 @@
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
   gap: var(--a-spacing-4);
-  margin-top: var(--a-spacing-2);
 }
 
 .component-card {

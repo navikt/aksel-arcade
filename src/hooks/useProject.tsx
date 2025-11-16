@@ -24,6 +24,7 @@ interface AppState {
   updateEditorState: (updates: Partial<EditorState>) => void
   updatePreviewState: (updates: Partial<PreviewState>) => void
   toggleComponentPalette: () => void
+  closeComponentPalette: () => void
   toggleSettings: () => void
   insertSnippet: (snippet: ComponentSnippet) => void
 }
@@ -83,6 +84,10 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     setIsComponentPaletteOpen((prev) => !prev)
   }
 
+  const closeComponentPalette = () => {
+    setIsComponentPaletteOpen(false)
+  }
+
   const toggleSettings = () => {
     setIsSettingsOpen((prev) => !prev)
   }
@@ -117,6 +122,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     updateEditorState,
     updatePreviewState,
     toggleComponentPalette,
+    closeComponentPalette,
     toggleSettings,
     insertSnippet,
   }

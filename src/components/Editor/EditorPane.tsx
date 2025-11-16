@@ -12,7 +12,7 @@ export const EditorPane = () => {
   const context = useContext(AppContext)
   if (!context) throw new Error('EditorPane must be used within AppProvider')
 
-  const { project, editorState, isComponentPaletteOpen, updateProject, updateEditorState, toggleComponentPalette } = context
+  const { project, editorState, isComponentPaletteOpen, updateProject, updateEditorState, toggleComponentPalette, closeComponentPalette } = context
   
   // Ref for the currently active editor to access undo/redo
   const editorRef = useRef<CodeEditorRef>(null)
@@ -41,6 +41,9 @@ export const EditorPane = () => {
   }
 
   const handleComponentInsert = (snippet: string) => {
+    // Close the component palette immediately
+    closeComponentPalette();
+    
     // Insert the snippet at the current cursor position
     const currentContent = currentTab === 'JSX' ? project.jsxCode : project.hooksCode
     const cursor = currentTab === 'JSX' ? editorState.jsxCursor : editorState.hooksCursor
@@ -122,7 +125,7 @@ export const EditorPane = () => {
       <ComponentPalette
         open={isComponentPaletteOpen}
         onInsertComponent={handleComponentInsert}
-        onClose={() => toggleComponentPalette()}
+        onClose={() => closeComponentPalette()}
       />
     </div>
   )

@@ -24,13 +24,11 @@ export const ComponentPalette = ({ open, onClose, onInsertComponent }: Component
 
   const handleInsert = (component: ComponentMetadata) => {
     onInsertComponent(component.snippet);
-    onClose();
-    setSearchQuery(''); // Reset search
   };
 
   const handleClose = () => {
+    setSearchQuery(''); // Reset search when closing
     onClose();
-    setSearchQuery(''); // Reset search on close
   };
 
   return (
@@ -47,8 +45,8 @@ export const ComponentPalette = ({ open, onClose, onInsertComponent }: Component
         </Heading>
       </Modal.Header>
 
-      <Modal.Body>
-        <VStack gap="space-4">
+      <Modal.Body className="component-palette-body">
+        <VStack gap="space-4" className="component-palette-content">
           {/* Search Field */}
           <TextField
             label="Search components"
@@ -70,7 +68,8 @@ export const ComponentPalette = ({ open, onClose, onInsertComponent }: Component
           </Tabs>
 
           {/* Component Grid */}
-          <div className="component-grid">
+          <div className="component-grid-wrapper">
+            <div className="component-grid">
             {filteredComponents.length === 0 ? (
               <BoxNew padding="space-8" className="no-results">
                 <BodyShort>No components found matching "{searchQuery}"</BodyShort>
@@ -84,6 +83,7 @@ export const ComponentPalette = ({ open, onClose, onInsertComponent }: Component
                 />
               ))
             )}
+            </div>
           </div>
         </VStack>
       </Modal.Body>
@@ -104,12 +104,16 @@ const ComponentCard = ({ component, onInsert }: ComponentCardProps) => {
       borderRadius="medium"
       borderWidth="1"
       borderColor="neutral-subtleA"
-      onClick={() => onInsert(component)}
+      onClick={(e) => {
+        e.stopPropagation();
+        onInsert(component);
+      }}
       role="button"
       tabIndex={0}
       onKeyDown={(e) => {
         if (e.key === 'Enter' || e.key === ' ') {
           e.preventDefault();
+          e.stopPropagation();
           onInsert(component);
         }
       }}
