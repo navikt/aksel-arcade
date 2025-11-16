@@ -30,6 +30,18 @@ export const transpileCode = async (
       .replace(/import\s+.*?from\s+['"]@navikt\/aksel-icons['"]\s*;?\n?/g, '')
       .replace(/import\s+.*?from\s+['"]react['"]\s*;?\n?/g, '')
 
+    // Check if code is empty after cleaning
+    const trimmedJsx = cleanJsxCode.trim()
+    
+    // If completely empty, return a valid no-op component
+    if (!trimmedJsx) {
+      return {
+        success: true,
+        code: 'function App() { return null; }',
+        error: null,
+      }
+    }
+
     // Smart wrapping: detect if user provided component structure
     const hasExportDefault = /export\s+default\s+(function|class|\(|const|let|var)/.test(cleanJsxCode)
     
@@ -42,7 +54,6 @@ export const transpileCode = async (
     } else {
       // Designer mode: auto-wrap bare JSX in component structure
       // Check if there are multiple root JSX elements by counting lines starting with <
-      const trimmedJsx = cleanJsxCode.trim()
       const rootElementMatches = trimmedJsx.match(/^\s*</gm) // Lines starting with <
       const hasMultipleRoots = rootElementMatches && rootElementMatches.length > 1
       

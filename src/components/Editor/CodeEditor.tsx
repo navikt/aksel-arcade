@@ -2,10 +2,11 @@ import CodeMirror from '@uiw/react-codemirror'
 import { createTheme } from '@uiw/codemirror-themes'
 import { javascript } from '@codemirror/lang-javascript'
 import { autocompletion, startCompletion, completionStatus, type CompletionContext, type CompletionResult } from '@codemirror/autocomplete'
-import { ViewPlugin, type EditorView, type ViewUpdate } from '@codemirror/view'
+import { ViewPlugin, EditorView, type ViewUpdate } from '@codemirror/view'
 import { keymap } from '@codemirror/view'
 import { undo, redo } from '@codemirror/commands'
 import { linter, type Diagnostic } from '@codemirror/lint'
+import { bracketMatching } from '@codemirror/language'
 import { tags as t } from '@lezer/highlight'
 import { forwardRef, useImperativeHandle, useRef, useMemo } from 'react'
 import type { ReactCodeMirrorRef } from '@uiw/react-codemirror'
@@ -397,6 +398,7 @@ export const CodeEditor = forwardRef<CodeEditorRef, CodeEditorProps>(({
         // Auto-trigger completion after selecting an option
         activateOnCompletion: () => true,
       }),
+      bracketMatching(),
       cursorInQuotesPlugin,
       customKeymap,
       jsxLinter,

@@ -102,4 +102,24 @@ export default function App() {
     expect(result.code).toBeTruthy()
     expect(result.code).toContain('React.createElement')
   })
+
+  it('should handle empty code without errors', async () => {
+    const jsxCode = ''
+    const result = await transpileCode(jsxCode, '')
+    
+    expect(result.success).toBe(true)
+    expect(result.code).toBeTruthy()
+    expect(result.code).toContain('function App()')
+    expect(result.code).toContain('return null')
+  })
+
+  it('should handle whitespace-only code without errors', async () => {
+    const jsxCode = '   \n  \n  '
+    const result = await transpileCode(jsxCode, '')
+    
+    expect(result.success).toBe(true)
+    expect(result.code).toBeTruthy()
+    expect(result.code).toContain('function App()')
+    expect(result.code).toContain('return null')
+  })
 })

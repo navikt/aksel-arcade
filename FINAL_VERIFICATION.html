@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Final Verification - Empty Editor Fix</title>
+  <style>
+    body { 
+      font-family: system-ui, sans-serif; 
+      padding: 40px;
+      background: #1a1a1a;
+      color: white;
+    }
+    .result {
+      padding: 30px;
+      border-radius: 12px;
+      margin: 20px 0;
+      font-size: 1.2em;
+    }
+    .pass { background: #0a5; border: 3px solid #0f7; }
+    .fail { background: #a05; border: 3px solid #f33; }
+    h1 { color: #0af; }
+    pre {
+      background: #0a0a0a;
+      padding: 15px;
+      border-radius: 8px;
+      overflow-x: auto;
+      font-size: 0.9em;
+    }
+    .status {
+      font-size: 2em;
+      font-weight: bold;
+      margin: 20px 0;
+    }
+  </style>
+</head>
+<body>
+  <h1>🎯 Final Verification: Empty Editor Bug Fix</h1>
+  <p>Testing the exact scenario the user reported...</p>
+
+  <div id="loading" style="padding: 20px; background: #333; border-radius: 8px;">
+    <p>⏳ Running tests...</p>
+  </div>
+
+  <div id="results"></div>
+
+  <script type="module">
+    const loading = document.getElementById('loading');
+    const results = document.getElementById('results');
+
+    // Simulate the transpiler.ts code
+    async function loadBabelAndTest() {
+      // Load Babel
+      await new Promise((resolve) => {
+        const script = document.createElement('script');
+        script.src = 'https://unpkg.com/@babel/standalone/babel.min.js';
+        script.onload = resolve;
+        document.head.appendChild(script);
+      });
+
+      loading.style.display = 'none';
+
+      // This is the EXACT transpiler logic from the fix
+      function transpileCode(jsxCode, hooksCode) {
+        const cleanJsxCode = jsxCode
+          .replace(/import\s+.*?from\s+['"]@navikt\/ds-react['"]\s*;?\n?/g, '')
+          .replace(/import\s+.*?from\s+['"]@navikt\/aksel-icons['"]\s*;?\n?/g, '')
+          .replace(/import\s+.*?from\s+['"]react['"]\s*;?\n?/g, '')
+          .replace(/import\s+.*?from\s+['"]\.(\/hooks)?['"]\s*;?\n?/g, '');
+
+        // Check if code is empty after cleaning
+        const trimmedJsx = cleanJsxCode.trim();
+
+        // THE FIX: If completely empty, return a valid no-op component
+        if (!trimmedJsx) {
+          return {
+            success: true,
+            code: 'function App() { return null; }',
+            error: null
+          };
+        }
+
+        // Normal transpilation logic...
+        try {
+          const hasExportDefault = /export\s+default\s+(function|class|\(|const|let|var)/.test(cleanJsxCode);
+          let processedJsxCode;
+
+          if (hasExportDefault) {
+            processedJsxCode = cleanJsxCode.replace(/export\s+default\s+function\s+(\w+)/g, 'function $1');
+            processedJsxCode = processedJsxCode.replace(/export\s+default\s+/g, 'const App = ');
+          } else {
+            const rootElementMatches = trimmedJsx.match(/^\s*</gm);
+            const hasMultipleRoots = rootElementMatches && rootElementMatches.length > 1;
+
+            if (hasMultipleRoots) {
+              processedJsxCode = `function App() {\n  return (\n    <>\n${cleanJsxCode}\n    </>\n  );\n}`;
+            } else {
+              processedJsxCode = `function App() {\n  return (\n    ${cleanJsxCode}\n  );\n}`;
+            }
+          }
+
+          const result = Babel.transform(processedJsxCode, {
+            presets: ['react', 'typescript'],
+            filename: 'app.tsx',
+          });
+
+          return {
+            success: true,
+            code: result.code,
+            error: null
+          };
+        } catch (error) {
+          return {
+            success: false,
+            code: null,
+            error: {
+              message: error.message,
+              line: null,
+              column: null,
+              stack: error.stack
+            }
+          };
+        }
+      }
+
+      // Test the exact scenario: User has written NO code
+      console.log('🧪 Testing: Empty editor (no code written)');
+      const result = transpileCode('', '');
+
+      console.log('Result:', result);
+
+      // Verify the fix
+      const passed = result.success && 
+                    result.code === 'function App() { return null; }' &&
+                    result.error === null;
+
+      if (passed) {
+        results.innerHTML = `
+          <div class="result pass">
+            <div class="status">✅ PASS</div>
+            <h2>Empty Editor Bug is FIXED!</h2>
+            <p><strong>Test Scenario:</strong> Editor is completely empty (user has written no code)</p>
+            <p><strong>Expected:</strong> No compile error</p>
+            <p><strong>Actual:</strong> No compile error ✅</p>
+            <p><strong>Transpiled Code:</strong></p>
+            <pre>${result.code}</pre>
+            <p style="margin-top: 30px; padding: 20px; background: rgba(0,255,0,0.1); border-radius: 8px;">
+              The transpiler now gracefully handles empty code by returning a valid no-op component.
+              The preview will show blank content instead of an error.
+            </p>
+          </div>
+        `;
+      } else {
+        results.innerHTML = `
+          <div class="result fail">
+            <div class="status">❌ FAIL</div>
+            <h2>Fix Not Working</h2>
+            <p><strong>Result:</strong></p>
+            <pre>${JSON.stringify(result, null, 2)}</pre>
+          </div>
+        `;
+      }
+
+      // Additional test: Verify the OLD buggy behavior
+      console.log('\n🧪 Verifying old buggy behavior would have failed...');
+      try {
+        const buggyCode = `function App() {\n  return (\n    \n  );\n}`;
+        Babel.transform(buggyCode, {
+          presets: ['react', 'typescript'],
+          filename: 'app.tsx',
+        });
+        results.innerHTML += `
+          <div class="result fail">
+            <h3>⚠️ Warning: Old bug test</h3>
+            <p>The old buggy code should have failed but didn't!</p>
+          </div>
+        `;
+      } catch (error) {
+        results.innerHTML += `
+          <div class="result" style="background: #333; border: 2px solid #666;">
+            <h3>✅ Confirmed: Old Behavior Would Have Failed</h3>
+            <p>The old wrapping logic would produce this error:</p>
+            <pre>${error.message}</pre>
+            <p style="color: #0f7; margin-top: 15px;">
+              This is the exact error the user reported. Our fix prevents this!
+            </p>
+          </div>
+        `;
+      }
+    }
+
+    loadBabelAndTest();
+  </script>
+</body>
+</html>

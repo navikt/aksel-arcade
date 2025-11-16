@@ -35,3 +35,18 @@
 .code-editor .cm-line {
   padding: 0 8px;
 }
+
+/* Matching bracket/tag highlighting */
+.code-editor .cm-matchingBracket {
+  background-color: var(--ax-bg-brand-magenta-moderate-hover);
+  color: var(--ax-text-brand-magenta-subtle);
+  outline: 1px solid var(--ax-border-brand-magenta-subtle);
+  border-radius: 2px;
+}
+
+.code-editor .cm-nonmatchingBracket {
+  background-color: var(--ax-bg-danger-moderate);
+  color: var(--ax-text-danger-subtle);
+  outline: 1px solid var(--ax-border-danger-subtle);
+  border-radius: 2px;
+}
