@@ -27,6 +27,7 @@ interface AppState {
   closeComponentPalette: () => void
   toggleSettings: () => void
   insertSnippet: (snippet: ComponentSnippet) => void
+  resetToIntro: () => void
 }
 
 const AppContext = createContext<AppState | null>(null)
@@ -111,6 +112,23 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     }
   }
 
+  const resetToIntro = () => {
+    const confirmed = window.confirm(
+      'Reset editor to intro state? This will replace your current code.'
+    )
+    if (confirmed) {
+      const introProject = createDefaultProject()
+      setProjectState({
+        ...project,
+        jsxCode: introProject.jsxCode,
+        hooksCode: introProject.hooksCode,
+        lastModified: new Date().toISOString(),
+      })
+      // Reset editor state to JSX tab
+      setEditorState(createDefaultEditorState())
+    }
+  }
+
   const value: AppState = {
     project,
     editorState,
@@ -125,6 +143,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     closeComponentPalette,
     toggleSettings,
     insertSnippet,
+    resetToIntro,
   }
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>

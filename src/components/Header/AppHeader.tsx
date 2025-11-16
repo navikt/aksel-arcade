@@ -1,6 +1,6 @@
 import { useRef } from 'react'
 import { Heading, Detail, Button, HStack, VStack, ProgressBar, BoxNew, ActionMenu } from '@navikt/ds-react'
-import { PencilIcon, FileExportIcon, FileImportIcon, CogIcon, MoonIcon, SunIcon, ArrowsSquarepathIcon } from '@navikt/aksel-icons'
+import { PencilIcon, FileExportIcon, FileImportIcon, CogIcon, MoonIcon, SunIcon, ArrowsSquarepathIcon, ArrowUndoIcon } from '@navikt/aksel-icons'
 import { SaveStatusIndicator } from './SaveStatusIndicator'
 import { useSettings } from '@/contexts/SettingsContext'
 import type { Project } from '@/types/project'
@@ -32,6 +32,7 @@ interface AppHeaderProps {
   onProjectImported: (project: Project) => void
   saveStatus: SaveStatus
   projectSizeBytes: number
+  onResetToIntro: () => void
 }
 
 export const AppHeader = ({
@@ -41,6 +42,7 @@ export const AppHeader = ({
   onProjectImported,
   saveStatus,
   projectSizeBytes,
+  onResetToIntro,
 }: AppHeaderProps) => {
   const MAX_PROJECT_SIZE = 5 * 1024 * 1024 // 5MB
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -168,6 +170,15 @@ export const AppHeader = ({
                   onSelect={togglePanelOrder}
                 >
                   Swap panel order
+                </ActionMenu.Item>
+              </ActionMenu.Group>
+              <ActionMenu.Divider />
+              <ActionMenu.Group label="Editor">
+                <ActionMenu.Item
+                  icon={<ArrowUndoIcon aria-hidden />}
+                  onSelect={onResetToIntro}
+                >
+                  Reset editor
                 </ActionMenu.Item>
               </ActionMenu.Group>
             </ActionMenu.Content>
