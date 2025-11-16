@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Alert Darkside Test</title>
+  <link rel="stylesheet" href="https://cdn.nav.no/aksel/@navikt/ds-css/7.25.0/darkside/index.css">
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://cdn.nav.no/aksel/@navikt/ds-react/7.25.0/ds-react.umd.min.js"></script>
+  
+  <style>
+    body {
+      margin: 0;
+      padding: 20px;
+      font-family: system-ui;
+    }
+    .test-section {
+      margin-bottom: 40px;
+      padding: 20px;
+      border: 2px solid #ccc;
+    }
+    .info {
+      background: #f0f0f0;
+      padding: 10px;
+      margin: 10px 0;
+      font-family: monospace;
+      font-size: 12px;
+    }
+  </style>
+</head>
+<body>
+  <h1>Alert Darkside CSS Variable Test</h1>
+  
+  <div class="test-section">
+    <h2>Test 1: Dark Mode (Default)</h2>
+    <div id="dark-root" class="aksel-theme dark"></div>
+    <div class="info" id="dark-info"></div>
+  </div>
+  
+  <div class="test-section">
+    <h2>Test 2: Light Mode</h2>
+    <div id="light-root" class="aksel-theme light"></div>
+    <div class="info" id="light-info"></div>
+  </div>
+
+  <div class="test-section">
+    <h2>CSS Variable Values</h2>
+    <div class="info" id="css-vars"></div>
+  </div>
+
+  <script>
+    const { Alert } = window.DesignSystem;
+    const { Theme } = window.DesignSystem;
+    
+    // Render Alert in dark mode
+    const darkRoot = ReactDOM.createRoot(document.getElementById('dark-root'));
+    darkRoot.render(
+      React.createElement(Theme, { theme: 'dark' },
+        React.createElement(Alert, { variant: 'info' }, 
+          'Welcome to AkselArcade! This Alert component is styled with Aksel Darkside.'
+        )
+      )
+    );
+    
+    // Render Alert in light mode
+    const lightRoot = ReactDOM.createRoot(document.getElementById('light-root'));
+    lightRoot.render(
+      React.createElement(Theme, { theme: 'light' },
+        React.createElement(Alert, { variant: 'info' }, 
+          'Welcome to AkselArcade! This Alert component is styled with Aksel Darkside.'
+        )
+      )
+    );
+    
+    // Check computed styles after render
+    setTimeout(() => {
+      // Dark mode
+      const darkAlert = document.querySelector('#dark-root [class*="alert"]');
+      if (darkAlert) {
+        const darkStyle = getComputedStyle(darkAlert);
+        document.getElementById('dark-info').innerHTML = `
+          Color: ${darkStyle.color}<br>
+          Background: ${darkStyle.backgroundColor}<br>
+          Color-scheme: ${darkStyle.colorScheme}<br>
+          Classes: ${darkAlert.className}
+        `;
+      }
+      
+      // Light mode
+      const lightAlert = document.querySelector('#light-root [class*="alert"]');
+      if (lightAlert) {
+        const lightStyle = getComputedStyle(lightAlert);
+        document.getElementById('light-info').innerHTML = `
+          Color: ${lightStyle.color}<br>
+          Background: ${lightStyle.backgroundColor}<br>
+          Color-scheme: ${lightStyle.colorScheme}<br>
+          Classes: ${lightAlert.className}
+        `;
+      }
+      
+      // CSS Variables
+      const darkTheme = document.querySelector('#dark-root .aksel-theme');
+      const lightTheme = document.querySelector('#light-root .aksel-theme');
+      
+      if (darkTheme && lightTheme) {
+        const darkVars = getComputedStyle(darkTheme);
+        const lightVars = getComputedStyle(lightTheme);
+        
+        document.getElementById('css-vars').innerHTML = `
+          <strong>Dark Mode:</strong><br>
+          --ax-text-neutral: ${darkVars.getPropertyValue('--ax-text-neutral').trim()}<br>
+          --ax-text-subtle: ${darkVars.getPropertyValue('--ax-text-subtle').trim()}<br>
+          <br>
+          <strong>Light Mode:</strong><br>
+          --ax-text-neutral: ${lightVars.getPropertyValue('--ax-text-neutral').trim()}<br>
+          --ax-text-subtle: ${lightVars.getPropertyValue('--ax-text-subtle').trim()}<br>
+        `;
+      }
+    }, 500);
+  </script>
+</body>
+</html>

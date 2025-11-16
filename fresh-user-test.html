@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Fresh User Test - Alert Component</title>
+  <style>
+    body {
+      font-family: system-ui;
+      padding: 20px;
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+    h1 { color: #0067C5; }
+    .step {
+      margin: 20px 0;
+      padding: 15px;
+      border: 2px solid #ddd;
+      border-radius: 8px;
+    }
+    .step.complete { border-color: #0067C5; background: #e6f3ff; }
+    button {
+      padding: 10px 20px;
+      font-size: 16px;
+      background: #0067C5;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      margin: 5px;
+    }
+    button:hover { background: #005ba3; }
+    #status { margin-top: 10px; font-weight: bold; }
+    .success { color: green; }
+    .error { color: red; }
+    iframe {
+      width: 100%;
+      height: 600px;
+      border: 3px solid #0067C5;
+      margin-top: 10px;
+    }
+  </style>
+</head>
+<body>
+  <h1>🧪 Fresh User Test - Alert Component Verification</h1>
+  <p>This test simulates a brand new user opening AkselArcade for the first time.</p>
+
+  <div class="step" id="step1">
+    <h2>Step 1: Clear ALL Storage</h2>
+    <p>Click to clear localStorage, sessionStorage, and all browser storage:</p>
+    <button onclick="clearAllStorage()">🗑️ Clear All Storage</button>
+    <div id="status1"></div>
+  </div>
+
+  <div class="step" id="step2">
+    <h2>Step 2: Open App as Fresh User</h2>
+    <p>Opens app in iframe below (simulates new user with no localStorage):</p>
+    <button onclick="openApp()">🚀 Open App</button>
+    <div id="status2"></div>
+    <div id="app-container"></div>
+  </div>
+
+  <div class="step" id="step3">
+    <h2>Step 3: Visual Verification</h2>
+    <p>Check the iframe above. You should see:</p>
+    <ul>
+      <li>✅ An <strong>Alert component</strong> (not a Button)</li>
+      <li>✅ Light blue/info background color</li>
+      <li>✅ Info icon (ℹ️) on the left</li>
+      <li>✅ Text: "Welcome to AkselArcade! This Alert component is styled with Aksel Darkside."</li>
+      <li>✅ Proper Aksel styling (padding, border-radius, typography)</li>
+    </ul>
+    <button onclick="verifyVisually()">👀 I've Verified Visually</button>
+    <div id="status3"></div>
+  </div>
+
+  <div class="step" id="step4">
+    <h2>Step 4: Test Theme Toggle</h2>
+    <p>In the iframe above, click the theme toggle (sun/moon icon) and verify:</p>
+    <ul>
+      <li>✅ Dark mode: Alert has dark background with light text</li>
+      <li>✅ Light mode: Alert has light background with dark text</li>
+      <li>✅ Both modes look like proper Aksel Darkside styling</li>
+    </ul>
+    <button onclick="testTheme()">🌓 Theme Tested</button>
+    <div id="status4"></div>
+  </div>
+
+  <div class="step" id="step5">
+    <h2>Step 5: Check Console</h2>
+    <p>Open browser DevTools console (F12) and check for:</p>
+    <ul>
+      <li>✅ "✅ Sandbox ready, Aksel + React loaded from Vite"</li>
+      <li>✅ "🎨 Rendering component wrapped with Aksel Theme"</li>
+      <li>✅ "✅ Render success"</li>
+      <li>❌ No errors about missing components or Theme</li>
+    </ul>
+    <button onclick="consoleChecked()">✅ Console Checked</button>
+    <div id="status5"></div>
+  </div>
+
+  <div class="step" id="final">
+    <h2>✨ Final Result</h2>
+    <div id="final-status">Complete all steps above</div>
+  </div>
+
+  <script>
+    let stepsComplete = 0;
+
+    function clearAllStorage() {
+      localStorage.clear();
+      sessionStorage.clear();
+      
+      // Also clear in the iframe if it exists
+      const iframe = document.getElementById('app-iframe');
+      if (iframe && iframe.contentWindow) {
+        try {
+          iframe.contentWindow.localStorage.clear();
+          iframe.contentWindow.sessionStorage.clear();
+        } catch (e) {
+          console.log('Could not clear iframe storage (may not be loaded yet)');
+        }
+      }
+      
+      document.getElementById('status1').innerHTML = '<span class="success">✅ All storage cleared!</span>';
+      document.getElementById('step1').classList.add('complete');
+      stepsComplete = Math.max(stepsComplete, 1);
+      updateFinal();
+    }
+
+    function openApp() {
+      const container = document.getElementById('app-container');
+      container.innerHTML = '<iframe src="http://localhost:5173" id="app-iframe"></iframe>';
+      
+      document.getElementById('status2').innerHTML = '<span class="success">✅ App loaded! Check preview pane on the right side.</span>';
+      document.getElementById('step2').classList.add('complete');
+      stepsComplete = Math.max(stepsComplete, 2);
+      updateFinal();
+      
+      // Add load listener
+      const iframe = document.getElementById('app-iframe');
+      iframe.addEventListener('load', () => {
+        console.log('✅ App iframe loaded');
+      });
+    }
+
+    function verifyVisually() {
+      const confirmation = confirm('Did you see an Alert component with Aksel Darkside styling (not a plain Button)?');
+      if (confirmation) {
+        document.getElementById('status3').innerHTML = '<span class="success">✅ Visual verification complete!</span>';
+        document.getElementById('step3').classList.add('complete');
+        stepsComplete = Math.max(stepsComplete, 3);
+        updateFinal();
+      } else {
+        document.getElementById('status3').innerHTML = '<span class="error">❌ Alert not displaying correctly. Check console for errors.</span>';
+      }
+    }
+
+    function testTheme() {
+      const confirmation = confirm('Did the Alert theme switch correctly between light and dark modes?');
+      if (confirmation) {
+        document.getElementById('status4').innerHTML = '<span class="success">✅ Theme toggle works!</span>';
+        document.getElementById('step4').classList.add('complete');
+        stepsComplete = Math.max(stepsComplete, 4);
+        updateFinal();
+      } else {
+        document.getElementById('status4').innerHTML = '<span class="error">❌ Theme not switching correctly.</span>';
+      }
+    }
+
+    function consoleChecked() {
+      const confirmation = confirm('Did you see the success messages in console with no errors?');
+      if (confirmation) {
+        document.getElementById('status5').innerHTML = '<span class="success">✅ Console verification complete!</span>';
+        document.getElementById('step5').classList.add('complete');
+        stepsComplete = Math.max(stepsComplete, 5);
+        updateFinal();
+      } else {
+        document.getElementById('status5').innerHTML = '<span class="error">❌ Console has errors. Check logs.</span>';
+      }
+    }
+
+    function updateFinal() {
+      const final = document.getElementById('final-status');
+      if (stepsComplete === 5) {
+        final.innerHTML = '<span class="success" style="font-size: 24px;">🎉 SUCCESS! Alert component is correctly themed with Aksel Darkside!</span>';
+        document.getElementById('final').classList.add('complete');
+      } else {
+        final.innerHTML = `Progress: ${stepsComplete}/5 steps complete`;
+      }
+    }
+
+    // Log for debugging
+    console.log('🧪 Fresh User Test Page Loaded');
+    console.log('Follow steps 1-5 to verify the Alert component fix');
+  </script>
+</body>
+</html>

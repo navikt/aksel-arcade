@@ -5,7 +5,7 @@ import type { PreviewState } from '@/types/preview'
 export const createDefaultProject = (): Project => ({
   id: crypto.randomUUID(),
   name: 'Untitled Project',
-  jsxCode: '<Button variant="primary">Button text</Button>',
+  jsxCode: 'export default function App() {\n  return (\n    <Alert variant="info">\n      Welcome to AkselArcade! This Alert component is styled with Aksel Darkside.\n    </Alert>\n  )\n}',
   hooksCode: '// Define custom hooks here\n// Example:\n// export const useCounter = () => {\n//   const [count, setCount] = useState(0);\n//   return { count, increment: () => setCount(c => c + 1) };\n// };',
   viewportSize: 'MD',
   panelLayout: 'editor-left',

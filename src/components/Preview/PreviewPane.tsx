@@ -1,9 +1,9 @@
 import { useContext, useEffect, useState, useRef } from 'react'
-import { HStack, VStack, BoxNew } from '@navikt/ds-react'
+import { HStack, VStack, BoxNew, Button } from '@navikt/ds-react'
+import { XMarkIcon } from '@navikt/aksel-icons'
 import { AppContext } from '@/hooks/useProject'
 import { transpileCode } from '@/services/transpiler'
 import { LivePreview } from './LivePreview'
-import { ErrorOverlay } from './ErrorOverlay'
 import { ViewportToggle } from './ViewportToggle'
 import { InspectMode } from './InspectMode'
 import { ThemeToggle } from './ThemeToggle'
@@ -132,17 +132,75 @@ export const PreviewPane = () => {
           paddingInline="space-16" 
           background="sunken"
           className={previewTheme}
-          style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}
+          style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, position: 'relative' }}
         >
-          <ErrorOverlay
-            compileError={compileError}
-            runtimeError={runtimeError}
-            onClose={() => {
-              setCompileError(null)
-              setRuntimeError(null)
-            }}
-          />
-          
+          {/* Error Display - Simple and Direct */}
+          {(compileError || runtimeError) && (
+            <BoxNew
+              borderWidth="1"
+              borderColor="danger-moderate"
+              paddingBlock="space-12"
+              paddingInline="space-16"
+              style={{
+                position: 'absolute',
+                top: '16px',
+                left: '16px',
+                right: '16px',
+                zIndex: 1000,
+                borderRadius: 'var(--ax-radius-8)',
+                background: 'var(--ax-bg-raised)',
+              }}
+            >
+              <HStack gap="space-12" justify="space-between" align="start">
+                <VStack gap="space-4" style={{ flex: 1 }}>
+                  <strong style={{ color: 'var(--ax-text-neutral)', fontSize: '1rem' }}>
+                    {compileError ? 'Compile Error' : 'Runtime Error'}
+                    {compileError && compileError.line !== null && ` (line ${(compileError.line || 0) + 1})`}
+                  </strong>
+                  <pre style={{
+                    margin: 0,
+                    color: 'var(--ax-text-neutral)',
+                    fontFamily: 'Monaco, Menlo, Consolas, monospace',
+                    fontSize: '0.875rem',
+                    whiteSpace: 'pre-wrap',
+                    wordBreak: 'break-word',
+                  }}>
+                    {(compileError || runtimeError)?.message}
+                  </pre>
+                  {runtimeError?.componentStack && (
+                    <details style={{ marginTop: '8px', color: 'var(--ax-text-neutral)' }}>
+                      <summary style={{ cursor: 'pointer', fontWeight: 600 }}>
+                        Component Stack
+                      </summary>
+                      <pre style={{
+                        marginTop: '8px',
+                        padding: '8px',
+                        background: 'rgba(0, 0, 0, 0.1)',
+                        borderRadius: 'var(--ax-radius-4)',
+                        fontSize: '0.75rem',
+                        overflowX: 'auto',
+                      }}>
+                        {runtimeError.componentStack}
+                      </pre>
+                    </details>
+                  )}
+                </VStack>
+                <Button
+                  variant="tertiary"
+                  size="small"
+                  icon={<XMarkIcon aria-hidden />}
+                  onClick={() => {
+                    setCompileError(null)
+                    setRuntimeError(null)
+                  }}
+                  style={{ flexShrink: 0 }}
+                >
+                  Close
+                </Button>
+              </HStack>
+            </BoxNew>
+          )}
+
           <LivePreview
             iframeRef={iframeRef}
             transpiledCode={transpiledCode}

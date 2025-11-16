@@ -1,6 +1,7 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Button } from '@navikt/ds-react'
 import { SunIcon, MoonIcon } from '@navikt/aksel-icons'
+import { useSettings } from '@/contexts/SettingsContext'
 import type { MainToSandboxMessage } from '@/types/messages'
 
 interface ThemeToggleProps {
@@ -9,7 +10,31 @@ interface ThemeToggleProps {
 }
 
 export const ThemeToggle = ({ iframeRef, onThemeChange }: ThemeToggleProps) => {
-  const [theme, setTheme] = useState<'light' | 'dark'>('light')
+  // Preview has its own independent theme (not tied to main app theme)
+  const [theme, setTheme] = useState<'light' | 'dark'>('dark')
+
+  // Sync preview theme to sandbox when iframe is ready
+  useEffect(() => {
+    const sendTheme = () => {
+      if (iframeRef.current?.contentWindow) {
+        const message: MainToSandboxMessage = {
+          type: 'UPDATE_THEME',
+          payload: { theme },
+        }
+        iframeRef.current.contentWindow.postMessage(message, '*')
+        console.log(`📤 Sent preview theme to sandbox: ${theme}`)
+        return true
+      }
+      return false
+    }
+
+    // Try immediately
+    if (!sendTheme()) {
+      // If iframe not ready, retry after short delay
+      const timer = setTimeout(sendTheme, 100)
+      return () => clearTimeout(timer)
+    }
+  }, [iframeRef, theme])
 
   const handleToggle = () => {
     const newTheme = theme === 'light' ? 'dark' : 'light'

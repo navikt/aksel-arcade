@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Alert Style Inspector</title>
+  <style>
+    body { 
+      font-family: system-ui; 
+      padding: 20px; 
+      max-width: 1200px; 
+      margin: 0 auto;
+    }
+    .results { 
+      background: #f5f5f5; 
+      padding: 20px; 
+      border-radius: 8px; 
+      margin-top: 20px;
+      font-family: monospace;
+      white-space: pre-wrap;
+    }
+    button {
+      padding: 10px 20px;
+      margin: 5px;
+      cursor: pointer;
+    }
+    .error { color: red; }
+    .success { color: green; }
+  </style>
+</head>
+<body>
+  <h1>Alert Style Inspector</h1>
+  <p>This tool inspects the computed styles of the Alert component in the sandbox iframe.</p>
+  
+  <button onclick="inspectSandbox()">Inspect Sandbox Alert Styles</button>
+  <button onclick="checkTheme()">Check Theme State</button>
+  <button onclick="getCSSVariables()">Get CSS Variables</button>
+  
+  <div class="results" id="results">Click a button to start inspection...</div>
+
+  <script>
+    function log(message, type = 'info') {
+      const results = document.getElementById('results');
+      const timestamp = new Date().toLocaleTimeString();
+      const prefix = type === 'error' ? '❌' : type === 'success' ? '✅' : '📋';
+      results.innerHTML += `\n${prefix} [${timestamp}] ${message}`;
+      console.log(message);
+    }
+
+    function inspectSandbox() {
+      const results = document.getElementById('results');
+      results.innerHTML = '🔍 Inspecting sandbox iframe...\n';
+      
+      // Find the main app iframe (if opened in VS Code Simple Browser)
+      const mainFrame = window.parent;
+      
+      log('Looking for sandbox iframe in parent window...');
+      
+      // Try to access the sandbox through postMessage
+      window.addEventListener('message', (event) => {
+        log(`Received message: ${JSON.stringify(event.data)}`);
+      });
+      
+      // Alternative: Direct inspection if this HTML is loaded in the app
+      setTimeout(() => {
+        const iframes = document.querySelectorAll('iframe');
+        log(`Found ${iframes.length} iframes in current document`);
+        
+        if (iframes.length === 0) {
+          log('No iframes found. Load this page inside the app or manually inspect.', 'error');
+          log('\nManual Inspection Steps:', 'info');
+          log('1. Open http://localhost:5173 in browser');
+          log('2. Open DevTools (F12)');
+          log('3. Find the preview iframe');
+          log('4. Inspect the Alert component');
+          log('5. Check computed styles for color property');
+          log('6. Check what --ax-text-neutral resolves to');
+        }
+      }, 100);
+    }
+
+    function checkTheme() {
+      const results = document.getElementById('results');
+      results.innerHTML = '🎨 Checking theme state...\n';
+      
+      log(`Document root class: ${document.documentElement.className}`);
+      log(`Body class: ${document.body.className}`);
+      log(`Color scheme: ${getComputedStyle(document.documentElement).colorScheme}`);
+      
+      // Check if Aksel CSS is loaded
+      const stylesheets = Array.from(document.styleSheets);
+      const akselSheet = stylesheets.find(s => s.href && s.href.includes('darkside'));
+      
+      if (akselSheet) {
+        log('✅ Aksel Darkside CSS is loaded', 'success');
+        log(`Stylesheet URL: ${akselSheet.href}`);
+      } else {
+        log('❌ Aksel Darkside CSS NOT found', 'error');
+      }
+    }
+
+    function getCSSVariables() {
+      const results = document.getElementById('results');
+      results.innerHTML = '📐 Reading CSS Variables...\n';
+      
+      const root = document.documentElement;
+      const computedStyle = getComputedStyle(root);
+      
+      const variables = [
+        '--ax-text-neutral',
+        '--ax-text-subtle',
+        '--ax-surface-default',
+        '--ax-surface-neutral-subtle',
+        '--a-text-default',
+        '--a-text-subtle'
+      ];
+      
+      variables.forEach(varName => {
+        const value = computedStyle.getPropertyValue(varName);
+        if (value) {
+          log(`${varName}: ${value.trim()}`);
+        } else {
+          log(`${varName}: NOT DEFINED`, 'error');
+        }
+      });
+    }
+
+    // Auto-run basic checks
+    window.addEventListener('load', () => {
+      checkTheme();
+    });
+  </script>
+</body>
+</html>

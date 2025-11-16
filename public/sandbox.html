@@ -10,7 +10,8 @@
     /* Set iframe canvas color to match preview container background */
     html {
       /* Color-scheme will be set dynamically by updateTheme function */
-      color-scheme: light;
+      /* Initial: dark (matches main app default) */
+      color-scheme: dark;
       /* Use Aksel Darkside sunken background variable (adapts to theme) */
       background: var(--ax-bg-sunken);
       /* Enable scrolling when content overflows */
@@ -90,17 +91,31 @@
       scrollbar-color: var(--ax-text-neutral-decoration) transparent;
       scrollbar-width: thin;
     }
+    
+    /* CRITICAL FIX: Force Alert text to use correct color in light mode */
+    /* Aksel Alert component should handle this, but explicitly ensure it */
+    html.light .aksel-alert,
+    html.light .aksel-alert .aksel-body-long,
+    html.light .aksel-alert .aksel-alert__wrapper {
+      color: var(--ax-text-neutral) !important;
+    }
+    
+    html.dark .aksel-alert,
+    html.dark .aksel-alert .aksel-body-long,
+    html.dark .aksel-alert .aksel-alert__wrapper {
+      color: var(--ax-text-neutral) !important;
+    }
   </style>
 </head>
 <body>
   <!-- Apply aksel-theme and light classes for Darkside styling to both html and root -->
   <!-- data-color activates Darkside color system -->
   <script>
-    // Set initial theme classes on html element for background
-    document.documentElement.className = 'aksel-theme light';
+    // Set initial theme classes on html element for background (matches main app default: dark)
+    document.documentElement.className = 'aksel-theme dark';
     document.documentElement.setAttribute('data-color', 'accent');
   </script>
-  <div id="root" class="aksel-theme light" data-color="accent"></div>
+  <div id="root" class="aksel-theme dark" data-color="accent"></div>
   
   <script type="module">
     // React will be loaded from Vite via sandboxAksel.ts (same instance as Aksel components)
@@ -166,8 +181,8 @@
     let lastInspectionTime = 0;
     const INSPECTION_THROTTLE_MS = 16; // ~60fps
     
-    // Theme state
-    let currentTheme = 'light';
+    // Theme state - matches main app default (dark)
+    let currentTheme = 'dark';
 
     // Listen for messages from parent window
     window.addEventListener('message', (event) => {
@@ -642,21 +657,46 @@
         }
         
         console.log(`🎨 Rendering component wrapped with Aksel Theme (${currentTheme} mode)`);
+        
+        // CRITICAL FIX: Ensure theme is explicitly 'light' or 'dark', never undefined
+        const themeValue = currentTheme === 'dark' ? 'dark' : 'light';
+        console.log(`🔍 DEBUG: currentTheme variable = "${currentTheme}"`);
+        console.log(`🔍 DEBUG: Theme value being passed to Theme component: "${themeValue}"`);
+        console.log(`🔍 DEBUG: Theme component props:`, { theme: themeValue });
+        
         const wrappedComponent = React.createElement(
           ThemeComponent,
-          { theme: currentTheme },
+          { theme: themeValue },
           React.createElement(Component)
         );
         
+        console.log(`🔍 DEBUG: Created Theme element:`, wrappedComponent);
+        
         currentRoot.render(wrappedComponent);
         
-        // Debug: Check rendered button after a short delay
+        // Debug: Check rendered elements and theme after a short delay
         setTimeout(() => {
+          // Check theme wrapper
+          const themeWrapper = rootElement.querySelector('.aksel-theme');
+          if (themeWrapper) {
+            console.log('🔍 DEBUG: Theme wrapper classes:', themeWrapper.className);
+            console.log('🔍 DEBUG: Theme wrapper color-scheme:', getComputedStyle(themeWrapper).colorScheme);
+          }
+          
+          // Check Alert component
+          const alert = rootElement.querySelector('[class*="aksel-alert"]');
+          if (alert) {
+            console.log('🔍 DEBUG: Alert classes:', alert.className);
+            console.log('🔍 DEBUG: Alert computed color:', getComputedStyle(alert).color);
+            console.log('🔍 DEBUG: Alert computed background:', getComputedStyle(alert).backgroundColor);
+            console.log('🔍 DEBUG: Alert color-scheme:', getComputedStyle(alert).colorScheme);
+          }
+          
+          // Check any button
           const button = rootElement.querySelector('button');
           if (button) {
-            console.log('🔍 DEBUG: Rendered button classes:', button.className);
-            console.log('🔍 DEBUG: Rendered button computed background:', getComputedStyle(button).backgroundColor);
-            console.log('🔍 DEBUG: Rendered button computed color:', getComputedStyle(button).color);
+            console.log('🔍 DEBUG: Button classes:', button.className);
+            console.log('🔍 DEBUG: Button computed color:', getComputedStyle(button).color);
           }
         }, 100);
       } catch (error) {

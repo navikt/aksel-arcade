@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Test Error Dialog</title>
+  <link rel="stylesheet" href="./node_modules/@navikt/ds-css/darkside/index.css">
+  <style>
+    body {
+      margin: 0;
+      padding: 2rem;
+      font-family: 'Source Sans Pro', Arial, sans-serif;
+    }
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+    }
+    .error-overlay {
+      position: relative;
+      margin-bottom: 2rem;
+    }
+    .error-overlay__message {
+      margin-top: 0.5rem;
+      font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', 'Consolas', 'source-code-pro', monospace;
+      font-size: 0.875rem;
+      white-space: pre-wrap;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Error Dialog Test</h1>
+    
+    <h2>Light Theme</h2>
+    <div id="light-root"></div>
+    
+    <h2>Dark Theme (Darkside)</h2>
+    <div id="dark-root"></div>
+  </div>
+
+  <script type="module">
+    import React from './node_modules/react/index.js';
+    import ReactDOM from './node_modules/react-dom/client.js';
+    import { Alert } from './node_modules/@navikt/ds-react/esm/index.js';
+    import { Theme } from './node_modules/@navikt/ds-react/esm/Theme/index.js';
+
+    const ErrorOverlayTest = () => {
+      return React.createElement('div', { className: 'error-overlay' },
+        React.createElement(Alert, { 
+          variant: 'error', 
+          closeButton: true,
+          onClose: () => console.log('Close clicked')
+        },
+          React.createElement('strong', null, 'Compile Error (line 5)'),
+          React.createElement('div', { className: 'error-overlay__message' }, 
+            'Unexpected token. Expected ")" or ","'
+          )
+        )
+      );
+    };
+
+    // Light theme
+    const lightRoot = ReactDOM.createRoot(document.getElementById('light-root'));
+    lightRoot.render(
+      React.createElement(Theme, { theme: 'light', hasBackground: true },
+        React.createElement(ErrorOverlayTest)
+      )
+    );
+
+    // Dark theme
+    const darkRoot = ReactDOM.createRoot(document.getElementById('dark-root'));
+    darkRoot.render(
+      React.createElement(Theme, { theme: 'dark', hasBackground: true },
+        React.createElement(ErrorOverlayTest)
+      )
+    );
+  </script>
+</body>
+</html>
