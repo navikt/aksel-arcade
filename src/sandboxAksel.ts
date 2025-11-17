@@ -22,11 +22,14 @@ import * as AkselComponents from '@navikt/ds-react';
 // Import all Aksel icons
 import * as AkselIcons from '@navikt/aksel-icons';
 
-// Export everything explicitly to prevent Vite tree-shaking
-export {
+// Bundle all exports into a single object to prevent code-splitting
+// This prevents Vite from splitting external re-exports into vendor chunks
+const sandbox = {
   React,
   createRoot,
   Theme,
   AkselComponents,
   AkselIcons,
 };
+
+export default sandbox;

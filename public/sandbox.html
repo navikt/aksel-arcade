@@ -279,10 +279,14 @@
       .then((module) => {
         console.log('✅ Module loaded successfully!');
         console.log('🔍 Module keys:', Object.keys(module || {}).slice(0, 15));
-        console.log('🔍 module.React:', !!module.React, 'module.createRoot:', !!module.createRoot, 'module.Theme:', !!module.Theme);
         
-        // sandboxAksel.ts now uses named exports, so module should have them directly
-        const { React, createRoot, Theme, AkselComponents, AkselIcons } = module;
+        // sandboxAksel.ts exports default object with all properties
+        // In production, module.default is the sandbox object
+        // In dev, Vite unwraps it so module IS the sandbox object
+        const sandbox = module.default || module;
+        console.log('🔍 sandbox.React:', !!sandbox.React, 'sandbox.createRoot:', !!sandbox.createRoot, 'sandbox.Theme:', !!sandbox.Theme);
+        
+        const { React, createRoot, Theme, AkselComponents, AkselIcons } = sandbox;
         
         // Make React available globally (same instance as Aksel uses)
         window.React = React;
