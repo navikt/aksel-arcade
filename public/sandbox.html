@@ -145,7 +145,8 @@
 
     // Load Aksel + React from Vite dev server with proper CSS import
     // Following Aksel docs: import "@navikt/ds-css/darkside";
-    import('/src/sandboxAksel.ts')
+    // Use relative path to work with base path configuration
+    import('./src/sandboxAksel.ts')
       .then((module) => {
         const { React, createRoot, Theme, AkselComponents, AkselIcons } = module;
         

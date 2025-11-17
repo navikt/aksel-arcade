@@ -48,18 +48,18 @@ export const INTRO_HOOKS_CODE = `// Define custom hooks here
 
 export const FORM_SUMMARY_JSX_CODE = `export default function App() {
   return (
-    <BoxNew asChild="true" background="default" paddingBlock="space-12">
+    <BoxNew asChild background="default" paddingBlock="space-12">
       <Page>
         <Page.Block as="main" width="text" gutters>
           <VStack gap="8">
             <VStack gap="3">
-              <Bleed asChild marginInline={{ lg: '32' }}>
+              <Bleed asChild marginInline={{ lg: 'space-32' }}>
                 <BoxNew
                   width={{ xs: '64px', lg: '96px' }}
                   height={{ xs: '64px', lg: '96px' }}
                   asChild
                   position={{ xs: 'relative', lg: 'absolute' }}
-                ></BoxNew>
+                />
               </Bleed>
               <VStack gap="1">
                 <BodyShort size="small">Nav 10-07.03 (Om søknaden har ID)</BodyShort>
@@ -73,7 +73,7 @@ export const FORM_SUMMARY_JSX_CODE = `export default function App() {
               <Link href="#">
                 <ArrowLeftIcon aria-hidden /> Forrige steg
               </Link>
-              <BoxNew paddingBlock="6 5">
+              <BoxNew paddingBlock="space-6">
                 <Heading level="2" size="large">
                   Oppsummering
                 </Heading>
@@ -207,7 +207,7 @@ export const FORM_SUMMARY_JSX_CODE = `export default function App() {
                   </Button>
                 </Show>
 
-                <BoxNew asChild marginBlock={{ xs: 'space-16 0', sm: '0' }}>
+                <BoxNew asChild marginBlock={{ xs: 'space-16', sm: 'space-0' }}>
                   <Button
                     variant="tertiary"
                     icon={<FloppydiskIcon aria-hidden />}

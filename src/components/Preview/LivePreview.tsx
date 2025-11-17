@@ -109,13 +109,11 @@ export const LivePreview = ({
   // Send code to sandbox when it changes
   useEffect(() => {
     if (!transpiledCode || !iframeRef.current?.contentWindow) {
-      console.log('⏸️ Skipping execution - no code or iframe not ready')
       return
     }
 
     // If sandbox isn't ready yet, store code to send later
     if (!sandboxReady) {
-      console.log('⏸️ Sandbox not ready, storing code for later')
       pendingCodeRef.current = transpiledCode
       return
     }
@@ -125,7 +123,6 @@ export const LivePreview = ({
       payload: { jsxCode: transpiledCode, hooksCode: '' },
     }
 
-    console.log('📤 Sending EXECUTE_CODE to sandbox')
     iframeRef.current.contentWindow.postMessage(message, window.location.origin)
   }, [transpiledCode, sandboxReady, iframeRef])
 
@@ -165,7 +162,7 @@ export const LivePreview = ({
       <iframe
         ref={iframeRef}
         className="live-preview__iframe"
-        src="/sandbox.html"
+        src="./sandbox.html"
         sandbox="allow-scripts allow-same-origin"
         title="Live Preview Sandbox"
         data-testid="preview-iframe"

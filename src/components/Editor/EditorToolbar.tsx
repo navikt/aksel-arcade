@@ -1,6 +1,5 @@
 import { Button, HStack } from '@navikt/ds-react'
 import { PlusIcon, CodeIcon, ArrowUndoIcon, ArrowRedoIcon } from '@navikt/aksel-icons'
-import './EditorToolbar.css'
 
 interface EditorToolbarProps {
   onAddComponent: () => void

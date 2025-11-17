@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Transpile Test</title>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+</head>
+<body>
+  <h1>Transpile Test</h1>
+  <button onclick="testSimpleAlert()">Test Simple Alert</button>
+  <button onclick="testFormSummary()">Test Form Summary Template</button>
+  <pre id="output" style="background: #f0f0f0; padding: 20px; margin-top: 20px;"></pre>
+
+  <script>
+    function log(msg) {
+      const output = document.getElementById('output');
+      output.textContent += msg + '\n';
+    }
+
+    function testSimpleAlert() {
+      document.getElementById('output').textContent = '';
+      log('=== Testing Simple Alert ===\n');
+      
+      const jsxCode = '<Alert variant="info">Alert message</Alert>';
+      log('Input: ' + jsxCode);
+      
+      // Simulate transpiler wrapping
+      const wrapped = `function App() {\n  return (\n    ${jsxCode}\n  );\n}`;
+      log('\nWrapped code:');
+      log(wrapped);
+      
+      try {
+        const result = Babel.transform(wrapped, {
+          presets: ['react', 'typescript'],
+          filename: 'app.tsx',
+        });
+        log('\n✅ Success!');
+        log('\nTranspiled output:');
+        log(result.code);
+      } catch (error) {
+        log('\n❌ Error: ' + error.message);
+      }
+    }
+
+    function testFormSummary() {
+      document.getElementById('output').textContent = '';
+      log('=== Testing Form Summary Template ===\n');
+      
+      // First few lines of the template
+      const jsxCode = `export default function App() {
+  return (
+    <BoxNew asChild background="default" paddingBlock="space-12">
+      <Page>
+        <Page.Block as="main" width="text" gutters>
+          <VStack gap="8">
+            <Alert variant="info">Test</Alert>
+          </VStack>
+        </Page.Block>
+      </Page>
+    </BoxNew>
+  )
+}`;
+      
+      log('Input (first few lines):');
+      log(jsxCode.substring(0, 200) + '...');
+      
+      // Simulate transpiler export removal
+      let processed = jsxCode.replace(/export\s+default\s+function\s+(\w+)/g, 'function $1');
+      log('\nAfter first replace:');
+      log(processed.substring(0, 100) + '...');
+      
+      processed = processed.replace(/export\s+default\s+/g, 'const App = ');
+      log('\nAfter second replace:');
+      log(processed.substring(0, 100) + '...');
+      
+      // Test transpilation
+      try {
+        const result = Babel.transform(processed, {
+          presets: ['react', 'typescript'],
+          filename: 'app.tsx',
+        });
+        log('\n✅ Success!');
+        log('\nTranspiled output (first 200 chars):');
+        log(result.code.substring(0, 200) + '...');
+      } catch (error) {
+        log('\n❌ Error: ' + error.message);
+        log('\nError stack:');
+        log(error.stack);
+      }
+    }
+  </script>
+</body>
+</html>
