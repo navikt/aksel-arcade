@@ -8,7 +8,7 @@ export type SaveStatus = 'idle' | 'saving' | 'saved' | 'error'
  * Auto-saves project to localStorage with 1-second debounce
  */
 export const useAutoSave = (project: Project) => {
-  const timeoutRef = useRef<number>()
+  const timeoutRef = useRef<number | undefined>(undefined)
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle')
   const [saveError, setSaveError] = useState<string | null>(null)
 

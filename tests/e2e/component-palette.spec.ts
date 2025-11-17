@@ -41,6 +41,7 @@ export default function App() {
     // Get current content before insertion
     const contentBefore = await editor.textContent()
     console.log(`📝 Content before insertion:\n${contentBefore}`)
+    if (!contentBefore) throw new Error('No content before')
     
     const linesBefore = contentBefore.split('\n')
     console.log(`📊 Lines before: ${linesBefore.length}`)
@@ -66,6 +67,7 @@ export default function App() {
     // Get content after insertion
     const contentAfter = await editor.textContent()
     console.log(`📝 Content after insertion:\n${contentAfter}`)
+    if (!contentAfter) throw new Error('No content after')
     
     const linesAfter = contentAfter.split('\n')
     console.log(`📊 Lines after: ${linesAfter.length}`)
@@ -135,6 +137,7 @@ export default function App() {
     await page.waitForTimeout(500)
     
     const contentAfter = await editor.textContent()
+    if (!contentAfter) throw new Error('No content after insert')
     const lines = contentAfter.split('\n')
     
     console.log(`📝 Final content:\n${contentAfter}`)

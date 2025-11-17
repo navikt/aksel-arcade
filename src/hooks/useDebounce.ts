@@ -26,7 +26,7 @@ export const useDebouncedCallback = <T extends (...args: Parameters<T>) => Retur
   callback: T,
   delay: number
 ): T => {
-  const timeoutRef = useRef<number>()
+  const timeoutRef = useRef<number | undefined>(undefined)
 
   useEffect(() => {
     return () => {
