@@ -440,9 +440,13 @@ export const uiComponents: ComponentMetadata[] = [
     import: '@navikt/ds-react',
     description: 'Clickable card link',
     props: [
-      { name: 'href', type: 'string', required: true, description: 'Link URL' },
+      { name: 'arrow', type: 'boolean', description: 'Show arrow icon', default: 'true' },
+      { name: 'arrowPosition', type: 'string', values: ['baseline', 'center'], default: 'baseline', description: 'Adjusts arrow position' },
+      { name: 'size', type: 'string', values: ['small', 'medium'], default: 'medium', description: 'Changes padding and typo sizes' },
+      { name: 'className', type: 'string', description: 'Additional CSS class names' },
+      { name: 'data-color', type: 'string', values: ['neutral', 'accent', 'success', 'warning', 'danger', 'info'], description: 'Color theme for the card' },
     ],
-    snippet: '<LinkCard href="#">\n  <LinkCard.Title>Card title</LinkCard.Title>\n  <LinkCard.Description>Card description</LinkCard.Description>\n</LinkCard>',
+    snippet: '<LinkCard>\n  <LinkCard.Title>\n    <LinkCard.Anchor href="">Datasikkerheit er ivareteken gjennom kryptert overføring.</LinkCard.Anchor>\n  </LinkCard.Title>\n  <LinkCard.Description>\n    I samband med systemvedlikehald kan tenesta vere utilgjengeleg sundag mellom klokka 22 og 02. Planlagde avbrot vert varsla på framsida minst 48 timar før nedetid tek til å gjelde.\n  </LinkCard.Description>\n</LinkCard>',
   },
   {
     name: 'List',

@@ -1732,10 +1732,165 @@ export const AKSEL_COMPONENTS: Record<string, ComponentMetadata> = {
     description: 'Clickable card link',
     props: [
       {
+        name: 'arrow',
+        type: 'boolean',
+        values: ['true', 'false'],
+        description: 'Show arrow icon',
+      },
+      {
+        name: 'arrowPosition',
+        type: 'string',
+        values: ['baseline', 'center'],
+        description: 'Adjusts arrow position',
+      },
+      {
+        name: 'size',
+        type: 'string',
+        values: ['small', 'medium'],
+        description: 'Changes padding and typo sizes',
+      },
+      {
+        name: 'className',
+        type: 'string',
+        description: 'Additional CSS class names',
+      },
+      {
+        name: 'data-color',
+        type: 'string',
+        values: DATA_COLOR_VALUES,
+        description: 'Color theme for the card',
+      },
+    ],
+  },
+
+  'LinkCard.Title': {
+    name: 'LinkCard.Title',
+    description: 'Title section of LinkCard',
+    props: [
+      {
+        name: 'className',
+        type: 'string',
+        description: 'Additional CSS class names',
+      },
+      {
+        name: 'data-color',
+        type: 'string',
+        values: DATA_COLOR_VALUES,
+        description: 'Color theme',
+      },
+      {
+        name: 'as',
+        type: 'string',
+        values: ['span', 'h2', 'h3', 'h4', 'h5', 'h6'],
+        description: 'Heading tag. Use "span" if you want a non header defining card',
+      },
+    ],
+  },
+
+  'LinkCard.Anchor': {
+    name: 'LinkCard.Anchor',
+    description: 'Anchor link within LinkCard.Title',
+    props: [
+      {
         name: 'href',
         type: 'string',
         required: true,
         description: 'Link URL',
+      },
+      {
+        name: 'className',
+        type: 'string',
+        description: 'Additional CSS class names',
+      },
+      {
+        name: 'data-color',
+        type: 'string',
+        values: DATA_COLOR_VALUES,
+        description: 'Color theme',
+      },
+      {
+        name: 'asChild',
+        type: 'boolean',
+        values: ['true', 'false'],
+        description: 'Renders the component and its child as a single element, merging the props',
+      },
+    ],
+  },
+
+  'LinkCard.Description': {
+    name: 'LinkCard.Description',
+    description: 'Description section of LinkCard',
+    props: [
+      {
+        name: 'className',
+        type: 'string',
+        description: 'Additional CSS class names',
+      },
+      {
+        name: 'data-color',
+        type: 'string',
+        values: DATA_COLOR_VALUES,
+        description: 'Color theme',
+      },
+    ],
+  },
+
+  'LinkCard.Footer': {
+    name: 'LinkCard.Footer',
+    description: 'Footer section of LinkCard',
+    props: [
+      {
+        name: 'className',
+        type: 'string',
+        description: 'Additional CSS class names',
+      },
+      {
+        name: 'data-color',
+        type: 'string',
+        values: DATA_COLOR_VALUES,
+        description: 'Color theme',
+      },
+    ],
+  },
+
+  'LinkCard.Icon': {
+    name: 'LinkCard.Icon',
+    description: 'Icon section of LinkCard',
+    props: [
+      {
+        name: 'className',
+        type: 'string',
+        description: 'Additional CSS class names',
+      },
+      {
+        name: 'data-color',
+        type: 'string',
+        values: DATA_COLOR_VALUES,
+        description: 'Color theme',
+      },
+    ],
+  },
+
+  'LinkCard.Image': {
+    name: 'LinkCard.Image',
+    description: 'Image section of LinkCard',
+    props: [
+      {
+        name: 'aspectRatio',
+        type: 'string',
+        values: ['16/9', '4/3', '1/1', '3/4', '9/16'],
+        description: 'The aspect-ratio CSS property for the image box',
+      },
+      {
+        name: 'className',
+        type: 'string',
+        description: 'Additional CSS class names',
+      },
+      {
+        name: 'data-color',
+        type: 'string',
+        values: DATA_COLOR_VALUES,
+        description: 'Color theme',
       },
     ],
   },

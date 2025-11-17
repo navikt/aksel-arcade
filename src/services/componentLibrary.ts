@@ -460,7 +460,7 @@ export const AKSEL_SNIPPETS: ComponentSnippet[] = [
     name: 'LinkCard',
     category: 'component',
     keywords: ['link', 'card', 'navigate', 'clickable'],
-    template: '<LinkCard href="${1:#}">\n  <LinkCard.Title>${2:Card title}</LinkCard.Title>\n  <LinkCard.Description>${3:Card description}</LinkCard.Description>\n</LinkCard>',
+    template: '<LinkCard>\n  <LinkCard.Title>\n    <LinkCard.Anchor href="${1:}">${2:Datasikkerheit er ivareteken gjennom kryptert overføring.}</LinkCard.Anchor>\n  </LinkCard.Title>\n  <LinkCard.Description>\n    ${3:I samband med systemvedlikehald kan tenesta vere utilgjengeleg sundag mellom klokka 22 og 02. Planlagde avbrot vert varsla på framsida minst 48 timar før nedetid tek til å gjelde.}\n  </LinkCard.Description>\n</LinkCard>',
     description: 'Clickable card link',
     import: "import { LinkCard } from '@navikt/ds-react';",
   },
