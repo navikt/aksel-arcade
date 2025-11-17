@@ -384,3 +384,60 @@ manualChunks: {
 - Clean, maintainable, predictable
 
 **CRITICAL QUESTION FOR USER**: Should we continue trying to fix Vite's export handling, or switch approaches? I recommend Option C for a guaranteed fix.
+
+### Attempt 14 (2025-11-17) - IMPLEMENTED OPTION C
+**Solution**: Pre-bundle sandbox with esbuild before Vite processes it
+
+**Implementation**:
+1. **Created scripts/build-sandbox.mjs**
+   - Uses esbuild to bundle `src/sandboxAksel.ts` into IIFE format
+   - Outputs to `public/sandbox-bundle.js` with global name `sandboxBundle`
+   - Bundles ALL dependencies (React, Aksel, etc.) into single file
+   - Generated bundle exposes: `window.sandboxBundle = { React, createRoot, Theme, AkselComponents, AkselIcons }`
+
+2. **Updated package.json**
+   - `npm run build` now runs: `build-sandbox.mjs` → TypeScript → Vite
+   - Pre-bundling happens BEFORE Vite sees the sandbox code
+   - Vite treats `sandbox-bundle.js` as static asset (copies as-is)
+
+3. **Updated sandbox.html**
+   - Dev mode: Import `sandboxAksel.ts` as ES module (Vite processes it)
+   - Production: Load `sandbox-bundle.js` via script tag, access `window.sandboxBundle`
+   - No more dynamic imports of Vite-built bundles
+
+4. **Updated vite.config.ts**
+   - Removed `sandbox` from build inputs
+   - Vite no longer processes sandboxAksel.ts in production
+
+5. **Updated sandboxAksel.ts**
+   - Export both default and named exports for flexibility
+   - Works in both module (dev) and IIFE (prod) contexts
+
+**Why This Works**:
+- esbuild bundles everything into predictable IIFE with known global
+- No Vite processing = no code-splitting = no mangled exports
+- Simple script tag + window global = guaranteed to work
+- Dev experience unchanged (still uses Vite HMR)
+
+**Files Changed**:
+- `scripts/build-sandbox.mjs` (NEW)
+- `package.json` (build script)
+- `public/sandbox.html` (loading logic)
+- `src/sandboxAksel.ts` (export style)
+- `vite.config.ts` (removed sandbox input)
+- Installed `esbuild` package
+
+**Verification Performed**:
+- ✅ Built successfully with esbuild
+- ✅ Verified `sandbox-bundle.js` exists in dist/
+- ✅ Confirmed bundle exports correct structure
+- ✅ Pushed to GitHub (commit 2a90bb9)
+- ⏳ AWAITING: Production deployment and browser verification
+
+**Status**: ✅ DEPLOYED - Waiting for GitHub Actions to build and deploy
+
+**Next**: After deployment completes, verify at https://navikt.github.io/aksel-arcade/ that:
+1. Preview pane loads without error Alert
+2. React components render correctly
+3. Console shows "✅ Sandbox bundle loaded successfully"
+4. window.sandboxBundle contains all expected exports
