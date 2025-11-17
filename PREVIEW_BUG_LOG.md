@@ -201,4 +201,16 @@ if (keys.length === 1 && !exports.React && !exports.createRoot && !exports.Theme
 - ✅ Verified unwrap logic is in dist/sandbox.html
 - ⏳ Need to verify in actual browser that preview works
 
-**Status**: READY FOR TESTING - Fix built and ready to commit
+**Status**: ✅ DEPLOYED
+
+**Files Changed**:
+- `/Users/Sjur.Gronningseter/dev/AkselArcade/public/sandbox.html` (lines 280-291) - Added unwrap logic
+
+**Deployment**:
+- ✅ Committed: 91fd21a
+- ✅ Pushed to: navikt/aksel-arcade master branch
+- ⏳ GitHub Actions: Deploying now
+- 🔗 Monitor: https://github.com/navikt/aksel-arcade/actions
+- 🔗 Test at: https://navikt.github.io/aksel-arcade/
+
+**Expected Result**: Preview should now work - React/Aksel components should render correctly
