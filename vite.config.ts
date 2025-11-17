@@ -4,7 +4,7 @@ import path from 'path'
 
 // https://vite.dev/config/
 export default defineConfig({
-  base: '/Arcade/', // GitHub Pages base path
+  base: '/aksel-arcade/', // GitHub Pages base path
   plugins: [react()],
   resolve: {
     alias: {

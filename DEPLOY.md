@@ -21,7 +21,7 @@ git push origin master
 
 GitHub Actions will automatically build and deploy to GitHub Pages.
 
-Your app will be live at: **https://sjur-gr.github.io/Arcade/**
+Your app will be live at: **https://navikt.github.io/aksel-arcade/**
 
 ## Security ✅
 
@@ -58,14 +58,14 @@ Open http://localhost:4173 and test:
 If this is your first deployment:
 
 1. **Enable GitHub Pages**:
-   - Go to: https://github.com/sjur-gr/Arcade/settings/pages
+   - Go to: https://github.com/navikt/aksel-arcade/settings/pages
    - Source: "GitHub Actions"
    - Save
 
 2. **Push the workflow** (already created in `.github/workflows/deploy.yml`)
 
 3. **Monitor deployment**:
-   - Go to: https://github.com/sjur-gr/Arcade/actions
+   - Go to: https://github.com/navikt/aksel-arcade/actions
    - Watch the "Deploy to GitHub Pages" workflow
 
 ## Architecture
@@ -88,7 +88,7 @@ If this is your first deployment:
 
 **White screen after deploy?**
 - Check GitHub Actions logs for build errors
-- Verify `vite.config.ts` has correct `base: '/Arcade/'`
+- Verify `vite.config.ts` has correct `base: '/aksel-arcade/'`
 
 **Assets not loading?**
 - Clear browser cache (Cmd+Shift+R)
@@ -118,7 +118,7 @@ git push origin master
 ## Monitoring
 
 **After deployment, verify**:
-1. Visit https://sjur-gr.github.io/Arcade/
+1. Visit https://navikt.github.io/aksel-arcade/
 2. Open DevTools Console
 3. Check for:
    - ✅ "🔒 CSP applied: Production"
@@ -132,8 +132,8 @@ git push origin master
 
 ## Support
 
-- **GitHub Issues**: https://github.com/sjur-gr/Arcade/issues
-- **Actions Dashboard**: https://github.com/sjur-gr/Arcade/actions
+- **GitHub Issues**: https://github.com/navikt/aksel-arcade/issues
+- **Actions Dashboard**: https://github.com/navikt/aksel-arcade/actions
 
 ---
 
