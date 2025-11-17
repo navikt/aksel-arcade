@@ -46,6 +46,214 @@ export const INTRO_HOOKS_CODE = `// Define custom hooks here
 //   return [value, toggle];
 // };`
 
+export const HOOKS_DEMO_HOOKS_CODE = `import { useState } from 'react';
+
+// Custom hook for form state management
+export const useForm = (initialValues = {}) => {
+  const [values, setValues] = useState(initialValues);
+  const [errors, setErrors] = useState({});
+
+  const handleChange = (name, value) => {
+    setValues(prev => ({ ...prev, [name]: value }));
+    // Clear error when user starts typing
+    if (errors[name]) {
+      setErrors(prev => ({ ...prev, [name]: null }));
+    }
+  };
+
+  const validate = () => {
+    const newErrors = {};
+    if (!values.name?.trim()) {
+      newErrors.name = 'Namn er påkravd';
+    }
+    if (!values.email?.trim()) {
+      newErrors.email = 'E-post er påkravd';
+    } else if (!/\\S+@\\S+\\.\\S+/.test(values.email)) {
+      newErrors.email = 'Ugyldig e-postadresse';
+    }
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const reset = () => {
+    setValues(initialValues);
+    setErrors({});
+  };
+
+  return { values, errors, handleChange, validate, reset };
+};
+
+// Custom hook for toggling visibility
+export const useToggle = (initialValue = false) => {
+  const [isOn, setIsOn] = useState(initialValue);
+  
+  const toggle = () => setIsOn(prev => !prev);
+  const setOn = () => setIsOn(true);
+  const setOff = () => setIsOn(false);
+  
+  return { isOn, toggle, setOn, setOff };
+};
+
+// Custom hook for counter with min/max limits
+export const useCounter = (initialValue = 0, min = 0, max = 100) => {
+  const [count, setCount] = useState(initialValue);
+  
+  const increment = () => setCount(prev => Math.min(prev + 1, max));
+  const decrement = () => setCount(prev => Math.max(prev - 1, min));
+  const reset = () => setCount(initialValue);
+  const setValue = (value) => setCount(Math.max(min, Math.min(value, max)));
+  
+  return { count, increment, decrement, reset, setValue };
+};`
+
+export const HOOKS_DEMO_JSX_CODE = `import { useForm, useToggle, useCounter } from './hooks';
+
+export default function App() {
+  const form = useForm({ name: '', email: '', message: '' });
+  const details = useToggle(false);
+  const likes = useCounter(0, 0, 999);
+  
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (form.validate()) {
+      alert(\`Skjema sendt!\\nNamn: \${form.values.name}\\nE-post: \${form.values.email}\`);
+      form.reset();
+    }
+  };
+
+  return (
+    <BoxNew padding="space-16" background="default">
+      <VStack gap="space-12">
+        <Heading size="xlarge" level="1">
+          🎮 Aksel Arcade Demo
+        </Heading>
+        
+        <BodyLong>
+          Dette eksemplet demonstrerer tre custom hooks: <code>useForm</code>, <code>useToggle</code>, og <code>useCounter</code>.
+        </BodyLong>
+
+        {/* Counter Demo */}
+        <BoxNew
+          padding="space-8"
+          background="raised"
+          borderRadius="large"
+          borderWidth="1"
+          borderColor="neutral-subtleA"
+        >
+          <VStack gap="space-4">
+            <Heading size="medium" level="2">
+              👍 Likes: {likes.count}
+            </Heading>
+            <HStack gap="space-4">
+              <Button variant="secondary" onClick={likes.decrement} size="small">
+                👎 Minus
+              </Button>
+              <Button variant="primary" onClick={likes.increment} size="small">
+                👍 Pluss
+              </Button>
+              <Button variant="tertiary" onClick={likes.reset} size="small">
+                Reset
+              </Button>
+            </HStack>
+          </VStack>
+        </BoxNew>
+
+        {/* Toggle Demo */}
+        <BoxNew
+          padding="space-8"
+          background="raised"
+          borderRadius="large"
+          borderWidth="1"
+          borderColor="neutral-subtleA"
+        >
+          <VStack gap="space-4">
+            <HStack gap="space-4" align="center">
+              <Heading size="medium" level="2">
+                📋 Detaljar
+              </Heading>
+              <Switch checked={details.isOn} onChange={details.toggle}>
+                Vis detaljar
+              </Switch>
+            </HStack>
+            
+            {details.isOn && (
+              <Alert variant="info">
+                <Heading size="small" level="3" spacing>
+                  Om custom hooks
+                </Heading>
+                <BodyShort spacing>
+                  Custom hooks lèt deg gjenbruke stateful logikk mellom komponentar.
+                </BodyShort>
+                <BodyShort>
+                  Dei byrjar alltid med <code>use</code> og kan kalle andre hooks.
+                </BodyShort>
+              </Alert>
+            )}
+          </VStack>
+        </BoxNew>
+
+        {/* Form Demo */}
+        <BoxNew
+          padding="space-8"
+          background="raised"
+          borderRadius="large"
+          borderWidth="1"
+          borderColor="neutral-subtleA"
+        >
+          <form onSubmit={handleSubmit}>
+            <VStack gap="space-6">
+              <Heading size="medium" level="2">
+                📬 Kontaktskjema
+              </Heading>
+              
+              <TextField
+                label="Namn"
+                value={form.values.name || ''}
+                onChange={(e) => form.handleChange('name', e.target.value)}
+                error={form.errors.name}
+              />
+              
+              <TextField
+                label="E-post"
+                type="email"
+                value={form.values.email || ''}
+                onChange={(e) => form.handleChange('email', e.target.value)}
+                error={form.errors.email}
+              />
+              
+              <Textarea
+                label="Melding (valfri)"
+                value={form.values.message || ''}
+                onChange={(e) => form.handleChange('message', e.target.value)}
+                minRows={3}
+              />
+              
+              <HStack gap="space-4">
+                <Button type="submit" variant="primary">
+                  Send inn
+                </Button>
+                <Button type="button" variant="secondary" onClick={form.reset}>
+                  Nullstill
+                </Button>
+              </HStack>
+            </VStack>
+          </form>
+        </BoxNew>
+
+        <Alert variant="success">
+          <Heading size="small" level="3" spacing>
+            ✨ Prøv å interagere!
+          </Heading>
+          <BodyShort>
+            Klikk på knappane, skriv i skjemaet, og slå av/på detaljar. 
+            All state blir handtert av custom hooks definert i Hooks-fana.
+          </BodyShort>
+        </Alert>
+      </VStack>
+    </BoxNew>
+  );
+}`
+
 export const FORM_SUMMARY_JSX_CODE = `export default function App() {
   return (
     <BoxNew asChild background="default" paddingBlock="space-12">

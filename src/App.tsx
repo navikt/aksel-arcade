@@ -17,7 +17,7 @@ function App() {
   const context = useContext(AppContext)
   if (!context) throw new Error('App must be used within AppProvider')
 
-  const { project, updateProject, setProject, resetToIntro, loadFormSummaryTemplate } = context
+  const { project, updateProject, setProject, resetToIntro, loadFormSummaryTemplate, loadHooksDemo } = context
 
   // T097: Auto-save integration
   const { saveStatus, saveError } = useAutoSave(project)
@@ -90,8 +90,9 @@ function App() {
             saveStatus={saveStatus}
             projectSizeBytes={projectSizeBytes}
             onResetToIntro={resetToIntro}
-            onClearStorage={handleClearStorage}
+            onClearStorage={clearStorage}
             onLoadFormSummaryTemplate={loadFormSummaryTemplate}
+            onLoadHooksDemo={loadHooksDemo}
           />
           
           <div style={{ height: 'calc(100vh - 60px)', width: '100%' }}>

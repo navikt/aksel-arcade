@@ -6,7 +6,7 @@ import { createContext, useContext, useState, type ReactNode } from 'react'
 import type { Project } from '@/types/project'
 import type { EditorState } from '@/types/editor'
 import type { PreviewState } from '@/types/preview'
-import { createDefaultProject, createDefaultEditorState, createDefaultPreviewState, FORM_SUMMARY_JSX_CODE } from '@/utils/projectDefaults'
+import { createDefaultProject, createDefaultEditorState, createDefaultPreviewState, FORM_SUMMARY_JSX_CODE, HOOKS_DEMO_JSX_CODE, HOOKS_DEMO_HOOKS_CODE } from '@/utils/projectDefaults'
 import { loadProject } from '@/services/storage'
 import type { ComponentSnippet } from '@/types/snippets'
 
@@ -33,6 +33,7 @@ interface AppState {
   insertSnippet: (snippet: ComponentSnippet) => void
   resetToIntro: () => void
   loadFormSummaryTemplate: () => void
+  loadHooksDemo: () => void
 }
 
 const AppContext = createContext<AppState | null>(null)
@@ -152,6 +153,23 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     }
   }
 
+  const loadHooksDemo = () => {
+    const confirmed = window.confirm(
+      'Load Hooks demo? This will replace your current code.'
+    )
+    if (confirmed) {
+      setProjectState({
+        ...project,
+        jsxCode: HOOKS_DEMO_JSX_CODE,
+        hooksCode: HOOKS_DEMO_HOOKS_CODE,
+        lastModified: new Date().toISOString(),
+      })
+      // Reset editor state to JSX tab
+      setEditorState(createDefaultEditorState())
+      console.log('✅ Hooks demo loaded successfully')
+    }
+  }
+
   const value: AppState = {
     project,
     editorState,
@@ -168,6 +186,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     insertSnippet,
     resetToIntro,
     loadFormSummaryTemplate,
+    loadHooksDemo,
   }
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>

@@ -35,6 +35,7 @@ interface AppHeaderProps {
   onResetToIntro: () => void
   onClearStorage: () => void
   onLoadFormSummaryTemplate: () => void
+  onLoadHooksDemo: () => void
 }
 
 export const AppHeader = ({
@@ -47,6 +48,7 @@ export const AppHeader = ({
   onResetToIntro,
   onClearStorage,
   onLoadFormSummaryTemplate,
+  onLoadHooksDemo,
 }: AppHeaderProps) => {
   const MAX_PROJECT_SIZE = 5 * 1024 * 1024 // 5MB
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -182,6 +184,11 @@ export const AppHeader = ({
                   onSelect={onLoadFormSummaryTemplate}
                 >
                   Oppsummeringsside for søknadsdialoger
+                </ActionMenu.Item>
+                <ActionMenu.Item
+                  onSelect={onLoadHooksDemo}
+                >
+                  Hooks demo
                 </ActionMenu.Item>
               </ActionMenu.Group>
               <ActionMenu.Divider />
