@@ -151,7 +151,54 @@ src={import.meta.env.BASE_URL + 'sandbox.html'}
 6. If error, look for "❌❌❌ CRITICAL ERROR" messages
 7. Record actual error message in this log
 
-**Files Ready to Commit**:
+**Files Committed and Pushed**:
 - public/sandbox.html (enhanced logging)
 - src/components/Preview/LivePreview.tsx (fixed iframe src)
-- dist/* (built files)
+- PREVIEW_BUG_LOG.md (this log)
+
+**Deployment Status**:
+- ✅ Committed: cbcb8ec
+- ✅ Pushed to: navikt/aksel-arcade master branch
+- ⏳ GitHub Actions: Building and deploying
+- 🔗 Monitor deployment: https://github.com/navikt/aksel-arcade/actions
+- 🔗 Production URL: https://navikt.github.io/aksel-arcade/
+
+**What to Check After Deployment**:
+1. Open https://navikt.github.io/aksel-arcade/
+2. Open browser DevTools (F12) and go to Console tab
+3. Type some code in the editor (e.g., simple Button component)
+4. Watch for console messages in the preview iframe:
+   - "🚀 Starting module load, isDev: false"
+   - "🚀 Will call: loadFromBuild()"
+   - Either success: "✅ Module loaded successfully!" OR
+   - Error: "❌❌❌ CRITICAL ERROR" with details
+5. Record findings here for next iteration if needed
+
+### Attempt 9 (2025-11-17 - Current Session)
+**Theory**: Vite build wraps sandbox export in single named export (e.g., `{c: {...}}`)
+**Root Cause Found**: 
+- Built sandbox bundle exports as: `export{jh as c}` (single named export)
+- Code expected: `module.default` or direct properties on module
+- Result: `exports` was `{c: {React, createRoot, ...}}` but code tried to destructure `{React, createRoot}` from `exports` directly
+- This caused: `Cannot read properties of undefined (reading 'useState')` because `exports.React` was undefined
+
+**Fix Applied**: Added unwrapping logic in sandbox.html lines 280-291:
+```javascript
+// Extract the actual exports - Vite may wrap in named export
+let exports = module.default || module;
+
+// If exports is an object with a single key that's not our expected keys,
+// it's likely the Vite-wrapped bundle - extract it
+const keys = Object.keys(exports);
+if (keys.length === 1 && !exports.React && !exports.createRoot && !exports.Theme) {
+  exports = exports[keys[0]];
+  console.log('🔧 Unwrapped Vite bundle, new keys:', Object.keys(exports || {}).slice(0, 10));
+}
+```
+
+**Verification Performed**:
+- ✅ Built production bundle
+- ✅ Verified unwrap logic is in dist/sandbox.html
+- ⏳ Need to verify in actual browser that preview works
+
+**Status**: READY FOR TESTING - Fix built and ready to commit
