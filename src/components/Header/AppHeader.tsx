@@ -104,7 +104,7 @@ export const AppHeader = ({
         <HStack data-name="Project info wrapper" gap="space-32" align="center">
           <HStack data-name="Title wrapper" gap="space-8" align="center">
             <AkselLogoMark />
-            <Heading size="medium" level="1" style={{ color: 'var(--ax-text-brand-blue-subtle)' }}>
+            <Heading size="medium" level="1" style={{ color: 'var(--ax-text-brand-blue-subtle)', margin: 0 }}>
               Aksel Arcade
             </Heading>
           </HStack>

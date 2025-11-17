@@ -23,7 +23,7 @@ export default defineConfig({
         manualChunks: {
           'vendor-react': ['react', 'react-dom'],
           'vendor-codemirror': ['@uiw/react-codemirror', '@codemirror/lang-javascript', '@codemirror/autocomplete', '@codemirror/lint'],
-          'vendor-aksel': ['@navikt/ds-react', '@navikt/ds-css', '@navikt/ds-tokens'],
+          'vendor-aksel': ['@navikt/ds-react', '@navikt/ds-tokens'],
           'vendor-babel': ['@babel/standalone'],
         },
       },

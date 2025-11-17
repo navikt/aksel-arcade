@@ -1,6 +1,6 @@
 .editor-tabs {
-  background: var(--a-surface-default);
-  border-bottom: 1px solid var(--a-border-default);
+  background: var(--ax-bg-default);
+  border-bottom: 1px solid var(--ax-border-neutral-default);
 }
 
 .editor-tabs .navds-tabs__tablist {

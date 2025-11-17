@@ -40,7 +40,7 @@
 
 .viewport-toggle__button--active {
   background: var(--ax-bg-neutral-strong-pressed, #49515e);
-  color: var(--a-text-neutral-contrast, #ffffff);
+  color: var(--ax-text-neutral-contrast, #ffffff);
 }
 
 .viewport-toggle__button:focus-visible {

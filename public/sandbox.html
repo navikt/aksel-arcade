@@ -143,10 +143,50 @@
     let ThemeComponent = null;
     let lastComponent = null;
 
-    // Load Aksel + React from Vite dev server with proper CSS import
-    // Following Aksel docs: import "@navikt/ds-css/darkside";
-    // Use relative path to work with base path configuration
-    import('./src/sandboxAksel.ts')
+    // Load Aksel + React - detect environment
+    const isDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+    
+    console.log(`🔧 Environment: ${isDev ? 'Development' : 'Production'}`);
+    
+    // Function to load from production CDN
+    async function loadFromCDN() {
+      console.log('📦 Loading from ESM.sh CDN...');
+      
+      // Load React first
+      const React = await import('https://esm.sh/react@18.3.1');
+      const ReactDOM = await import('https://esm.sh/react-dom@18.3.1');
+      
+      // Load Aksel components
+      const AkselReact = await import('https://esm.sh/@navikt/ds-react@7.33.1?deps=react@18.3.1,react-dom@18.3.1');
+      const AkselIcons = await import('https://esm.sh/@navikt/aksel-icons@7.33.1?deps=react@18.3.1');
+      
+      // Load Darkside CSS
+      const link = document.createElement('link');
+      link.rel = 'stylesheet';
+      link.href = 'https://cdn.nav.no/aksel/@navikt/ds-css/7.33.1/index.min.css';
+      document.head.appendChild(link);
+      
+      await new Promise(resolve => link.onload = resolve);
+      console.log('✅ Darkside CSS loaded from CDN');
+      
+      return {
+        React: React.default || React,
+        createRoot: ReactDOM.createRoot,
+        Theme: AkselReact.Theme || AkselReact.default.Theme,
+        AkselComponents: AkselReact.default || AkselReact,
+        AkselIcons: AkselIcons.default || AkselIcons,
+      };
+    }
+    
+    // Function to load from Vite dev server
+    async function loadFromVite() {
+      console.log('📦 Loading from Vite dev server...');
+      const module = await import('./src/sandboxAksel.ts');
+      return module;
+    }
+    
+    // Load based on environment
+    (isDev ? loadFromVite() : loadFromCDN())
       .then((module) => {
         const { React, createRoot, Theme, AkselComponents, AkselIcons } = module;
         

@@ -2,11 +2,11 @@
 
 /* Target the Aksel Button when aria-pressed is true to match ToggleGroup active styling */
 .inspect-mode-button[aria-pressed="true"] {
-  background-color: var(--a-surface-action-subtle-active, rgb(165, 172, 182)) !important;
-  color: var(--a-text-on-action, rgb(0, 0, 0)) !important;
+  background-color: var(--ax-bg-action-subtle-active, rgb(165, 172, 182)) !important;
+  color: var(--ax-text-on-action, rgb(0, 0, 0)) !important;
 }
 
 /* Hover state when not active */
 .inspect-mode-button[aria-pressed="false"]:hover {
-  background-color: var(--a-surface-neutral-subtle-hover, rgba(0, 0, 0, 0.04)) !important;
+  background-color: var(--ax-bg-neutral-subtle-hover, rgba(0, 0, 0, 0.04)) !important;
 }

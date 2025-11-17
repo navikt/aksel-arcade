@@ -4,5 +4,5 @@
   height: 100vh;
   width: 100vw;
   overflow: hidden;
-  background: var(--a-surface-default);
+  background: var(--ax-bg-default);
 }

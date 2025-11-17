@@ -19,8 +19,8 @@
   flex-direction: column;
   align-items: flex-start;
   padding: 0.75rem 1rem;
-  background: var(--a-surface-subtle);
-  border: 1px solid var(--a-border-default);
+  background: var(--ax-bg-subtle);
+  border: 1px solid var(--ax-border-neutral-default);
   border-radius: 4px;
   cursor: pointer;
   transition: all 0.2s;
@@ -29,8 +29,8 @@
 }
 
 .component-palette__item:hover {
-  background: var(--a-surface-hover);
-  border-color: var(--a-border-strong);
+  background: var(--ax-bg-neutral-subtle-hover);
+  border-color: var(--ax-border-neutral-strong);
 }
 
 .component-palette__item-name {
@@ -41,11 +41,11 @@
 
 .component-palette__item-desc {
   font-size: 0.875rem;
-  color: var(--a-text-subtle);
+  color: var(--ax-text-neutral-subtle);
 }
 
 .component-palette__empty {
   text-align: center;
-  color: var(--a-text-subtle);
+  color: var(--ax-text-neutral-subtle);
   padding: 2rem;
 }

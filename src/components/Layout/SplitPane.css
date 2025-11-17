@@ -7,7 +7,7 @@
 /* Left panel */
 .split-pane__left {
   overflow: visible;
-  background: var(--a-surface-default);
+  background: var(--ax-bg-default);
   display: flex;
   flex-direction: column;
 }
@@ -37,7 +37,7 @@
   top: 0;
   bottom: 0;
   width: 1px;
-  background: var(--a-border-default);
+  background: var(--ax-border-neutral-default);
   transform: translateX(-0.5px);
   transition: background-color 0.2s;
   pointer-events: none;
@@ -45,17 +45,17 @@
 
 .split-pane__divider:hover::after,
 .split-pane__divider[data-resize-handle-active]::after {
-  background: var(--a-border-strong);
+  background: var(--ax-border-neutral-strong);
 }
 
 .split-pane__divider:hover::before {
-  background: var(--a-surface-hover);
+  background: var(--ax-bg-neutral-subtle-hover);
 }
 
 /* Right panel */
 .split-pane__right {
   overflow: hidden; /* Prevent outer scroll - iframe should handle internal scrolling */
-  background: var(--a-surface-subtle);
+  background: var(--ax-bg-subtle);
   display: flex;
   flex-direction: column;
 }
