@@ -1,5 +1,6 @@
 import type { Project, ProjectSizeStatus } from '@/types/project'
 import { AKSEL_METADATA, AI_INSTRUCTIONS, extractUsedComponents } from '@/data/akselMetadata'
+import { createDefaultProject } from '@/utils/projectDefaults'
 
 const STORAGE_KEY = 'aksel-arcade:project'
 const MAX_PROJECT_SIZE_BYTES = 5 * 1024 * 1024 // 5MB
@@ -317,18 +318,6 @@ export const clearStorage = (): void => {
 }
 
 // Helper functions
-
-const createDefaultProject = (): Project => ({
-  id: crypto.randomUUID(),
-  name: 'Untitled Project',
-  jsxCode: 'export default function App() {\n  return (\n    <Alert variant="info">\n      Welcome to AkselArcade! This Alert component is styled with Aksel Darkside.\n    </Alert>\n  )\n}',
-  hooksCode: '// Define custom hooks here\n// Example:\n// export const useCounter = () => {\n//   const [count, setCount] = useState(0);\n//   return { count, increment: () => setCount(c => c + 1) };\n// };',
-  viewportSize: 'MD',
-  panelLayout: 'editor-left',
-  version: '1.0.0',
-  createdAt: new Date().toISOString(),
-  lastModified: new Date().toISOString(),
-})
 
 const validateProjectSchema: (project: unknown) => asserts project is Project = (project) => {
   if (!project || typeof project !== 'object') {

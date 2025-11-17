@@ -8,5 +8,5 @@
 
 /* Hover state when not active */
 .inspect-mode-button[aria-pressed="false"]:hover {
-  background-color: var(--ax-bg-neutral-subtle-hover, rgba(0, 0, 0, 0.04)) !important;
+  background-color: var(--ax-bg-neutral-moderateA) !important;
 }
