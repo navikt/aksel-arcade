@@ -286,7 +286,8 @@ export const CodeEditor = forwardRef<CodeEditorRef, CodeEditorProps>(({
     // 2. Match props after component name: e.g., <Button | or <Button v|
     // Support component names with dots like Page.Block
     // Support prop names with hyphens like data-color
-    const propMatch = textBeforeCursor.match(/<([\w.]+)(?:\s+[\w-]+(?:=["'][^"']*["'])?\s*)*\s+([\w-]*)$/)
+    // Fixed ReDoS vulnerability by simplifying regex - use [^>]*? to skip existing props
+    const propMatch = textBeforeCursor.match(/<([\w.]+)[^>]*?\s+([\w-]*)$/)
     if (propMatch) {
       const [, componentName, partialProp] = propMatch
       const props = getComponentProps(componentName)
