@@ -25,7 +25,8 @@
     
     console.log('🔒 CSP applied:', isDev ? 'Development' : 'Production')
   </script>
-  <!-- Aksel Darkside CSS loaded via import in sandboxAksel.ts -->
+  <!-- Aksel Darkside CSS: Bundled by esbuild in production, loaded via Vite in dev -->
+  <link rel="stylesheet" href="./sandbox-bundle.css">
   <style>
     /* Set iframe canvas color to match preview container background */
     html {
