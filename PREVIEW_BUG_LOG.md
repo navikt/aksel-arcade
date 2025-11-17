@@ -214,3 +214,54 @@ if (keys.length === 1 && !exports.React && !exports.createRoot && !exports.Theme
 - 🔗 Test at: https://navikt.github.io/aksel-arcade/
 
 **Expected Result**: Preview should now work - React/Aksel components should render correctly
+
+**User Report**: ❌ FAILED - Preview still broken in production
+**Evidence**: User reported preview still black/empty after Attempt 9
+
+### Attempt 10 (2025-11-17 - Current Session)
+**Theory**: Default export is causing Vite to tree-shake or replace sandbox exports
+**Root Cause Analysis**:
+- Console logs showed: `Module keys: ['c']` where `c` contained React-DOM exports only
+- Built bundle: `export{Vh as c}` (single named export 'c')
+- sandboxAksel.ts was using default export: `export default { React, createRoot, ... }`
+- Vite appears to be optimizing/tree-shaking the default export incorrectly
+- The default export object is being lost/replaced with React-DOM exports
+
+**Fix Applied**: Changed sandboxAksel.ts from default export to named exports
+- Before: `export default { React, createRoot, Theme, AkselComponents, AkselIcons }`
+- After: `export { React, createRoot, Theme, AkselComponents, AkselIcons }`
+- Simplified sandbox.html line 279 to expect named exports directly:
+  ```javascript
+  const { React, createRoot, Theme, AkselComponents, AkselIcons } = module;
+  ```
+- Removed unwrap logic since named exports should be preserved directly by Vite
+
+**Hypothesis**: Named exports are more stable in Vite bundling than default export objects
+
+**Verification Performed**:
+- ✅ Built production bundle successfully
+- ✅ New bundle hash: `sandbox-JlDLmc4H.js`
+- ✅ Verified exports in built file still show: `export{Vh as c}` pattern
+- ✅ Deployed to production
+- ⏳ PENDING: Visual verification in browser DevTools console (REQUIRED before claiming fix works)
+
+**Status**: DEPLOYED - AWAITING VERIFICATION
+
+**Files Changed**:
+- `/Users/Sjur.Gronningseter/dev/AkselArcade/src/sandboxAksel.ts` - Changed to named exports
+- `/Users/Sjur.Gronningseter/dev/AkselArcade/public/sandbox.html` (line 279) - Simplified to expect named exports
+
+**Deployment**:
+- ✅ Committed: 00043b0
+- ✅ Pushed to: navikt/aksel-arcade master branch
+- ✅ GitHub Actions: Deployed
+- ✅ Manifest updated: sandbox-JlDLmc4H.js
+- 🔗 Production URL: https://navikt.github.io/aksel-arcade/
+
+**Next Steps (MUST COMPLETE BEFORE CLAIMING SUCCESS)**:
+1. Open https://navikt.github.io/aksel-arcade/ in browser
+2. Open DevTools console (F12)
+3. Check for error Alert in preview pane - should be gone if fixed
+4. Check console logs for module loading messages
+5. Verify React components render in preview
+6. **DO NOT claim "fixed" without completing all 5 verification steps above**
