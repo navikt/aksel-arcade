@@ -18,16 +18,16 @@ export default defineConfig({
   build: {
     // Security: Disable source maps in production
     sourcemap: false,
-    manifest: true, // Generate manifest.json for runtime asset discovery
+    manifest: true, // Generate manifest.json for runtime asset discovery (for main app assets)
     rollupOptions: {
       input: {
         main: path.resolve(__dirname, 'index.html'),
-        sandbox: path.resolve(__dirname, 'src/sandboxAksel.ts'),
+        // NOTE: sandboxAksel.ts is pre-bundled with esbuild (see scripts/build-sandbox.mjs)
+        // It's NOT included here to avoid Vite mangling the exports
       },
       output: {
         manualChunks: {
-          // NO code-splitting for React/Aksel - they must be in the sandbox bundle
-          // Only split truly independent vendor chunks that sandbox doesn't need
+          // Split codemirror and babel into separate chunks to reduce main bundle size
           'vendor-codemirror': ['@uiw/react-codemirror', '@codemirror/lang-javascript', '@codemirror/autocomplete', '@codemirror/lint'],
           'vendor-babel': ['@babel/standalone'],
         },

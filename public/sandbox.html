@@ -227,48 +227,51 @@
       };
     }
     
-    // Function to load from Vite dev server
+    // Function to load from Vite dev server (uses module import)
     async function loadFromVite() {
       console.log('📦 Loading from Vite dev server...');
       const module = await import('./src/sandboxAksel.ts');
-      return module;
+      return module.default || module;
     }
     
-    // Function to load from built assets (production via local preview or GitHub Pages)
+    // Function to load pre-bundled sandbox (production)
+    // The sandbox bundle is pre-built with esbuild and loaded as IIFE
     async function loadFromBuild() {
-      console.log('📦 Loading from built assets...');
-      const basePath = '/aksel-arcade/';
+      console.log('📦 Loading pre-bundled sandbox...');
+      // Extract base path from current location
+      // sandbox.html is at /aksel-arcade/sandbox.html
+      // sandbox-bundle.js is at /aksel-arcade/sandbox-bundle.js
+      const currentPath = window.location.pathname;
+      const basePath = currentPath.substring(0, currentPath.lastIndexOf('/') + 1);
+      console.log('📍 Base path:', basePath);
       
-      try {
-        // Fetch Vite's build manifest to find the sandbox entry point
-        const manifest = await fetch(basePath + '.vite/manifest.json').then(r => r.json());
-        console.log('📥 Manifest loaded, keys:', Object.keys(manifest));
-        
-        // Find the sandbox entry in manifest
-        const sandboxEntry = manifest['src/sandboxAksel.ts'];
-        if (!sandboxEntry || !sandboxEntry.file) {
-          throw new Error('Sandbox entry not found in manifest');
+      return new Promise((resolve, reject) => {
+        // Check if already loaded
+        if (window.sandboxBundle) {
+          console.log('✅ Sandbox bundle already loaded from window.sandboxBundle');
+          resolve(window.sandboxBundle);
+          return;
         }
         
-        // CRITICAL: Use basePath to construct correct absolute path
-        // sandbox.html is at /aksel-arcade/sandbox.html
-        // assets are at /aksel-arcade/assets/
-        // Must use basePath (not '../') to ensure correct path resolution
-        const sandboxPath = basePath + sandboxEntry.file;
-        console.log('📥 Found sandbox bundle:', sandboxPath);
-        
-        const module = await import(sandboxPath);
-        console.log('✅ Loaded sandbox from built assets');
-        console.log('🔍 Module keys:', Object.keys(module).slice(0, 10));
-        console.log('🔍 Module.React:', !!module.React, 'Module.createRoot:', !!module.createRoot);
-        console.log('🔍 Module.Theme:', !!module.Theme, 'Module.AkselComponents:', !!module.AkselComponents);
-        return module;
-      } catch (err) {
-        console.error('❌ Failed to load from built assets:', err);
-        // Fallback to CDN
-        console.log('📦 Falling back to CDN...');
-        return loadFromCDN();
-      }
+        // Load the pre-bundled sandbox script
+        const script = document.createElement('script');
+        script.src = basePath + 'sandbox-bundle.js';
+        console.log('📥 Loading script from:', script.src);
+        script.onload = () => {
+          console.log('✅ Sandbox bundle loaded successfully');
+          if (window.sandboxBundle) {
+            console.log('✅ window.sandboxBundle found, keys:', Object.keys(window.sandboxBundle));
+            resolve(window.sandboxBundle);
+          } else {
+            reject(new Error('sandboxBundle not found on window after script load'));
+          }
+        };
+        script.onerror = (err) => {
+          console.error('❌ Failed to load sandbox bundle:', err);
+          reject(err);
+        };
+        document.head.appendChild(script);
+      });
     }
     
     // Load based on environment

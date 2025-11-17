@@ -22,9 +22,10 @@ import * as AkselComponents from '@navikt/ds-react';
 // Import all Aksel icons
 import * as AkselIcons from '@navikt/aksel-icons';
 
-// Bundle all exports into a single object to prevent code-splitting
-// This prevents Vite from splitting external re-exports into vendor chunks
-const sandbox = {
+// Export for both dev (Vite module) and production (esbuild IIFE)
+// In dev: imported as ES module
+// In production: bundled as IIFE with globalName 'sandboxBundle'
+export default {
   React,
   createRoot,
   Theme,
@@ -32,4 +33,11 @@ const sandbox = {
   AkselIcons,
 };
 
-export default sandbox;
+// Also export named for flexibility
+export {
+  React,
+  createRoot,
+  Theme,
+  AkselComponents,
+  AkselIcons,
+};
