@@ -22,9 +22,8 @@ import * as AkselComponents from '@navikt/ds-react';
 // Import all Aksel icons
 import * as AkselIcons from '@navikt/aksel-icons';
 
-// ONLY export as default to avoid minification issues
-// Named exports get mangled by Vite, default export is stable
-export default {
+// Export everything explicitly to prevent Vite tree-shaking
+export {
   React,
   createRoot,
   Theme,
