@@ -250,6 +250,10 @@
           throw new Error('Sandbox entry not found in manifest');
         }
         
+        // CRITICAL: Use basePath to construct correct absolute path
+        // sandbox.html is at /aksel-arcade/sandbox.html
+        // assets are at /aksel-arcade/assets/
+        // Must use basePath (not '../') to ensure correct path resolution
         const sandboxPath = basePath + sandboxEntry.file;
         console.log('📥 Found sandbox bundle:', sandboxPath);
         
@@ -268,8 +272,12 @@
     }
     
     // Load based on environment
+    console.log('🚀 Starting module load, isDev:', isDev);
+    console.log('🚀 Will call:', isDev ? 'loadFromVite()' : 'loadFromBuild()');
+    
     (isDev ? loadFromVite() : loadFromBuild())
       .then((module) => {
+        console.log('✅ Module loaded successfully!');
         console.log('🔍 Processing loaded module...');
         console.log('🔍 Module type:', typeof module, 'Keys:', Object.keys(module || {}).slice(0, 10));
         console.log('🔍 module.default:', !!module.default, 'typeof:', typeof module.default);
@@ -322,8 +330,26 @@
         window.parent.postMessage({ type: 'SANDBOX_READY' }, window.location.origin);
       })
       .catch((err) => {
-        console.error('❌ Failed to load from Vite:', err);
-        console.error('Ensure Vite dev server is running and allow-same-origin is enabled');
+        console.error('❌❌❌ CRITICAL ERROR: Module loading failed completely!');
+        console.error('❌ Error type:', err.name);
+        console.error('❌ Error message:', err.message);
+        console.error('❌ Full error:', err);
+        console.error('❌ Stack:', err.stack);
+        console.error('❌ Environment was:', isDev ? 'Development' : 'Production');
+        
+        // Send error to parent so it's visible in main app console
+        try {
+          window.parent.postMessage({
+            type: 'RUNTIME_ERROR',
+            payload: {
+              message: `Sandbox initialization failed: ${err.message}`,
+              componentStack: null,
+              stack: err.stack || ''
+            }
+          }, window.location.origin);
+        } catch (postErr) {
+          console.error('❌ Could not even send error to parent:', postErr);
+        }
       });
 
     // Inspection state (T077)
