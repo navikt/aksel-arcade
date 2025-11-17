@@ -441,3 +441,41 @@ manualChunks: {
 2. React components render correctly
 3. Console shows "✅ Sandbox bundle loaded successfully"
 4. window.sandboxBundle contains all expected exports
+
+### Attempt 15 (2025-11-17) - CSS LOADING FIX ✅ SUCCESS
+**Problem**: Preview pane showed unstyled HTML - React components rendered but without Aksel Darkside CSS
+
+**Root Cause Found**:
+- esbuild was extracting CSS from `import '@navikt/ds-css/darkside'` into separate file: `sandbox-bundle.css`
+- The CSS file was being created (236KB) but NOT loaded in sandbox.html
+- No `<link>` tag to load the CSS file
+
+**Diagnosis Process** (using DevTools MCP):
+1. ✅ Inspected localhost:4174 preview - saw Alert component without styling
+2. ✅ Checked network requests - only main-C-QnzQak.css loading, no sandbox CSS
+3. ✅ Found `sandbox-bundle.css` exists in dist/ (236KB with Aksel Darkside styles)
+4. ✅ Confirmed CSS file contains `@navikt/ds-css/dist/darkside/index.css`
+5. ✅ Used evaluate_script to check iframe DOM - zero link tags initially
+
+**Fix Applied**: Added `<link rel="stylesheet" href="./sandbox-bundle.css">` to sandbox.html (line 29)
+
+**Verification Performed**:
+- ✅ Tested locally on localhost:4174 - CSS loads, Alert has proper styling
+- ✅ Built production bundle - verified link tag in dist/sandbox.html
+- ✅ Pushed to GitHub (commit 32a39cc)
+- ✅ Waited for GitHub Actions deployment (90 seconds)
+- ✅ Hard refreshed production with cache cleared
+- ✅ Used DevTools MCP evaluate_script to confirm link tag in production iframe
+- ✅ Verified network request: `sandbox-bundle.css` returns 200 OK
+- ✅ Screenshot confirms proper Aksel Darkside styling (blue Alert background, proper borders, icon styling)
+
+**Files Changed**:
+- `/Users/Sjur.Gronningseter/dev/AkselArcade/public/sandbox.html` (line 29) - Added CSS link tag
+
+**Result**: ✅ **FIXED** - Preview now displays components with full Aksel Darkside styling
+
+**Production URL**: https://navikt.github.io/aksel-arcade/
+**Commit**: 32a39cc
+**Deployed**: 2025-11-17
+
+**Key Learning**: esbuild with default configuration extracts CSS imports into separate files. Must explicitly load them via `<link>` tags - they're not automatically injected like in Vite dev mode.
