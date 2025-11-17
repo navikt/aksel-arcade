@@ -18,7 +18,12 @@ export default defineConfig({
   build: {
     // Security: Disable source maps in production
     sourcemap: false,
+    manifest: true, // Generate manifest.json for runtime asset discovery
     rollupOptions: {
+      input: {
+        main: path.resolve(__dirname, 'index.html'),
+        sandbox: path.resolve(__dirname, 'src/sandboxAksel.ts'),
+      },
       output: {
         manualChunks: {
           'vendor-react': ['react', 'react-dom'],
