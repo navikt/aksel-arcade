@@ -26,9 +26,9 @@ export default defineConfig({
       },
       output: {
         manualChunks: {
-          'vendor-react': ['react', 'react-dom'],
+          // NO code-splitting for React/Aksel - they must be in the sandbox bundle
+          // Only split truly independent vendor chunks that sandbox doesn't need
           'vendor-codemirror': ['@uiw/react-codemirror', '@codemirror/lang-javascript', '@codemirror/autocomplete', '@codemirror/lint'],
-          'vendor-aksel': ['@navikt/ds-react', '@navikt/ds-tokens'],
           'vendor-babel': ['@babel/standalone'],
         },
       },
