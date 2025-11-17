@@ -52,19 +52,6 @@ function App() {
     setProject(importedProject)
   }
 
-  // Handle clear storage - preserves current editor content
-  const handleClearStorage = () => {
-    const confirmed = window.confirm(
-      'Clear stored data? Your current editor content will be preserved but not saved until you make changes.'
-    )
-    if (confirmed) {
-      // Clear storage while keeping current project in memory
-      clearStorage()
-      // Note: Project remains in memory, user can continue working
-      // Next auto-save will re-save the project to clean storage
-    }
-  }
-
   return (
     <SettingsProvider>
       <ThemeProvider>
