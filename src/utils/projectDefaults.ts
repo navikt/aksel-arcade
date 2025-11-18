@@ -52,6 +52,7 @@ export const HOOKS_DEMO_HOOKS_CODE = `import { useState } from 'react';
 export const useForm = (initialValues = {}) => {
   const [values, setValues] = useState(initialValues);
   const [errors, setErrors] = useState({});
+  const [showAlert, setShowAlert] = useState(false);
 
   const handleChange = (name, value) => {
     setValues(prev => ({ ...prev, [name]: value }));
@@ -64,10 +65,10 @@ export const useForm = (initialValues = {}) => {
   const validate = () => {
     const newErrors = {};
     if (!values.name?.trim()) {
-      newErrors.name = 'Namn er påkravd';
+      newErrors.name = 'Navn er påkrevd';
     }
     if (!values.email?.trim()) {
-      newErrors.email = 'E-post er påkravd';
+      newErrors.email = 'E-post er påkrevd';
     } else if (!/\\S+@\\S+\\.\\S+/.test(values.email)) {
       newErrors.email = 'Ugyldig e-postadresse';
     }
@@ -80,7 +81,11 @@ export const useForm = (initialValues = {}) => {
     setErrors({});
   };
 
-  return { values, errors, handleChange, validate, reset };
+  const closeAlert = () => {
+    setShowAlert(false);
+  };
+
+  return { values, errors, handleChange, validate, reset, showAlert, setShowAlert, closeAlert };
 };
 
 // Custom hook for toggling visibility
@@ -113,11 +118,13 @@ export default function App() {
   const details = useToggle(false);
   const likes = useCounter(0, 0, 999);
   
-  const handleSubmit = (e) => {
-    e.preventDefault();
+  const handleSubmit = () => {
+    // Don't submit if Alert is already shown
+    if (form.showAlert) {
+      return;
+    }
     if (form.validate()) {
-      alert(\`Skjema sendt!\\nNamn: \${form.values.name}\\nE-post: \${form.values.email}\`);
-      form.reset();
+      form.setShowAlert(true);
     }
   };
 
@@ -200,7 +207,7 @@ export default function App() {
           borderWidth="1"
           borderColor="neutral-subtleA"
         >
-          <form onSubmit={handleSubmit}>
+          <form>
             <VStack gap="space-6">
               <Heading size="medium" level="2">
                 📬 Kontaktskjema
@@ -229,13 +236,24 @@ export default function App() {
               />
               
               <HStack gap="space-4">
-                <Button type="submit" variant="primary">
+                <Button type="button" variant="primary" onClick={handleSubmit}>
                   Send inn
                 </Button>
                 <Button type="button" variant="secondary" onClick={form.reset}>
                   Nullstill
                 </Button>
               </HStack>
+              
+              {form.showAlert && (
+                <Alert variant="info" size="medium" closeButton onClose={form.closeAlert}>
+                  <Heading size="small" level="3" spacing>
+                    Kamelåså!
+                  </Heading>
+                  <BodyShort>
+                    Now you just ordered thousands liters of milk!
+                  </BodyShort>
+                </Alert>
+              )}
             </VStack>
           </form>
         </BoxNew>
