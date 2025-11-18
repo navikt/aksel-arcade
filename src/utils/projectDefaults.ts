@@ -152,7 +152,7 @@ export default function App() {
                 👍 Pluss
               </Button>
               <Button variant="tertiary" onClick={likes.reset} size="small">
-                Reset
+                Nullstill
               </Button>
             </HStack>
           </VStack>
@@ -169,10 +169,10 @@ export default function App() {
           <VStack gap="space-4">
             <HStack gap="space-4" align="center">
               <Heading size="medium" level="2">
-                📋 Detaljar
+                📋 Detaljer
               </Heading>
               <Switch checked={details.isOn} onChange={details.toggle}>
-                Vis detaljar
+                Vis detaljer
               </Switch>
             </HStack>
             
@@ -182,10 +182,10 @@ export default function App() {
                   Om custom hooks
                 </Heading>
                 <BodyShort spacing>
-                  Custom hooks lèt deg gjenbruke stateful logikk mellom komponentar.
+                  Custom hooks lat deg gjenbruke stateful logikk mellom komponenter.
                 </BodyShort>
                 <BodyShort>
-                  Dei byrjar alltid med <code>use</code> og kan kalle andre hooks.
+                  De starter alltid med <code>use</code> og kan kalle andre hooks.
                 </BodyShort>
               </Alert>
             )}
@@ -207,7 +207,7 @@ export default function App() {
               </Heading>
               
               <TextField
-                label="Namn"
+                label="Navn"
                 value={form.values.name || ''}
                 onChange={(e) => form.handleChange('name', e.target.value)}
                 error={form.errors.name}
@@ -222,7 +222,7 @@ export default function App() {
               />
               
               <Textarea
-                label="Melding (valfri)"
+                label="Melding (valgfri)"
                 value={form.values.message || ''}
                 onChange={(e) => form.handleChange('message', e.target.value)}
                 minRows={3}
@@ -245,8 +245,8 @@ export default function App() {
             ✨ Prøv å interagere!
           </Heading>
           <BodyShort>
-            Klikk på knappane, skriv i skjemaet, og slå av/på detaljar. 
-            All state blir handtert av custom hooks definert i Hooks-fana.
+            Klikk på knappene, skriv i skjemaet, og slå av/på detaljer. 
+            All state blir håndtert av custom hooks definert i Hooks-fanen.
           </BodyShort>
         </Alert>
       </VStack>
@@ -254,9 +254,7 @@ export default function App() {
   );
 }`
 
-export const FORM_SUMMARY_JSX_CODE = `export default function App() {
-  return (
-    <BoxNew asChild background="default" paddingBlock="space-12">
+export const FORM_SUMMARY_JSX_CODE = `<BoxNew asChild background="default" paddingBlock="space-12">
       <Page>
         <Page.Block as="main" width="text" gutters>
           <VStack gap="8">
@@ -432,9 +430,7 @@ export const FORM_SUMMARY_JSX_CODE = `export default function App() {
           </VStack>
         </Page.Block>
       </Page>
-    </BoxNew>
-  )
-}`
+    </BoxNew>`
 
 export const createDefaultProject = (): Project => ({
   id: crypto.randomUUID(),
