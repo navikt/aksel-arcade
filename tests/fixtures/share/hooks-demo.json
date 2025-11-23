@@ -1,0 +1,41 @@
+{
+  "version": "2.0.0",
+  "files": [
+    {
+      "id": "hooks-app",
+      "name": "App.tsx",
+      "language": "tsx",
+      "content": "import { useState } from 'react'\nimport { PlaygroundCard } from './components/PlaygroundCard'\nimport { useHookGallery } from './hooks/useHookGallery'\n\nexport default function HooksPlayground() {\n  const [filter, setFilter] = useState('')\n  const hooks = useHookGallery(filter)\n\n  return (\n    <main className=\"hooks-playground\">\n      <header>\n        <h1>Hooks demo</h1>\n        <p>Toggle hooks to preview how they behave inside the Arcade preview.</p>\n      </header>\n      <section>\n        {hooks.map(hook => (\n          <PlaygroundCard key={hook.id} hook={hook} />\n        ))}\n      </section>\n    </main>\n  )\n}",
+      "order": 0
+    },
+    {
+      "id": "hooks-gallery",
+      "name": "useHookGallery.ts",
+      "language": "tsx",
+      "content": "const catalog = [\n  {\n    id: 'hook-1',\n    title: 'useDemoHook1',\n    description: 'Sample hook for behavioral preview 1',\n    code: () => console.log('demo-1')\n  },\n  {\n    id: 'hook-2',\n    title: 'useDemoHook2',\n    description: 'Sample hook for behavioral preview 2',\n    code: () => console.log('demo-2')\n  },\n  {\n    id: 'hook-3',\n    title: 'useDemoHook3',\n    description: 'Sample hook for behavioral preview 3',\n    code: () => console.log('demo-3')\n  },\n  {\n    id: 'hook-4',\n    title: 'useDemoHook4',\n    description: 'Sample hook for behavioral preview 4',\n    code: () => console.log('demo-4')\n  },\n  {\n    id: 'hook-5',\n    title: 'useDemoHook5',\n    description: 'Sample hook for behavioral preview 5',\n    code: () => console.log('demo-5')\n  },\n  {\n    id: 'hook-6',\n    title: 'useDemoHook6',\n    description: 'Sample hook for behavioral preview 6',\n    code: () => console.log('demo-6')\n  },\n  {\n    id: 'hook-7',\n    title: 'useDemoHook7',\n    description: 'Sample hook for behavioral preview 7',\n    code: () => console.log('demo-7')\n  },\n  {\n    id: 'hook-8',\n    title: 'useDemoHook8',\n    description: 'Sample hook for behavioral preview 8',\n    code: () => console.log('demo-8')\n  },\n  {\n    id: 'hook-9',\n    title: 'useDemoHook9',\n    description: 'Sample hook for behavioral preview 9',\n    code: () => console.log('demo-9')\n  },\n  {\n    id: 'hook-10',\n    title: 'useDemoHook10',\n    description: 'Sample hook for behavioral preview 10',\n    code: () => console.log('demo-10')\n  },\n  {\n    id: 'hook-11',\n    title: 'useDemoHook11',\n    description: 'Sample hook for behavioral preview 11',\n    code: () => console.log('demo-11')\n  },\n  {\n    id: 'hook-12',\n    title: 'useDemoHook12',\n    description: 'Sample hook for behavioral preview 12',\n    code: () => console.log('demo-12')\n  }\n]\n\nexport function useHookGallery(filter) {\n  if (!filter) {\n    return catalog\n  }\n  return catalog.filter(entry => entry.title.toLowerCase().includes(filter.toLowerCase()))\n}",
+      "order": 1
+    },
+    {
+      "id": "hooks-styles",
+      "name": "App.css",
+      "language": "css",
+      "content": ".hooks-playground {\n  display: flex;\n  flex-direction: column;\n  gap: 1.5rem;\n  padding: 2rem;\n}\n\n.hooks-playground header {\n  border-bottom: 1px solid var(--ax-border-neutral-subtle);\n  padding-bottom: 1rem;\n}\n\n.hooks-playground section {\n  display: grid;\n  gap: 1rem;\n  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));\n}",
+      "order": 2
+    }
+  ],
+  "activeFileId": "hooks-app",
+  "preview": {
+    "viewport": "LG",
+    "zoom": 1,
+    "theme": "dark",
+    "sandboxFlags": {
+      "animations": true
+    }
+  },
+  "settings": {
+    "autosave": true,
+    "linting": true,
+    "showLineNumbers": true
+  },
+  "updatedAt": 1763934563071
+}

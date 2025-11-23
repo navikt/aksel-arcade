@@ -2,7 +2,6 @@ import { useContext, useState, useEffect } from 'react'
 import { Page } from '@navikt/ds-react'
 import { AppContext } from './hooks/useProject'
 import { useAutoSave } from './hooks/useAutoSave'
-import { SettingsProvider } from './contexts/SettingsContext'
 import { ThemeProvider } from './components/Layout/ThemeProvider'
 import { AppHeader } from './components/Header/AppHeader'
 import { EditorPane } from './components/Editor/EditorPane'
@@ -17,7 +16,17 @@ function App() {
   const context = useContext(AppContext)
   if (!context) throw new Error('App must be used within AppProvider')
 
-  const { project, updateProject, setProject, resetToIntro, loadFormSummaryTemplate, loadHooksDemo } = context
+  const {
+    project,
+    updateProject,
+    setProject,
+    resetToIntro,
+    loadFormSummaryTemplate,
+    loadHooksDemo,
+    shareHydration,
+    applySharedSnapshot,
+    dismissShareHydration,
+  } = context
 
   // T097: Auto-save integration
   const { saveStatus, saveError } = useAutoSave(project)
@@ -53,23 +62,44 @@ function App() {
   }
 
   return (
-    <SettingsProvider>
-      <ThemeProvider>
-        <Page.Block gutters={false} style={{ width: '100%', height: '100vh' }}>
-          {sizeWarning && (
-            <WarningNotification 
-              message={sizeWarning} 
-              onClose={() => setSizeWarning(null)} 
-            />
-          )}
-          
-          {saveError && (
-            <WarningNotification 
-              message={`Save error: ${saveError}`}
-            />
-          )}
-          
-          <AppHeader 
+    <ThemeProvider>
+      <Page.Block gutters={false} style={{ width: '100%', height: '100vh' }}>
+        {shareHydration.status === 'ready' && shareHydration.snapshot && (
+          <WarningNotification
+            variant="warning"
+            message="Load shared project?"
+            description={`Loading this shared snapshot will replace your current work. Last updated ${formatShareTimestamp(shareHydration.snapshot.updatedAt)}.`}
+            actions={[
+              { label: 'Load shared project', variant: 'primary', onClick: applySharedSnapshot },
+              { label: 'Keep my work', variant: 'secondary', onClick: dismissShareHydration },
+            ]}
+            onClose={dismissShareHydration}
+          />
+        )}
+
+        {shareHydration.status === 'error' && (
+          <WarningNotification
+            variant="error"
+            message="Share link could not be opened"
+            description={shareHydration.error?.message}
+            onClose={dismissShareHydration}
+          />
+        )}
+
+        {sizeWarning && (
+          <WarningNotification
+            message={sizeWarning}
+            onClose={() => setSizeWarning(null)}
+          />
+        )}
+        
+        {saveError && (
+          <WarningNotification 
+            message={`Save error: ${saveError}`}
+          />
+        )}
+        
+        <AppHeader 
             projectName={project.name} 
             onProjectNameChange={handleProjectNameChange}
             currentProject={project}
@@ -80,22 +110,32 @@ function App() {
             onClearStorage={clearStorage}
             onLoadFormSummaryTemplate={loadFormSummaryTemplate}
             onLoadHooksDemo={loadHooksDemo}
+        />
+
+        <div style={{ height: 'calc(100vh - 60px)', width: '100%' }}>
+          <SplitPane
+            left={<EditorPane />}
+            right={<PreviewPane />}
+            defaultLeftWidth={50}
+            minLeftWidth={20}
+            minRightWidth={20}
           />
-          
-          <div style={{ height: 'calc(100vh - 60px)', width: '100%' }}>
-            <SplitPane
-              left={<EditorPane />}
-              right={<PreviewPane />}
-              defaultLeftWidth={50}
-              minLeftWidth={20}
-              minRightWidth={20}
-            />
-          </div>
-        </Page.Block>
-      </ThemeProvider>
-    </SettingsProvider>
+        </div>
+      </Page.Block>
+    </ThemeProvider>
   )
 }
 
 export default App
+
+const formatShareTimestamp = (timestamp: number): string => {
+  try {
+    return new Intl.DateTimeFormat(undefined, {
+      dateStyle: 'medium',
+      timeStyle: 'short',
+    }).format(new Date(timestamp))
+  } catch {
+    return new Date(timestamp).toLocaleString()
+  }
+}
 

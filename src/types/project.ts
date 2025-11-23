@@ -27,3 +27,73 @@ export interface ProjectSizeStatus {
   message?: string
   warning?: string
 }
+
+export type ProjectFileLanguage = 'tsx' | 'css' | 'json'
+
+export interface ProjectFileSnapshot {
+  id: string
+  name: string
+  language: ProjectFileLanguage
+  content: string
+  order: number
+  isReadonly?: boolean
+}
+
+export interface ProjectPreviewSnapshot {
+  viewport: ViewportSize
+  zoom: number
+  theme: 'light' | 'dark'
+  sandboxFlags: Record<string, boolean>
+}
+
+export interface ProjectSettingsSnapshot {
+  autosave: boolean
+  linting: boolean
+  showLineNumbers: boolean
+}
+
+export interface ProjectSnapshot {
+  version: string
+  files: ProjectFileSnapshot[]
+  activeFileId: string
+  preview: ProjectPreviewSnapshot
+  settings: ProjectSettingsSnapshot
+  updatedAt: number
+}
+
+export type CompressionStrategyId =
+  | 'lz-string-uri'
+  | 'fflate-deflate-b91'
+  | 'lzma-worker-b64url'
+  | 'brotli-wasm-b64url'
+  | 'ast-minify-lz-string'
+
+export interface SharePayloadEnvelope {
+  formatVersion: number
+  metadataVersion: number
+  checksum: string
+  compressed: string
+  approxBytes: number
+  strategyId: CompressionStrategyId
+  warningThresholdHit: boolean
+  warningThreshold: number
+  charLimit: number
+}
+
+export interface ShareUrlMetadata {
+  formatVersion: number
+  metadataVersion: number
+  checksum: string
+  payload: string
+  strategyId: CompressionStrategyId
+  warningThresholdHit: boolean
+  warningThreshold?: number
+  charLimit?: number
+}
+
+export interface CompressionExperimentResult {
+  strategyId: CompressionStrategyId
+  estimatedChars: number
+  actualChars: number
+  encodeMs: number
+}

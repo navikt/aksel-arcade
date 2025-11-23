@@ -1,5 +1,1 @@
-.project-controls {
-  display: flex;
-  gap: var(--ax-space-2);
-  align-items: center;
-}
+/* Intentionally left blank. Share popover styles now live in AppHeader.css */
