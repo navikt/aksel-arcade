@@ -69,3 +69,23 @@
    - Reload with DevTools open and verify the `?share=` query parameter is present. Look for checksum mismatch logs; if present, the app intentionally prevents hydration and shows the tamper error message.
 5. **Share query parameter not cleared**
    - Ensure `useProject` ran the `history.replaceState` call after decoding. If you navigated via hash routing, manually call `window.history.replaceState(null, document.title, window.location.pathname)` and reopen the Share link to confirm the fix.
+
+## Packed Snapshot Troubleshooting
+1. **Count suspect quotes quickly**
+   - When you collect a failing packed payload, run a one-liner to count unescaped quotes before `repairPackedSnapshotJson` touches it:
+     ```sh
+     node - <<'NODE'
+     const payload = process.argv[2]
+     const stray = (payload.match(/className="/g) ?? []).length
+     console.log('Unescaped className quotes:', stray)
+     NODE "$CORRUPTED_PAYLOAD"
+     ```
+   - This matches the snippet captured in T065; the full regeneration script (documented beside `tests/integration/share-decode.test.tsx`) rewrites `tests/fixtures/share/packed-with-unescaped-quotes.json` whenever schemas change.
+2. **Force a specific compression strategy**
+   - In DevTools console, set `window.__akselShareDebug.forceStrategyId = 'packed-deflate-b91'` and reopen the Share popover. The helper also exposes `currentStrategyId`, `lastLink`, and `repairApplied` so you can double-check what the hook is doing during QA—this is the same deterministic hook referenced in T064 when Playwright selectors were stabilized via `data-testid="project-controls-settings"`.
+3. **Decode payloads offline**
+   - Use the existing bench harness to reproduce encode/decode pipelines without the UI: `npm run share-strategy-bench`. The bundled runner (`scripts/share-strategy-bench.mjs`) caches its compiled entry under `node_modules/.cache/aksel-arcade/`, exposing the same helpers T065 relies on for generating canonical packed JSON snippets.
+4. **Verify repair logic end-to-end**
+   - Run `npx vitest run tests/integration/share-decode.test.tsx` to execute the regression from T065 (fixture: `tests/fixtures/share/packed-with-unescaped-quotes.json`); the test also documents the Node bundle recipe for rebuilding the fixture.
+   - For manual smoke tests (T063), start `npm run dev`, load the Summary template, force the packed strategy, copy the link, and open it in a clean profile. Inspect `localStorage.telemetryQueue` to confirm `{ strategyId, repairApplied }` are recorded and that the warning banner clears once hydration succeeds.
+   - Document any findings in `specs/001-share-project-url/compression-log.md` and reference T063–T065 so future contributors know where to continue the investigation.

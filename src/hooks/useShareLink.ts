@@ -30,6 +30,17 @@ type PendingGeneration = {
 export type ShareLinkStatus = 'idle' | 'generating' | 'warning' | 'ready' | 'oversize' | 'error'
 export type ClipboardStatus = 'idle' | 'copying' | 'copied' | 'error'
 
+type ShareDebugHandle = {
+  forceStrategyId?: CompressionStrategyId
+  currentStrategyId?: CompressionStrategyId
+  lastToken?: string
+  lastLink?: string
+  lastEnvelope?: SharePayloadEnvelope
+  warningThresholdHit?: boolean
+  forceWarningThresholdHit?: boolean
+  repairApplied?: boolean
+}
+
 export type ShareLinkErrorCode =
   | 'unavailable'
   | 'generation-failed'
@@ -84,6 +95,7 @@ export const useShareLink = (options?: UseShareLinkOptions) => {
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const pendingGenerationRef = useRef<PendingGeneration | null>(null)
   const lastResultRef = useRef<{
+    contentSignature: string
     checksum: string
     link: string
     token: string
@@ -261,9 +273,9 @@ export const useShareLink = (options?: UseShareLinkOptions) => {
       const snapshot = await Promise.resolve(snapshotBuilder())
       await applyShareDebugDelay()
       const serialized = serializeSnapshot(snapshot)
-      const checksum = await computeChecksum(serialized)
+      const contentSignature = await computeChecksum(serialized)
 
-      if (lastResultRef.current && lastResultRef.current.checksum === checksum) {
+      if (lastResultRef.current && lastResultRef.current.contentSignature === contentSignature) {
         emitGenerationTelemetry({
           outcome: 'success',
           approxChars: lastResultRef.current?.approxChars,
@@ -324,14 +336,17 @@ export const useShareLink = (options?: UseShareLinkOptions) => {
 
       const viableCandidates = rankedStrategies.filter(est => est.estimatedChars <= charLimit)
       const updateEstimateState = (estimate: StrategyEstimate) => {
+        const thresholdHit = estimate.estimatedChars >= SHARE_URL_WARNING_THRESHOLD
+        const warningActive = thresholdHit || isDebugWarningForced()
         setState(prev => ({
           ...prev,
-          status: estimate.estimatedChars >= SHARE_URL_WARNING_THRESHOLD ? 'warning' : 'generating',
+          status: warningActive ? 'warning' : 'generating',
           estimatedChars: estimate.estimatedChars,
-          warningThresholdHit: estimate.estimatedChars >= SHARE_URL_WARNING_THRESHOLD,
+          warningThresholdHit: warningActive,
           strategyId: estimate.strategy.id,
           approxChars: prev.approxChars,
         }))
+        setShareDebugCurrentStrategy(estimate.strategy.id)
       }
 
       updateEstimateState(viableCandidates[0])
@@ -349,7 +364,6 @@ export const useShareLink = (options?: UseShareLinkOptions) => {
           const envelope = await encodeWithStrategy({
             snapshot,
             serialized,
-            checksum,
             strategy: estimate.strategy,
           })
           const finalized = finalizeShareToken(envelope, options?.baseUrl)
@@ -368,9 +382,12 @@ export const useShareLink = (options?: UseShareLinkOptions) => {
           }
 
           const shouldWarn =
-            finalized.warningThresholdHit || estimate.estimatedChars >= SHARE_URL_WARNING_THRESHOLD
+            isDebugWarningForced() ||
+            finalized.warningThresholdHit ||
+            estimate.estimatedChars >= SHARE_URL_WARNING_THRESHOLD
 
           lastResultRef.current = {
+            contentSignature,
             checksum: envelope.checksum,
             link: finalized.link,
             token: finalized.token,
@@ -379,6 +396,14 @@ export const useShareLink = (options?: UseShareLinkOptions) => {
             warningThresholdHit: shouldWarn,
             strategyId: estimate.strategy.id,
           }
+
+          recordShareDebugResult({
+            envelope: finalized.envelope,
+            link: finalized.link,
+            token: finalized.token,
+            strategyId: estimate.strategy.id,
+            warningThresholdHit: shouldWarn,
+          })
 
           emitGenerationTelemetry({
             outcome: 'success',
@@ -469,6 +494,7 @@ export const useShareLink = (options?: UseShareLinkOptions) => {
     if (!lastResult) {
       return undefined
     }
+    setShareDebugCurrentStrategy(lastResult.strategyId)
     setState(prev => ({
       ...prev,
       status: 'ready',
@@ -561,7 +587,6 @@ type EstimateAdjuster = (strategyId: CompressionStrategyId, baseEstimate: number
 interface EncodeWithStrategyInput {
   snapshot: ProjectSnapshot
   serialized: string
-  checksum: string
   strategy: CompressionStrategy
 }
 
@@ -571,7 +596,7 @@ const rankCompressionStrategies = (
   adjustEstimate?: EstimateAdjuster,
 ): StrategyEstimate[] => {
   const strategies = listCompressionStrategies()
-  return strategies
+  const estimates = strategies
     .map(strategy => {
       const basePayload = Math.ceil(Math.max(0, strategy.estimateSize(serializedLength)))
       const adjustedPayload = adjustEstimate ? adjustEstimate(strategy.id, basePayload) : basePayload
@@ -583,16 +608,70 @@ const rankCompressionStrategies = (
       }
     })
     .sort((a, b) => a.estimatedChars - b.estimatedChars)
+  return applyShareDebugStrategyOverride(estimates)
 }
 
-const encodeWithStrategy = async ({ snapshot, serialized, checksum, strategy }: EncodeWithStrategyInput) => {
+const encodeWithStrategy = async ({ snapshot, serialized, strategy }: EncodeWithStrategyInput) => {
   const result = await strategy.encode({ snapshot, serialized })
-  return encodeSharePayload(snapshot, {
-    serialized: result.serialized,
-    checksum,
-    compressed: result.payload,
-    strategyId: strategy.id,
-  })
+    const checksumSource = result.checksumSource ?? result.serialized ?? serialized
+    return encodeSharePayload(snapshot, {
+      serialized: result.serialized,
+      checksumSource,
+      compressed: result.payload,
+      strategyId: strategy.id,
+    })
+}
+
+const applyShareDebugStrategyOverride = (estimates: StrategyEstimate[]): StrategyEstimate[] => {
+  const handle = resolveShareDebugHandle()
+  if (!handle?.forceStrategyId) {
+    return estimates
+  }
+  const forcedIndex = estimates.findIndex(entry => entry.strategy.id === handle.forceStrategyId)
+  if (forcedIndex <= 0) {
+    return estimates
+  }
+  const forced = estimates[forcedIndex]
+  return [forced, ...estimates.slice(0, forcedIndex), ...estimates.slice(forcedIndex + 1)]
+}
+
+const resolveShareDebugHandle = (): ShareDebugHandle | undefined => {
+  if (import.meta.env.PROD || typeof window === 'undefined') {
+    return undefined
+  }
+  if (!window.__akselShareDebug) {
+    window.__akselShareDebug = {}
+  }
+  return window.__akselShareDebug
+}
+
+const setShareDebugCurrentStrategy = (strategyId: CompressionStrategyId) => {
+  const handle = resolveShareDebugHandle()
+  if (handle) {
+    handle.currentStrategyId = strategyId
+  }
+}
+
+const recordShareDebugResult = (payload: {
+  envelope: SharePayloadEnvelope
+  link: string
+  token: string
+  strategyId: CompressionStrategyId
+  warningThresholdHit: boolean
+}) => {
+  const handle = resolveShareDebugHandle()
+  if (!handle) {
+    return
+  }
+  handle.currentStrategyId = payload.strategyId
+  handle.lastLink = payload.link
+  handle.lastToken = payload.token
+  handle.lastEnvelope = payload.envelope
+  handle.warningThresholdHit = payload.warningThresholdHit
+}
+
+const isDebugWarningForced = (): boolean => {
+  return Boolean(resolveShareDebugHandle()?.forceWarningThresholdHit)
 }
 
 const finalizeShareToken = (envelope: SharePayloadEnvelope, baseUrl?: string) => {

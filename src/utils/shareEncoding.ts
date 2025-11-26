@@ -15,6 +15,7 @@ const SHARE_TOKEN_PLACEHOLDER = '__SHARE_TOKEN__'
 interface EncodeOptions {
   serialized?: string
   checksum?: string
+  checksumSource?: string
   strategyId?: CompressionStrategyId
   warningThresholdHit?: boolean
   warningThreshold?: number
@@ -67,7 +68,8 @@ export const encodeSharePayload = async (
   options?: EncodeOptions
 ): Promise<SharePayloadEnvelope> => {
   const json = options?.serialized ?? serializeSnapshot(snapshot)
-  const checksum = options?.checksum ?? (await computeChecksum(json))
+  const checksumPayload = options?.checksumSource ?? json
+  const checksum = options?.checksum ?? (await computeChecksum(checksumPayload))
   const compressed = options?.compressed ?? compressToEncodedURIComponent(json)
 
   return {
@@ -97,15 +99,9 @@ export const createShareToken = (envelope: SharePayloadEnvelope): string => {
 
 export const buildShareUrl = (token: string, baseUrl?: string): string => {
   const fallback = typeof window !== 'undefined' ? window.location.href : 'http://localhost:5173/'
-  const target = baseUrl ?? fallback
-  const url = new URL(target)
-  const searchParams = new URLSearchParams(url.search)
-  searchParams.delete(SHARE_URL_PARAM)
-  const existingQuery = searchParams.toString()
-  const queryPrefix = existingQuery ? `?${existingQuery}&` : '?'
-  const hash = url.hash ?? ''
-
-  return `${url.origin}${url.pathname}${queryPrefix}${SHARE_URL_PARAM}=${token}${hash}`
+  const url = new URL(baseUrl ?? fallback)
+  url.searchParams.set(SHARE_URL_PARAM, token)
+  return url.toString()
 }
 
 export const estimateShareUrlLength = (serializedLength: number, baseUrl?: string): number => {
@@ -115,7 +111,9 @@ export const estimateShareUrlLength = (serializedLength: number, baseUrl?: strin
 
 export const estimateShareUrlLengthFromPayload = (payloadLength: number, baseUrl?: string): number => {
   const sampleUrl = buildShareUrl(SHARE_TOKEN_PLACEHOLDER, baseUrl)
-  const baseLength = sampleUrl.length - SHARE_TOKEN_PLACEHOLDER.length
+  const encodedPlaceholder = encodeURIComponent(SHARE_TOKEN_PLACEHOLDER)
+  const placeholderIndex = sampleUrl.indexOf(encodedPlaceholder)
+  const baseLength = placeholderIndex === -1 ? sampleUrl.length : sampleUrl.length - encodedPlaceholder.length
   const normalizedPayload = Math.max(0, payloadLength)
   return baseLength + SHARE_TOKEN_FIXED_OVERHEAD + normalizedPayload
 }

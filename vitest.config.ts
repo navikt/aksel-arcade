@@ -7,7 +7,7 @@ export default mergeConfig(
     test: {
       globals: true,
       environment: 'jsdom',
-      setupFiles: [],
+      setupFiles: ['tests/setup/wasmFetchPolyfill.ts'],
       include: ['tests/**/*.test.{ts,tsx}'],
     },
   })

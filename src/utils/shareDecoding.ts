@@ -1,5 +1,4 @@
-import { decompressFromEncodedURIComponent } from 'lz-string'
-import type { ProjectSnapshot, ShareUrlMetadata } from '@/types/project'
+import type { CompressionStrategyId, ProjectSnapshot, ShareUrlMetadata } from '@/types/project'
 import {
   computeChecksum,
   SHARE_FORMAT_VERSION,
@@ -8,6 +7,13 @@ import {
   decodeShareTokenMetadata,
   DEFAULT_COMPRESSION_STRATEGY_ID,
 } from '@/utils/shareEncoding'
+import { getCompressionStrategy } from '@/services/compressionStrategies'
+import {
+  serializePackedSnapshot,
+  consumePackedSnapshotRepairState,
+  resetPackedSnapshotRepairState,
+} from '@/utils/snapshotPacking'
+import { recordShareDecodeTelemetry } from '@/services/telemetry'
 
 export type ShareDecodeErrorCode =
   | 'missing-token'
@@ -61,18 +67,22 @@ export const decodeShareToken = async (token: string): Promise<ShareDecodeResult
     }
   }
 
-  try {
-    const decompressed = decompressFromEncodedURIComponent(metadata.payload)
-    if (!decompressed) {
-      return {
-        metadata,
-        checksumValid: false,
-        error: createDecodeError('decode-failed'),
-      }
-    }
+  let repairApplied = false
 
-    const computedChecksum = await computeChecksum(decompressed)
+  try {
+    const { snapshot, repairApplied: packedRepairApplied } = await decodeSnapshotWithStrategy(metadata)
+    repairApplied = packedRepairApplied
+    const checksumPayload = getChecksumPayloadForStrategy(snapshot, metadata.strategyId)
+    const computedChecksum = await computeChecksum(checksumPayload)
+
     if (computedChecksum !== metadata.checksum) {
+      recordShareDecodeTelemetry({
+        strategyId: metadata.strategyId,
+        repairApplied,
+        checksumValid: false,
+        errorCode: 'checksum-mismatch',
+      })
+      updateShareDebugRepairState(repairApplied)
       return {
         metadata,
         checksumValid: false,
@@ -80,26 +90,68 @@ export const decodeShareToken = async (token: string): Promise<ShareDecodeResult
       }
     }
 
-    const snapshot = JSON.parse(decompressed) as ProjectSnapshot
+    recordShareDecodeTelemetry({
+      strategyId: metadata.strategyId,
+      repairApplied,
+      checksumValid: true,
+    })
+    updateShareDebugRepairState(repairApplied)
+
     return {
       metadata,
       snapshot,
       checksumValid: true,
     }
   } catch (error) {
-    if (error instanceof SyntaxError) {
+    recordShareDecodeTelemetry({
+      strategyId: metadata.strategyId,
+      repairApplied,
+      checksumValid: false,
+      errorCode: 'decode-failed',
+    })
+    updateShareDebugRepairState(repairApplied)
+    if (error instanceof Error && error.message === 'unknown-strategy') {
       return {
         metadata,
         checksumValid: false,
         error: createDecodeError('decode-failed'),
       }
     }
+
     return {
       metadata,
       checksumValid: false,
       error: createDecodeError('decode-failed'),
     }
   }
+}
+
+const decodeSnapshotWithStrategy = async (
+  metadata: ShareUrlMetadata,
+): Promise<{ snapshot: ProjectSnapshot; repairApplied: boolean }> => {
+  const strategy = getCompressionStrategy(metadata.strategyId)
+  if (!strategy) {
+    throw new Error('unknown-strategy')
+  }
+
+  resetPackedSnapshotRepairState()
+  const snapshot = await strategy.decode(metadata.payload)
+  const repairApplied = consumePackedSnapshotRepairState()
+  return { snapshot, repairApplied }
+}
+
+const getChecksumPayloadForStrategy = (
+  snapshot: ProjectSnapshot,
+  strategyId?: CompressionStrategyId,
+): string => {
+  if (usesPackedSnapshotChecksum(strategyId)) {
+    return serializePackedSnapshot(snapshot)
+  }
+  return JSON.stringify(snapshot)
+}
+
+const usesPackedSnapshotChecksum = (strategyId?: CompressionStrategyId): boolean => {
+  return typeof strategyId === 'string' && strategyId.startsWith('packed-')
 }
 
 export const stripShareQueryParam = (): void => {
@@ -226,4 +278,14 @@ const createDecodeError = (code: ShareDecodeErrorCode): ShareDecodeError => {
         message: 'We could not decode this share link. Please try again or request a new link.',
       }
   }
+}
+
+const updateShareDebugRepairState = (repairApplied: boolean) => {
+  if (typeof window === 'undefined' || import.meta.env.PROD) {
+    return
+  }
+  if (!window.__akselShareDebug) {
+    window.__akselShareDebug = {}
+  }
+  window.__akselShareDebug.repairApplied = repairApplied
 }

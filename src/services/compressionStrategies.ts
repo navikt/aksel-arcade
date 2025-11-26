@@ -2,6 +2,7 @@ import { compressToEncodedURIComponent, decompressFromEncodedURIComponent } from
 import { deflateSync, inflateSync, strFromU8, strToU8 } from 'fflate'
 import type { ProjectSnapshot, CompressionStrategyId, ProjectFileSnapshot } from '@/types/project'
 import { toBase64Url, fromBase64Url } from '@/utils/base64'
+import { serializePackedSnapshot, unpackSnapshot } from '@/utils/snapshotPacking'
 
 interface CompressionEncodeInput {
   snapshot: ProjectSnapshot
@@ -11,6 +12,7 @@ interface CompressionEncodeInput {
 export interface CompressionEncodeResult {
   payload: string
   serialized: string
+  checksumSource?: string
 }
 
 export interface CompressionStrategy {
@@ -56,7 +58,7 @@ const strategyRegistry: Record<CompressionStrategyId, CompressionStrategy> = {
   'fflate-deflate-b91': {
     id: 'fflate-deflate-b91',
     label: 'Deflate + Base91',
-    estimateSize: (bytes) => Math.ceil(bytes * 0.52) + 95,
+    estimateSize: (bytes) => Math.ceil(bytes * 0.82) + 120,
     encode: async (input) => {
       const serialized = ensureSerialized(input)
       const compressed = deflateSync(strToU8(serialized, true), { level: 6 })
@@ -132,6 +134,74 @@ const strategyRegistry: Record<CompressionStrategyId, CompressionStrategy> = {
     avgCpuMs: { encode: 9, decode: 4 },
     libraryCostKb: 4,
     lossy: true,
+  },
+  'packed-deflate-b91': {
+    id: 'packed-deflate-b91',
+    label: 'Snapshot pack + Deflate + Base91',
+    estimateSize: (bytes) => Math.ceil(bytes * 0.7) + 120,
+    encode: async (input) => {
+      const serialized = ensureSerialized(input)
+      const packed = serializePackedSnapshot(input.snapshot)
+      if (import.meta.env.DEV) {
+        const marker = 'BodyShort>'
+        const index = packed.indexOf(marker)
+        if (index !== -1) {
+          console.debug('[packed-deflate-b91] snippet', packed.slice(Math.max(0, index - 20), index + 40))
+        }
+      }
+      const compressed = deflateSync(strToU8(packed, true), { level: 9 })
+      const payload = encodeBase91(compressed)
+      return { payload, serialized, checksumSource: packed }
+    },
+    decode: async (payload) => {
+      const compressed = decodeBase91(payload)
+      const packed = strFromU8(inflateSync(compressed), true)
+      return unpackSnapshot(packed)
+    },
+    avgCpuMs: { encode: 13, decode: 8 },
+    libraryCostKb: 9,
+  },
+  'packed-brotli-q11-b91': {
+    id: 'packed-brotli-q11-b91',
+    label: 'Snapshot pack + Brotli (q11) + Base91',
+    estimateSize: (bytes) => Math.ceil(bytes * 0.5) + 120,
+    encode: async (input) => {
+      const serialized = ensureSerialized(input)
+      const packed = serializePackedSnapshot(input.snapshot)
+      const module = await loadBrotliModule()
+      const compressed = module.compress(textEncoder.encode(packed), { quality: 11 })
+      const payload = encodeBase91(compressed)
+      return { payload, serialized, checksumSource: packed }
+    },
+    decode: async (payload) => {
+      const module = await loadBrotliModule()
+      const bytes = decodeBase91(payload)
+      const packed = textDecoder.decode(module.decompress(bytes))
+      return unpackSnapshot(packed)
+    },
+    avgCpuMs: { encode: 15, decode: 6 },
+    libraryCostKb: 1032,
+  },
+  'packed-brotli-q11-b64url': {
+    id: 'packed-brotli-q11-b64url',
+    label: 'Snapshot pack + Brotli (q11) + Base64url',
+    estimateSize: (bytes) => Math.ceil(bytes * 0.4) + 85,
+    encode: async (input) => {
+      const serialized = ensureSerialized(input)
+      const packed = serializePackedSnapshot(input.snapshot)
+      const module = await loadBrotliModule()
+      const compressed = module.compress(textEncoder.encode(packed), { quality: 11 })
+      const payload = toBase64Url(compressed)
+      return { payload, serialized, checksumSource: packed }
+    },
+    decode: async (payload) => {
+      const module = await loadBrotliModule()
+      const bytes = fromBase64Url(payload)
+      const packed = textDecoder.decode(module.decompress(bytes))
+      return unpackSnapshot(packed)
+    },
+    avgCpuMs: { encode: 15, decode: 6 },
+    libraryCostKb: 1032,
   },
 }
 

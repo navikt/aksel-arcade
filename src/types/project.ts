@@ -67,6 +67,9 @@ export type CompressionStrategyId =
   | 'lzma-worker-b64url'
   | 'brotli-wasm-b64url'
   | 'ast-minify-lz-string'
+  | 'packed-deflate-b91'
+  | 'packed-brotli-q11-b91'
+  | 'packed-brotli-q11-b64url'
 
 export interface SharePayloadEnvelope {
   formatVersion: number

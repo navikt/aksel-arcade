@@ -13,7 +13,7 @@ export default defineConfig({
   },
   optimizeDeps: {
     // Exclude Aksel from pre-bundling so it uses external React from sandbox importmap
-    exclude: ['@navikt/ds-react', '@navikt/ds-css'],
+    exclude: ['@navikt/ds-react', '@navikt/ds-css', 'brotli-wasm', 'lzma'],
   },
   build: {
     // Security: Disable source maps in production

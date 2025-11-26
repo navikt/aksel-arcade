@@ -177,11 +177,24 @@ describe('Share popover integration', () => {
   }, 15000)
 
   it('states when projects are too large for sharing after encoding completes', async () => {
+    const oversizeChars = shareEncoding.SHARE_URL_CHAR_LIMIT + 200
+    const oversizeToken = shareEncoding.createShareToken({
+      formatVersion: shareEncoding.SHARE_FORMAT_VERSION,
+      metadataVersion: shareEncoding.SHARE_METADATA_VERSION,
+      checksum: 'mock-checksum',
+      compressed: 'X'.repeat(oversizeChars),
+      approxBytes: oversizeChars,
+      strategyId: shareEncoding.DEFAULT_COMPRESSION_STRATEGY_ID,
+      warningThresholdHit: false,
+      warningThreshold: shareEncoding.SHARE_URL_WARNING_THRESHOLD,
+      charLimit: shareEncoding.SHARE_URL_CHAR_LIMIT,
+    })
+    const expectedOversizeChars = shareEncoding.buildShareUrl(oversizeToken).length
     strategySpy.mockReturnValue([
       createMockStrategy({
         estimateSize: () => 500,
         encode: async ({ serialized }) => ({
-          payload: 'X'.repeat(shareEncoding.SHARE_URL_CHAR_LIMIT + 200),
+          payload: 'X'.repeat(oversizeChars),
           serialized: serialized ?? '{}',
         }),
       }),
@@ -191,6 +204,16 @@ describe('Share popover integration', () => {
     fireEvent.click(screen.getByLabelText(/share project/i))
 
     expect(await screen.findByText(/too large for a share link/i)).toBeTruthy()
+    const oversizeDetails = await screen.findByText((content, element) => {
+      const matchesTarget = element?.classList.contains('share-popover__oversize-details')
+      if (!matchesTarget) {
+        return false
+      }
+      return content.includes(
+        `${expectedOversizeChars.toLocaleString()} / ${shareEncoding.SHARE_URL_CHAR_LIMIT.toLocaleString()}`,
+      )
+    })
+    expect(oversizeDetails).toBeTruthy()
     expect(screen.queryByRole('button', { name: /copy share link/i })).toBeNull()
   })
 

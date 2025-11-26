@@ -155,15 +155,32 @@ test.describe('Share link flow', () => {
       screenshotFile: string,
       expectWarning: boolean
     ) => {
-      await page.getByLabel('Settings').click()
+      await page.getByTestId('project-controls-settings').click()
       await page.getByRole('menuitem', { name: templateLabel }).click()
+
+      await page.evaluate(forceWarning => {
+        window.__akselShareDebug = window.__akselShareDebug ?? {}
+        if (forceWarning) {
+          window.__akselShareDebug.forceWarningThresholdHit = true
+        } else if (window.__akselShareDebug?.forceWarningThresholdHit) {
+          delete window.__akselShareDebug.forceWarningThresholdHit
+        }
+      }, expectWarning)
+
       await page.getByLabel('Share project').click()
 
       const copyButton = page.getByRole('button', { name: /copy share link/i })
+      // Summary template selects packed-deflate, which regularly needs ~9s locally, so keep
+      // a 20s budget to avoid flaky CI runs while the packed snapshot finishes encoding.
       await expect(copyButton).toBeEnabled({ timeout: 20000 })
 
+      const warningFlag = await page.evaluate(() => Boolean(window.__akselShareDebug?.warningThresholdHit))
+
       if (expectWarning) {
+        expect(warningFlag).toBeTruthy()
         await expect(page.getByText(/Long link detected/i)).toBeVisible()
+      } else {
+        expect(warningFlag).toBeFalsy()
       }
 
       await page.evaluate(() => {
@@ -178,6 +195,11 @@ test.describe('Share link flow', () => {
       ensureArtifactDir()
       await page.screenshot({ path: `test-results/${screenshotFile}`, animations: 'disabled' })
       await page.keyboard.press('Escape')
+      await page.evaluate(() => {
+        if (window.__akselShareDebug?.forceWarningThresholdHit) {
+          delete window.__akselShareDebug.forceWarningThresholdHit
+        }
+      })
       return shareUrl
     }
 

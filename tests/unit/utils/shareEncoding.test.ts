@@ -62,7 +62,19 @@ describe('shareEncoding utilities', () => {
     const token = createShareToken(envelope)
     const url = buildShareUrl(token, 'https://example.com/playground')
 
-    expect(url).toBe(`https://example.com/playground?share=${token}`)
+    const parsed = new URL(url)
+    expect(`${parsed.origin}${parsed.pathname}`).toBe('https://example.com/playground')
+    expect(parsed.searchParams.get('share')).toBe(token)
+  })
+
+  it('URL-encodes reserved token characters', () => {
+    const token = "2.meta.checksum.A&B/?:#@"
+    const url = buildShareUrl(token, 'https://example.com/playground?foo=bar')
+    const parsed = new URL(url)
+
+    expect(parsed.searchParams.get('share')).toBe(token)
+    expect(url).toContain('%26')
+    expect(url).toContain('%2F')
   })
 
   it('keeps default project snapshot under share limit', async () => {

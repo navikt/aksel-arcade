@@ -184,7 +184,7 @@ export const AppHeader = ({
   const isGeneratingShare = shareState.status === 'generating' || shareState.status === 'warning'
   const showOversizeMessage = shareState.status === 'oversize' || shareState.error?.code === 'oversize'
   const showWarningMessage = shareState.warningThresholdHit && !showOversizeMessage
-  const shareEstimateChars = shareState.estimatedChars ?? shareState.approxChars
+  const shareEstimateChars = shareState.approxChars ?? shareState.estimatedChars
   const warningEstimate = shareEstimateChars ?? SHARE_URL_WARNING_THRESHOLD
 
   const shareEstimateTag = shareEstimateChars ? (
