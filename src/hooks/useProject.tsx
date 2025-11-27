@@ -72,8 +72,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       console.error('Failed to load project:', result.error)
       return createDefaultProject()
     }
-    if (result.migrated) {
-    }
     return result.project || createDefaultProject()
   })
   

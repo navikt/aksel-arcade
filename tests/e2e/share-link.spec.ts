@@ -1,6 +1,8 @@
 import { expect, test } from '@playwright/test'
 import fs from 'node:fs'
 
+import type { ShareGenerationTelemetryEvent } from '@/services/telemetry'
+
 const SHARED_PREVIEW_TEXT = 'Shared via E2E'
 const SHARED_CODE = `export default function App() {
   return <div>${SHARED_PREVIEW_TEXT}</div>
@@ -63,8 +65,13 @@ test.describe('Share link flow', () => {
     await expect(copyButton).toBeEnabled()
     await copyButton.click()
 
-    const urlHandle = await page.waitForFunction(() => window.__COPIED_SHARE_URL__ || null)
-    const shareUrl = await urlHandle.jsonValue<string>()
+    const urlHandle = await page.waitForFunction<string | null>(
+      () => window.__COPIED_SHARE_URL__ || null
+    )
+    const shareUrl = await urlHandle.jsonValue()
+    if (!shareUrl) {
+      throw new Error('Share URL was not captured')
+    }
     expect(shareUrl).toMatch(/\?share=/)
 
     const recipientContext = await browser.newContext()
@@ -101,15 +108,16 @@ test.describe('Share link flow', () => {
     await expect(copyButton).toBeEnabled()
     await copyButton.click()
 
-    const generationHandle = await page.waitForFunction(() => {
-      return window.__AKSEL_TELEMETRY_LOG__?.find?.(
-        event => event.type === 'share_generation' && !event.reused
-      ) ?? null
+    const generationHandle = await page.waitForFunction<ShareGenerationTelemetryEvent | null>(() => {
+      const event = window.__AKSEL_TELEMETRY_LOG__?.find?.(
+        entry => entry.type === 'share_generation' && !entry.reused
+      )
+      return event && event.type === 'share_generation' ? event : null
     })
-    const generationEvent = await generationHandle.jsonValue<{
-      bucket: string
-      withinTarget: boolean
-    }>()
+    const generationEvent = await generationHandle.jsonValue()
+    if (!generationEvent) {
+      throw new Error('Share generation telemetry not found')
+    }
     expect(generationEvent.withinTarget).toBeTruthy()
     expect(['<1s', '1-3s']).toContain(generationEvent.bucket)
 
@@ -190,8 +198,13 @@ test.describe('Share link flow', () => {
       })
       await copyButton.click()
 
-      const urlHandle = await page.waitForFunction(() => window.__COPIED_SHARE_URL__ || null)
-      const shareUrl = await urlHandle.jsonValue<string>()
+      const urlHandle = await page.waitForFunction<string | null>(
+        () => window.__COPIED_SHARE_URL__ || null
+      )
+      const shareUrl = await urlHandle.jsonValue()
+      if (!shareUrl) {
+        throw new Error('Share URL was not captured')
+      }
       expect(shareUrl.length).toBeLessThanOrEqual(SHARE_CHAR_LIMIT)
 
       ensureArtifactDir()

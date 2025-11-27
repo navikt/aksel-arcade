@@ -38,8 +38,6 @@ export default function App() {
     const contentBefore = await editor.textContent()
     if (!contentBefore) throw new Error('No content before')
     
-    const linesBefore = contentBefore.split('\n')
-    
     // Open component palette
     const addButton = page.getByRole('button', { name: /add component/i })
     await expect(addButton).toBeVisible()

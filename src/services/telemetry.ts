@@ -6,7 +6,7 @@ export type ShareClipboardOutcome = 'success' | 'fallback' | 'error'
 export type ShareGenerationBucket = '<1s' | '1-3s' | '3-9s' | '>=9s'
 export type TelemetryHook = (event: TelemetryEvent) => void
 
-interface ShareGenerationTelemetryEvent {
+export interface ShareGenerationTelemetryEvent {
   type: 'share_generation'
   durationMs: number
   bucket: ShareGenerationBucket
@@ -21,13 +21,13 @@ interface ShareGenerationTelemetryEvent {
   timestamp: number
 }
 
-interface ShareClipboardTelemetryEvent {
+export interface ShareClipboardTelemetryEvent {
   type: 'share_clipboard'
   outcome: ShareClipboardOutcome
   timestamp: number
 }
 
-interface ShareDecodeTelemetryEvent {
+export interface ShareDecodeTelemetryEvent {
   type: 'share_decode'
   strategyId?: CompressionStrategyId
   repairApplied?: boolean
