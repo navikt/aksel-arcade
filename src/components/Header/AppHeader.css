@@ -44,12 +44,6 @@
   gap: var(--ax-space-3);
 }
 
-.share-popover__estimate-row {
-  display: flex;
-  align-items: center;
-  gap: var(--ax-space-2);
-}
-
 .share-popover__estimate-tag {
   text-transform: none;
 }
@@ -58,10 +52,17 @@
   color: var(--ax-text-neutral-subtle);
 }
 
+.share-popover__meta {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ax-space-1);
+  margin-top: var(--ax-space-8);
+}
+
 .share-popover__actions {
   display: flex;
   flex-direction: column;
-  gap: var(--ax-space-2);
+  gap: var(--ax-space-12);
 }
 
 .share-popover__loader {
@@ -103,10 +104,6 @@
   opacity: 0;
 }
 
-.share-popover__export-hint {
-  color: var(--ax-text-neutral-subtle);
-}
-
 .share-popover__retry {
   margin-top: var(--ax-space-2);
 }
@@ -114,7 +111,14 @@
 .share-popover__oversize {
   display: flex;
   flex-direction: column;
-  gap: var(--ax-space-2);
+  gap: var(--ax-space-12);
+  margin-top: var(--ax-space-12);
+}
+
+.share-popover__oversize-copy {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ax-space-1);
 }
 
 .share-popover__oversize-details {
@@ -122,19 +126,5 @@
 }
 
 .share-popover__oversize-cta {
-  align-self: flex-start;
-}
-
-.share-popover__warning {
-  display: flex;
-  flex-direction: column;
-  gap: var(--ax-space-2);
-}
-
-.share-popover__warning-details {
-  color: var(--ax-text-neutral-subtle);
-}
-
-.share-popover__warning-cta {
   align-self: flex-start;
 }

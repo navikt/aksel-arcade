@@ -6,6 +6,18 @@ const SHARED_CODE = `export default function App() {
   return <div>${SHARED_PREVIEW_TEXT}</div>
 }`
 const SHARE_CHAR_LIMIT = 4000
+const SHARE_WARNING_THRESHOLD = 3600
+const WARNING_FILLER_REPEAT = 9
+
+const buildWarningFillerBlock = (blockIndex: number) => {
+  const lines = [`/* share size filler block start (${blockIndex}) */`]
+  for (let lineIndex = 0; lineIndex < 96; lineIndex += 1) {
+    const hash = ((lineIndex + 1) * 2654435761) >>> 0
+    lines.push(`block-${blockIndex}-line-${lineIndex}: ${hash.toString(36)}-${lineIndex ** 3}`)
+  }
+  lines.push(`/* share size filler block end (${blockIndex}) */`)
+  return lines.join('\n')
+}
 
 const ensureArtifactDir = () => {
   if (!fs.existsSync('test-results')) {
@@ -14,32 +26,8 @@ const ensureArtifactDir = () => {
 }
 
 test.describe('Share link flow', () => {
-  test('communicates slow generation states before enabling copy', async ({ page }) => {
-    await page.addInitScript(() => {
-      window.__AXEL_SHARE_DEBUG_CONFIG__ = {
-        delayMs: 4000,
-        apologyThresholdMs: 50,
-      }
-    })
-
-    await page.goto('/')
-
-    const shareButton = page.getByLabel('Share project')
-    await shareButton.click()
-
-    await expect(page.getByText(/Link is being generated/i)).toBeVisible()
-    await expect(page.getByText(/This is taking longer than usual/i)).toBeVisible()
-
-    const copyButton = page.getByRole('button', { name: /copy share link/i })
-    await expect(copyButton).toBeEnabled({ timeout: 20000 })
-  })
-
   test('hydrates a shared snapshot generated from the UI', async ({ page, browser }) => {
     await page.addInitScript(({ sharedCode }) => {
-      window.__AXEL_SHARE_DEBUG_CONFIG__ = {
-        delayMs: 0,
-        apologyThresholdMs: 9000,
-      }
       window.__COPIED_SHARE_URL__ = ''
       Object.defineProperty(navigator, 'clipboard', {
         value: {
@@ -95,9 +83,6 @@ test.describe('Share link flow', () => {
 
   test('records telemetry for share generation performance targets', async ({ page }) => {
     await page.addInitScript(() => {
-      window.__AXEL_SHARE_DEBUG_CONFIG__ = {
-        delayMs: 2500,
-      }
       window.__AKSEL_TELEMETRY_LOG__ = []
       Object.defineProperty(navigator, 'clipboard', {
         value: {
@@ -126,7 +111,7 @@ test.describe('Share link flow', () => {
       withinTarget: boolean
     }>()
     expect(generationEvent.withinTarget).toBeTruthy()
-    expect(generationEvent.bucket).toBe('1-3s')
+    expect(['<1s', '1-3s']).toContain(generationEvent.bucket)
 
     const clipboardEvent = await page.evaluate(() => {
       return window.__AKSEL_TELEMETRY_LOG__?.find?.(event => event.type === 'share_clipboard') ?? null
@@ -156,16 +141,27 @@ test.describe('Share link flow', () => {
       expectWarning: boolean
     ) => {
       await page.getByTestId('project-controls-settings').click()
-      await page.getByRole('menuitem', { name: templateLabel }).click()
+      const templateDialog = page.waitForEvent('dialog')
+      await Promise.all([
+        templateDialog.then(dialog => dialog.accept()),
+        page.getByRole('menuitem', { name: templateLabel }).click(),
+      ])
 
-      await page.evaluate(forceWarning => {
-        window.__akselShareDebug = window.__akselShareDebug ?? {}
-        if (forceWarning) {
-          window.__akselShareDebug.forceWarningThresholdHit = true
-        } else if (window.__akselShareDebug?.forceWarningThresholdHit) {
-          delete window.__akselShareDebug.forceWarningThresholdHit
+      if (expectWarning) {
+        const editor = page.locator('.cm-content[contenteditable="true"]').first()
+        await expect(editor).toContainText('FormSummary', { timeout: 10000 })
+        await editor.click()
+
+        const isMac = await page.evaluate(() => navigator.platform.includes('Mac'))
+        const jumpShortcut = isMac ? 'Meta+ArrowDown' : 'Control+End'
+        await page.keyboard.press(jumpShortcut).catch(async () => {
+          await page.keyboard.press(isMac ? 'Meta+End' : 'Control+ArrowDown')
+        })
+
+        for (let i = 0; i < WARNING_FILLER_REPEAT; i += 1) {
+          await page.keyboard.insertText(`\n${buildWarningFillerBlock(i)}`)
         }
-      }, expectWarning)
+      }
 
       await page.getByLabel('Share project').click()
 
@@ -174,13 +170,19 @@ test.describe('Share link flow', () => {
       // a 20s budget to avoid flaky CI runs while the packed snapshot finishes encoding.
       await expect(copyButton).toBeEnabled({ timeout: 20000 })
 
-      const warningFlag = await page.evaluate(() => Boolean(window.__akselShareDebug?.warningThresholdHit))
+      const tag = page.locator('.share-popover__estimate-tag')
+      await expect(tag).toBeVisible()
+      const tagText = (await tag.textContent()) ?? ''
+      const match = tagText.match(/(\d[\d\s.,]*)\s*\/\s*/) ?? undefined
+      if (!match) {
+        throw new Error(`Unable to parse share length text: "${tagText}"`)
+      }
+      const shareChars = Number(match[1].replace(/[^\d]/g, ''))
 
       if (expectWarning) {
-        expect(warningFlag).toBeTruthy()
-        await expect(page.getByText(/Long link detected/i)).toBeVisible()
+        expect(shareChars).toBeGreaterThanOrEqual(SHARE_WARNING_THRESHOLD)
       } else {
-        expect(warningFlag).toBeFalsy()
+        expect(shareChars).toBeLessThan(SHARE_WARNING_THRESHOLD)
       }
 
       await page.evaluate(() => {
@@ -195,11 +197,6 @@ test.describe('Share link flow', () => {
       ensureArtifactDir()
       await page.screenshot({ path: `test-results/${screenshotFile}`, animations: 'disabled' })
       await page.keyboard.press('Escape')
-      await page.evaluate(() => {
-        if (window.__akselShareDebug?.forceWarningThresholdHit) {
-          delete window.__akselShareDebug.forceWarningThresholdHit
-        }
-      })
       return shareUrl
     }
 

@@ -73,7 +73,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       return createDefaultProject()
     }
     if (result.migrated) {
-      console.log('Project migrated from version', result.project?.version)
     }
     return result.project || createDefaultProject()
   })
@@ -220,7 +219,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       })
       // Reset editor state to JSX tab
       setEditorState(createDefaultEditorState())
-      console.log('✅ Form summary template loaded successfully')
     }
   }
 
@@ -237,7 +235,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       })
       // Reset editor state to JSX tab
       setEditorState(createDefaultEditorState())
-      console.log('✅ Hooks demo loaded successfully')
     }
   }
 
@@ -246,22 +243,24 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       return
     }
 
+    const snapshot = shareHydration.snapshot
+
     try {
-      const nextProject = buildProjectFromSnapshot(shareHydration.snapshot, project)
+      const nextProject = buildProjectFromSnapshot(snapshot, project)
       setProjectState(nextProject)
 
       const nextEditorState = createDefaultEditorState()
       nextEditorState.activeTab =
-        shareHydration.snapshot.activeFileId === SNAPSHOT_FILE_IDS.hooks ? 'Hooks' : 'JSX'
+        snapshot.activeFileId === SNAPSHOT_FILE_IDS.hooks ? 'Hooks' : 'JSX'
       setEditorState(nextEditorState)
 
       setPreviewState(prev => ({
         ...prev,
-        currentViewport: shareHydration.snapshot.preview.viewport,
-        viewportWidth: getViewportWidth(shareHydration.snapshot.preview.viewport),
+        currentViewport: snapshot.preview.viewport,
+        viewportWidth: getViewportWidth(snapshot.preview.viewport),
       }))
 
-      setTheme(shareHydration.snapshot.preview.theme)
+      setTheme(snapshot.preview.theme)
     } catch (error) {
       console.error('Failed to apply shared snapshot', error)
     } finally {

@@ -21,7 +21,6 @@ export const ThemeToggle = ({ iframeRef, onThemeChange }: ThemeToggleProps) => {
           payload: { theme },
         }
         iframeRef.current.contentWindow.postMessage(message, window.location.origin)
-        console.log(`📤 Sent preview theme to sandbox: ${theme}`)
         return true
       }
       return false
@@ -46,7 +45,6 @@ export const ThemeToggle = ({ iframeRef, onThemeChange }: ThemeToggleProps) => {
         payload: { theme: newTheme },
       }
       iframeRef.current.contentWindow.postMessage(message, window.location.origin)
-      console.log(`📤 Sent UPDATE_THEME: ${newTheme}`)
     }
     
     // Notify parent component

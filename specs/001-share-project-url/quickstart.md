@@ -82,7 +82,7 @@
      ```
    - This matches the snippet captured in T065; the full regeneration script (documented beside `tests/integration/share-decode.test.tsx`) rewrites `tests/fixtures/share/packed-with-unescaped-quotes.json` whenever schemas change.
 2. **Force a specific compression strategy**
-   - In DevTools console, set `window.__akselShareDebug.forceStrategyId = 'packed-deflate-b91'` and reopen the Share popover. The helper also exposes `currentStrategyId`, `lastLink`, and `repairApplied` so you can double-check what the hook is doing during QA—this is the same deterministic hook referenced in T064 when Playwright selectors were stabilized via `data-testid="project-controls-settings"`.
+   - The old `window.__akselShareDebug` shim has been removed. When you need to exercise a single strategy in the UI, temporarily limit `listCompressionStrategies()` to that entry (remember to revert before committing) or lean on the bench harness (`npm run share-strategy-bench`) to encode/decode fixtures deterministically outside the UI.
 3. **Decode payloads offline**
    - Use the existing bench harness to reproduce encode/decode pipelines without the UI: `npm run share-strategy-bench`. The bundled runner (`scripts/share-strategy-bench.mjs`) caches its compiled entry under `node_modules/.cache/aksel-arcade/`, exposing the same helpers T065 relies on for generating canonical packed JSON snippets.
 4. **Verify repair logic end-to-end**

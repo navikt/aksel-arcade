@@ -144,9 +144,6 @@ const pushTelemetryEvent = (event: TelemetryEvent): void => {
 
   dispatchTelemetryHooks(event)
 
-  if (import.meta.env.DEV) {
-    console.debug('[telemetry]', event)
-  }
 }
 
 const dispatchTelemetryHooks = (event: TelemetryEvent): void => {

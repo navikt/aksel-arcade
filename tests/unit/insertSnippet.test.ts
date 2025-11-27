@@ -49,7 +49,6 @@ export default function App() {
       }
     }
 
-    console.log('Result:\n', newCode)
 
     // Verify it's NOT nested inside Button
     expect(newCode).not.toContain('<Button>Hello Aksel!\n  <Button variant')

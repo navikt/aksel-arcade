@@ -82,7 +82,6 @@ export const decodeShareToken = async (token: string): Promise<ShareDecodeResult
         checksumValid: false,
         errorCode: 'checksum-mismatch',
       })
-      updateShareDebugRepairState(repairApplied)
       return {
         metadata,
         checksumValid: false,
@@ -95,7 +94,6 @@ export const decodeShareToken = async (token: string): Promise<ShareDecodeResult
       repairApplied,
       checksumValid: true,
     })
-    updateShareDebugRepairState(repairApplied)
 
     return {
       metadata,
@@ -109,7 +107,6 @@ export const decodeShareToken = async (token: string): Promise<ShareDecodeResult
       checksumValid: false,
       errorCode: 'decode-failed',
     })
-    updateShareDebugRepairState(repairApplied)
     if (error instanceof Error && error.message === 'unknown-strategy') {
       return {
         metadata,
@@ -278,14 +275,4 @@ const createDecodeError = (code: ShareDecodeErrorCode): ShareDecodeError => {
         message: 'We could not decode this share link. Please try again or request a new link.',
       }
   }
-}
-
-const updateShareDebugRepairState = (repairApplied: boolean) => {
-  if (typeof window === 'undefined' || import.meta.env.PROD) {
-    return
-  }
-  if (!window.__akselShareDebug) {
-    window.__akselShareDebug = {}
-  }
-  window.__akselShareDebug.repairApplied = repairApplied
 }

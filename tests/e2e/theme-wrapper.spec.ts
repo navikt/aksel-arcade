@@ -41,7 +41,6 @@ test.describe('Aksel Theme Wrapper', () => {
     expect(buttonStyles.backgroundColor).not.toBe('rgba(0, 0, 0, 0)')
     expect(buttonStyles.backgroundColor).not.toBe('transparent')
     
-    console.log('Button styles:', buttonStyles)
   })
 
   test('Theme wrapper should be present in sandbox', async ({ page }) => {

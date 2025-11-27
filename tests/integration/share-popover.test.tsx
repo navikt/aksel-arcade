@@ -1,12 +1,22 @@
+import { useCallback, useEffect } from 'react'
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { AppProvider, useProject } from '@/hooks/useProject'
 import { SettingsProvider } from '@/contexts/SettingsContext'
 import { AppHeader } from '@/components/Header/AppHeader'
+import type { UseShareLinkOptions } from '@/hooks/useShareLink'
 import * as shareEncoding from '@/utils/shareEncoding'
 import * as storage from '@/services/storage'
 import type { CompressionStrategy } from '@/services/compressionStrategies'
 import * as compressionStrategies from '@/services/compressionStrategies'
+
+const TEST_ALERT_SNIPPET = Array.from({ length: 30 })
+  .map((_, index) => `
+  <Alert variant="warning" fullWidth>
+    Auto-refresh sample ${index}
+  </Alert>`)
+  .join('\n')
 
 const createMockStrategy = (overrides?: Partial<CompressionStrategy>): CompressionStrategy => {
   return {
@@ -25,40 +35,118 @@ const createMockStrategy = (overrides?: Partial<CompressionStrategy>): Compressi
 
 const noop = () => {}
 
-const Harness = () => {
+const Harness = ({ shareOptions }: { shareOptions?: UseShareLinkOptions }) => {
   const {
     project,
     setProject,
     updateProject,
+    previewState,
     resetToIntro,
     loadFormSummaryTemplate,
     loadHooksDemo,
   } = useProject()
 
+  const appendAlertSnippet = useCallback(() => {
+    updateProject({ jsxCode: `${project.jsxCode}${TEST_ALERT_SNIPPET}` })
+  }, [project.jsxCode, updateProject])
+
+  useEffect(() => {
+    const handleAppend = () => appendAlertSnippet()
+    document.addEventListener('test:append-alert-snippet', handleAppend)
+    return () => {
+      document.removeEventListener('test:append-alert-snippet', handleAppend)
+    }
+  }, [appendAlertSnippet])
+
   return (
-    <AppHeader
-      projectName={project.name}
-      onProjectNameChange={name => updateProject({ name })}
-      currentProject={project}
-      onProjectImported={setProject}
-      saveStatus="idle"
-      projectSizeBytes={0}
-      onResetToIntro={resetToIntro}
-      onClearStorage={noop}
-      onLoadFormSummaryTemplate={loadFormSummaryTemplate}
-      onLoadHooksDemo={loadHooksDemo}
-    />
+    <>
+      <AppHeader
+        projectName={project.name}
+        onProjectNameChange={name => updateProject({ name })}
+        currentProject={project}
+        shareViewport={previewState.currentViewport}
+        onProjectImported={setProject}
+        saveStatus="idle"
+        projectSizeBytes={0}
+        onResetToIntro={resetToIntro}
+        onClearStorage={noop}
+        onLoadFormSummaryTemplate={loadFormSummaryTemplate}
+        onLoadHooksDemo={loadHooksDemo}
+        shareOptions={shareOptions}
+      />
+      <button
+        type="button"
+        data-testid="append-alert-snippet"
+        onClick={appendAlertSnippet}
+        style={{ position: 'absolute', left: '-9999px', top: 'auto' }}
+      >
+        Append alert snippet
+      </button>
+    </>
   )
 }
 
-const renderHeader = () => {
+const renderHeader = (shareOptions?: UseShareLinkOptions) => {
   return render(
     <SettingsProvider>
       <AppProvider>
-        <Harness />
+        <Harness shareOptions={shareOptions} />
       </AppProvider>
     </SettingsProvider>
   )
+}
+
+const normalizeWhitespace = (value: string): string => value.replace(/\s+/g, ' ').trim()
+
+const computeShareLinkChars = (payloadLength: number): number => {
+  let workingEnvelope = {
+    formatVersion: shareEncoding.SHARE_FORMAT_VERSION,
+    metadataVersion: shareEncoding.SHARE_METADATA_VERSION,
+    checksum: 'mock-checksum',
+    compressed: 'X'.repeat(payloadLength),
+    approxBytes: payloadLength,
+    strategyId: shareEncoding.DEFAULT_COMPRESSION_STRATEGY_ID,
+    warningThresholdHit: false,
+    warningThreshold: shareEncoding.SHARE_URL_WARNING_THRESHOLD,
+    charLimit: shareEncoding.SHARE_URL_CHAR_LIMIT,
+  }
+
+  const buildLinkInfo = () => {
+    const token = shareEncoding.createShareToken(workingEnvelope)
+    const link = shareEncoding.buildShareUrl(token)
+    return { link, linkChars: link.length }
+  }
+
+  let { linkChars } = buildLinkInfo()
+  const shouldWarn = linkChars >= shareEncoding.SHARE_URL_WARNING_THRESHOLD
+
+  if (shouldWarn !== workingEnvelope.warningThresholdHit) {
+    workingEnvelope = {
+      ...workingEnvelope,
+      warningThresholdHit: shouldWarn,
+    }
+    linkChars = buildLinkInfo().linkChars
+  }
+
+  return linkChars
+}
+
+const findShareLengthLabelForPayload = async (payloadLength: number) => {
+  const shareCharsText = computeShareLinkChars(payloadLength).toLocaleString()
+  const target = normalizeWhitespace(
+    `Share URL length ${shareCharsText} / ${shareEncoding.SHARE_URL_CHAR_LIMIT.toLocaleString()} chars`,
+  )
+
+  const matches = await screen.findAllByText((_, element) => {
+    const text = normalizeWhitespace(element?.textContent ?? '')
+    return text.includes(target)
+  })
+
+  if (!matches.length) {
+    throw new Error(`Unable to locate share length label for payload ${payloadLength}`)
+  }
+
+  return matches[0]
 }
 
 describe('Share popover integration', () => {
@@ -73,7 +161,6 @@ describe('Share popover integration', () => {
       configurable: true,
       value: true,
     })
-    window.__AXEL_SHARE_DEBUG_CONFIG__ = undefined
     strategySpy = vi
       .spyOn(compressionStrategies, 'listCompressionStrategies')
       .mockReturnValue([createMockStrategy()])
@@ -92,7 +179,6 @@ describe('Share popover integration', () => {
 
   afterEach(() => {
     vi.useRealTimers()
-    window.__AXEL_SHARE_DEBUG_CONFIG__ = undefined
     encodeSpy?.mockRestore()
     strategySpy?.mockRestore()
   })
@@ -118,7 +204,7 @@ describe('Share popover integration', () => {
 
     await waitFor(() => expect(writeText).toHaveBeenCalled())
     expect(writeText.mock.calls[0][0]).toContain('?share=')
-    expect(screen.getByText(/Copied!/i)).toBeTruthy()
+    expect(screen.queryByText(/Copied!/i)).toBeNull()
   })
 
   it('surfaces offline errors with retry guidance', async () => {
@@ -152,24 +238,25 @@ describe('Share popover integration', () => {
 
   it('shows the >9s apology within 500ms once the threshold passes', async () => {
     vi.useFakeTimers()
-    window.__AXEL_SHARE_DEBUG_CONFIG__ = {
-      delayMs: 1500,
-      apologyThresholdMs: 900,
-    }
-
-    renderHeader()
+    renderHeader({ generationDelayMs: 1500, slowGenerationThresholdMs: 900 })
     fireEvent.click(screen.getByLabelText(/share project/i))
     await Promise.resolve()
     expect(screen.getByText(/Link is being generated/i)).toBeTruthy()
 
-    await vi.advanceTimersByTimeAsync(800)
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(800)
+    })
     expect(screen.queryByText(/This is taking longer than usual/i)).toBeNull()
 
-    await vi.advanceTimersByTimeAsync(450)
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(450)
+    })
     await Promise.resolve()
     expect(screen.getByText(/This is taking longer than usual/i)).toBeTruthy()
 
-    await vi.advanceTimersByTimeAsync(1000)
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1000)
+    })
     await Promise.resolve()
     await Promise.resolve()
     const copyButton = screen.getByRole('button', { name: /copy share link/i })
@@ -214,15 +301,20 @@ describe('Share popover integration', () => {
       )
     })
     expect(oversizeDetails).toBeTruthy()
+    expect(screen.getByRole('button', { name: /use export instead/i })).toBeTruthy()
     expect(screen.queryByRole('button', { name: /copy share link/i })).toBeNull()
   })
 
-  it('short-circuits oversize payloads with an export CTA', async () => {
+  it('still encodes when estimates exceed the limit and reuses the measured result', async () => {
     const exportSpy = vi.spyOn(storage, 'exportProject').mockImplementation(() => undefined)
 
     strategySpy.mockReturnValue([
       createMockStrategy({
         estimateSize: () => shareEncoding.SHARE_URL_CHAR_LIMIT * 2,
+        encode: async ({ serialized }) => ({
+          payload: 'mock-token'.repeat(2),
+          serialized: serialized ?? '{}',
+        }),
       }),
     ])
 
@@ -230,17 +322,17 @@ describe('Share popover integration', () => {
       renderHeader()
       fireEvent.click(screen.getByLabelText(/share project/i))
 
-      expect(await screen.findByText(/too large for a share link/i)).toBeTruthy()
-      expect(screen.getByText(/Estimated/i)).toBeTruthy()
-      const cta = screen.getByRole('button', { name: /use export instead/i })
-      fireEvent.click(cta)
-      expect(exportSpy).toHaveBeenCalled()
+      expect(await screen.findByText(/Share URL length/i)).toBeTruthy()
+      expect(screen.queryByText(/too large for a share link/i)).toBeNull()
+      expect(screen.queryByRole('button', { name: /use export instead/i })).toBeNull()
+      expect(screen.getByRole('button', { name: /copy share link/i })).toBeTruthy()
+      expect(exportSpy).not.toHaveBeenCalled()
     } finally {
       exportSpy.mockRestore()
     }
   })
 
-  it('renders warning badge and export CTA when nearing the URL limit', async () => {
+  it('leans on the estimate badge without rendering a warning alert near the URL limit', async () => {
     strategySpy.mockReturnValue([
       createMockStrategy({
         estimateSize: () => shareEncoding.SHARE_URL_WARNING_THRESHOLD + 50,
@@ -250,9 +342,94 @@ describe('Share popover integration', () => {
     renderHeader()
     fireEvent.click(screen.getByLabelText(/share project/i))
 
-    expect(await screen.findByText(/Long link detected/i)).toBeTruthy()
-    expect(screen.getByText(/Estimated/i)).toBeTruthy()
-    const exportButton = screen.getByRole('button', { name: /use export instead/i })
-    expect(exportButton).toBeTruthy()
+    expect(await screen.findByText(/Share URL length/i)).toBeTruthy()
+    expect(screen.queryByText(/Some browsers cap URLs at/i)).toBeNull()
+    expect(screen.queryByRole('button', { name: /use export instead/i })).toBeNull()
+    expect(screen.getByRole('button', { name: /copy share link/i })).toBeTruthy()
+  })
+
+  it('refreshes the share length when clicking the share button while the popover is open', async () => {
+    let payloadLength = 100
+    encodeSpy.mockImplementation(async (
+      _snapshot: Parameters<typeof shareEncoding.encodeSharePayload>[0],
+      options: Parameters<typeof shareEncoding.encodeSharePayload>[1],
+    ) => {
+      const compressed = 'X'.repeat(payloadLength)
+      payloadLength += 137
+      return {
+        formatVersion: shareEncoding.SHARE_FORMAT_VERSION,
+        metadataVersion: shareEncoding.SHARE_METADATA_VERSION,
+        checksum: 'mock-checksum',
+        compressed,
+        approxBytes: compressed.length,
+        strategyId: options?.strategyId ?? shareEncoding.DEFAULT_COMPRESSION_STRATEGY_ID,
+        warningThresholdHit: false,
+        warningThreshold: shareEncoding.SHARE_URL_WARNING_THRESHOLD,
+        charLimit: shareEncoding.SHARE_URL_CHAR_LIMIT,
+      }
+    })
+
+    renderHeader()
+    const shareButton = screen.getByLabelText(/share project/i)
+    fireEvent.click(shareButton)
+
+    const shareTag = await screen.findByText(/Share URL length/i)
+    const initialLength = shareTag.textContent
+
+    fireEvent.click(shareButton)
+
+    await waitFor(() => {
+      const refreshedText = screen.getByText(/Share URL length/i).textContent
+      expect(refreshedText).not.toEqual(initialLength)
+    })
+  })
+
+  it('auto-regenerates the share length when the project changes while the popover is open', async () => {
+    let payloadLength = 100
+    encodeSpy.mockImplementation(async (
+      _snapshot: Parameters<typeof shareEncoding.encodeSharePayload>[0],
+      options: Parameters<typeof shareEncoding.encodeSharePayload>[1],
+    ) => {
+      const compressed = 'X'.repeat(payloadLength)
+      return {
+        formatVersion: shareEncoding.SHARE_FORMAT_VERSION,
+        metadataVersion: shareEncoding.SHARE_METADATA_VERSION,
+        checksum: 'mock-checksum',
+        compressed,
+        approxBytes: compressed.length,
+        strategyId: options?.strategyId ?? shareEncoding.DEFAULT_COMPRESSION_STRATEGY_ID,
+        warningThresholdHit: false,
+        warningThreshold: shareEncoding.SHARE_URL_WARNING_THRESHOLD,
+        charLimit: shareEncoding.SHARE_URL_CHAR_LIMIT,
+      }
+    })
+
+    renderHeader()
+    fireEvent.click(screen.getByLabelText(/share project/i))
+
+    await findShareLengthLabelForPayload(payloadLength)
+
+    payloadLength = 640
+    document.dispatchEvent(new Event('test:append-alert-snippet'))
+
+    await findShareLengthLabelForPayload(payloadLength)
+  })
+
+  it('closes the popover when clicking outside the share controls', async () => {
+    const user = userEvent.setup()
+    renderHeader()
+    const shareButton = screen.getByLabelText(/share project/i)
+    fireEvent.click(shareButton)
+
+    await screen.findByTestId('share-popover')
+    await act(async () => {
+      await new Promise(resolve => setTimeout(resolve, 0))
+    })
+
+    await user.click(screen.getByText(/Untitled Project/i))
+
+    await waitFor(() => {
+      expect(shareButton.getAttribute('aria-expanded')).toBe('false')
+    })
   })
 })

@@ -30,17 +30,6 @@ type PendingGeneration = {
 export type ShareLinkStatus = 'idle' | 'generating' | 'warning' | 'ready' | 'oversize' | 'error'
 export type ClipboardStatus = 'idle' | 'copying' | 'copied' | 'error'
 
-type ShareDebugHandle = {
-  forceStrategyId?: CompressionStrategyId
-  currentStrategyId?: CompressionStrategyId
-  lastToken?: string
-  lastLink?: string
-  lastEnvelope?: SharePayloadEnvelope
-  warningThresholdHit?: boolean
-  forceWarningThresholdHit?: boolean
-  repairApplied?: boolean
-}
-
 export type ShareLinkErrorCode =
   | 'unavailable'
   | 'generation-failed'
@@ -74,6 +63,8 @@ export interface UseShareLinkOptions {
   snapshotBuilder?: () => Promise<ProjectSnapshot> | ProjectSnapshot
   charLimit?: number
   baseUrl?: string
+  slowGenerationThresholdMs?: number
+  generationDelayMs?: number
 }
 
 const IDLE_STATE: ShareLinkState = {
@@ -110,6 +101,10 @@ export const useShareLink = (options?: UseShareLinkOptions) => {
   const { adjustPayloadEstimate, recordResult } = useShareLinkExperiments()
 
   const charLimit = options?.charLimit ?? SHARE_URL_CHAR_LIMIT
+  const slowGenerationThresholdMs = options?.slowGenerationThresholdMs && options.slowGenerationThresholdMs > 0
+    ? options.slowGenerationThresholdMs
+    : SLOW_GENERATION_THRESHOLD_MS
+  const generationDelayMs = options?.generationDelayMs ?? 0
 
   useEffect(() => {
     stateRef.current = state
@@ -145,12 +140,11 @@ export const useShareLink = (options?: UseShareLinkOptions) => {
         }
 
         const elapsed = Date.now() - prev.startedAt
-        const threshold = getSlowGenerationThreshold()
 
         return {
           ...prev,
           elapsedMs: elapsed,
-          showSlowGenerationNotice: prev.showSlowGenerationNotice || elapsed >= threshold,
+          showSlowGenerationNotice: prev.showSlowGenerationNotice || elapsed >= slowGenerationThresholdMs,
         }
       })
     }, 250)
@@ -161,7 +155,7 @@ export const useShareLink = (options?: UseShareLinkOptions) => {
         intervalRef.current = null
       }
     }
-  }, [state.status])
+  }, [slowGenerationThresholdMs, state.status])
 
   const resetShareState = useCallback(() => {
     if (intervalRef.current) {
@@ -184,7 +178,7 @@ export const useShareLink = (options?: UseShareLinkOptions) => {
         status: currentStatus,
         startedAt,
         elapsedMs: elapsed,
-        showSlowGenerationNotice: prev.showSlowGenerationNotice || elapsed >= getSlowGenerationThreshold(),
+        showSlowGenerationNotice: prev.showSlowGenerationNotice || elapsed >= slowGenerationThresholdMs,
         error: undefined,
         clipboardStatus: 'idle',
         clipboardError: undefined,
@@ -264,14 +258,16 @@ export const useShareLink = (options?: UseShareLinkOptions) => {
       clipboardStatus: 'idle',
       clipboardError: undefined,
       warningThresholdHit: false,
-      approxChars: prev.approxChars,
+      approxChars: undefined,
       estimatedChars: undefined,
       strategyId: undefined,
     }))
 
     try {
       const snapshot = await Promise.resolve(snapshotBuilder())
-      await applyShareDebugDelay()
+      if (generationDelayMs > 0) {
+        await new Promise(resolve => setTimeout(resolve, generationDelayMs))
+      }
       const serialized = serializeSnapshot(snapshot)
       const contentSignature = await computeChecksum(serialized)
 
@@ -309,53 +305,30 @@ export const useShareLink = (options?: UseShareLinkOptions) => {
       }
 
       const smallestEstimate = rankedStrategies[0]
-      if (smallestEstimate.estimatedChars > charLimit) {
-        emitGenerationTelemetry({
-          outcome: 'oversize',
-          approxChars: smallestEstimate.estimatedChars,
-          estimatedChars: smallestEstimate.estimatedChars,
-          warningThresholdHit: smallestEstimate.estimatedChars >= SHARE_URL_WARNING_THRESHOLD,
-        })
-        setState({
-          status: 'oversize',
-          link: undefined,
-          token: undefined,
-          approxChars: undefined,
-          estimatedChars: smallestEstimate.estimatedChars,
-          error: {
-            code: 'oversize',
-            message: `Share link exceeds ${charLimit} characters`,
-          },
-          clipboardStatus: 'idle',
-          showSlowGenerationNotice: false,
-          warningThresholdHit: smallestEstimate.estimatedChars >= SHARE_URL_WARNING_THRESHOLD,
-          strategyId: undefined,
-        })
-        return
-      }
-
       const viableCandidates = rankedStrategies.filter(est => est.estimatedChars <= charLimit)
+      const candidateQueue = viableCandidates.length ? viableCandidates : [smallestEstimate]
       const updateEstimateState = (estimate: StrategyEstimate) => {
         const thresholdHit = estimate.estimatedChars >= SHARE_URL_WARNING_THRESHOLD
-        const warningActive = thresholdHit || isDebugWarningForced()
+        const warningActive = thresholdHit
         setState(prev => ({
           ...prev,
           status: warningActive ? 'warning' : 'generating',
           estimatedChars: estimate.estimatedChars,
           warningThresholdHit: warningActive,
           strategyId: estimate.strategy.id,
-          approxChars: prev.approxChars,
+          approxChars: undefined,
         }))
-        setShareDebugCurrentStrategy(estimate.strategy.id)
       }
 
-      updateEstimateState(viableCandidates[0])
+      if (candidateQueue.length) {
+        updateEstimateState(candidateQueue[0])
+      }
 
       let lastFailure: Error | null = null
       let maxOversizeChars: number | null = null
 
-      for (const estimate of viableCandidates) {
-        if (estimate !== viableCandidates[0]) {
+      for (const estimate of candidateQueue) {
+        if (estimate !== candidateQueue[0]) {
           updateEstimateState(estimate)
         }
 
@@ -381,10 +354,7 @@ export const useShareLink = (options?: UseShareLinkOptions) => {
             continue
           }
 
-          const shouldWarn =
-            isDebugWarningForced() ||
-            finalized.warningThresholdHit ||
-            estimate.estimatedChars >= SHARE_URL_WARNING_THRESHOLD
+          const shouldWarn = finalized.warningThresholdHit
 
           lastResultRef.current = {
             contentSignature,
@@ -396,14 +366,6 @@ export const useShareLink = (options?: UseShareLinkOptions) => {
             warningThresholdHit: shouldWarn,
             strategyId: estimate.strategy.id,
           }
-
-          recordShareDebugResult({
-            envelope: finalized.envelope,
-            link: finalized.link,
-            token: finalized.token,
-            strategyId: estimate.strategy.id,
-            warningThresholdHit: shouldWarn,
-          })
 
           emitGenerationTelemetry({
             outcome: 'success',
@@ -438,7 +400,7 @@ export const useShareLink = (options?: UseShareLinkOptions) => {
         emitGenerationTelemetry({
           outcome: 'oversize',
           approxChars: maxOversizeChars,
-          estimatedChars: smallestEstimate.estimatedChars,
+          estimatedChars: candidateQueue[0]?.estimatedChars ?? smallestEstimate.estimatedChars,
           warningThresholdHit: maxOversizeChars >= SHARE_URL_WARNING_THRESHOLD,
         })
         setState({
@@ -446,7 +408,7 @@ export const useShareLink = (options?: UseShareLinkOptions) => {
           link: undefined,
           token: undefined,
           approxChars: maxOversizeChars,
-          estimatedChars: smallestEstimate.estimatedChars,
+          estimatedChars: candidateQueue[0]?.estimatedChars ?? smallestEstimate.estimatedChars,
           error: {
             code: 'oversize',
             message: `Share link exceeds ${charLimit} characters`,
@@ -487,14 +449,21 @@ export const useShareLink = (options?: UseShareLinkOptions) => {
     } finally {
       pendingGenerationRef.current = null
     }
-  }, [adjustPayloadEstimate, charLimit, options?.baseUrl, recordResult, snapshotBuilder])
+  }, [
+    adjustPayloadEstimate,
+    charLimit,
+    generationDelayMs,
+    options?.baseUrl,
+    recordResult,
+    slowGenerationThresholdMs,
+    snapshotBuilder,
+  ])
 
   const reuseExistingLink = useCallback(() => {
     const lastResult = lastResultRef.current
     if (!lastResult) {
       return undefined
     }
-    setShareDebugCurrentStrategy(lastResult.strategyId)
     setState(prev => ({
       ...prev,
       status: 'ready',
@@ -535,12 +504,6 @@ export const useShareLink = (options?: UseShareLinkOptions) => {
       clipboardError: message,
     }))
   }, [])
-
-  useEffect(() => {
-    if (import.meta.env.MODE === 'test') {
-      console.info('[share-link]', state.status, state.error?.code ?? '')
-    }
-  }, [state.error?.code, state.status])
 
   return {
     state,
@@ -608,70 +571,18 @@ const rankCompressionStrategies = (
       }
     })
     .sort((a, b) => a.estimatedChars - b.estimatedChars)
-  return applyShareDebugStrategyOverride(estimates)
+  return estimates
 }
 
 const encodeWithStrategy = async ({ snapshot, serialized, strategy }: EncodeWithStrategyInput) => {
   const result = await strategy.encode({ snapshot, serialized })
-    const checksumSource = result.checksumSource ?? result.serialized ?? serialized
-    return encodeSharePayload(snapshot, {
-      serialized: result.serialized,
-      checksumSource,
-      compressed: result.payload,
-      strategyId: strategy.id,
-    })
-}
-
-const applyShareDebugStrategyOverride = (estimates: StrategyEstimate[]): StrategyEstimate[] => {
-  const handle = resolveShareDebugHandle()
-  if (!handle?.forceStrategyId) {
-    return estimates
-  }
-  const forcedIndex = estimates.findIndex(entry => entry.strategy.id === handle.forceStrategyId)
-  if (forcedIndex <= 0) {
-    return estimates
-  }
-  const forced = estimates[forcedIndex]
-  return [forced, ...estimates.slice(0, forcedIndex), ...estimates.slice(forcedIndex + 1)]
-}
-
-const resolveShareDebugHandle = (): ShareDebugHandle | undefined => {
-  if (import.meta.env.PROD || typeof window === 'undefined') {
-    return undefined
-  }
-  if (!window.__akselShareDebug) {
-    window.__akselShareDebug = {}
-  }
-  return window.__akselShareDebug
-}
-
-const setShareDebugCurrentStrategy = (strategyId: CompressionStrategyId) => {
-  const handle = resolveShareDebugHandle()
-  if (handle) {
-    handle.currentStrategyId = strategyId
-  }
-}
-
-const recordShareDebugResult = (payload: {
-  envelope: SharePayloadEnvelope
-  link: string
-  token: string
-  strategyId: CompressionStrategyId
-  warningThresholdHit: boolean
-}) => {
-  const handle = resolveShareDebugHandle()
-  if (!handle) {
-    return
-  }
-  handle.currentStrategyId = payload.strategyId
-  handle.lastLink = payload.link
-  handle.lastToken = payload.token
-  handle.lastEnvelope = payload.envelope
-  handle.warningThresholdHit = payload.warningThresholdHit
-}
-
-const isDebugWarningForced = (): boolean => {
-  return Boolean(resolveShareDebugHandle()?.forceWarningThresholdHit)
+  const checksumSource = result.checksumSource ?? result.serialized ?? serialized
+  return encodeSharePayload(snapshot, {
+    serialized: result.serialized,
+    checksumSource,
+    compressed: result.payload,
+    strategyId: strategy.id,
+  })
 }
 
 const finalizeShareToken = (envelope: SharePayloadEnvelope, baseUrl?: string) => {
@@ -699,35 +610,6 @@ const finalizeShareToken = (envelope: SharePayloadEnvelope, baseUrl?: string) =>
     linkChars,
     warningThresholdHit,
   }
-}
-
-const getSlowGenerationThreshold = (): number => {
-  const config = getShareDebugConfig()
-  if (config?.apologyThresholdMs && config.apologyThresholdMs > 0) {
-    return config.apologyThresholdMs
-  }
-  return SLOW_GENERATION_THRESHOLD_MS
-}
-
-const applyShareDebugDelay = async (): Promise<void> => {
-  const delayMs = getShareDebugConfig()?.delayMs ?? 0
-  if (!delayMs) {
-    return
-  }
-
-  await new Promise(resolve => setTimeout(resolve, delayMs))
-}
-
-const getShareDebugConfig = () => {
-  if (import.meta.env.PROD) {
-    return undefined
-  }
-
-  if (typeof window === 'undefined') {
-    return undefined
-  }
-
-  return window.__AXEL_SHARE_DEBUG_CONFIG__
 }
 
 const nowMs = (): number => {

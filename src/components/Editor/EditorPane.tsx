@@ -62,11 +62,9 @@ export const EditorPane = () => {
   const handleFormat = async () => {
     try {
       const formatted = await formatCode(currentContent, { parser: 'babel' })
-      console.log('✅ Format successful!')
       handleCodeChange(formatted)
     } catch {
       // Silently ignore format errors - invalid syntax expected while editing
-      console.log('Format skipped - invalid syntax (expected while editing)')
     }
   }
 

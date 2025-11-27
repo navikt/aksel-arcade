@@ -38,8 +38,6 @@ export const PreviewPane = () => {
           if (isCancelled) return
           
           if (result.success && result.code) {
-            console.log('✅ Transpilation successful')
-            console.log('📝 Transpiled code:', result.code)
             setTranspiledCode(result.code)
             setCompileError(null)
           } else if (result.error) {

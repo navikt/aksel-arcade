@@ -11,6 +11,7 @@ const Harness = () => {
     project,
     setProject,
     updateProject,
+    previewState,
     resetToIntro,
     loadFormSummaryTemplate,
     loadHooksDemo,
@@ -21,6 +22,7 @@ const Harness = () => {
       projectName={project.name}
       onProjectNameChange={name => updateProject({ name })}
       currentProject={project}
+      shareViewport={previewState.currentViewport}
       onProjectImported={setProject}
       saveStatus="idle"
       projectSizeBytes={0}
@@ -47,7 +49,7 @@ describe('ProjectControls layout', () => {
     vi.clearAllMocks()
   })
 
-  it('keeps Import → Share → Settings order and reminds about export', async () => {
+  it('keeps Import → Share → Settings order and surfaces share metrics', async () => {
     renderHeader()
 
     const importButton = screen.getByRole('button', { name: /^import$/i })
@@ -59,6 +61,7 @@ describe('ProjectControls layout', () => {
 
     fireEvent.click(shareButton)
 
-    expect(await screen.findByText(/Need an offline backup/i)).toBeTruthy()
+    expect(await screen.findByText(/Share URL length/i)).toBeTruthy()
+    expect(screen.getByText(/Strategy:/i)).toBeTruthy()
   })
 })

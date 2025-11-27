@@ -142,13 +142,6 @@ const strategyRegistry: Record<CompressionStrategyId, CompressionStrategy> = {
     encode: async (input) => {
       const serialized = ensureSerialized(input)
       const packed = serializePackedSnapshot(input.snapshot)
-      if (import.meta.env.DEV) {
-        const marker = 'BodyShort>'
-        const index = packed.indexOf(marker)
-        if (index !== -1) {
-          console.debug('[packed-deflate-b91] snippet', packed.slice(Math.max(0, index - 20), index + 40))
-        }
-      }
       const compressed = deflateSync(strToU8(packed, true), { level: 9 })
       const payload = encodeBase91(compressed)
       return { payload, serialized, checksumSource: packed }
