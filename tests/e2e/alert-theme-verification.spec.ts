@@ -33,7 +33,6 @@ test.describe('Alert Component Theme Verification', () => {
     
     // Check that Alert has Aksel classes (indicating theme is applied)
     const alertClasses = await alert.getAttribute('class');
-    console.log('Alert classes:', alertClasses);
     expect(alertClasses).toContain('aksel-alert');
     
     // Check that Alert has the info variant
@@ -42,8 +41,6 @@ test.describe('Alert Component Theme Verification', () => {
     // Take screenshot for manual verification
     await page.screenshot({ path: 'alert-verification-light-mode.png', fullPage: true });
     
-    console.log('✅ Alert component renders with Aksel classes');
-    console.log('✅ Screenshot saved: alert-verification-light-mode.png');
   });
 
   test('should render Alert in dark mode', async ({ page }) => {
@@ -73,8 +70,6 @@ test.describe('Alert Component Theme Verification', () => {
     // Take screenshot for manual verification
     await page.screenshot({ path: 'alert-verification-dark-mode.png', fullPage: true });
     
-    console.log('✅ Alert component renders in dark mode');
-    console.log('✅ Screenshot saved: alert-verification-dark-mode.png');
   });
 
   test('should have proper Aksel computed styles', async ({ page }) => {
@@ -104,16 +99,11 @@ test.describe('Alert Component Theme Verification', () => {
       return window.getComputedStyle(el).borderRadius;
     });
     
-    console.log('Alert computed styles:');
-    console.log('  backgroundColor:', backgroundColor);
-    console.log('  padding:', padding);
-    console.log('  borderRadius:', borderRadius);
     
     // Verify styles are not default browser styles
     expect(backgroundColor).not.toBe('rgba(0, 0, 0, 0)');
     expect(padding).not.toBe('0px');
     expect(borderRadius).not.toBe('0px');
     
-    console.log('✅ Alert has non-default computed styles (Aksel theme applied)');
   });
 });

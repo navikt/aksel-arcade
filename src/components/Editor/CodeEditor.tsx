@@ -355,7 +355,6 @@ export const CodeEditor = forwardRef<CodeEditorRef, CodeEditorProps>(({
           options,
           validFor: /^[\w.]*$/, // Keep results valid while typing word characters or dots
         }
-        console.log('[akselCompletion] Returning component completions:', options.length, 'items')
         return result
       }
     }

@@ -1,0 +1,49 @@
+{
+  "version": "2.0.0",
+  "files": [
+    {
+      "id": "summary-app",
+      "name": "SummaryPage.tsx",
+      "language": "tsx",
+      "content": "import { SummaryLayout } from './components/SummaryLayout'\nimport { SummaryTile } from './components/SummaryTile'\n\nexport default function SummaryPage() {\n  return (\n    <SummaryLayout title=\"Oppsummeringsside\" description=\"Oppsummerer søknadsdata på en modulær måte.\">\n        <SummaryTile key=\"tile-1\" title=\"Section 1\" description=\"Auto-generated summary tile 1\" />\n        <SummaryTile key=\"tile-2\" title=\"Section 2\" description=\"Auto-generated summary tile 2\" />\n        <SummaryTile key=\"tile-3\" title=\"Section 3\" description=\"Auto-generated summary tile 3\" />\n        <SummaryTile key=\"tile-4\" title=\"Section 4\" description=\"Auto-generated summary tile 4\" />\n        <SummaryTile key=\"tile-5\" title=\"Section 5\" description=\"Auto-generated summary tile 5\" />\n        <SummaryTile key=\"tile-6\" title=\"Section 6\" description=\"Auto-generated summary tile 6\" />\n        <SummaryTile key=\"tile-7\" title=\"Section 7\" description=\"Auto-generated summary tile 7\" />\n        <SummaryTile key=\"tile-8\" title=\"Section 8\" description=\"Auto-generated summary tile 8\" />\n        <SummaryTile key=\"tile-9\" title=\"Section 9\" description=\"Auto-generated summary tile 9\" />\n        <SummaryTile key=\"tile-10\" title=\"Section 10\" description=\"Auto-generated summary tile 10\" />\n        <SummaryTile key=\"tile-11\" title=\"Section 11\" description=\"Auto-generated summary tile 11\" />\n        <SummaryTile key=\"tile-12\" title=\"Section 12\" description=\"Auto-generated summary tile 12\" />\n        <SummaryTile key=\"tile-13\" title=\"Section 13\" description=\"Auto-generated summary tile 13\" />\n        <SummaryTile key=\"tile-14\" title=\"Section 14\" description=\"Auto-generated summary tile 14\" />\n        <SummaryTile key=\"tile-15\" title=\"Section 15\" description=\"Auto-generated summary tile 15\" />\n        <SummaryTile key=\"tile-16\" title=\"Section 16\" description=\"Auto-generated summary tile 16\" />\n        <SummaryTile key=\"tile-17\" title=\"Section 17\" description=\"Auto-generated summary tile 17\" />\n        <SummaryTile key=\"tile-18\" title=\"Section 18\" description=\"Auto-generated summary tile 18\" />\n        <SummaryTile key=\"tile-19\" title=\"Section 19\" description=\"Auto-generated summary tile 19\" />\n        <SummaryTile key=\"tile-20\" title=\"Section 20\" description=\"Auto-generated summary tile 20\" />\n        <SummaryTile key=\"tile-21\" title=\"Section 21\" description=\"Auto-generated summary tile 21\" />\n        <SummaryTile key=\"tile-22\" title=\"Section 22\" description=\"Auto-generated summary tile 22\" />\n        <SummaryTile key=\"tile-23\" title=\"Section 23\" description=\"Auto-generated summary tile 23\" />\n        <SummaryTile key=\"tile-24\" title=\"Section 24\" description=\"Auto-generated summary tile 24\" />\n        <SummaryTile key=\"tile-25\" title=\"Section 25\" description=\"Auto-generated summary tile 25\" />\n        <SummaryTile key=\"tile-26\" title=\"Section 26\" description=\"Auto-generated summary tile 26\" />\n        <SummaryTile key=\"tile-27\" title=\"Section 27\" description=\"Auto-generated summary tile 27\" />\n        <SummaryTile key=\"tile-28\" title=\"Section 28\" description=\"Auto-generated summary tile 28\" />\n        <SummaryTile key=\"tile-29\" title=\"Section 29\" description=\"Auto-generated summary tile 29\" />\n        <SummaryTile key=\"tile-30\" title=\"Section 30\" description=\"Auto-generated summary tile 30\" />\n        <SummaryTile key=\"tile-31\" title=\"Section 31\" description=\"Auto-generated summary tile 31\" />\n        <SummaryTile key=\"tile-32\" title=\"Section 32\" description=\"Auto-generated summary tile 32\" />\n    </SummaryLayout>\n  )\n}",
+      "order": 0
+    },
+    {
+      "id": "summary-layout",
+      "name": "components/SummaryLayout.tsx",
+      "language": "tsx",
+      "content": "export function SummaryLayout({ title, description, children }) {\n  return (\n    <div className=\"summary-layout\">\n      <header>\n        <h1>{title}</h1>\n        <p>{description}</p>\n      </header>\n      <div className=\"summary-grid\">{children}</div>\n    </div>\n  )\n}",
+      "order": 1
+    },
+    {
+      "id": "summary-tile",
+      "name": "components/SummaryTile.tsx",
+      "language": "tsx",
+      "content": "export function SummaryTile({ title, description }) {\n  return (\n    <article className=\"summary-tile\">\n      <strong>{title}</strong>\n      <p>{description}</p>\n      <ul>\n        <li>Sanitized data point</li>\n        <li>Sanitized data point</li>\n        <li>Sanitized data point</li>\n        <li>Sanitized data point</li>\n        <li>Sanitized data point</li>\n        <li>Sanitized data point</li>\n      </ul>\n    </article>\n  )\n}",
+      "order": 2
+    },
+    {
+      "id": "summary-styles",
+      "name": "summary.css",
+      "language": "css",
+      "content": ".summary-layout {\n  max-width: 1200px;\n  margin: 0 auto;\n  padding: 2rem;\n}\n\n.summary-grid {\n  display: grid;\n  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));\n  gap: 1.25rem;\n}\n\n.summary-tile {\n  background: var(--ax-bg-subtle);\n  border: 1px solid var(--ax-border-neutral-subtle);\n  border-radius: 16px;\n  padding: 1.5rem;\n  box-shadow: 0 12px 32px rgba(0,0,0,0.12);\n}\n\n.summary-tile ul {\n  max-height: 200px;\n  overflow: auto;\n  padding-inline-start: 1.5rem;\n}\n",
+      "order": 3
+    }
+  ],
+  "activeFileId": "summary-app",
+  "preview": {
+    "viewport": "XL",
+    "zoom": 0.9,
+    "theme": "light",
+    "sandboxFlags": {
+      "animations": true,
+      "outlines": false
+    }
+  },
+  "settings": {
+    "autosave": true,
+    "linting": true,
+    "showLineNumbers": true
+  },
+  "updatedAt": 1763934566671
+}

@@ -1,0 +1,31 @@
+{
+  "corruptedPacked": "[1,\"3.0.0\",1764000000000,0,[[\"jsx-file\",\"App.tsx\",0,0,\"export default function App() {\\n  return <div className=\"quote\">Packed</div>\\n}\\n\"]],[3,1,1,[\"animations\",\"outlines\"],\"10\"],5]",
+  "expectedSnapshot": {
+    "version": "3.0.0",
+    "files": [
+      {
+        "id": "jsx-file",
+        "name": "App.tsx",
+        "language": "tsx",
+        "content": "export default function App() {\n  return <div className=\"quote\">Packed</div>\n}\n",
+        "order": 0
+      }
+    ],
+    "activeFileId": "jsx-file",
+    "preview": {
+      "viewport": "MD",
+      "zoom": 1,
+      "theme": "dark",
+      "sandboxFlags": {
+        "animations": true,
+        "outlines": false
+      }
+    },
+    "settings": {
+      "autosave": true,
+      "linting": false,
+      "showLineNumbers": true
+    },
+    "updatedAt": 1764000000000
+  }
+}

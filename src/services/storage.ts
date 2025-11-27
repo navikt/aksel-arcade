@@ -1,4 +1,11 @@
-import type { Project, ProjectSizeStatus } from '@/types/project'
+import type {
+  Project,
+  ProjectFileSnapshot,
+  ProjectPreviewSnapshot,
+  ProjectSettingsSnapshot,
+  ProjectSizeStatus,
+  ProjectSnapshot,
+} from '@/types/project'
 import { AKSEL_METADATA, AI_INSTRUCTIONS, extractUsedComponents } from '@/data/akselMetadata'
 import { createDefaultProject } from '@/utils/projectDefaults'
 
@@ -26,6 +33,18 @@ export interface ImportResult {
   success: boolean
   error?: string
 }
+
+export interface ShareSnapshotOverrides {
+  files?: ProjectFileSnapshot[]
+  activeFileId?: string
+  preview?: Partial<ProjectPreviewSnapshot>
+  settings?: Partial<ProjectSettingsSnapshot>
+}
+
+export const SNAPSHOT_FILE_IDS = {
+  jsx: 'file-jsx',
+  hooks: 'file-hooks',
+} as const
 
 export const validateProjectSize = (project: Project): ProjectSizeStatus => {
   const json = JSON.stringify(project)
@@ -317,7 +336,58 @@ export const clearStorage = (): void => {
   localStorage.removeItem(STORAGE_KEY)
 }
 
+export const createShareSnapshot = (
+  project: Project,
+  overrides?: ShareSnapshotOverrides
+): ProjectSnapshot => {
+  const files = overrides?.files ?? buildDefaultSnapshotFiles(project)
+  if (!files.length) {
+    throw new Error('Project snapshot requires at least one file')
+  }
+
+  const preview: ProjectPreviewSnapshot = {
+    viewport: overrides?.preview?.viewport ?? project.viewportSize,
+    zoom: overrides?.preview?.zoom ?? 1,
+    theme: overrides?.preview?.theme ?? 'dark',
+    sandboxFlags: overrides?.preview?.sandboxFlags ?? {},
+  }
+
+  const settings: ProjectSettingsSnapshot = {
+    autosave: overrides?.settings?.autosave ?? true,
+    linting: overrides?.settings?.linting ?? true,
+    showLineNumbers: overrides?.settings?.showLineNumbers ?? true,
+  }
+
+  return {
+    version: project.version,
+    files,
+    activeFileId: overrides?.activeFileId ?? files[0].id,
+    preview,
+    settings,
+    updatedAt: Date.now(),
+  }
+}
+
 // Helper functions
+
+const buildDefaultSnapshotFiles = (project: Project): ProjectFileSnapshot[] => {
+  return [
+    {
+      id: SNAPSHOT_FILE_IDS.jsx,
+      name: 'App.tsx',
+      language: 'tsx',
+      content: project.jsxCode,
+      order: 0,
+    },
+    {
+      id: SNAPSHOT_FILE_IDS.hooks,
+      name: 'hooks.ts',
+      language: 'tsx',
+      content: project.hooksCode,
+      order: 1,
+    },
+  ]
+}
 
 const validateProjectSchema: (project: unknown) => asserts project is Project = (project) => {
   if (!project || typeof project !== 'object') {

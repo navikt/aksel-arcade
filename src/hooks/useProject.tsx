@@ -1,14 +1,25 @@
-import { createContext, useContext, useState, type ReactNode } from 'react'
+import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
 
 /* eslint-disable react-refresh/only-export-components */
 // Context providers intentionally export both context and hooks
 
-import type { Project } from '@/types/project'
+import type { Project, ProjectSnapshot, ShareUrlMetadata } from '@/types/project'
 import type { EditorState } from '@/types/editor'
 import type { PreviewState } from '@/types/preview'
 import { createDefaultProject, createDefaultEditorState, createDefaultPreviewState, FORM_SUMMARY_JSX_CODE, HOOKS_DEMO_JSX_CODE, HOOKS_DEMO_HOOKS_CODE } from '@/utils/projectDefaults'
-import { loadProject } from '@/services/storage'
+import { loadProject, SNAPSHOT_FILE_IDS } from '@/services/storage'
 import type { ComponentSnippet } from '@/types/snippets'
+import { useSettings } from '@/contexts/SettingsContext'
+import { getViewportWidth } from '@/types/viewports'
+import { decodeShareToken, getShareTokenFromLocation, stripShareQueryParam, type ShareDecodeError } from '@/utils/shareDecoding'
+
+interface ShareHydrationState {
+  status: 'idle' | 'decoding' | 'ready' | 'error'
+  token?: string
+  snapshot?: ProjectSnapshot
+  metadata?: ShareUrlMetadata
+  error?: ShareDecodeError
+}
 
 interface AppState {
   // Persisted state
@@ -34,6 +45,11 @@ interface AppState {
   resetToIntro: () => void
   loadFormSummaryTemplate: () => void
   loadHooksDemo: () => void
+
+  // Share hydration
+  shareHydration: ShareHydrationState
+  applySharedSnapshot: () => void
+  dismissShareHydration: () => void
 }
 
 const AppContext = createContext<AppState | null>(null)
@@ -56,9 +72,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       console.error('Failed to load project:', result.error)
       return createDefaultProject()
     }
-    if (result.migrated) {
-      console.log('Project migrated from version', result.project?.version)
-    }
     return result.project || createDefaultProject()
   })
   
@@ -66,6 +79,61 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const [previewState, setPreviewState] = useState<PreviewState>(createDefaultPreviewState())
   const [isComponentPaletteOpen, setIsComponentPaletteOpen] = useState(false)
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
+  const { setTheme } = useSettings()
+  const [shareHydration, setShareHydration] = useState<ShareHydrationState>(() => {
+    const token = getShareTokenFromLocation()
+    return token ? { status: 'decoding', token } : { status: 'idle' }
+  })
+
+  useEffect(() => {
+    if (shareHydration.status !== 'decoding' || !shareHydration.token) {
+      return
+    }
+
+    let cancelled = false
+    const token = shareHydration.token
+
+    const run = async () => {
+      const result = await decodeShareToken(token)
+      if (cancelled) {
+        return
+      }
+
+      if (result.snapshot && result.checksumValid) {
+        setShareHydration({
+          status: 'ready',
+          token,
+          snapshot: result.snapshot,
+          metadata: result.metadata,
+        })
+      } else {
+        setShareHydration({
+          status: 'error',
+          token,
+          error: result.error ?? DEFAULT_SHARE_DECODE_ERROR,
+        })
+      }
+
+      stripShareQueryParam()
+    }
+
+    run().catch((error) => {
+      if (cancelled) {
+        return
+      }
+      console.error('Share link decode failed', error)
+      setShareHydration({
+        status: 'error',
+        token,
+        error: DEFAULT_SHARE_DECODE_ERROR,
+      })
+      stripShareQueryParam()
+    })
+
+    return () => {
+      cancelled = true
+    }
+  }, [shareHydration.status, shareHydration.token])
 
   const updateProject = (updates: Partial<Project>) => {
     setProjectState((prev) => ({
@@ -149,7 +217,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       })
       // Reset editor state to JSX tab
       setEditorState(createDefaultEditorState())
-      console.log('✅ Form summary template loaded successfully')
     }
   }
 
@@ -166,8 +233,41 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       })
       // Reset editor state to JSX tab
       setEditorState(createDefaultEditorState())
-      console.log('✅ Hooks demo loaded successfully')
     }
+  }
+
+  const applySharedSnapshot = () => {
+    if (shareHydration.status !== 'ready' || !shareHydration.snapshot) {
+      return
+    }
+
+    const snapshot = shareHydration.snapshot
+
+    try {
+      const nextProject = buildProjectFromSnapshot(snapshot, project)
+      setProjectState(nextProject)
+
+      const nextEditorState = createDefaultEditorState()
+      nextEditorState.activeTab =
+        snapshot.activeFileId === SNAPSHOT_FILE_IDS.hooks ? 'Hooks' : 'JSX'
+      setEditorState(nextEditorState)
+
+      setPreviewState(prev => ({
+        ...prev,
+        currentViewport: snapshot.preview.viewport,
+        viewportWidth: getViewportWidth(snapshot.preview.viewport),
+      }))
+
+      setTheme(snapshot.preview.theme)
+    } catch (error) {
+      console.error('Failed to apply shared snapshot', error)
+    } finally {
+      setShareHydration({ status: 'idle' })
+    }
+  }
+
+  const dismissShareHydration = () => {
+    setShareHydration({ status: 'idle' })
   }
 
   const value: AppState = {
@@ -187,7 +287,33 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     resetToIntro,
     loadFormSummaryTemplate,
     loadHooksDemo,
+    shareHydration,
+    applySharedSnapshot,
+    dismissShareHydration,
   }
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>
+}
+
+const DEFAULT_SHARE_DECODE_ERROR: ShareDecodeError = {
+  code: 'decode-failed',
+  message: 'We could not decode this share link. Please request a new one.',
+}
+
+const buildProjectFromSnapshot = (snapshot: ProjectSnapshot, previous: Project): Project => {
+  const nextJsx = findSnapshotContent(snapshot, SNAPSHOT_FILE_IDS.jsx) ?? previous.jsxCode
+  const nextHooks = findSnapshotContent(snapshot, SNAPSHOT_FILE_IDS.hooks) ?? previous.hooksCode
+
+  return {
+    ...previous,
+    jsxCode: nextJsx,
+    hooksCode: nextHooks,
+    viewportSize: snapshot.preview.viewport,
+    version: snapshot.version,
+    lastModified: new Date().toISOString(),
+  }
+}
+
+const findSnapshotContent = (snapshot: ProjectSnapshot, fileId: string): string | undefined => {
+  return snapshot.files.find(file => file.id === fileId)?.content
 }

@@ -49,6 +49,20 @@ One of Aksel Arcade's most powerful features! Enable inspect mode to:
 - **Edit project names**: Keep your prototypes organized
 - **Session recovery**: Return to your last project when you reopen the app
 
+### 🔗 Share Projects Instantly
+- **Header Share button**: Click the Link icon between Import and Settings to open the share popover without leaving your flow.
+- **One-click CopyButton**: The popover generates a link client-side, keeps the CopyButton disabled until ready, and confirms when the URL is copied.
+- **Offline-aware**: If generation takes longer than expected or clipboard permissions are denied, you’ll get inline guidance plus a manual copy fallback without revealing the full URL.
+- **Payload guard rails**: Oversize snapshots are caught by a 1.4× heuristic before compression finishes, so the CopyButton never flashes an unusable link.
+- **Still exportable**: Oversize warnings now include a dedicated **Use Export instead** CTA that triggers the JSON export flow without leaving the popover.
+- **Telemetry-backed SLA**: Every generation and clipboard attempt emits a telemetry event so we can prove the 95% < 3 s / 99% clipboard-success targets from the spec.
+
+## ✅ Share Success Criteria
+
+- **95% of share generations finish < 3 s** — the telemetry payload exposes `withinTarget: true` whenever we’re inside the budget, so you can check `window.__AKSEL_TELEMETRY_LOG__` in DevTools while testing.
+- **99% clipboard success rate** — CopyButton paths use the native API first and log `share_clipboard` events with `outcome: "success"`; fallback selections show up as `"fallback"` and should stay below 1%.
+- **Oversize guard rails fire before compression** — as soon as estimates cross 3,600 characters the popover shows a warning badge, and any token projected to exceed 4,000 characters logs a `share_generation` event with `outcome: "oversize"` and disables the CopyButton while surfacing the export CTA.
+
 ### 🛡️ Safe Sandbox
 - Code runs in an isolated iframe for security
 - No backend dependencies—fully offline-capable
@@ -176,6 +190,19 @@ Aksel Arcade runs entirely in the browser:
 - **Safe execution**: User code runs in isolated iframe
 - **Offline-capable**: All dependencies bundled at build time
 - **localStorage persistence**: Auto-save without servers
+
+## 🧰 Troubleshooting
+
+### Oversize share links
+- Share URLs now issue a warning between 3,600-4,000 characters and hard-stop at 4,000. A pre-flight heuristic multiplies the snapshot length by ~1.4; if the estimate breaks those guard rails the popover immediately disables CopyButton and shows **Use Export instead**.
+- Click the CTA to trigger the JSON export without leaving the popover, or trim files and hit **Retry generation** to try again.
+- Developers can verify the guard rails by inspecting `window.__AKSEL_TELEMETRY_LOG__` and ensuring a `share_generation` event with `outcome: "oversize"` fires when the warning appears.
+
+### Clipboard access when sharing projects
+- `navigator.clipboard.writeText` works in Chromium, Firefox, and Safari as long as the page is served over HTTPS (or `http://localhost` during development). If the API is unavailable or permission is denied, the Share popover automatically falls back to a hidden textarea copy path so the CopyButton still guides you through copying the link.
+- Safari and hardened enterprise browsers occasionally block clipboard writes until the user interacts with the page. Click anywhere inside the editor (or the Share popover) and try copying again; the fallback path triggers instantly when the modern API throws.
+- If you have previously denied clipboard permissions, open your browser site settings (`chrome://settings/content/clipboard`, `edge://settings/content/clipboard`, or Safari > Settings for This Website) and re-allow clipboard access. The troubleshooting banner in the README matches the runtime messaging so users know why CopyButton is disabled.
+- Offline mode or browser profiles with `document.execCommand` disabled will show inline helper text instructing you to use the hidden textarea output. You can always press `Cmd/Ctrl+C` after the text is auto-selected to finish copying manually, and telemetry should still log the attempt with `outcome: "fallback"` to keep the 99% target honest.
 
 ---
 

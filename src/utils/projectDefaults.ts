@@ -13,23 +13,42 @@ export const INTRO_JSX_CODE = `export default function App() {
       borderColor="neutral-subtleA"
     >
       <VStack gap="space-8">
-        <Heading size="large" level="1">👋 Welcome to Aksel Arcade!</Heading>
+        <Heading size="large" level="1">
+          👋 Welcome to Aksel Arcade!
+        </Heading>
         <BodyLong>
           A browser-based React playground for Aksel Darkside components.
         </BodyLong>
-        
-        <VStack gap="space-4">
-          <Heading size="small" level="2">✨ Features:</Heading>
-          <BodyShort>• <strong>Two tabs:</strong> JSX for components, Hooks for custom logic</BodyShort>
-          <BodyShort>• <strong>Live preview:</strong> See changes instantly</BodyShort>
-          <BodyShort>• <strong>Component palette:</strong> Click "Add" to insert components</BodyShort>
-          <BodyShort>• <strong>Format code:</strong> Prettier integration</BodyShort>
-          <BodyShort>• <strong>Responsive testing:</strong> Toggle viewports</BodyShort>
-          <BodyShort>• <strong>Auto-save:</strong> Your work is saved automatically</BodyShort>
+
+        <VStack gap="space-4" paddingBlock="space-12">
+          <Heading size="small" level="2">
+            ✨ Features:
+          </Heading>
+          <List as="ul">
+            <List.Item>
+              <strong>Two tabs:</strong> JSX for components, Hooks for custom logic
+            </List.Item>
+            <List.Item>
+              <strong>Live preview:</strong> See changes instantly
+            </List.Item>
+            <List.Item>
+              <strong>Component palette:</strong> Click "Add" to insert components
+            </List.Item>
+            <List.Item>
+              <strong>Format code:</strong> Prettier integration
+            </List.Item>
+            <List.Item>
+              <strong>Responsive testing:</strong> Toggle viewports
+            </List.Item>
+            <List.Item>
+              <strong>Auto-save:</strong> Your work is saved automatically
+            </List.Item>
+          </List>
         </VStack>
-        
+
         <Alert variant="info">
-          <strong>Quick tip:</strong> Delete this intro and start coding! You can always reset via Settings → Reset editor.
+          <strong>Quick tip:</strong> Delete this intro and start coding! You can always reset via
+          Settings → Reset editor.
         </Alert>
       </VStack>
     </BoxNew>

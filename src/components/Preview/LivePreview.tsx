@@ -44,7 +44,6 @@ export const LivePreview = ({
 
       // Check for SANDBOX_READY message (not in type-safe messages yet)
       if (event.data?.type === 'SANDBOX_READY') {
-        console.log('✅ Sandbox is ready')
         setSandboxReady(true)
         
         // Send pending code if any
@@ -53,7 +52,6 @@ export const LivePreview = ({
             type: 'EXECUTE_CODE',
             payload: { jsxCode: pendingCodeRef.current, hooksCode: '' },
           }
-          console.log('📤 Sending pending code to sandbox')
           iframeRef.current.contentWindow.postMessage(message, window.location.origin)
           pendingCodeRef.current = null
         }
@@ -138,7 +136,6 @@ export const LivePreview = ({
       payload: { width },
     }
 
-    console.log(`📤 Sending UPDATE_VIEWPORT to sandbox: ${width}px`)
     iframeRef.current.contentWindow.postMessage(message, window.location.origin)
   }, [viewportWidth, sandboxReady, iframeRef])
 
@@ -153,7 +150,6 @@ export const LivePreview = ({
       payload: { theme },
     }
 
-    console.log(`📤 Sending UPDATE_THEME to sandbox: ${theme}`)
     iframeRef.current.contentWindow.postMessage(message, window.location.origin)
   }, [theme, sandboxReady, iframeRef])
 

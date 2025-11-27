@@ -2,8 +2,6 @@ import { test, expect } from '@playwright/test'
 
 test.describe('Component Palette Insertion', () => {
   test('should insert component at cursor position, not at end', async ({ page }) => {
-    page.on('console', msg => console.log(`PAGE: ${msg.text()}`))
-    
     await page.goto('/')
     await page.waitForLoadState('networkidle')
     await page.waitForTimeout(5000) // Wait for Aksel to load
@@ -36,15 +34,9 @@ export default function App() {
     await page.keyboard.press('ArrowDown') // Line 4
     await page.keyboard.press('End') // End of line (after ';')
     
-    console.log('✅ Cursor positioned')
-    
     // Get current content before insertion
     const contentBefore = await editor.textContent()
-    console.log(`📝 Content before insertion:\n${contentBefore}`)
     if (!contentBefore) throw new Error('No content before')
-    
-    const linesBefore = contentBefore.split('\n')
-    console.log(`📊 Lines before: ${linesBefore.length}`)
     
     // Open component palette
     const addButton = page.getByRole('button', { name: /add component/i })
@@ -55,8 +47,6 @@ export default function App() {
     
     // Wait for palette modal
     await expect(page.locator('.component-palette')).toBeVisible()
-    console.log('✅ Component palette opened')
-    
     // Select Button component
     const buttonSnippet = page.locator('.component-palette__item').filter({ hasText: 'Button' }).first()
     await expect(buttonSnippet).toBeVisible()
@@ -66,11 +56,9 @@ export default function App() {
     
     // Get content after insertion
     const contentAfter = await editor.textContent()
-    console.log(`📝 Content after insertion:\n${contentAfter}`)
     if (!contentAfter) throw new Error('No content after')
     
     const linesAfter = contentAfter.split('\n')
-    console.log(`📊 Lines after: ${linesAfter.length}`)
     
     // Verify Button import was added
     expect(contentAfter).toContain('Button')
@@ -78,18 +66,13 @@ export default function App() {
     
     // Find where the Button component was inserted
     const buttonInsertLine = linesAfter.findIndex(line => line.includes('<Button'))
-    console.log(`📍 Button inserted at line: ${buttonInsertLine}`)
     
     // CRITICAL: Button should NOT be at the very end (last line)
     // It should be inserted near the cursor position (around line 4)
     const lastLineIndex = linesAfter.length - 1
     
     if (buttonInsertLine === lastLineIndex || buttonInsertLine === lastLineIndex - 1) {
-      console.log(`❌ FAIL: Button inserted at end (line ${buttonInsertLine} of ${linesAfter.length})`)
-      console.log(`Expected: near line 4, Got: line ${buttonInsertLine}`)
       throw new Error(`Component inserted at end of file (line ${buttonInsertLine}), not at cursor position`)
-    } else {
-      console.log(`✅ PASS: Button inserted at line ${buttonInsertLine}, not at end (${lastLineIndex})`)
     }
     
     // Button should be somewhere in the middle (lines 4-6 range)
@@ -98,8 +81,6 @@ export default function App() {
   })
   
   test('should insert at current cursor position in middle of code', async ({ page }) => {
-    page.on('console', msg => console.log(`PAGE: ${msg.text()}`))
-    
     await page.goto('/')
     await page.waitForLoadState('networkidle')
     await page.waitForTimeout(5000)
@@ -125,8 +106,6 @@ export default function App() {
     }
     await page.keyboard.press('End')
     
-    console.log('✅ Cursor positioned at line 4')
-    
     // Insert Heading component
     await page.getByRole('button', { name: /add component/i }).click()
     await page.waitForTimeout(200)
@@ -140,16 +119,12 @@ export default function App() {
     if (!contentAfter) throw new Error('No content after insert')
     const lines = contentAfter.split('\n')
     
-    console.log(`📝 Final content:\n${contentAfter}`)
-    
     // Find Heading insertion
     const headingLine = lines.findIndex(line => line.includes('<Heading'))
-    console.log(`📍 Heading inserted at line: ${headingLine}`)
     
     // Should be near line 4, not at the end
     expect(headingLine).toBeGreaterThanOrEqual(3)
     expect(headingLine).toBeLessThan(7)
     
-    console.log('✅ Component inserted at cursor position')
   })
 })
