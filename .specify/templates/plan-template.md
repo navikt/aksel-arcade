@@ -33,6 +33,15 @@
 
 [Gates determined based on constitution file]
 
+- Principle I: Clean Code Excellence — clear single-purpose modules
+- Principle II: Browser-First Architecture — no backend/services
+- Principle III: UI Contract Fidelity — align to Figma MCP
+- Principle IV: Performance-First Design — budgets and 60fps targets
+- Principle V: Modular & Reusable Code — extract shared utilities/components
+- Principle VI: Pragmatic Testing — right-sized tests, avoid theater
+- Principle VII: Preservation of Proven Features — add guards/flags to avoid regressions
+- Principle VIII: Aksel Design System Exclusivity — Aksel tokens/layout primitives/components only; wrap with `<Theme>`
+
 ## Project Structure
 
 ### Documentation (this feature)

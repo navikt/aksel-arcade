@@ -1,9 +1,15 @@
 <!--
 Sync Impact Report - Constitution Update
 =========================================
-Version: 1.0.0 → 1.1.0
+Version: 1.0.0 → 1.1.2
 Ratification: 2025-11-06
-Last Amended: 2025-11-06
+Last Amended: 2025-12-12
+
+Changes (v1.1.2):
+- 🔴 HIGH: Locked the project to the Aksel design system with tokens, layout primitives, and components as the only styling and UI source
+
+Changes (v1.1.1):
+- 🔴 HIGH: Added Preservation of Proven Features mandate to prevent regressions when introducing new development
 
 Changes (v1.1.0):
 - ✅ MINOR: Specified React as the framework (Technical Constraints)
@@ -22,12 +28,12 @@ Changes (v1.0.0):
 - ✅ Added Section: Technical Constraints
 
 Templates requiring updates:
-- ✅ plan-template.md: Updated Constitution Check to reference all 6 principles
-- ✅ spec-template.md: Already compatible (no changes required)
-- ✅ tasks-template.md: Already compatible with testing guidance override
+- ✅ plan-template.md: Constitution Check references all 8 principles (incl. Preservation of Proven Features and Aksel Design System Exclusivity)
+- ✅ spec-template.md: Checkpoints added for Principles VII and VIII
+- ✅ tasks-template.md: Tasks call out guards for protected features and Aksel-only implementation
 
 Follow-up TODOs:
-- None - all placeholders filled
+- None
 -->
 
 # AkselArcade Constitution
@@ -121,6 +127,28 @@ Testing MUST be pragmatic and fit the project scale. Focus on high-value tests t
 
 **Rationale**: For a browser-first React playground, pragmatic testing balances quality assurance with development velocity. Over-testing slows iteration; under-testing risks instability. This guidance overrides any generic TDD or test-first mandates from external templates.
 
+### VII. Preservation of Proven Features
+
+When new development could alter any feature or UX that is already validated as correct and must remain unchanged, treat it as protected. Before merging:
+
+- Identify impacted flows and classify protected behaviors explicitly
+- Add or update automated guards (tests, visual snapshots, contract checks) to lock in current behavior
+- Use safe integration patterns (feature flags, opt-in toggles, side-by-side paths) to avoid regressions
+- Require explicit signoff from product/design for any intentional deviation and document rationale
+
+**Rationale**: Perfected features are assets. Guardrails prevent accidental regressions while allowing new development to proceed safely.
+
+### VIII. Aksel Design System Exclusivity
+
+This project MUST use only the Aksel design system for all styling and UI. Implementation requirements:
+
+- Styling and theming come solely from Aksel design tokens (e.g., via `@navikt/ds-css/darkside` and `@navikt/ds-tokens`) and Darkside variables (`--ax-*`); no alternative token sources or ad-hoc theme palettes
+- Layouts use Aksel layout primitives (e.g., Box, Stack, Grid) as the default building blocks; custom layout CSS MUST be token-based and justified
+- Interactive UI uses `@navikt/ds-react` components as the baseline; bespoke components MUST wrap or extend Aksel primitives without breaking token fidelity
+- The entire app, including sandboxed user renders, MUST be wrapped in the Aksel `<Theme>` provider to ensure consistent Darkside theming
+
+**Rationale**: Aksel provides unified tokens, primitives, and components. Exclusivity guarantees visual consistency, predictable theming, and reduces maintenance overhead.
+
 ## UX Excellence Standards
 
 User experience MUST be recognizable, smart, and delightful. The application MUST feel polished, intuitive, and performant.
@@ -152,7 +180,7 @@ User experience MUST be recognizable, smart, and delightful. The application MUS
 - **Framework**: React 18+ (hooks-based components, functional style preferred)
 - **Languages**: TypeScript (strongly encouraged for type safety), JavaScript (ES2022+)
 - **State Management**: React Context, Zustand, or Jotai (avoid Redux unless justified)
-- **Styling**: CSS Modules, Tailwind CSS, or styled-components (consistent approach per project)
+- **Styling**: Aksel design tokens and Darkside styles only (e.g., `@navikt/ds-css/darkside`, `@navikt/ds-tokens`); custom CSS must remain token-based. Do not introduce Tailwind, styled-components, or non-Aksel design systems.
 - **Build**: Vite (preferred for fast HMR and optimized builds)
 - **Testing**: Vitest + React Testing Library (component + integration focus)
 
@@ -195,4 +223,4 @@ This constitution supersedes all other development practices and guidelines. All
 
 This constitution is a living document. As the project evolves, principles may be refined based on learnings. Amendments follow the versioning policy above.
 
-**Version**: 1.1.0 | **Ratified**: 2025-11-06 | **Last Amended**: 2025-11-06
+**Version**: 1.1.2 | **Ratified**: 2025-11-06 | **Last Amended**: 2025-12-12

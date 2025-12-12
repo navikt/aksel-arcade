@@ -82,6 +82,11 @@
   Fill them out with the right functional requirements.
 -->
 
+### Constitution Checkpoints (must be satisfied in this spec)
+
+- Principle VII: Preservation of Proven Features — enumerate protected behaviors/flows; define regression guards (tests, visual snapshots, flags)
+- Principle VIII: Aksel Design System Exclusivity — confirm all UI uses Aksel tokens (`@navikt/ds-css/darkside`, `@navikt/ds-tokens`), layout primitives (Box/Stack/Grid), `@navikt/ds-react` components, and `<Theme>` wrapping for app/sandbox
+
 ### Functional Requirements
 
 - **FR-001**: System MUST [specific capability, e.g., "allow users to create accounts"]

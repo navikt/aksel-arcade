@@ -249,3 +249,5 @@ With multiple developers:
 - Commit after each task or logical group
 - Stop at any checkpoint to validate story independently
 - Avoid: vague tasks, same file conflicts, cross-story dependencies that break independence
+- Add guards for protected behaviors (Principle VII): include tasks for regression tests/visual snapshots or feature flags when touching validated flows
+- Enforce Aksel-only implementation (Principle VIII): include tasks to verify Aksel tokens, layout primitives, @navikt/ds-react components, and <Theme> wrapping in app and sandbox
