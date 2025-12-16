@@ -7,6 +7,8 @@ Auto-generated from all feature plans. Last updated: 2025-11-06
 - Browser localStorage for baseline persistence + encoded query-string payload for sharing (no backend) (001-share-project-url)
 - TypeScript 5.x targeting React 19 with Vite bundling. + React + @navikt/ds-react v7.25+, @navikt/ds-css/darkside, `@uiw/react-codemirror`, `lz-string`, Web Crypto API (`crypto.subtle`), local `telemetry` service, Playwright for E2E. (001-share-project-url)
 - Browser-only (localStorage for persistence, URL query string/fragment for share payloads). (001-share-project-url)
+- TypeScript 5.x, React 19, Vite toolchain + @navikt/ds-react v7.25+ with Darkside tokens, @navikt/ds-css/darkside, existing inspect/preview services, react testing stack (Vitest + Testing Library), Playwright for E2E (001-inspect-overlay-gaps)
+- Browser localStorage only (unchanged) (001-inspect-overlay-gaps)
 
 - TypeScript 5.x / JavaScript ES2022+ + React 19+ (1-aksel-arcade)
 - react-codemirror (@uiw/react-codemirror) (1-aksel-arcade)
@@ -97,10 +99,10 @@ npm run preview          # Preview production build
 - No over-testing (pragmatic approach per Constitution)
 
 ## Recent Changes
+- 001-inspect-overlay-gaps: Added TypeScript 5.x, React 19, Vite toolchain + @navikt/ds-react v7.25+ with Darkside tokens, @navikt/ds-css/darkside, existing inspect/preview services, react testing stack (Vitest + Testing Library), Playwright for E2E
 - 001-share-project-url: Added TypeScript 5.x targeting React 19 with Vite bundling. + React + @navikt/ds-react v7.25+, @navikt/ds-css/darkside, `@uiw/react-codemirror`, `lz-string`, Web Crypto API (`crypto.subtle`), local `telemetry` service, Playwright for E2E.
 - 001-share-project-url: Added TypeScript 5.x with React 19 (Vite toolchain) + React, @navikt/ds-react v7.25+ (Popover, CopyButton, Theme), react-codemirror, Aksel Darkside tokens, local crypto APIs
 
-- 1-aksel-arcade: Added TypeScript 5.x / JavaScript ES2022+ + React 18+ (browser-based React playground)
 
 <!-- MANUAL ADDITIONS START -->
 

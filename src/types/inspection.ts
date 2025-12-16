@@ -1,3 +1,21 @@
+export interface SpacingValues {
+  top: number
+  right: number
+  bottom: number
+  left: number
+}
+
+export interface InspectionRect {
+  x?: number
+  y?: number
+  left: number
+  top: number
+  right: number
+  bottom: number
+  width: number
+  height: number
+}
+
 export interface InspectionData {
   // Element identity
   componentName: string // React component name (e.g., "Button")
@@ -13,9 +31,17 @@ export interface InspectionData {
   fontSize: string // Font size (e.g., "16px")
   margin: string // Margin shorthand (e.g., "16px 0px")
   padding: string // Padding shorthand (e.g., "8px 16px")
+  marginValues: SpacingValues
+  paddingValues: SpacingValues
+  layoutType: string // e.g., flex | grid | block
+  flexDirection: string // e.g., row | column
+  rowGap: number // gap along inline dimension
+  columnGap: number // gap along cross dimension
+  gap: string | null // gap shorthand, null when n/a
+  gapApplicable: boolean
 
   // Position (for highlight border)
-  boundingRect: DOMRect // Element bounding box
+  boundingRect: InspectionRect // Element bounding box
   
   // Cursor position (relative to iframe viewport)
   cursorX: number // Mouse X position in iframe
