@@ -135,6 +135,7 @@ When new development could alter any feature or UX that is already validated as 
 - Add or update automated guards (tests, visual snapshots, contract checks) to lock in current behavior
 - Use safe integration patterns (feature flags, opt-in toggles, side-by-side paths) to avoid regressions
 - Require explicit signoff from product/design for any intentional deviation and document rationale
+- Make sure not to break any existing functionality; treat unaffected flows as protected by default
 
 **Rationale**: Perfected features are assets. Guardrails prevent accidental regressions while allowing new development to proceed safely.
 

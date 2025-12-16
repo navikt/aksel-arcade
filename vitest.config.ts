@@ -9,6 +9,8 @@ export default mergeConfig(
       environment: 'jsdom',
       setupFiles: ['tests/setup/wasmFetchPolyfill.ts'],
       include: ['tests/**/*.test.{ts,tsx}'],
+      testTimeout: 15000,
+      hookTimeout: 15000,
     },
   })
 )

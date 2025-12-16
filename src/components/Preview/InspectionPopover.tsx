@@ -1,5 +1,11 @@
+import { useLayoutEffect, useRef, useState } from 'react'
 import type { InspectionData } from '@/types/inspection'
 import './InspectionPopover.css'
+
+export const POPOVER_WIDTH = 300
+export const POPOVER_FALLBACK_HEIGHT = 260
+const VIEWPORT_MARGIN = 8
+const ELEMENT_GAP = 8
 
 interface InspectionPopoverProps {
   data: InspectionData
@@ -8,64 +14,108 @@ interface InspectionPopoverProps {
 }
 
 export const InspectionPopover = ({ data, iframeRef, isVisible }: InspectionPopoverProps) => {
+  const popoverRef = useRef<HTMLDivElement | null>(null)
+  const [position, setPosition] = useState<{ left: number; top: number } | null>(null)
+
+  const calculatePosition = () => {
+    if (!iframeRef.current || !popoverRef.current) return null
+
+    const iframeRect = iframeRef.current.getBoundingClientRect()
+    const elementRect = data.boundingRect
+    const elementInWindow = {
+      left: iframeRect.left + elementRect.left,
+      right: iframeRect.left + elementRect.right,
+      top: iframeRect.top + elementRect.top,
+      bottom: iframeRect.top + elementRect.bottom,
+      width: elementRect.width,
+      height: elementRect.height,
+    }
+
+    const popoverRect = popoverRef.current.getBoundingClientRect()
+    const popoverWidth = popoverRect.width || POPOVER_WIDTH
+    const popoverHeight = popoverRect.height || POPOVER_FALLBACK_HEIGHT
+
+    const viewportWidth = window.innerWidth
+    const viewportHeight = window.innerHeight
+
+    const elementCenter = elementInWindow.left + elementInWindow.width / 2
+    const minLeft = Math.max(iframeRect.left + VIEWPORT_MARGIN, VIEWPORT_MARGIN)
+    const maxLeftCandidateIframe = iframeRect.right - popoverWidth - VIEWPORT_MARGIN
+    const maxLeftCandidateViewport = viewportWidth - popoverWidth - VIEWPORT_MARGIN
+    const maxLeft = Math.max(minLeft, Math.min(maxLeftCandidateIframe, maxLeftCandidateViewport))
+    const centeredLeft = elementCenter - popoverWidth / 2
+    const left = Math.min(Math.max(centeredLeft, minLeft), maxLeft)
+
+    const spaceBelow = viewportHeight - elementInWindow.bottom - VIEWPORT_MARGIN
+    const spaceAbove = elementInWindow.top - VIEWPORT_MARGIN
+    const preferBelow = spaceBelow >= popoverHeight + ELEMENT_GAP || spaceBelow >= spaceAbove
+
+    const preferredTop = preferBelow
+      ? elementInWindow.bottom + ELEMENT_GAP
+      : elementInWindow.top - popoverHeight - ELEMENT_GAP
+
+    const minTop = Math.max(iframeRect.top + VIEWPORT_MARGIN, VIEWPORT_MARGIN)
+    const maxTopCandidateIframe = iframeRect.bottom - popoverHeight - VIEWPORT_MARGIN
+    const maxTopCandidateViewport = viewportHeight - popoverHeight - VIEWPORT_MARGIN
+    const maxTop = Math.max(minTop, Math.min(maxTopCandidateIframe, maxTopCandidateViewport))
+
+    const top = Math.min(Math.max(preferredTop, minTop), maxTop)
+
+    return { left, top }
+  }
+
+  useLayoutEffect(() => {
+    if (!isVisible) {
+      setPosition(null)
+      return
+    }
+
+    const nextPosition = calculatePosition()
+    if (nextPosition) {
+      setPosition(nextPosition)
+    }
+
+    const handleResize = () => {
+      const updatedPosition = calculatePosition()
+      if (updatedPosition) {
+        setPosition(updatedPosition)
+      }
+    }
+
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, [data, iframeRef, isVisible])
+
   if (!isVisible || !iframeRef.current) return null
 
-  // Get iframe position in the main window
-  const iframeRect = iframeRef.current.getBoundingClientRect()
-  
-  // Get element's position (convert from iframe-relative to window coordinates)
-  const elementRect = data.boundingRect
-  const elementInWindow = {
-    left: iframeRect.left + elementRect.left,
-    right: iframeRect.left + elementRect.right,
-    top: iframeRect.top + elementRect.top,
-    bottom: iframeRect.top + elementRect.bottom,
-    width: elementRect.width,
-    height: elementRect.height,
-  }
-  
-  // Popover dimensions
-  const popoverWidth = 300
-  const gap = 8 // Gap between element and popover
-  const estimatedPopoverHeight = 250 // Estimated height (no max-height, let it flow)
-  
-  // Calculate vertical position (prefer below, but use above if not enough space)
-  const spaceBelow = iframeRect.bottom - elementInWindow.bottom
-  const spaceAbove = elementInWindow.top - iframeRect.top
-  
-  let top: number
-  if (spaceBelow >= estimatedPopoverHeight || spaceBelow >= spaceAbove) {
-    // Position below element
-    top = elementInWindow.bottom + gap
-  } else {
-    // Position above element
-    top = elementInWindow.top - estimatedPopoverHeight - gap
-  }
-  
-  // Calculate horizontal position (center on element, but stay within iframe bounds)
-  const elementCenter = elementInWindow.left + elementInWindow.width / 2
-  let left = elementCenter - popoverWidth / 2
-  
-  // Ensure popover stays within iframe horizontal bounds
-  if (left < iframeRect.left + 8) {
-    left = iframeRect.left + 8
-  } else if (left + popoverWidth > iframeRect.right - 8) {
-    left = iframeRect.right - popoverWidth - 8
-  }
-  
-  // Ensure popover stays within iframe vertical bounds
-  if (top < iframeRect.top + 8) {
-    top = iframeRect.top + 8
-  } else if (top + estimatedPopoverHeight > iframeRect.bottom - 8) {
-    top = Math.max(iframeRect.top + 8, iframeRect.bottom - estimatedPopoverHeight - 8)
-  }
+  const gapLabel = (() => {
+    if (!data.gapApplicable) return 'n/a'
+
+    const rowGap = Number.isFinite(data.rowGap) ? data.rowGap : 0
+    const columnGap = Number.isFinite(data.columnGap) ? data.columnGap : 0
+    const hasRow = rowGap > 0
+    const hasColumn = columnGap > 0
+
+    if (!hasRow && !hasColumn) return '0'
+
+    if (hasRow && hasColumn && Math.abs(rowGap - columnGap) > 0.5) {
+      return `${rowGap}px ${columnGap}px`
+    }
+
+    const numericGap = hasRow ? rowGap : columnGap
+    if (numericGap > 0) return `${numericGap}px`
+
+    return data.gap ?? '0'
+  })()
 
   return (
     <div
       className="inspection-popover"
+      ref={popoverRef}
       style={{
-        left: `${left}px`,
-        top: `${top}px`,
+        left: `${position?.left ?? -9999}px`,
+        top: `${position?.top ?? -9999}px`,
+        visibility: position ? 'visible' : 'hidden',
       }}
       data-testid="inspection-popover"
     >
@@ -120,6 +170,10 @@ export const InspectionPopover = ({ data, iframeRef, isVisible }: InspectionPopo
           <div className="inspection-popover__style-row">
             <span className="inspection-popover__style-key">Padding:</span>
             <span className="inspection-popover__style-value">{data.padding}</span>
+          </div>
+          <div className="inspection-popover__style-row">
+            <span className="inspection-popover__style-key">Gap:</span>
+            <span className="inspection-popover__style-value">{gapLabel}</span>
           </div>
         </div>
       </div>

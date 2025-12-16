@@ -139,6 +139,16 @@
   <div id="root" class="aksel-theme dark" data-color="accent"></div>
   
   <script type="module">
+    import {
+      computeGapRects,
+      computeSpacingOverlayRects,
+      createOverlayElements,
+      hideOverlays,
+      parseSpacing,
+      renderGapLayers,
+      renderSpacingLayers,
+    } from './inspect-overlays.js'
+
     // React will be loaded from Vite via sandboxAksel.ts (same instance as Aksel components)
     let currentRoot = null;
     let akselLoaded = false;
@@ -357,7 +367,8 @@
 
     // Inspection state (T077)
     let inspectEnabled = false;
-    let highlightOverlay = null;
+    let overlayElements = null;
+    let lastInspectionData = null;
     let lastInspectionTime = 0;
     const INSPECTION_THROTTLE_MS = 16; // ~60fps
     
@@ -425,13 +436,18 @@
         inspectEnabled = payload.enabled;
         
         if (inspectEnabled) {
+          if (!overlayElements) {
+            overlayElements = createOverlayElements(document);
+          }
           // Attach mousemove listener
           document.addEventListener('mousemove', handleInspectMouseMove);
+          document.addEventListener('click', handleInspectClick, true);
           console.log('✅ Inspect mode enabled - mousemove listener attached');
         } else {
           // Remove mousemove listener and clear highlight
           document.removeEventListener('mousemove', handleInspectMouseMove);
-          clearHighlight();
+          document.removeEventListener('click', handleInspectClick, true);
+          clearInspectOverlays();
           sendMessage('INSPECTION_DATA', null);
           console.log('✅ Inspect mode disabled - mousemove listener removed');
         }
@@ -454,7 +470,7 @@
 
         const element = document.elementFromPoint(event.clientX, event.clientY);
         if (!element || element === document.body || element === document.documentElement) {
-          clearHighlight();
+          clearInspectOverlays();
           sendMessage('INSPECTION_DATA', null);
           return;
         }
@@ -470,8 +486,8 @@
           hasProps: Object.keys(inspectionData.props || {}).length,
         });
         
-        // T081: Display highlight border
-        showHighlight(inspectionData.boundingRect);
+        lastInspectionData = inspectionData;
+        renderInspectOverlays(element, inspectionData);
         
         // T079: Send inspection data to main app
         sendMessage('INSPECTION_DATA', inspectionData);
@@ -487,6 +503,24 @@
       try {
         const computedStyle = window.getComputedStyle(element);
         const rect = element.getBoundingClientRect();
+        const marginValues = {
+          top: parseSpacing(computedStyle.marginTop),
+          right: parseSpacing(computedStyle.marginRight),
+          bottom: parseSpacing(computedStyle.marginBottom),
+          left: parseSpacing(computedStyle.marginLeft),
+        };
+        const paddingValues = {
+          top: parseSpacing(computedStyle.paddingTop),
+          right: parseSpacing(computedStyle.paddingRight),
+          bottom: parseSpacing(computedStyle.paddingBottom),
+          left: parseSpacing(computedStyle.paddingLeft),
+        };
+        const layoutType = computedStyle.display || 'block';
+        const flexDirection = computedStyle.flexDirection || 'row';
+        const rowGap = parseSpacing(computedStyle.rowGap);
+        const columnGap = parseSpacing(computedStyle.columnGap);
+        const gapValue = computedStyle.gap || null;
+        const gapApplicable = layoutType.includes('flex') || layoutType.includes('grid');
         
         // Try to find React component name from Fiber
         let componentName = element.tagName.toLowerCase();
@@ -528,6 +562,14 @@
           fontSize: computedStyle.fontSize,
           margin: computedStyle.margin,
           padding: computedStyle.padding,
+          marginValues,
+          paddingValues,
+          layoutType,
+          flexDirection,
+          rowGap,
+          columnGap,
+          gap: gapValue === 'normal' ? null : gapValue,
+          gapApplicable,
           boundingRect: {
             x: rect.x,
             y: rect.y,
@@ -554,6 +596,14 @@
           fontSize: '',
           margin: '',
           padding: '',
+          marginValues: { top: 0, right: 0, bottom: 0, left: 0 },
+          paddingValues: { top: 0, right: 0, bottom: 0, left: 0 },
+          layoutType: 'block',
+          flexDirection: 'row',
+          rowGap: 0,
+          columnGap: 0,
+          gap: null,
+          gapApplicable: false,
           boundingRect: {
             x: 0, y: 0, width: 0, height: 0,
             top: 0, right: 0, bottom: 0, left: 0,
@@ -580,39 +630,58 @@
       return sanitized;
     }
 
-    // T081: Display highlight border around hovered element
-    function showHighlight(rect) {
+    function renderInspectOverlays(element, inspectionData) {
       try {
-        if (!highlightOverlay) {
-          highlightOverlay = document.createElement('div');
-          highlightOverlay.style.position = 'fixed';
-          highlightOverlay.style.border = '2px solid #0067C5';
-          highlightOverlay.style.backgroundColor = 'rgba(0, 103, 197, 0.1)';
-          highlightOverlay.style.pointerEvents = 'none';
-          highlightOverlay.style.zIndex = '9998';
-          highlightOverlay.style.transition = 'all 0.1s ease';
-          document.body.appendChild(highlightOverlay);
+        if (!overlayElements) {
+          overlayElements = createOverlayElements(document);
         }
-        
-        highlightOverlay.style.left = `${rect.left}px`;
-        highlightOverlay.style.top = `${rect.top}px`;
-        highlightOverlay.style.width = `${rect.width}px`;
-        highlightOverlay.style.height = `${rect.height}px`;
-        highlightOverlay.style.display = 'block';
+
+        const viewportBounds = {
+          left: 0,
+          top: 0,
+          right: window.innerWidth,
+          bottom: window.innerHeight,
+        };
+
+        const spacingRects = computeSpacingOverlayRects({
+          boundingRect: inspectionData.boundingRect,
+          margin: inspectionData.marginValues,
+          padding: inspectionData.paddingValues,
+          viewport: viewportBounds,
+        });
+
+        renderSpacingLayers(overlayElements, spacingRects);
+
+        const childrenRects = Array.from(element.children || []).map((child) =>
+          child.getBoundingClientRect()
+        );
+
+        const gapRects = computeGapRects({
+          layoutType: inspectionData.layoutType,
+          flexDirection: inspectionData.flexDirection,
+          rowGap: inspectionData.rowGap,
+          columnGap: inspectionData.columnGap,
+          childrenRects,
+          containerRect: inspectionData.boundingRect,
+          viewport: viewportBounds,
+        });
+
+        renderGapLayers(overlayElements, gapRects);
       } catch (error) {
-        console.error('❌ Error in showHighlight:', error);
-        // Don't propagate error - highlight is non-critical
+        console.error('❌ Error in renderInspectOverlays:', error);
       }
     }
 
-    function clearHighlight() {
+    function handleInspectClick() {
+      // Hover remains authoritative; clicks intentionally do nothing to selection/overlays
+    }
+
+    function clearInspectOverlays() {
       try {
-        if (highlightOverlay) {
-          highlightOverlay.style.display = 'none';
-        }
+        lastInspectionData = null;
+        hideOverlays(overlayElements);
       } catch (error) {
-        console.error('❌ Error in clearHighlight:', error);
-        // Don't propagate error
+        console.error('❌ Error in clearInspectOverlays:', error);
       }
     }
 
