@@ -1,6 +1,7 @@
 import type { Project } from '@/types/project'
 import type { EditorState } from '@/types/editor'
 import type { PreviewState } from '@/types/preview'
+import { generateSecureUUID } from '@/utils/crypto'
 
 // Intro content that showcases features
 export const INTRO_JSX_CODE = `export default function App() {
@@ -470,7 +471,7 @@ export const FORM_SUMMARY_JSX_CODE = `<BoxNew asChild background="default" paddi
     </BoxNew>`
 
 export const createDefaultProject = (): Project => ({
-  id: crypto.randomUUID(),
+  id: generateSecureUUID(),
   name: 'Untitled Project',
   jsxCode: INTRO_JSX_CODE,
   hooksCode: INTRO_HOOKS_CODE,

@@ -8,6 +8,7 @@ import type {
 } from '@/types/project'
 import { AKSEL_METADATA, AI_INSTRUCTIONS, extractUsedComponents } from '@/data/akselMetadata'
 import { createDefaultProject } from '@/utils/projectDefaults'
+import { generateSecureUUID } from '@/utils/crypto'
 
 const STORAGE_KEY = 'aksel-arcade:project'
 const MAX_PROJECT_SIZE_BYTES = 5 * 1024 * 1024 // 5MB
@@ -316,7 +317,7 @@ export const importProject = async (file: File): Promise<ImportResult> => {
     }
 
     // Assign new ID and timestamp (treat as new project)
-    project.id = crypto.randomUUID()
+    project.id = generateSecureUUID()
     project.lastModified = new Date().toISOString()
 
     return {
