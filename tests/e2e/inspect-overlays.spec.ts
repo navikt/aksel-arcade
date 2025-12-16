@@ -1,6 +1,6 @@
-import { test, expect } from '@playwright/test'
+import { test, expect, type Page } from '@playwright/test'
 
-const enableInspectMode = async (page: Parameters<typeof test>[0]['page']) => {
+const enableInspectMode = async (page: Page) => {
   await page.goto('/')
   await page.waitForLoadState('networkidle')
   const toggle = page.locator('.inspect-mode-button')

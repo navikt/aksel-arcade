@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest'
-// @ts-expect-error: overlay helpers are authored in public assets for sandbox runtime
 import {
   clampRect,
   computeGapRects,
