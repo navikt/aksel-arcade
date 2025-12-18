@@ -3,7 +3,7 @@
 export const overlayColors = {
   margin: 'var(--ax-bg-warning-moderate-hoverA, rgba(255, 183, 77, 0.45))',
   padding: 'var(--ax-bg-success-moderate-hoverA, rgba(0, 138, 56, 0.35))',
-  element: 'var(--ax-bg-accent-moderate-hoverA, rgba(0, 103, 197, 0.35))',
+  element: 'var(--ax-bg-accent-moderateA, rgba(0, 95, 255, 0.11))',
   gap: 'var(--ax-bg-meta-purple-moderate-hoverA, rgba(102, 86, 255, 0.35))',
 }
 
