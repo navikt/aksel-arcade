@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   Modal,
   Tabs,
@@ -27,6 +27,17 @@ interface ComponentPaletteProps {
 export const ComponentPalette = ({ open, onClose, onInsertComponent }: ComponentPaletteProps) => {
   const [searchQuery, setSearchQuery] = useState('')
   const [activeTab, setActiveTab] = useState<AkselCatalogGroup>('component')
+  const searchInputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    if (!open) return undefined
+
+    const timeoutId = window.setTimeout(() => {
+      searchInputRef.current?.focus()
+    }, 0)
+
+    return () => window.clearTimeout(timeoutId)
+  }, [open])
 
   // Filter components based on search and active tab
   const filteredComponents = useMemo(() => {
@@ -71,17 +82,21 @@ export const ComponentPalette = ({ open, onClose, onInsertComponent }: Component
             onChange={(e) => setSearchQuery(e.target.value)}
             // @ts-expect-error - icon prop exists
             icon={<MagnifyingGlassIcon />}
+            ref={searchInputRef}
             size="small"
+            autoFocus
           />
 
           {/* Tabs */}
-          <Tabs value={activeTab} onChange={(value) => setActiveTab(value as AkselCatalogGroup)}>
-            <Tabs.List>
-              <Tabs.Tab value="layout" label="Layout" />
-              <Tabs.Tab value="component" label="Components" />
-              <Tabs.Tab value="icon" label="Icons" />
-            </Tabs.List>
-          </Tabs>
+          <div className="component-palette-tabs">
+            <Tabs value={activeTab} onChange={(value) => setActiveTab(value as AkselCatalogGroup)}>
+              <Tabs.List>
+                <Tabs.Tab value="layout" label="Layout" />
+                <Tabs.Tab value="component" label="Components" />
+                <Tabs.Tab value="icon" label="Icons" />
+              </Tabs.List>
+            </Tabs>
+          </div>
 
           {/* Component Grid */}
           <div className="component-grid-wrapper">

@@ -3,12 +3,18 @@
   width: 500px !important;
 }
 
+.component-palette-modal:focus,
+.component-palette-modal:focus-visible {
+  outline: none !important;
+}
+
 .component-palette-body {
   min-height: 400px;
   max-height: 600px;
   overflow: hidden !important;
   display: flex !important;
   flex-direction: column !important;
+  padding-top: var(--ax-space-8) !important;
 }
 
 .component-palette-content {
@@ -18,9 +24,24 @@
   flex-direction: column !important;
 }
 
+.component-palette-tabs {
+  flex: 0 0 auto;
+}
+
+.component-palette-tabs .aksel-tabs__tablist {
+  scrollbar-width: none;
+}
+
+.component-palette-tabs .aksel-tabs__tablist::-webkit-scrollbar {
+  display: none;
+}
+
 .component-grid-wrapper {
   flex: 1;
   min-height: 0;
+  margin-inline: calc(var(--ax-space-4) * -1);
+  padding: var(--ax-space-4) var(--ax-space-4) var(--ax-space-12);
+  overflow-x: hidden;
   overflow-y: auto;
   scrollbar-gutter: stable;
 }
