@@ -53,33 +53,6 @@
   transform: translateY(0);
 }
 
-.component-badge {
-  font-size: 0.75rem;
-  padding: 0.125rem 0.5rem;
-  border-radius: var(--ax-border-radius-medium);
-  font-weight: 500;
-}
-
-.layout-category-badge {
-  background: var(--ax-bg-info-soft);
-  color: var(--ax-text-info-subtle);
-}
-
-.component-category-badge {
-  background: var(--ax-bg-neutral-soft);
-  color: var(--ax-text-neutral-subtle);
-}
-
-.icon-category-badge {
-  background: var(--ax-bg-accent-soft);
-  color: var(--ax-text-accent-subtle);
-}
-
-.experimental-badge {
-  background: var(--ax-bg-warning-soft);
-  color: var(--ax-text-warning-subtle);
-}
-
 .component-description {
   color: var(--ax-text-neutral-subtle);
   line-height: 1.4;

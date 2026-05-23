@@ -113,8 +113,6 @@ interface ComponentCardProps {
 }
 
 const ComponentCard = ({ component, onInsert }: ComponentCardProps) => {
-  const categoryLabel = getCategoryLabel(component.category)
-
   return (
     <BoxNew
       className="component-card"
@@ -141,14 +139,6 @@ const ComponentCard = ({ component, onInsert }: ComponentCardProps) => {
           <Heading level="3" size="xsmall">
             {component.name}
           </Heading>
-          <HStack gap="space-2" align="center">
-            <span className={`component-badge ${component.category}-category-badge`}>
-              {categoryLabel}
-            </span>
-            {component.status === 'experimental' && (
-              <span className="component-badge experimental-badge">Experimental</span>
-            )}
-          </HStack>
         </HStack>
         {component.description && (
           <BodyShort size="small" className="component-description">
@@ -156,7 +146,7 @@ const ComponentCard = ({ component, onInsert }: ComponentCardProps) => {
           </BodyShort>
         )}
         <div className="component-props">
-          {component.props.length > 0 ? (
+          {component.props.length > 0 && (
             <>
               {component.props.slice(0, 3).map((prop) => (
                 <span key={prop.name} className="prop-tag">
@@ -168,8 +158,6 @@ const ComponentCard = ({ component, onInsert }: ComponentCardProps) => {
                 <span className="prop-tag more">+{component.props.length - 3} more</span>
               )}
             </>
-          ) : (
-            <span className="prop-tag">import-free</span>
           )}
           {component.docs && (
             <a
@@ -186,14 +174,4 @@ const ComponentCard = ({ component, onInsert }: ComponentCardProps) => {
       </VStack>
     </BoxNew>
   )
-}
-
-const getCategoryLabel = (category: AkselCatalogGroup): string => {
-  const labels: Record<AkselCatalogGroup, string> = {
-    layout: 'Layout',
-    component: 'Component',
-    icon: 'Icon',
-  }
-
-  return labels[category]
 }

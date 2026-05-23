@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import iconMetadata from '@navikt/aksel-icons/metadata'
 import {
   AKSEL_CATALOG,
   AKSEL_CATALOG_VERSION,
@@ -56,7 +57,7 @@ describe('Aksel catalog starter path', () => {
     expect(buttonPaletteEntry?.snippet).not.toMatch(/^import\s/m)
   })
 
-  it('exposes palette groups, experimental labels, docs links, and icon snippets from the catalog', () => {
+  it('exposes palette groups, experimental statuses, docs links, and icon snippets from the catalog', () => {
     const paletteComponents = getCatalogPaletteComponents()
     const layoutEntry = paletteComponents.find((component) => component.name === 'HStack')
     const experimentalEntry = paletteComponents.find(
@@ -74,8 +75,23 @@ describe('Aksel catalog starter path', () => {
       expect.objectContaining({ name: 'PlusIcon', category: 'icon' })
     )
     expect(layoutEntry?.docs).toContain('aksel.nav.no')
-    expect(experimentalEntry?.description).toContain('Experimental')
+    expect(experimentalEntry?.status).toBe('experimental')
     expect(iconEntry?.snippet).toBe('<PlusIcon aria-hidden />')
+  })
+
+  it('mirrors the installed Aksel icon metadata in the Icons palette group', () => {
+    const expectedIconNames = Object.values(iconMetadata)
+      .map((icon) => `${icon.name}Icon`)
+      .sort()
+    const paletteIconNames = getComponentsByCategory('icon')
+      .map((component) => component.name)
+      .sort()
+
+    expect(paletteIconNames).toHaveLength(expectedIconNames.length)
+    expect(paletteIconNames).toEqual(expectedIconNames)
+    expect(paletteIconNames).toContain('AirplaneIcon')
+    expect(paletteIconNames).toContain('PlusIcon')
+    expect(paletteIconNames).toContain('XMarkIcon')
   })
 
   it('keeps legacy entries cataloged but hidden from default palette and autocomplete discovery', () => {

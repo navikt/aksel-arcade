@@ -1,4 +1,5 @@
 import type { ComponentSnippet, SnippetCategory } from '@/types/snippets'
+import iconMetadata from '@navikt/aksel-icons/metadata'
 
 export const AKSEL_CATALOG_VERSION = '8.11.0'
 
@@ -56,8 +57,47 @@ const ICON_DOCS = `${AKSEL_DOCS_BASE}/ikoner`
 const TOKEN_DOCS = `${AKSEL_DOCS_BASE}/grunnleggende/styling/design-tokens`
 const DEFAULT_DISCOVERY_STATUSES: AkselCatalogStatus[] = ['current', 'experimental']
 
-const describeCatalogEntry = (entry: AkselCatalogEntry): string =>
-  entry.status === 'experimental' ? `${entry.description} Experimental.` : entry.description
+const splitIconName = (iconName: string): string[] =>
+  iconName
+    .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+    .replace(/([A-Z]+)([A-Z][a-z])/g, '$1 $2')
+    .toLowerCase()
+    .split(/\s+/)
+
+const iconCatalogEntries: AkselCatalogEntry[] = Object.values(iconMetadata)
+  .sort((a, b) => a.name.localeCompare(b.name))
+  .map((icon) => {
+    const componentName = `${icon.name}Icon`
+    const readableName = splitIconName(icon.name).join(' ')
+    const keywords = [
+      ...splitIconName(icon.name),
+      icon.category,
+      icon.sub_category,
+      icon.variant,
+      ...icon.keywords,
+      'icon',
+    ]
+      .filter(Boolean)
+      .map((keyword) => keyword.toLowerCase())
+
+    return {
+      id: `${icon.name.toLowerCase()}-icon`,
+      name: componentName,
+      group: 'icon',
+      status: 'current',
+      package: '@navikt/aksel-icons',
+      importName: componentName,
+      importGuidance: `import { ${componentName} } from '@navikt/aksel-icons';`,
+      docs: ICON_DOCS,
+      description: `${readableName} icon.`,
+      keywords: Array.from(new Set(keywords)),
+      props: [],
+      snippet: {
+        code: `<${componentName} aria-hidden />`,
+        description: `${readableName} icon.`,
+      },
+    }
+  })
 
 export const AKSEL_TOKEN_METADATA: Record<string, AkselTokenMetadata> = {
   spacing: {
@@ -744,74 +784,7 @@ export const AKSEL_CATALOG: AkselCatalogEntry[] = [
       description: 'Experimental multi-step form progress indicator.',
     },
   },
-  {
-    id: 'plus-icon',
-    name: 'PlusIcon',
-    group: 'icon',
-    status: 'current',
-    package: '@navikt/aksel-icons',
-    importName: 'PlusIcon',
-    importGuidance: "import { PlusIcon } from '@navikt/aksel-icons';",
-    docs: ICON_DOCS,
-    description: 'Plus icon for add actions.',
-    keywords: ['plus', 'add', 'create', 'new', 'icon'],
-    props: [],
-    snippet: {
-      code: '<PlusIcon aria-hidden />',
-      description: 'Add/action icon.',
-    },
-  },
-  {
-    id: 'trash-icon',
-    name: 'TrashIcon',
-    group: 'icon',
-    status: 'current',
-    package: '@navikt/aksel-icons',
-    importName: 'TrashIcon',
-    importGuidance: "import { TrashIcon } from '@navikt/aksel-icons';",
-    docs: ICON_DOCS,
-    description: 'Trash icon for delete actions.',
-    keywords: ['trash', 'delete', 'remove', 'icon'],
-    props: [],
-    snippet: {
-      code: '<TrashIcon aria-hidden />',
-      description: 'Delete/action icon.',
-    },
-  },
-  {
-    id: 'checkmark-icon',
-    name: 'CheckmarkIcon',
-    group: 'icon',
-    status: 'current',
-    package: '@navikt/aksel-icons',
-    importName: 'CheckmarkIcon',
-    importGuidance: "import { CheckmarkIcon } from '@navikt/aksel-icons';",
-    docs: ICON_DOCS,
-    description: 'Checkmark icon for success and confirmation.',
-    keywords: ['check', 'checkmark', 'success', 'confirm', 'icon'],
-    props: [],
-    snippet: {
-      code: '<CheckmarkIcon aria-hidden />',
-      description: 'Success/confirmation icon.',
-    },
-  },
-  {
-    id: 'information-icon',
-    name: 'InformationIcon',
-    group: 'icon',
-    status: 'current',
-    package: '@navikt/aksel-icons',
-    importName: 'InformationIcon',
-    importGuidance: "import { InformationIcon } from '@navikt/aksel-icons';",
-    docs: ICON_DOCS,
-    description: 'Information icon for explanatory content.',
-    keywords: ['info', 'information', 'help', 'icon'],
-    props: [],
-    snippet: {
-      code: '<InformationIcon aria-hidden />',
-      description: 'Information icon.',
-    },
-  },
+  ...iconCatalogEntries,
   {
     id: 'boxnew',
     name: 'BoxNew',
@@ -934,7 +907,7 @@ export function getCatalogPaletteComponents(): Array<{
     import: entry.importGuidance,
     props: entry.props,
     snippet: entry.snippet.code,
-    description: describeCatalogEntry(entry),
+    description: entry.description,
     docs: entry.docs,
   }))
 }
