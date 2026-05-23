@@ -63,5 +63,7 @@ describe('Aksel catalog starter path', () => {
     expect(getPropValues('HStack', 'gap')).not.toContain('4')
     expect(getCatalogPropValues('Button', 'variant')).toContain('primary-neutral')
     expect(getPropValues('Button', 'variant')).toContain('primary-neutral')
+    expect(getComponentProps('Button')).toContain('type')
+    expect(getPropValues('Button', 'type')).toContain('submit')
   })
 })

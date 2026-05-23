@@ -2601,18 +2601,19 @@ export const AKSEL_COMPONENTS: Record<string, ComponentMetadata> = {
  */
 export function getComponentProps(componentName: string): string[] {
   const catalogComponent = getCatalogComponent(componentName)
-  if (catalogComponent) return catalogComponent.props.map((p) => p.name)
-
   const metadata = AKSEL_COMPONENTS[componentName]
-  return metadata ? metadata.props.map((p) => p.name) : []
+  const catalogProps = catalogComponent?.props.map((p) => p.name) ?? []
+  const manualProps = metadata?.props.map((p) => p.name) ?? []
+
+  return [...catalogProps, ...manualProps.filter((prop) => !catalogProps.includes(prop))]
 }
 
 /**
  * Get valid values for a specific prop
  */
 export function getPropValues(componentName: string, propName: string): string[] {
-  const catalogComponent = getCatalogComponent(componentName)
-  if (catalogComponent) return getCatalogPropValues(componentName, propName)
+  const catalogProp = getCatalogPropDefinition(componentName, propName)
+  if (catalogProp) return getCatalogPropValues(componentName, propName)
 
   const metadata = AKSEL_COMPONENTS[componentName]
   if (!metadata) return []
@@ -2628,18 +2629,15 @@ export function getPropDefinition(
   componentName: string,
   propName: string
 ): PropDefinition | undefined {
-  const catalogComponent = getCatalogComponent(componentName)
-  if (catalogComponent) {
-    const catalogProp = getCatalogPropDefinition(componentName, propName)
-    return catalogProp
-      ? {
-          name: catalogProp.name,
-          type: catalogProp.type,
-          values: catalogProp.values,
-          description: catalogProp.description,
-          required: catalogProp.required,
-        }
-      : undefined
+  const catalogProp = getCatalogPropDefinition(componentName, propName)
+  if (catalogProp) {
+    return {
+      name: catalogProp.name,
+      type: catalogProp.type,
+      values: catalogProp.values,
+      description: catalogProp.description,
+      required: catalogProp.required,
+    }
   }
 
   const metadata = AKSEL_COMPONENTS[componentName]
