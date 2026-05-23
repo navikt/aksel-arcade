@@ -78,3 +78,23 @@ Verification:
 - npm run typecheck
 - CI=1 npm run test -- --run
 - Browser smoke checks at local Vite URLs for 900+ icon entries, icon insertion/rendering, no redundant tags, initial search focus, focus-ring spacing, hidden tablist scrollbar strip, and no console errors.
+
+2026-05-24 - Issue #8: Aksel-aware autocomplete contract
+
+Selected #8 as the highest-priority ready-for-agent feature because it is the foundational author-facing autocomplete contract and unblocks contextual icon autocomplete (#9). Worked only on #8.
+
+Implemented:
+- Moved the editor autocomplete logic into `src/services/akselAutocomplete.ts` so component tags, subcomponents, props, and prop values use the checked-in Aksel catalog directly.
+- Added multi-line JSX opening-tag parsing so formatted tags still suggest props and values.
+- Kept default tag suggestions scoped to current/experimental Layout and Component catalog entries, excluding legacy entries and icons until #9 adds contextual icon autocomplete.
+- Added catalog-backed value suggestions for enum props, v8 spacing tokens, Box styling tokens (`background`, `borderColor`, `borderRadius`, `borderWidth`, `shadow`), and `data-color`.
+- Added user-facing regression coverage in `tests/unit/akselAutocomplete.test.ts` for tag, subcomponent, multi-line prop, enum, spacing, Box token, and `data-color` contexts.
+
+Verification:
+- npm run typecheck
+- CI=1 npm run test
+- npm run lint (passes with the existing `InspectionPopover` hook dependency warning)
+- Browser smoke check at http://127.0.0.1:5176/aksel-arcade/ for app render and console output.
+
+Next note:
+- #9 should build on `src/services/akselAutocomplete.ts` for icon-aware contexts instead of reintroducing broad icon suggestions into normal component tag or prop lists.

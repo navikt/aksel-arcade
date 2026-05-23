@@ -1,8 +1,8 @@
 import CodeMirror from '@uiw/react-codemirror'
 import { createTheme } from '@uiw/codemirror-themes'
 import { javascript } from '@codemirror/lang-javascript'
-import { autocompletion, startCompletion, completionStatus, type CompletionContext, type CompletionResult } from '@codemirror/autocomplete'
-import { ViewPlugin, EditorView, type ViewUpdate } from '@codemirror/view'
+import { autocompletion, startCompletion, completionStatus } from '@codemirror/autocomplete'
+import { ViewPlugin, type ViewUpdate } from '@codemirror/view'
 import { keymap } from '@codemirror/view'
 import { undo, redo } from '@codemirror/commands'
 import { linter, type Diagnostic } from '@codemirror/lint'
@@ -10,8 +10,10 @@ import { bracketMatching } from '@codemirror/language'
 import { tags as t } from '@lezer/highlight'
 import { forwardRef, useImperativeHandle, useRef, useMemo } from 'react'
 import type { ReactCodeMirrorRef } from '@uiw/react-codemirror'
-import { AKSEL_SNIPPETS } from '@/services/componentLibrary'
-import { getComponentProps, getPropValues, getPropDefinition } from '@/services/akselMetadata'
+import {
+  getAkselCompletionForContext,
+  isAkselPropValueCompletionContext,
+} from '@/services/akselAutocomplete'
 import * as Babel from '@babel/standalone'
 import './CodeEditor.css'
 
@@ -55,27 +57,6 @@ interface CodeEditorProps {
   readOnly?: boolean
 }
 
-// Helper to detect if cursor is inside quotes of a prop value
-function isCursorInPropValue(view: EditorView, pos: number): boolean {
-  const line = view.state.doc.lineAt(pos)
-  const textBeforeCursor = line.text.slice(0, pos - line.from)
-  const textAfterCursor = line.text.slice(pos - line.from)
-  
-  // Check if cursor is between quotes: prop="...cursor..." or prop='...cursor...'
-  // Match: <Component prop="text before cursor
-  // Support component names with dots like Page.Block
-  // Support prop names with hyphens like data-color
-  const beforeMatch = textBeforeCursor.match(/<[\w.]+[^>]*\s+[\w-]+=["']([^"']*)$/)
-  if (!beforeMatch) return false
-  
-  // Check that there's a closing quote after cursor (or end of prop value typing)
-  // We're inside quotes if we haven't hit the closing quote yet
-  const afterMatch = textAfterCursor.match(/^[^"']*["']/)
-  
-  // Inside quotes if: we have opening quote before AND (closing quote after OR still typing)
-  return beforeMatch !== null && (afterMatch !== null || textAfterCursor.length === 0 || !textAfterCursor.includes('>'))
-}
-
 // ViewPlugin to trigger autocomplete when cursor enters prop value quotes
 const cursorInQuotesPlugin = ViewPlugin.fromClass(class {
   private lastPos: number = -1
@@ -111,8 +92,8 @@ const cursorInQuotesPlugin = ViewPlugin.fromClass(class {
       return
     }
     
-    // Check if cursor is inside prop value quotes
-    if (isCursorInPropValue(update.view, pos)) {
+    // Check if cursor is inside catalog-backed prop value quotes
+    if (isAkselPropValueCompletionContext(update.state.doc.toString(), pos)) {
       // Defer startCompletion to next tick to avoid calling during view update
       this.completionTimeout = window.setTimeout(() => {
         this.lastTriggerTime = Date.now()
@@ -246,154 +227,11 @@ export const CodeEditor = forwardRef<CodeEditorRef, CodeEditorProps>(({
       },
     ])
 
-    // Custom autocomplete for Aksel components, props, and prop values
-    const akselCompletion = (context: CompletionContext): CompletionResult | null => {
-    const line = context.state.doc.lineAt(context.pos)
-    const textBeforeCursor = line.text.slice(0, context.pos - line.from)
-    
-    // 1. Match prop values: e.g., <Button variant="|" or size="m|" or variant="d|"
-    // Support component names with dots like Page.Block
-    // Support prop names with hyphens like data-color
-    // This matches when typing inside quotes OR when cursor is right after opening quote
-    const propValueMatch = textBeforeCursor.match(/<([\w.]+)[^>]*\s+([\w-]+)=["']([^"']*)$/)
-    if (propValueMatch) {
-      const [, componentName, propName, partialValue] = propValueMatch
-      const values = getPropValues(componentName, propName)
-      
-      if (values.length > 0) {
-        const propDef = getPropDefinition(componentName, propName)
-        const options = values
-          .filter((val) => val.toLowerCase().startsWith(partialValue.toLowerCase()))
-          .map((val) => ({
-            label: val,
-            type: 'value',
-            detail: propDef?.description || `${propName} value`,
-            apply: val,
-          }))
-        
-        if (options.length > 0) {
-          const valueStart = context.pos - partialValue.length
-          return {
-            from: valueStart,
-            options,
-            filter: false, // Disable default filtering since we handle it
-            validFor: /^[\w-]*$/, // Keep results valid while typing word characters or hyphens
-          }
-        }
-      }
-    }
-    
-    // 2. Match props after component name: e.g., <Button | or <Button v|
-    // Support component names with dots like Page.Block
-    // Support prop names with hyphens like data-color
-    // Fixed ReDoS vulnerability by simplifying regex - use [^>]*? to skip existing props
-    const propMatch = textBeforeCursor.match(/<([\w.]+)[^>]*?\s+([\w-]*)$/)
-    if (propMatch) {
-      const [, componentName, partialProp] = propMatch
-      const props = getComponentProps(componentName)
-      
-      if (props.length > 0) {
-        const options = props
-          .filter((prop) => prop.toLowerCase().startsWith(partialProp.toLowerCase()))
-          .map((prop) => {
-            const propDef = getPropDefinition(componentName, prop)
-            const hasValues = propDef?.values && propDef.values.length > 0
-            
-            return {
-              label: prop,
-              type: 'property',
-              detail: propDef?.description || `${componentName} prop`,
-              // If prop has enum values, add ="..." template, otherwise just add prop name
-              apply: hasValues ? `${prop}=""` : prop,
-              // Move cursor inside quotes if we added them
-              boost: propDef?.required ? 10 : 0,
-            }
-          })
-        
-        if (options.length > 0) {
-          const propStart = context.pos - partialProp.length
-          return {
-            from: propStart,
-            options,
-            validFor: /^[\w-]*$/, // Keep results valid while typing word characters or hyphens
-          }
-        }
-      }
-    }
-    
-    // 3. Match < followed by word characters (for JSX component tags)
-    // Support component names with dots like Page.Block
-    const beforeLt = context.matchBefore(/<[\w.]*/)
-    if (beforeLt) {
-      const query = beforeLt.text.slice(1) // Remove the <
-      
-      const options = AKSEL_SNIPPETS.map((snippet) => {
-        // Parse template to extract just the component code (remove ${N:placeholder} syntax)
-        let template = snippet.template
-        template = template.replace(/\$\{(\d+):([^}]+)\}/g, (_match, _num, placeholder) => placeholder)
-        
-        // Strip the leading < since we're replacing after the < character
-        if (template.startsWith('<')) {
-          template = template.slice(1)
-        }
-        
-        return {
-          label: snippet.name,
-          type: 'class',
-          detail: snippet.description,
-          // info: snippet.template, // DISABLED: Testing if preview popover causes focus snapping
-          apply: template, // Apply the parsed template without leading <
-        }
-      }).filter(opt => 
-        // Filter by query if user has typed something after <
-        query === '' || opt.label.toLowerCase().startsWith(query.toLowerCase())
-      )
-
-      if (options.length > 0) {
-        const result = {
-          from: beforeLt.from + 1, // Start after the < character (keep user's <)
-          options,
-          validFor: /^[\w.]*$/, // Keep results valid while typing word characters or dots
-        }
-        return result
-      }
-    }
-
-    // 4. Also match word at cursor (for non-JSX context)
-    const word = context.matchBefore(/\w+/)
-    if (word && word.text.length > 0) {
-      const options = AKSEL_SNIPPETS.map((snippet) => {
-        let template = snippet.template
-        template = template.replace(/\$\{(\d+):([^}]+)\}/g, (_match, _num, placeholder) => placeholder)
-        
-        return {
-          label: snippet.name,
-          type: 'class',
-          detail: snippet.description,
-          // info: snippet.template, // DISABLED: Testing if preview popover causes focus snapping
-          apply: template,
-        }
-      }).filter(opt => 
-        opt.label.toLowerCase().startsWith(word.text.toLowerCase())
-      )
-
-      if (options.length > 0) {
-        return {
-          from: word.from,
-          options,
-          validFor: /^\w*$/, // Keep results valid while typing word characters
-        }
-      }
-    }
-
-      return null
-    }
-
     // Return the extensions array
     return [
       javascript({ jsx: language === 'jsx', typescript: true }),
       autocompletion({ 
-        override: [akselCompletion], 
+        override: [getAkselCompletionForContext], 
         activateOnTyping: true,
         // Auto-trigger completion after selecting an option
         activateOnCompletion: () => true,
