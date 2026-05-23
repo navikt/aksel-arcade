@@ -17,7 +17,13 @@ export const validateMainToSandboxMessage = (data: unknown): data is MainToSandb
   if (!data || typeof data !== 'object') return false
   if (!('type' in data)) return false
 
-  const validTypes = ['EXECUTE_CODE', 'UPDATE_VIEWPORT', 'TOGGLE_INSPECT', 'GET_INSPECTION_DATA']
+  const validTypes = [
+    'EXECUTE_CODE',
+    'UPDATE_VIEWPORT',
+    'TOGGLE_INSPECT',
+    'GET_INSPECTION_DATA',
+    'UPDATE_THEME',
+  ]
   return validTypes.includes((data as { type: string }).type)
 }
 
@@ -33,6 +39,7 @@ export const validateSandboxToMainMessage = (data: unknown): data is SandboxToMa
     'COMPILE_ERROR',
     'RUNTIME_ERROR',
     'INSPECTION_DATA',
+    'THEME_UPDATED',
     'CONSOLE_LOG',
   ]
   return validTypes.includes((data as { type: string }).type)

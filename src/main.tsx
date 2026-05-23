@@ -2,7 +2,7 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { AppProvider } from './hooks/useProject.tsx'
 import { SettingsProvider } from './contexts/SettingsContext'
-import '@navikt/ds-css/darkside'
+import '@navikt/ds-css'
 import './index.css'
 import App from './App.tsx'
 

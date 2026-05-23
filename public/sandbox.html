@@ -10,7 +10,7 @@
     const isDev = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') && window.location.port === '5173'
     
     // Development CSP: Allow localhost for Vite HMR
-    const devCSP = "default-src 'none'; script-src 'unsafe-inline' 'unsafe-eval' http://localhost:* https://localhost:*; style-src 'unsafe-inline' http://localhost:* https://localhost:* https://cdn.nav.no; font-src https://cdn.nav.no data:; connect-src http://localhost:* https://localhost:* ws://localhost:* wss://localhost:*; img-src data: https:;"
+    const devCSP = "default-src 'none'; script-src 'unsafe-inline' 'unsafe-eval' 'self' http://localhost:* http://127.0.0.1:* https://localhost:* https://127.0.0.1:*; style-src 'unsafe-inline' 'self' http://localhost:* http://127.0.0.1:* https://localhost:* https://127.0.0.1:* https://cdn.nav.no; font-src 'self' https://cdn.nav.no data:; connect-src 'self' http://localhost:* http://127.0.0.1:* https://localhost:* https://127.0.0.1:* ws://localhost:* ws://127.0.0.1:* wss://localhost:* wss://127.0.0.1:*; img-src data: https:;"
     
     // Production CSP: Strict, only allow required CDN resources
     // Note: 'unsafe-eval' is required for user code execution (playground feature)
@@ -25,7 +25,7 @@
     
     console.log('🔒 CSP applied:', isDev ? 'Development' : 'Production')
   </script>
-  <!-- Aksel Darkside CSS: Bundled by esbuild in production, loaded via Vite in dev -->
+  <!-- Aksel CSS: Bundled by esbuild in production, loaded via Vite in dev -->
   <link rel="stylesheet" href="./sandbox-bundle.css">
   <style>
     /* Set iframe canvas color to match preview container background */
@@ -33,7 +33,7 @@
       /* Color-scheme will be set dynamically by updateTheme function */
       /* Initial: dark (matches main app default) */
       color-scheme: dark;
-      /* Use Aksel Darkside sunken background variable (adapts to theme) */
+      /* Use Aksel sunken background variable (adapts to theme) */
       background: var(--ax-bg-sunken);
       /* Enable scrolling when content overflows */
       overflow: auto;
@@ -46,7 +46,7 @@
       min-height: 100%;
     }
     
-    /* NO custom reset - Aksel Darkside provides complete reset.darkside.css via import */
+    /* NO custom reset - Aksel CSS provides the complete reset via import */
     #root {
       width: 100%;
       box-sizing: border-box;
@@ -66,9 +66,9 @@
       width: 100%;
     }
     
-    /* FIX: Missing Aksel textColor variants - decoration and contrast */
+    /* FIX: Missing Aksel textColor decoration variant */
     /* These CSS classes are used by Heading, BodyLong, BodyShort, Label, Detail, etc. */
-    /* The CSS variables exist (--ax-text-decoration, --ax-text-contrast) but the classes are missing in Aksel 7.33.1 */
+    /* The CSS variable exists (--ax-text-decoration) but this class is not emitted by Aksel v8. */
     .aksel-typo--color-decoration {
       color: var(--ax-text-neutral-decoration);
     }
@@ -129,8 +129,8 @@
   </style>
 </head>
 <body>
-  <!-- Apply aksel-theme and light classes for Darkside styling to both html and root -->
-  <!-- data-color activates Darkside color system -->
+  <!-- Apply aksel-theme and theme classes for Aksel styling to both html and root -->
+  <!-- data-color activates the Aksel color system -->
   <script>
     // Set initial theme classes on html element for background (matches main app default: dark)
     document.documentElement.className = 'aksel-theme dark';
@@ -164,17 +164,18 @@
     async function loadFromCDN() {
       console.log('📦 Loading from ESM.sh CDN...');
       
-      // Load Darkside CSS via fetch to avoid CORS issues with <link> tags
+      // Load Aksel CSS via fetch to avoid CORS issues with <link> tags
       try {
-        console.log('📥 Fetching Darkside CSS from CDN...');
-        const cssResponse = await fetch('https://cdn.nav.no/aksel/@navikt/ds-css/7.33.1/darkside/index.css');
+        console.log('📥 Fetching Aksel CSS from CDN...');
+        const cssResponse = await fetch('https://cdn.nav.no/aksel/@navikt/ds-css/8.11.0/index.css');
         const cssText = await cssResponse.text();
         const style = document.createElement('style');
+        style.dataset.akselCss = 'true';
         style.textContent = cssText;
         document.head.appendChild(style);
-        console.log('✅ Darkside CSS loaded from CDN');
+        console.log('✅ Aksel CSS loaded from CDN');
       } catch (err) {
-        console.error('❌ Failed to load Darkside CSS:', err);
+        console.error('❌ Failed to load Aksel CSS:', err);
         // Continue anyway - components might still work without styles
       }
       
@@ -205,7 +206,7 @@
       console.log('📥 Loading Aksel components from ESM.sh...');
       let AkselReact;
       try {
-        AkselReact = await import('https://esm.sh/@navikt/ds-react@7.33.1?external=react,react-dom&bundle');
+        AkselReact = await import('https://esm.sh/@navikt/ds-react@8.11.0?external=react,react-dom&bundle');
         console.log('✅ AkselReact loaded, keys:', Object.keys(AkselReact).slice(0, 5));
         console.log('🔍 AkselReact.Theme:', !!AkselReact.Theme, 'AkselReact.default:', !!AkselReact.default);
       } catch (err) {
@@ -216,7 +217,7 @@
       console.log('📥 Loading Aksel icons from ESM.sh...');
       let AkselIcons;
       try {
-        AkselIcons = await import('https://esm.sh/@navikt/aksel-icons@7.33.1?external=react&bundle');
+        AkselIcons = await import('https://esm.sh/@navikt/aksel-icons@8.11.0?external=react&bundle');
         console.log('✅ AkselIcons loaded, icon count:', Object.keys(AkselIcons).length);
       } catch (err) {
         console.error('❌ Failed to import AkselIcons:', err);
@@ -339,7 +340,7 @@
         console.log('✅ Aksel icons loaded:', Object.keys(AkselIcons).length, 'icons');
         console.log('✅ React version:', React.version);
         console.log('✅ Theme component available:', !!ThemeComponent);
-        console.log('✅ Darkside CSS imported via @navikt/ds-css/darkside');
+        console.log('✅ Aksel CSS imported via @navikt/ds-css');
         window.parent.postMessage({ type: 'SANDBOX_READY' }, window.location.origin);
       })
       .catch((err) => {
@@ -730,7 +731,7 @@
           aVarCount: aVars.length,
           axVarSample: axVars.slice(0, 5),
           aVarSample: aVars.slice(0, 5),
-          darksideCSSLoaded: !!document.querySelector('link[href*="darkside"]'),
+          akselCSSLoaded: !!document.querySelector('link[href*="sandbox-bundle.css"], style[data-aksel-css]'),
           allStylesheets: Array.from(document.styleSheets).map(s => s.href).filter(Boolean)
         }
       };
@@ -905,7 +906,7 @@
         // Create new root and render
         currentRoot = ReactDOM.createRoot(rootElement);
         
-        // CRITICAL: Wrap component with Theme for Aksel Darkside to work
+        // CRITICAL: Wrap component with Theme for Aksel light/dark semantics to work
         // Per Aksel docs: "må du bruke den nye Theme-komponenten"
         if (!ThemeComponent) {
           throw new Error('Theme component not loaded. Make sure Vite dev server is running.');

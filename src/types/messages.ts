@@ -15,6 +15,7 @@ export type SandboxToMainMessage =
   | { type: 'COMPILE_ERROR'; payload: CompileError }
   | { type: 'RUNTIME_ERROR'; payload: RuntimeError }
   | { type: 'INSPECTION_DATA'; payload: InspectionData | null }
+  | { type: 'THEME_UPDATED'; payload: { theme: 'light' | 'dark' } }
   | { type: 'CONSOLE_LOG'; payload: { level: 'log' | 'warn' | 'error'; args: unknown[] } }
 
 // Type guards

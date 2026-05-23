@@ -131,6 +131,15 @@ describe('Security Utilities', () => {
       expect(validateSandboxToMainMessage(message)).toBe(true)
     })
 
+    it('should accept valid THEME_UPDATED message', () => {
+      const message = {
+        type: 'THEME_UPDATED',
+        payload: { theme: 'light' },
+      }
+
+      expect(validateSandboxToMainMessage(message)).toBe(true)
+    })
+
     it('should reject message with invalid type', () => {
       const message = {
         type: 'EXECUTE_CODE',

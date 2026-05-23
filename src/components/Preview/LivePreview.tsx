@@ -86,6 +86,8 @@ export const LivePreview = ({
             setInspectionData(null)
           }
           break
+        case 'THEME_UPDATED':
+          break
         case 'CONSOLE_LOG':
           // Forward console logs to main console
           console[message.payload.level](...message.payload.args)

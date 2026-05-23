@@ -1,0 +1,15 @@
+2026-05-23 - Issue #5: V8 runtime foundation tracer
+
+Selected #5 as the highest-priority ready-for-agent feature because it establishes the v8 runtime/theme foundation needed by the later catalog, autocomplete, palette, and chrome work.
+
+Implemented:
+- Pinned runtime Aksel packages to 8.11.0 and removed the direct runtime @navikt/ds-tokens dependency.
+- Switched the app and sandbox to import current Aksel CSS from @navikt/ds-css, then regenerated the checked-in sandbox bundle.
+- Kept dark as the default theme and verified the default preview renders after switching between light and dark.
+- Updated export metadata/default intro copy to Aksel v8 and accepted THEME_UPDATED sandbox messages so theme toggles do not warn as invalid messages.
+- Fixed the sandbox development CSP for 127.0.0.1 so local browser verification has no CSP errors.
+
+Verification:
+- npm run typecheck
+- CI=1 npm run test
+- Browser check at http://127.0.0.1:5173/aksel-arcade/ for default preview render and light/dark toggle

@@ -1,13 +1,13 @@
 /**
  * Sandbox Aksel bundle
- * Following official Aksel setup: https://aksel.nav.no/grunnleggende/kode/migration-guide
+ * Following current Aksel setup: https://aksel.nav.no/grunnleggende/kode/migration-guide
  * 
- * import "@navikt/ds-css/darkside";
+ * import "@navikt/ds-css";
  * import { Theme } from "@navikt/ds-react/Theme";
  */
 
-// Import Darkside CSS - this is the correct way per Aksel docs
-import '@navikt/ds-css/darkside';
+// Import Aksel CSS once so the sandbox and app use the same v8 package.
+import '@navikt/ds-css';
 
 // Import React (must be same instance as Aksel uses)
 import * as React from 'react';

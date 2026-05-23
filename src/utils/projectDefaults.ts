@@ -18,7 +18,7 @@ export const INTRO_JSX_CODE = `export default function App() {
           👋 Welcome to Aksel Arcade!
         </Heading>
         <BodyLong>
-          A browser-based React playground for Aksel Darkside components.
+          A browser-based React playground for Aksel v8 components.
         </BodyLong>
 
         <VStack gap="space-4" paddingBlock="space-12">
