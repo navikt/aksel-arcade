@@ -100,8 +100,8 @@ const ComponentCard = ({ component, onInsert }: ComponentCardProps) => {
   return (
     <BoxNew
       className="component-card"
-      padding="3"
-      borderRadius="medium"
+      padding="space-12"
+      borderRadius="8"
       borderWidth="1"
       borderColor="neutral-subtleA"
       onClick={(e) => {

@@ -1,5 +1,5 @@
 /**
- * Aksel Darkside Metadata Template
+ * Aksel v8 Metadata Template
  * 
  * This metadata is included in JSON exports to provide AI assistants
  * with complete context for building production apps outside our editor.
@@ -19,7 +19,7 @@ export interface AkselMetadata {
   packages: {
     react: string;
     css: string;
-    tokens: string;
+    tokens: string | null;
     icons: string;
   };
   setup: {
@@ -44,34 +44,34 @@ export interface AkselMetadata {
     main: string;
     components: string;
     tokens: string;
-    darkside: string;
+    setup: string;
     migration: string;
   };
 }
 
 /**
- * Current Aksel Darkside metadata
+ * Current Aksel v8 metadata
  * Used when generating AI-enriched JSON exports
  */
 export const AKSEL_METADATA: AkselMetadata = {
-  designSystem: 'Aksel Darkside',
-  designSystemVersion: '7.33.1', // Update when packages are upgraded
+  designSystem: 'Aksel v8',
+  designSystemVersion: '8.11.0',
   framework: 'React 19+',
   runtime: 'browser',
 
   packages: {
     react: '@navikt/ds-react',
-    css: '@navikt/ds-css/darkside',
-    tokens: '@navikt/ds-tokens/darkside-css',
+    css: '@navikt/ds-css',
+    tokens: null,
     icons: '@navikt/aksel-icons',
   },
 
   setup: {
-    install: 'npm install react react-dom @navikt/ds-react @navikt/ds-css @navikt/aksel-icons',
-    cssImport: "import '@navikt/ds-css/darkside';",
-    themeWrapper: '<Theme theme="darkside">{app}</Theme>',
+    install: 'npm install --save-exact react react-dom @navikt/ds-react@8.11.0 @navikt/ds-css@8.11.0 @navikt/aksel-icons@8.11.0',
+    cssImport: "import '@navikt/ds-css';",
+    themeWrapper: '<Theme theme="dark">{app}</Theme>',
     themeImport: "import { Theme } from '@navikt/ds-react/Theme';",
-    minVersion: '@navikt/ds-react ^7.25.0 (minimum for Darkside support)',
+    minVersion: '@navikt/ds-react 8.11.0',
   },
 
   tokens: {
@@ -84,7 +84,7 @@ export const AKSEL_METADATA: AkselMetadata = {
       'shadows',
       'breakpoints',
     ],
-    documentation: 'https://aksel.nav.no/grunnleggende/darkside/design-tokens',
+    documentation: 'https://aksel.nav.no/grunnleggende/styling/design-tokens',
     examples: {
       colors: [
         '--ax-bg-default',
@@ -124,23 +124,23 @@ export const AKSEL_METADATA: AkselMetadata = {
   documentation: {
     main: 'https://aksel.nav.no',
     components: 'https://aksel.nav.no/komponenter',
-    tokens: 'https://aksel.nav.no/grunnleggende/darkside/design-tokens',
-    darkside: 'https://aksel.nav.no/grunnleggende/darkside/sette-opp-prosjekt-med-darkside',
-    migration: 'https://aksel.nav.no/grunnleggende/darkside/migrere-til-darkside',
+    tokens: 'https://aksel.nav.no/grunnleggende/styling/design-tokens',
+    setup: 'https://aksel.nav.no/grunnleggende/kode/migration-guide',
+    migration: 'https://aksel.nav.no/grunnleggende/kode/migration-guide',
   },
 };
 
 /**
  * AI-friendly instructions for building apps from exported JSON
  */
-export const AI_INSTRUCTIONS = `This is a React prototype built with Aksel Darkside design system.
+export const AI_INSTRUCTIONS = `This is a React prototype built with the Aksel v8 design system.
 
 To build a standalone production app:
 
 1. Install dependencies:
    ${AKSEL_METADATA.setup.install}
 
-2. Import Darkside CSS in your root file:
+2. Import Aksel CSS in your root file:
    ${AKSEL_METADATA.setup.cssImport}
 
 3. Import and wrap your app with Theme component:
@@ -157,15 +157,15 @@ To build a standalone production app:
    ${Object.entries(AKSEL_METADATA.breakpoints).map(([key, val]) => `${key}: ${val}`).join(', ')}
 
 Important constraints:
-- Minimum version: ${AKSEL_METADATA.setup.minVersion}
+- Pinned Aksel package version: ${AKSEL_METADATA.designSystemVersion}
 - All CSS variables use ${AKSEL_METADATA.tokens.prefix} prefix (not --a or --ac)
-- Theme wrapper is required for Darkside to work
+- Theme wrapper is required for light/dark theme semantics
 - Components must be imported from ${AKSEL_METADATA.packages.react}
 
 Documentation:
 - Main: ${AKSEL_METADATA.documentation.main}
 - Components: ${AKSEL_METADATA.documentation.components}
-- Darkside guide: ${AKSEL_METADATA.documentation.darkside}
+- Setup guide: ${AKSEL_METADATA.documentation.setup}
 `;
 
 /**
