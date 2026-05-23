@@ -65,3 +65,16 @@ Verification:
 
 Next note:
 - #8 should keep using `AKSEL_SNIPPETS`/catalog metadata for component autocomplete, but icons are intentionally palette-only until #9 adds contextual icon autocomplete.
+
+2026-05-23 - Issue #7 follow-up: Add Component modal fixes
+
+Updated after UX review:
+- Replaced the four manually listed icon catalog entries with generated catalog entries from `@navikt/aksel-icons/metadata`, so the Icons tab now reflects all installed Aksel icons.
+- Removed redundant Layout, Component, Icon, and Experimental tags from cards; the active tab now carries that categorization.
+- Fixed modal focus/layout polish: search receives initial focus, the modal container no longer shows the pink/purple focus border, the search field and card focus rings have inset room, the first card is not clipped, and the tablist scrollbar strip no longer appears as a rectangle between tabs and the list.
+- Updated PR #16 description and PRD #4 implementation progress to reflect these follow-up fixes.
+
+Verification:
+- npm run typecheck
+- CI=1 npm run test -- --run
+- Browser smoke checks at local Vite URLs for 900+ icon entries, icon insertion/rendering, no redundant tags, initial search focus, focus-ring spacing, hidden tablist scrollbar strip, and no console errors.
