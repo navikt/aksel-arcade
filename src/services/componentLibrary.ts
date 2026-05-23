@@ -1,6 +1,9 @@
 import type { ComponentSnippet } from '@/types/snippets'
+import { getCatalogSnippets } from '@/data/akselCatalog'
 
-export const AKSEL_SNIPPETS: ComponentSnippet[] = [
+const CATALOG_SNIPPETS = getCatalogSnippets()
+
+const MANUAL_AKSEL_SNIPPETS: ComponentSnippet[] = [
   // Layout Components
   {
     id: 'page',
@@ -155,7 +158,8 @@ export const AKSEL_SNIPPETS: ComponentSnippet[] = [
     name: 'Radio',
     category: 'component',
     keywords: ['radio', 'option', 'choice', 'form', 'group'],
-    template: '<Radio.Group legend="${1:Legend}">\n  <Radio value="1">${2:Option 1}</Radio>\n  <Radio value="2">${3:Option 2}</Radio>\n</Radio.Group>',
+    template:
+      '<Radio.Group legend="${1:Legend}">\n  <Radio value="1">${2:Option 1}</Radio>\n  <Radio value="2">${3:Option 2}</Radio>\n</Radio.Group>',
     description: 'Radio button input',
     import: "import { Radio } from '@navikt/ds-react';",
   },
@@ -218,7 +222,8 @@ export const AKSEL_SNIPPETS: ComponentSnippet[] = [
     name: 'Chips',
     category: 'component',
     keywords: ['chips', 'tags', 'filter', 'toggle', 'select'],
-    template: '<Chips>\n  <Chips.Toggle>${1:Chip 1}</Chips.Toggle>\n  <Chips.Toggle>${2:Chip 2}</Chips.Toggle>\n</Chips>',
+    template:
+      '<Chips>\n  <Chips.Toggle>${1:Chip 1}</Chips.Toggle>\n  <Chips.Toggle>${2:Chip 2}</Chips.Toggle>\n</Chips>',
     description: 'Selectable chips/tags',
     import: "import { Chips } from '@navikt/ds-react';",
   },
@@ -227,7 +232,8 @@ export const AKSEL_SNIPPETS: ComponentSnippet[] = [
     name: 'ToggleGroup',
     category: 'component',
     keywords: ['toggle', 'group', 'button', 'select', 'choice'],
-    template: '<ToggleGroup>\n  <ToggleGroup.Item value="1">${1:Option 1}</ToggleGroup.Item>\n  <ToggleGroup.Item value="2">${2:Option 2}</ToggleGroup.Item>\n</ToggleGroup>',
+    template:
+      '<ToggleGroup>\n  <ToggleGroup.Item value="1">${1:Option 1}</ToggleGroup.Item>\n  <ToggleGroup.Item value="2">${2:Option 2}</ToggleGroup.Item>\n</ToggleGroup>',
     description: 'Toggle button group',
     import: "import { ToggleGroup } from '@navikt/ds-react';",
   },
@@ -274,7 +280,8 @@ export const AKSEL_SNIPPETS: ComponentSnippet[] = [
     name: 'ErrorSummary',
     category: 'component',
     keywords: ['error', 'summary', 'form', 'validation'],
-    template: '<ErrorSummary heading="${1:Form has errors}">\n  <ErrorSummary.Item href="#field">${2:Error message}</ErrorSummary.Item>\n</ErrorSummary>',
+    template:
+      '<ErrorSummary heading="${1:Form has errors}">\n  <ErrorSummary.Item href="#field">${2:Error message}</ErrorSummary.Item>\n</ErrorSummary>',
     description: 'Summary of form errors',
     import: "import { ErrorSummary } from '@navikt/ds-react';",
   },
@@ -303,7 +310,8 @@ export const AKSEL_SNIPPETS: ComponentSnippet[] = [
     name: 'Tabs',
     category: 'component',
     keywords: ['tabs', 'navigation', 'panel', 'switch'],
-    template: '<Tabs value="tab1">\n  <Tabs.List>\n    <Tabs.Tab value="tab1" label="${1:Tab 1}" />\n    <Tabs.Tab value="tab2" label="${2:Tab 2}" />\n  </Tabs.List>\n  <Tabs.Panel value="tab1">${3:Content 1}</Tabs.Panel>\n  <Tabs.Panel value="tab2">${4:Content 2}</Tabs.Panel>\n</Tabs>',
+    template:
+      '<Tabs value="tab1">\n  <Tabs.List>\n    <Tabs.Tab value="tab1" label="${1:Tab 1}" />\n    <Tabs.Tab value="tab2" label="${2:Tab 2}" />\n  </Tabs.List>\n  <Tabs.Panel value="tab1">${3:Content 1}</Tabs.Panel>\n  <Tabs.Panel value="tab2">${4:Content 2}</Tabs.Panel>\n</Tabs>',
     description: 'Tab navigation',
     import: "import { Tabs } from '@navikt/ds-react';",
   },
@@ -321,7 +329,8 @@ export const AKSEL_SNIPPETS: ComponentSnippet[] = [
     name: 'Stepper',
     category: 'component',
     keywords: ['stepper', 'steps', 'wizard', 'progress', 'flow'],
-    template: '<Stepper activeStep={0}>\n  <Stepper.Step>${1:Step 1}</Stepper.Step>\n  <Stepper.Step>${2:Step 2}</Stepper.Step>\n</Stepper>',
+    template:
+      '<Stepper activeStep={0}>\n  <Stepper.Step>${1:Step 1}</Stepper.Step>\n  <Stepper.Step>${2:Step 2}</Stepper.Step>\n</Stepper>',
     description: 'Step-by-step wizard',
     import: "import { Stepper } from '@navikt/ds-react';",
   },
@@ -330,7 +339,8 @@ export const AKSEL_SNIPPETS: ComponentSnippet[] = [
     name: 'FormProgress',
     category: 'component',
     keywords: ['form', 'progress', 'steps', 'wizard'],
-    template: '<FormProgress totalSteps={3} activeStep={1}>\n  <FormProgress.Step>${1:Step 1}</FormProgress.Step>\n  <FormProgress.Step>${2:Step 2}</FormProgress.Step>\n  <FormProgress.Step>${3:Step 3}</FormProgress.Step>\n</FormProgress>',
+    template:
+      '<FormProgress totalSteps={3} activeStep={1}>\n  <FormProgress.Step>${1:Step 1}</FormProgress.Step>\n  <FormProgress.Step>${2:Step 2}</FormProgress.Step>\n  <FormProgress.Step>${3:Step 3}</FormProgress.Step>\n</FormProgress>',
     description: 'Multi-step form progress',
     import: "import { FormProgress } from '@navikt/ds-react';",
   },
@@ -341,7 +351,8 @@ export const AKSEL_SNIPPETS: ComponentSnippet[] = [
     name: 'Modal',
     category: 'component',
     keywords: ['modal', 'dialog', 'popup', 'overlay'],
-    template: '<Modal open={false} onClose={() => {}}>\n  <Modal.Header>\n    <Modal.Title>${1:Modal title}</Modal.Title>\n  </Modal.Header>\n  <Modal.Body>${2:Modal content}</Modal.Body>\n</Modal>',
+    template:
+      '<Modal open={false} onClose={() => {}}>\n  <Modal.Header>\n    <Modal.Title>${1:Modal title}</Modal.Title>\n  </Modal.Header>\n  <Modal.Body>${2:Modal content}</Modal.Body>\n</Modal>',
     description: 'Modal dialog',
     import: "import { Modal } from '@navikt/ds-react';",
   },
@@ -350,7 +361,8 @@ export const AKSEL_SNIPPETS: ComponentSnippet[] = [
     name: 'Popover',
     category: 'component',
     keywords: ['popover', 'tooltip', 'overlay', 'popup'],
-    template: '<Popover open={false} onClose={() => {}}>\n  <Popover.Trigger>${1:Open}</Popover.Trigger>\n  <Popover.Content>${2:Content}</Popover.Content>\n</Popover>',
+    template:
+      '<Popover open={false} onClose={() => {}}>\n  <Popover.Trigger>${1:Open}</Popover.Trigger>\n  <Popover.Content>${2:Content}</Popover.Content>\n</Popover>',
     description: 'Popover overlay',
     import: "import { Popover } from '@navikt/ds-react';",
   },
@@ -377,7 +389,8 @@ export const AKSEL_SNIPPETS: ComponentSnippet[] = [
     name: 'Dropdown',
     category: 'component',
     keywords: ['dropdown', 'menu', 'list', 'options'],
-    template: '<Dropdown>\n  <Button as={Dropdown.Toggle}>${1:Open menu}</Button>\n  <Dropdown.Menu>\n    <Dropdown.Menu.List>\n      <Dropdown.Menu.List.Item>${2:Item}</Dropdown.Menu.List.Item>\n    </Dropdown.Menu.List>\n  </Dropdown.Menu>\n</Dropdown>',
+    template:
+      '<Dropdown>\n  <Button as={Dropdown.Toggle}>${1:Open menu}</Button>\n  <Dropdown.Menu>\n    <Dropdown.Menu.List>\n      <Dropdown.Menu.List.Item>${2:Item}</Dropdown.Menu.List.Item>\n    </Dropdown.Menu.List>\n  </Dropdown.Menu>\n</Dropdown>',
     description: 'Dropdown menu',
     import: "import { Dropdown } from '@navikt/ds-react';",
   },
@@ -386,7 +399,8 @@ export const AKSEL_SNIPPETS: ComponentSnippet[] = [
     name: 'ActionMenu',
     category: 'component',
     keywords: ['action', 'menu', 'dropdown', 'options'],
-    template: '<ActionMenu>\n  <ActionMenu.Trigger>${1:Actions}</ActionMenu.Trigger>\n  <ActionMenu.Content>\n    <ActionMenu.Item>${2:Item 1}</ActionMenu.Item>\n  </ActionMenu.Content>\n</ActionMenu>',
+    template:
+      '<ActionMenu>\n  <ActionMenu.Trigger>${1:Actions}</ActionMenu.Trigger>\n  <ActionMenu.Content>\n    <ActionMenu.Item>${2:Item 1}</ActionMenu.Item>\n  </ActionMenu.Content>\n</ActionMenu>',
     description: 'Dropdown menu for actions',
     import: "import { ActionMenu } from '@navikt/ds-react';",
   },
@@ -397,7 +411,8 @@ export const AKSEL_SNIPPETS: ComponentSnippet[] = [
     name: 'Accordion',
     category: 'component',
     keywords: ['accordion', 'collapse', 'expand', 'toggle', 'panel'],
-    template: '<Accordion>\n  <Accordion.Item>\n    <Accordion.Header>${1:Header}</Accordion.Header>\n    <Accordion.Content>${2:Content}</Accordion.Content>\n  </Accordion.Item>\n</Accordion>',
+    template:
+      '<Accordion>\n  <Accordion.Item>\n    <Accordion.Header>${1:Header}</Accordion.Header>\n    <Accordion.Content>${2:Content}</Accordion.Content>\n  </Accordion.Item>\n</Accordion>',
     description: 'Expandable content sections',
     import: "import { Accordion } from '@navikt/ds-react';",
   },
@@ -406,7 +421,8 @@ export const AKSEL_SNIPPETS: ComponentSnippet[] = [
     name: 'ExpansionCard',
     category: 'component',
     keywords: ['expansion', 'card', 'collapse', 'expand'],
-    template: '<ExpansionCard>\n  <ExpansionCard.Header>\n    <ExpansionCard.Title>${1:Title}</ExpansionCard.Title>\n  </ExpansionCard.Header>\n  <ExpansionCard.Content>${2:Content}</ExpansionCard.Content>\n</ExpansionCard>',
+    template:
+      '<ExpansionCard>\n  <ExpansionCard.Header>\n    <ExpansionCard.Title>${1:Title}</ExpansionCard.Title>\n  </ExpansionCard.Header>\n  <ExpansionCard.Content>${2:Content}</ExpansionCard.Content>\n</ExpansionCard>',
     description: 'Expandable card component',
     import: "import { ExpansionCard } from '@navikt/ds-react';",
   },
@@ -433,7 +449,8 @@ export const AKSEL_SNIPPETS: ComponentSnippet[] = [
     name: 'Chat',
     category: 'component',
     keywords: ['chat', 'message', 'bubble', 'conversation'],
-    template: '<Chat variant="left" name="${1:User}">\n  <Chat.Bubble>${2:Message text}</Chat.Bubble>\n</Chat>',
+    template:
+      '<Chat variant="left" name="${1:User}">\n  <Chat.Bubble>${2:Message text}</Chat.Bubble>\n</Chat>',
     description: 'Chat message bubbles',
     import: "import { Chat } from '@navikt/ds-react';",
   },
@@ -442,7 +459,8 @@ export const AKSEL_SNIPPETS: ComponentSnippet[] = [
     name: 'Table',
     category: 'component',
     keywords: ['table', 'data', 'grid', 'list', 'rows'],
-    template: '<Table>\n  <Table.Header>\n    <Table.Row>\n      <Table.HeaderCell>${1:Header}</Table.HeaderCell>\n    </Table.Row>\n  </Table.Header>\n  <Table.Body>\n    <Table.Row>\n      <Table.DataCell>${2:Data}</Table.DataCell>\n    </Table.Row>\n  </Table.Body>\n</Table>',
+    template:
+      '<Table>\n  <Table.Header>\n    <Table.Row>\n      <Table.HeaderCell>${1:Header}</Table.HeaderCell>\n    </Table.Row>\n  </Table.Header>\n  <Table.Body>\n    <Table.Row>\n      <Table.DataCell>${2:Data}</Table.DataCell>\n    </Table.Row>\n  </Table.Body>\n</Table>',
     description: 'Data table',
     import: "import { Table } from '@navikt/ds-react';",
   },
@@ -451,7 +469,8 @@ export const AKSEL_SNIPPETS: ComponentSnippet[] = [
     name: 'List',
     category: 'component',
     keywords: ['list', 'items', 'ul', 'ol', 'bullet'],
-    template: '<List>\n  <List.Item>${1:Item 1}</List.Item>\n  <List.Item>${2:Item 2}</List.Item>\n</List>',
+    template:
+      '<List>\n  <List.Item>${1:Item 1}</List.Item>\n  <List.Item>${2:Item 2}</List.Item>\n</List>',
     description: 'Styled list component',
     import: "import { List } from '@navikt/ds-react';",
   },
@@ -460,7 +479,8 @@ export const AKSEL_SNIPPETS: ComponentSnippet[] = [
     name: 'LinkCard',
     category: 'component',
     keywords: ['link', 'card', 'navigate', 'clickable'],
-    template: '<LinkCard>\n  <LinkCard.Title>\n    <LinkCard.Anchor href="${1:}">${2:Datasikkerheit er ivareteken gjennom kryptert overføring.}</LinkCard.Anchor>\n  </LinkCard.Title>\n  <LinkCard.Description>\n    ${3:I samband med systemvedlikehald kan tenesta vere utilgjengeleg sundag mellom klokka 22 og 02. Planlagde avbrot vert varsla på framsida minst 48 timar før nedetid tek til å gjelde.}\n  </LinkCard.Description>\n</LinkCard>',
+    template:
+      '<LinkCard>\n  <LinkCard.Title>\n    <LinkCard.Anchor href="${1:}">${2:Datasikkerheit er ivareteken gjennom kryptert overføring.}</LinkCard.Anchor>\n  </LinkCard.Title>\n  <LinkCard.Description>\n    ${3:I samband med systemvedlikehald kan tenesta vere utilgjengeleg sundag mellom klokka 22 og 02. Planlagde avbrot vert varsla på framsida minst 48 timar før nedetid tek til å gjelde.}\n  </LinkCard.Description>\n</LinkCard>',
     description: 'Clickable card link',
     import: "import { LinkCard } from '@navikt/ds-react';",
   },
@@ -469,7 +489,8 @@ export const AKSEL_SNIPPETS: ComponentSnippet[] = [
     name: 'FormSummary',
     category: 'component',
     keywords: ['form', 'summary', 'review', 'submission'],
-    template: '<FormSummary>\n  <FormSummary.Header>\n    <FormSummary.Heading>${1:Summary}</FormSummary.Heading>\n  </FormSummary.Header>\n  <FormSummary.Answers>\n    <FormSummary.Answer>\n      <FormSummary.Label>${2:Label}</FormSummary.Label>\n      <FormSummary.Value>${3:Value}</FormSummary.Value>\n    </FormSummary.Answer>\n  </FormSummary.Answers>\n</FormSummary>',
+    template:
+      '<FormSummary>\n  <FormSummary.Header>\n    <FormSummary.Heading>${1:Summary}</FormSummary.Heading>\n  </FormSummary.Header>\n  <FormSummary.Answers>\n    <FormSummary.Answer>\n      <FormSummary.Label>${2:Label}</FormSummary.Label>\n      <FormSummary.Value>${3:Value}</FormSummary.Value>\n    </FormSummary.Answer>\n  </FormSummary.Answers>\n</FormSummary>',
     description: 'Form submission summary',
     import: "import { FormSummary } from '@navikt/ds-react';",
   },
@@ -545,10 +566,18 @@ export const AKSEL_SNIPPETS: ComponentSnippet[] = [
     name: 'InternalHeader',
     category: 'component',
     keywords: ['header', 'navigation', 'internal', 'app'],
-    template: '<InternalHeader>\n  <InternalHeader.Title>${1:App Title}</InternalHeader.Title>\n</InternalHeader>',
+    template:
+      '<InternalHeader>\n  <InternalHeader.Title>${1:App Title}</InternalHeader.Title>\n</InternalHeader>',
     description: 'Internal application header',
     import: "import { InternalHeader } from '@navikt/ds-react';",
   },
+]
+
+const catalogSnippetNames = new Set(CATALOG_SNIPPETS.map((snippet) => snippet.name))
+
+export const AKSEL_SNIPPETS: ComponentSnippet[] = [
+  ...CATALOG_SNIPPETS,
+  ...MANUAL_AKSEL_SNIPPETS.filter((snippet) => !catalogSnippetNames.has(snippet.name)),
 ]
 
 interface SearchOptions {

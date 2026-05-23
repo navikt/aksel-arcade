@@ -1,9 +1,15 @@
+import {
+  getCatalogComponent,
+  getCatalogPropDefinition,
+  getCatalogPropValues,
+} from '@/data/akselCatalog'
+
 /**
  * Aksel Darkside Component Metadata
- * 
+ *
  * Accurate prop definitions for autocomplete, sourced from official Aksel documentation.
  * Last updated: 2025-11-09
- * 
+ *
  * Sources:
  * - Button: https://aksel.nav.no/komponenter/core/button
  * - TextField: https://aksel.nav.no/komponenter/core/textfield
@@ -30,27 +36,27 @@ export interface ComponentMetadata {
  * Based on: https://aksel.nav.no/grunnleggende/styling/design-tokens
  */
 const SPACING_TOKENS = [
-  'space-0',   // 0rem
-  'space-1',   // 0.0625rem
-  'space-2',   // 0.125rem
-  'space-4',   // 0.25rem
-  'space-6',   // 0.375rem
-  'space-8',   // 0.5rem
-  'space-12',  // 0.75rem
-  'space-16',  // 1rem
-  'space-20',  // 1.25rem
-  'space-24',  // 1.5rem
-  'space-28',  // 1.75rem
-  'space-32',  // 2rem
-  'space-36',  // 2.25rem
-  'space-40',  // 2.5rem
-  'space-44',  // 2.75rem
-  'space-48',  // 3rem
-  'space-56',  // 3.5rem
-  'space-64',  // 4rem
-  'space-72',  // 4.5rem
-  'space-80',  // 5rem
-  'space-96',  // 6rem
+  'space-0', // 0rem
+  'space-1', // 0.0625rem
+  'space-2', // 0.125rem
+  'space-4', // 0.25rem
+  'space-6', // 0.375rem
+  'space-8', // 0.5rem
+  'space-12', // 0.75rem
+  'space-16', // 1rem
+  'space-20', // 1.25rem
+  'space-24', // 1.5rem
+  'space-28', // 1.75rem
+  'space-32', // 2rem
+  'space-36', // 2.25rem
+  'space-40', // 2.5rem
+  'space-44', // 2.75rem
+  'space-48', // 3rem
+  'space-56', // 3.5rem
+  'space-64', // 4rem
+  'space-72', // 4.5rem
+  'space-80', // 5rem
+  'space-96', // 6rem
   'space-128', // 8rem
 ]
 
@@ -59,7 +65,7 @@ const SPACING_TOKENS_WITH_AUTO = [...SPACING_TOKENS, 'auto']
 /**
  * Aksel Darkside background color tokens
  * Based on: https://aksel.nav.no/grunnleggende/styling/design-tokens
- * 
+ *
  * **CRITICAL**: Token fragments only (no "bg-" prefix)
  * Aksel props accept token fragments and add the --ax-bg- prefix automatically.
  * Using full token names would cause double-prefixing: `var(--ax-bg---ax-bg-default)` ❌
@@ -233,7 +239,7 @@ const DATA_COLOR_VALUES = [
  * Aksel Darkside border color tokens (token fragment only, NO prefix)
  * Based on: https://aksel.nav.no/grunnleggende/darkside/design-tokens
  * CRITICAL: Box.darkside automatically adds `--ax-border-` prefix to these values.
- * Example: Use `"neutral-subtle"` NOT `"border-neutral-subtle"` 
+ * Example: Use `"neutral-subtle"` NOT `"border-neutral-subtle"`
  * The component will transform it to `var(--ax-border-neutral-subtle)`.
  * Using "border-" prefix causes double-prefixing bug: `var(--ax-border-border-neutral-subtle)` ❌
  */
@@ -560,7 +566,8 @@ export const AKSEL_COMPONENTS: Record<string, ComponentMetadata> = {
 
   BoxNew: {
     name: 'BoxNew',
-    description: 'Layout container with spacing control and Darkside support (borderColor, background, shadow)',
+    description:
+      'Layout container with spacing control and Darkside support (borderColor, background, shadow)',
     props: [
       {
         name: 'padding',
@@ -608,13 +615,15 @@ export const AKSEL_COMPONENTS: Record<string, ComponentMetadata> = {
         name: 'borderColor',
         type: 'string',
         values: BORDER_COLOR_TOKENS,
-        description: 'Border color token (use token fragment like "neutral-subtle", NOT "border-neutral-subtle")',
+        description:
+          'Border color token (use token fragment like "neutral-subtle", NOT "border-neutral-subtle")',
       },
       {
         name: 'borderRadius',
         type: 'string',
         values: ['2', '4', '8', '12', 'full'],
-        description: 'Border radius value (component adds radius- prefix automatically to create --ax-radius-X token)',
+        description:
+          'Border radius value (component adds radius- prefix automatically to create --ax-radius-X token)',
       },
       {
         name: 'borderWidth',
@@ -841,7 +850,8 @@ export const AKSEL_COMPONENTS: Record<string, ComponentMetadata> = {
         name: 'width',
         type: 'string',
         values: ['text', 'md', 'lg', 'xl', '2xl'],
-        description: 'Predefined max-width (text: 576px, md: 768px, lg: 1024px, xl: 1280px, 2xl: 1440px)',
+        description:
+          'Predefined max-width (text: 576px, md: 768px, lg: 1024px, xl: 1280px, 2xl: 1440px)',
       },
       {
         name: 'gutters',
@@ -2590,6 +2600,9 @@ export const AKSEL_COMPONENTS: Record<string, ComponentMetadata> = {
  * Get all prop names for a component
  */
 export function getComponentProps(componentName: string): string[] {
+  const catalogComponent = getCatalogComponent(componentName)
+  if (catalogComponent) return catalogComponent.props.map((p) => p.name)
+
   const metadata = AKSEL_COMPONENTS[componentName]
   return metadata ? metadata.props.map((p) => p.name) : []
 }
@@ -2598,6 +2611,9 @@ export function getComponentProps(componentName: string): string[] {
  * Get valid values for a specific prop
  */
 export function getPropValues(componentName: string, propName: string): string[] {
+  const catalogComponent = getCatalogComponent(componentName)
+  if (catalogComponent) return getCatalogPropValues(componentName, propName)
+
   const metadata = AKSEL_COMPONENTS[componentName]
   if (!metadata) return []
 
@@ -2612,6 +2628,20 @@ export function getPropDefinition(
   componentName: string,
   propName: string
 ): PropDefinition | undefined {
+  const catalogComponent = getCatalogComponent(componentName)
+  if (catalogComponent) {
+    const catalogProp = getCatalogPropDefinition(componentName, propName)
+    return catalogProp
+      ? {
+          name: catalogProp.name,
+          type: catalogProp.type,
+          values: catalogProp.values,
+          description: catalogProp.description,
+          required: catalogProp.required,
+        }
+      : undefined
+  }
+
   const metadata = AKSEL_COMPONENTS[componentName]
   if (!metadata) return undefined
 
