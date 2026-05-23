@@ -1,9 +1,9 @@
 /**
  * Aksel v8 Metadata Template
- * 
+ *
  * This metadata is included in JSON exports to provide AI assistants
  * with complete context for building production apps outside our editor.
- * 
+ *
  * Update this file when:
  * - Aksel package versions change
  * - Documentation URLs change
@@ -11,42 +11,44 @@
  * - New token categories are added
  */
 
+import { getCatalogComponent } from './akselCatalog'
+
 export interface AkselMetadata {
-  designSystem: string;
-  designSystemVersion: string;
-  framework: string;
-  runtime: string;
+  designSystem: string
+  designSystemVersion: string
+  framework: string
+  runtime: string
   packages: {
-    react: string;
-    css: string;
-    tokens: string | null;
-    icons: string;
-  };
+    react: string
+    css: string
+    tokens: string | null
+    icons: string
+  }
   setup: {
-    install: string;
-    cssImport: string;
-    themeWrapper: string;
-    themeImport: string;
-    minVersion: string;
-  };
+    install: string
+    cssImport: string
+    themeWrapper: string
+    themeImport: string
+    minVersion: string
+  }
   tokens: {
-    prefix: string;
-    categories: string[];
-    documentation: string;
+    prefix: string
+    categories: string[]
+    documentation: string
     examples: {
-      colors: string[];
-      spacing: string[];
-      typography: string[];
-    };
-  };
-  breakpoints: Record<string, string>;
+      colors: string[]
+      spacing: string[]
+      typography: string[]
+    }
+  }
+  breakpoints: Record<string, string>
   documentation: {
-    main: string;
-    components: string;
-    tokens: string;
-    setup: string;
-    migration: string;
-  };
+    main: string
+    components: string
+    tokens: string
+    setup: string
+    migration: string
+  }
 }
 
 /**
@@ -67,7 +69,8 @@ export const AKSEL_METADATA: AkselMetadata = {
   },
 
   setup: {
-    install: 'npm install --save-exact react react-dom @navikt/ds-react@8.11.0 @navikt/ds-css@8.11.0 @navikt/aksel-icons@8.11.0',
+    install:
+      'npm install --save-exact react react-dom @navikt/ds-react@8.11.0 @navikt/ds-css@8.11.0 @navikt/aksel-icons@8.11.0',
     cssImport: "import '@navikt/ds-css';",
     themeWrapper: '<Theme theme="dark">{app}</Theme>',
     themeImport: "import { Theme } from '@navikt/ds-react/Theme';",
@@ -76,14 +79,7 @@ export const AKSEL_METADATA: AkselMetadata = {
 
   tokens: {
     prefix: '--ax',
-    categories: [
-      'colors',
-      'spacing',
-      'typography',
-      'borders',
-      'shadows',
-      'breakpoints',
-    ],
+    categories: ['colors', 'spacing', 'typography', 'borders', 'shadows', 'breakpoints'],
     documentation: 'https://aksel.nav.no/grunnleggende/styling/design-tokens',
     examples: {
       colors: [
@@ -105,10 +101,7 @@ export const AKSEL_METADATA: AkselMetadata = {
         '--ax-space-20',
         '--ax-space-32',
       ],
-      typography: [
-        '--ax-font-family',
-        '--ax-font-family-mono',
-      ],
+      typography: ['--ax-font-family', '--ax-font-family-mono'],
     },
   },
 
@@ -128,7 +121,7 @@ export const AKSEL_METADATA: AkselMetadata = {
     setup: 'https://aksel.nav.no/grunnleggende/kode/migration-guide',
     migration: 'https://aksel.nav.no/grunnleggende/kode/migration-guide',
   },
-};
+}
 
 /**
  * AI-friendly instructions for building apps from exported JSON
@@ -154,7 +147,9 @@ To build a standalone production app:
    Examples: ${AKSEL_METADATA.tokens.examples.colors.slice(0, 3).join(', ')}
 
 6. Responsive breakpoints:
-   ${Object.entries(AKSEL_METADATA.breakpoints).map(([key, val]) => `${key}: ${val}`).join(', ')}
+   ${Object.entries(AKSEL_METADATA.breakpoints)
+     .map(([key, val]) => `${key}: ${val}`)
+     .join(', ')}
 
 Important constraints:
 - Pinned Aksel package version: ${AKSEL_METADATA.designSystemVersion}
@@ -166,34 +161,42 @@ Documentation:
 - Main: ${AKSEL_METADATA.documentation.main}
 - Components: ${AKSEL_METADATA.documentation.components}
 - Setup guide: ${AKSEL_METADATA.documentation.setup}
-`;
+`
 
 /**
  * Generate component usage metadata from JSX code
  * Analyzes code to detect which Aksel components are being used
  */
-export const extractUsedComponents = (jsxCode: string): Array<{
-  name: string;
-  import: string;
-  docs: string;
+export const extractUsedComponents = (
+  jsxCode: string
+): Array<{
+  name: string
+  import: string
+  docs: string
 }> => {
   // Simple regex-based detection (could be enhanced with AST parsing)
-  const componentPattern = /<([A-Z][a-zA-Z]+)/g;
-  const matches = jsxCode.matchAll(componentPattern);
-  const componentNames = new Set<string>();
+  const componentPattern = /<([A-Z][a-zA-Z]+)/g
+  const matches = jsxCode.matchAll(componentPattern)
+  const componentNames = new Set<string>()
 
   for (const match of matches) {
-    componentNames.add(match[1]);
+    componentNames.add(match[1])
   }
 
   // Map to Aksel components (exclude HTML elements like Fragment)
   const akselComponents = Array.from(componentNames)
-    .filter(name => !['Fragment'].includes(name))
-    .map(name => ({
-      name,
-      import: AKSEL_METADATA.packages.react,
-      docs: `${AKSEL_METADATA.documentation.components}/core/${name.toLowerCase()}`,
-    }));
+    .filter((name) => !['Fragment'].includes(name))
+    .map((name) => {
+      const catalogEntry = getCatalogComponent(name)
 
-  return akselComponents;
-};
+      return {
+        name,
+        import: catalogEntry?.package ?? AKSEL_METADATA.packages.react,
+        docs:
+          catalogEntry?.docs ??
+          `${AKSEL_METADATA.documentation.components}/core/${name.toLowerCase()}`,
+      }
+    })
+
+  return akselComponents
+}

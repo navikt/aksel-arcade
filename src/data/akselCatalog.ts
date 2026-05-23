@@ -1,4 +1,5 @@
 import type { ComponentSnippet, SnippetCategory } from '@/types/snippets'
+import iconMetadata from '@navikt/aksel-icons/metadata'
 
 export const AKSEL_CATALOG_VERSION = '8.11.0'
 
@@ -52,7 +53,51 @@ export interface AkselTokenMetadata {
 
 const AKSEL_DOCS_BASE = 'https://aksel.nav.no'
 const COMPONENT_DOCS_BASE = `${AKSEL_DOCS_BASE}/komponenter/core`
+const ICON_DOCS = `${AKSEL_DOCS_BASE}/ikoner`
 const TOKEN_DOCS = `${AKSEL_DOCS_BASE}/grunnleggende/styling/design-tokens`
+const DEFAULT_DISCOVERY_STATUSES: AkselCatalogStatus[] = ['current', 'experimental']
+
+const splitIconName = (iconName: string): string[] =>
+  iconName
+    .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+    .replace(/([A-Z]+)([A-Z][a-z])/g, '$1 $2')
+    .toLowerCase()
+    .split(/\s+/)
+
+const iconCatalogEntries: AkselCatalogEntry[] = Object.values(iconMetadata)
+  .sort((a, b) => a.name.localeCompare(b.name))
+  .map((icon) => {
+    const componentName = `${icon.name}Icon`
+    const readableName = splitIconName(icon.name).join(' ')
+    const keywords = [
+      ...splitIconName(icon.name),
+      icon.category,
+      icon.sub_category,
+      icon.variant,
+      ...icon.keywords,
+      'icon',
+    ]
+      .filter(Boolean)
+      .map((keyword) => keyword.toLowerCase())
+
+    return {
+      id: `${icon.name.toLowerCase()}-icon`,
+      name: componentName,
+      group: 'icon',
+      status: 'current',
+      package: '@navikt/aksel-icons',
+      importName: componentName,
+      importGuidance: `import { ${componentName} } from '@navikt/aksel-icons';`,
+      docs: ICON_DOCS,
+      description: `${readableName} icon.`,
+      keywords: Array.from(new Set(keywords)),
+      props: [],
+      snippet: {
+        code: `<${componentName} aria-hidden />`,
+        description: `${readableName} icon.`,
+      },
+    }
+  })
 
 export const AKSEL_TOKEN_METADATA: Record<string, AkselTokenMetadata> = {
   spacing: {
@@ -704,6 +749,93 @@ export const AKSEL_CATALOG: AkselCatalogEntry[] = [
       description: 'Labeled text input.',
     },
   },
+  {
+    id: 'formprogress',
+    name: 'FormProgress',
+    group: 'component',
+    status: 'experimental',
+    package: '@navikt/ds-react',
+    importName: 'FormProgress',
+    importGuidance: "import { FormProgress } from '@navikt/ds-react';",
+    docs: `${COMPONENT_DOCS_BASE}/formprogress`,
+    description: 'Experimental step indicator for multi-step forms.',
+    keywords: ['form', 'progress', 'steps', 'wizard', 'experimental'],
+    props: [
+      {
+        name: 'totalSteps',
+        type: 'number',
+        required: true,
+        description: 'Total number of steps in the flow.',
+      },
+      {
+        name: 'activeStep',
+        type: 'number',
+        required: true,
+        description: 'Current zero-based active step.',
+      },
+    ],
+    snippet: {
+      code:
+        '<FormProgress totalSteps={3} activeStep={1}>\n' +
+        '  <FormProgress.Step>Start</FormProgress.Step>\n' +
+        '  <FormProgress.Step>Details</FormProgress.Step>\n' +
+        '  <FormProgress.Step>Submit</FormProgress.Step>\n' +
+        '</FormProgress>',
+      description: 'Experimental multi-step form progress indicator.',
+    },
+  },
+  ...iconCatalogEntries,
+  {
+    id: 'boxnew',
+    name: 'BoxNew',
+    group: 'layout',
+    status: 'legacy',
+    package: '@navikt/ds-react',
+    importName: 'BoxNew',
+    importGuidance: "import { BoxNew } from '@navikt/ds-react';",
+    docs: `${COMPONENT_DOCS_BASE}/box`,
+    description: 'Legacy container name retained only for compatibility; prefer Box.',
+    keywords: ['boxnew', 'box', 'legacy', 'darkside'],
+    props: [],
+    snippet: {
+      code: '<Box padding="space-16">Content</Box>',
+      description: 'Use Box for new v8 prototypes.',
+    },
+  },
+  {
+    id: 'stack',
+    name: 'Stack',
+    group: 'layout',
+    status: 'legacy',
+    package: '@navikt/ds-react',
+    importName: 'Stack',
+    importGuidance: "import { Stack } from '@navikt/ds-react';",
+    docs: `${COMPONENT_DOCS_BASE}/vstack`,
+    description: 'Legacy stack pattern; prefer VStack or HStack for new prototypes.',
+    keywords: ['stack', 'legacy', 'vstack', 'hstack'],
+    props: [],
+    snippet: {
+      code: '<VStack gap="space-16">Content</VStack>',
+      description: 'Use VStack for new v8 prototypes.',
+    },
+  },
+  {
+    id: 'grid',
+    name: 'Grid',
+    group: 'layout',
+    status: 'legacy',
+    package: '@navikt/ds-react',
+    importName: 'Grid',
+    importGuidance: "import { HGrid } from '@navikt/ds-react';",
+    docs: `${COMPONENT_DOCS_BASE}/hgrid`,
+    description: 'Legacy grid pattern; prefer HGrid for current Aksel v8 prototypes.',
+    keywords: ['grid', 'legacy', 'hgrid'],
+    props: [],
+    snippet: {
+      code: '<HGrid columns={2} gap="space-16">Content</HGrid>',
+      description: 'Use HGrid for new v8 prototypes.',
+    },
+  },
 ]
 
 export function listCatalogEntries(
@@ -739,35 +871,43 @@ export function getCatalogTokenValues(tokenKey: keyof typeof AKSEL_TOKEN_METADAT
 }
 
 export function getCatalogSnippets(): ComponentSnippet[] {
-  return listCatalogEntries({ groups: ['layout', 'component'], statuses: ['current'] }).map(
-    (entry) => ({
-      id: entry.id,
-      name: entry.name,
-      category: entry.group as SnippetCategory,
-      keywords: entry.keywords,
-      template: entry.snippet.code,
-      description: entry.snippet.description,
-      import: entry.importGuidance,
-    })
-  )
+  return listCatalogEntries({
+    groups: ['layout', 'component'],
+    statuses: DEFAULT_DISCOVERY_STATUSES,
+  }).map((entry) => ({
+    id: entry.id,
+    name: entry.name,
+    category: entry.group as SnippetCategory,
+    keywords: entry.keywords,
+    template: entry.snippet.code,
+    description: entry.snippet.description,
+    import: entry.importGuidance,
+    status: entry.status,
+    docs: entry.docs,
+  }))
 }
 
 export function getCatalogPaletteComponents(): Array<{
   name: string
-  category: 'layout' | 'component'
+  category: AkselCatalogGroup
+  status: AkselCatalogStatus
   import: string
   props: AkselCatalogProp[]
   snippet: string
   description: string
+  docs: string
 }> {
-  return listCatalogEntries({ groups: ['layout', 'component'], statuses: ['current'] }).map(
-    (entry) => ({
-      name: entry.name,
-      category: entry.group as 'layout' | 'component',
-      import: entry.importGuidance,
-      props: entry.props,
-      snippet: entry.snippet.code,
-      description: entry.description,
-    })
-  )
+  return listCatalogEntries({
+    groups: ['layout', 'component', 'icon'],
+    statuses: DEFAULT_DISCOVERY_STATUSES,
+  }).map((entry) => ({
+    name: entry.name,
+    category: entry.group,
+    status: entry.status,
+    import: entry.importGuidance,
+    props: entry.props,
+    snippet: entry.snippet.code,
+    description: entry.description,
+    docs: entry.docs,
+  }))
 }
