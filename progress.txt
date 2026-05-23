@@ -13,3 +13,15 @@ Verification:
 - npm run typecheck
 - CI=1 npm run test
 - Browser check at http://127.0.0.1:5173/aksel-arcade/ for default preview render and light/dark toggle
+
+2026-05-23 - PR #14 review follow-up
+
+Fixed a build-only v8 token type regression before merge:
+- Replaced old numeric Box/BoxNew padding props with v8 `space-*` tokens.
+- Replaced `borderRadius="medium"` with the v8 radius token `borderRadius="8"`.
+- Regenerated the sandbox source map so it matches the checked-in sandbox source.
+
+Verification:
+- npm run build
+- npm run typecheck
+- CI=1 npm run test

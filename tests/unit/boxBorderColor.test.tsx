@@ -22,7 +22,7 @@ describe('Box borderColor tokens', () => {
   it('renders children for a sample of valid tokens', () => {
     BORDER_COLOR_TOKENS.slice(0, 5).forEach((token) => {
       render(
-        <Box borderWidth="1" borderColor={token as BoxProps['borderColor']} padding="1">
+        <Box borderWidth="1" borderColor={token as BoxProps['borderColor']} padding="space-4">
           <span data-testid={`child-${token}`}>child</span>
         </Box>
       );
@@ -33,7 +33,7 @@ describe('Box borderColor tokens', () => {
 
   it('resilience: prefixed token (any-cast) still renders children (not recommended)', () => {
     render(
-      <Box borderWidth="1" borderColor={'--ax-border-neutral' as BoxProps['borderColor']} padding="1">
+      <Box borderWidth="1" borderColor={'--ax-border-neutral' as BoxProps['borderColor']} padding="space-4">
         <span data-testid="prefixed-child">child</span>
       </Box>
     );
