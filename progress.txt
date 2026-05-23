@@ -25,3 +25,23 @@ Verification:
 - npm run build
 - npm run typecheck
 - CI=1 npm run test
+
+2026-05-23 - Issue #6: Catalog-backed starter path
+
+Selected #6 as the highest-priority ready-for-agent feature because it provides the shared catalog foundation needed before the palette group/status work (#7), autocomplete contract work (#8), and later built-in/export follow-ups.
+
+Implemented:
+- Added a checked-in Aksel v8 starter catalog with current Layout and Components entries, prop metadata, token/value metadata, statuses, snippets, import guidance, and docs URLs.
+- Wired the active component palette to prefer catalog entries for the starter subset while preserving existing non-starter manual entries.
+- Wired editor tag snippets and autocomplete prop/value metadata to prefer the same catalog source for the starter subset.
+- Added catalog regression tests covering the catalog interface, palette adapter, snippet adapter, and autocomplete metadata path.
+
+Verification:
+- npm run typecheck
+- CI=1 npm run test -- --run
+- npm run lint
+- npm run build
+- Browser check at http://127.0.0.1:5174/aksel-arcade/ for default render, catalog-backed palette entries, runnable HStack snippet insertion, and no console errors.
+
+Next note:
+- #7 and #8 should extend `src/data/akselCatalog.ts` rather than adding new parallel component/snippet/prop lists. Existing manual data is still present for non-starter entries, but the starter subset now has one catalog source of truth.
