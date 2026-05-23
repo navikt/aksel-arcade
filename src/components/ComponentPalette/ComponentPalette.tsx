@@ -1,35 +1,49 @@
-import { useState, useMemo } from 'react';
-import { Modal, Tabs, TextField, VStack, HStack, BoxNew, Heading, BodyShort } from '@navikt/ds-react';
-import { MagnifyingGlassIcon } from '@navikt/aksel-icons';
-import { ComponentMetadata, getComponentsByCategory, searchComponents } from '../../data/akselComponents';
-import './ComponentPalette.css';
+import { useState, useMemo } from 'react'
+import {
+  Modal,
+  Tabs,
+  TextField,
+  VStack,
+  HStack,
+  BoxNew,
+  Heading,
+  BodyShort,
+} from '@navikt/ds-react'
+import { MagnifyingGlassIcon } from '@navikt/aksel-icons'
+import {
+  ComponentMetadata,
+  getComponentsByCategory,
+  searchComponents,
+} from '../../data/akselComponents'
+import type { AkselCatalogGroup } from '../../data/akselCatalog'
+import './ComponentPalette.css'
 
 interface ComponentPaletteProps {
-  open: boolean;
-  onClose: () => void;
-  onInsertComponent: (snippet: string) => void;
+  open: boolean
+  onClose: () => void
+  onInsertComponent: (snippet: string) => void
 }
 
 export const ComponentPalette = ({ open, onClose, onInsertComponent }: ComponentPaletteProps) => {
-  const [searchQuery, setSearchQuery] = useState('');
-  const [activeTab, setActiveTab] = useState<'layout' | 'component'>('component');
+  const [searchQuery, setSearchQuery] = useState('')
+  const [activeTab, setActiveTab] = useState<AkselCatalogGroup>('component')
 
   // Filter components based on search and active tab
   const filteredComponents = useMemo(() => {
     if (searchQuery.trim()) {
-      return searchComponents(searchQuery);
+      return searchComponents(searchQuery)
     }
-    return getComponentsByCategory(activeTab);
-  }, [searchQuery, activeTab]);
+    return getComponentsByCategory(activeTab)
+  }, [searchQuery, activeTab])
 
   const handleInsert = (component: ComponentMetadata) => {
-    onInsertComponent(component.snippet);
-  };
+    onInsertComponent(component.snippet)
+  }
 
   const handleClose = () => {
-    setSearchQuery(''); // Reset search when closing
-    onClose();
-  };
+    setSearchQuery('') // Reset search when closing
+    onClose()
+  }
 
   return (
     <Modal
@@ -38,6 +52,7 @@ export const ComponentPalette = ({ open, onClose, onInsertComponent }: Component
       className="component-palette-modal"
       closeOnBackdropClick
       aria-label="Add Component"
+      data-testid="component-palette"
     >
       <Modal.Header>
         <Heading level="2" size="medium">
@@ -51,7 +66,7 @@ export const ComponentPalette = ({ open, onClose, onInsertComponent }: Component
           <TextField
             label="Search components"
             hideLabel
-            placeholder="Search components..."
+            placeholder="Search Aksel building blocks..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             // @ts-expect-error - icon prop exists
@@ -60,43 +75,46 @@ export const ComponentPalette = ({ open, onClose, onInsertComponent }: Component
           />
 
           {/* Tabs */}
-          <Tabs value={activeTab} onChange={(value) => setActiveTab(value as 'layout' | 'component')}>
+          <Tabs value={activeTab} onChange={(value) => setActiveTab(value as AkselCatalogGroup)}>
             <Tabs.List>
               <Tabs.Tab value="layout" label="Layout" />
               <Tabs.Tab value="component" label="Components" />
+              <Tabs.Tab value="icon" label="Icons" />
             </Tabs.List>
           </Tabs>
 
           {/* Component Grid */}
           <div className="component-grid-wrapper">
             <div className="component-grid">
-            {filteredComponents.length === 0 ? (
-              <BoxNew padding="space-8" className="no-results">
-                <BodyShort>No components found matching "{searchQuery}"</BodyShort>
-              </BoxNew>
-            ) : (
-              filteredComponents.map((component) => (
-                <ComponentCard
-                  key={component.name}
-                  component={component}
-                  onInsert={handleInsert}
-                />
-              ))
-            )}
+              {filteredComponents.length === 0 ? (
+                <BoxNew padding="space-8" className="no-results">
+                  <BodyShort>No components found matching "{searchQuery}"</BodyShort>
+                </BoxNew>
+              ) : (
+                filteredComponents.map((component) => (
+                  <ComponentCard
+                    key={component.name}
+                    component={component}
+                    onInsert={handleInsert}
+                  />
+                ))
+              )}
             </div>
           </div>
         </VStack>
       </Modal.Body>
     </Modal>
-  );
-};
+  )
+}
 
 interface ComponentCardProps {
-  component: ComponentMetadata;
-  onInsert: (component: ComponentMetadata) => void;
+  component: ComponentMetadata
+  onInsert: (component: ComponentMetadata) => void
 }
 
 const ComponentCard = ({ component, onInsert }: ComponentCardProps) => {
+  const categoryLabel = getCategoryLabel(component.category)
+
   return (
     <BoxNew
       className="component-card"
@@ -105,16 +123,16 @@ const ComponentCard = ({ component, onInsert }: ComponentCardProps) => {
       borderWidth="1"
       borderColor="neutral-subtleA"
       onClick={(e) => {
-        e.stopPropagation();
-        onInsert(component);
+        e.stopPropagation()
+        onInsert(component)
       }}
       role="button"
       tabIndex={0}
       onKeyDown={(e) => {
         if (e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault();
-          e.stopPropagation();
-          onInsert(component);
+          e.preventDefault()
+          e.stopPropagation()
+          onInsert(component)
         }
       }}
     >
@@ -123,9 +141,14 @@ const ComponentCard = ({ component, onInsert }: ComponentCardProps) => {
           <Heading level="3" size="xsmall">
             {component.name}
           </Heading>
-          {component.category === 'layout' && (
-            <span className="component-badge layout-badge">Layout</span>
-          )}
+          <HStack gap="space-2" align="center">
+            <span className={`component-badge ${component.category}-category-badge`}>
+              {categoryLabel}
+            </span>
+            {component.status === 'experimental' && (
+              <span className="component-badge experimental-badge">Experimental</span>
+            )}
+          </HStack>
         </HStack>
         {component.description && (
           <BodyShort size="small" className="component-description">
@@ -133,17 +156,44 @@ const ComponentCard = ({ component, onInsert }: ComponentCardProps) => {
           </BodyShort>
         )}
         <div className="component-props">
-          {component.props.slice(0, 3).map((prop) => (
-            <span key={prop.name} className="prop-tag">
-              {prop.name}
-              {prop.required && <span className="required">*</span>}
-            </span>
-          ))}
-          {component.props.length > 3 && (
-            <span className="prop-tag more">+{component.props.length - 3} more</span>
+          {component.props.length > 0 ? (
+            <>
+              {component.props.slice(0, 3).map((prop) => (
+                <span key={prop.name} className="prop-tag">
+                  {prop.name}
+                  {prop.required && <span className="required">*</span>}
+                </span>
+              ))}
+              {component.props.length > 3 && (
+                <span className="prop-tag more">+{component.props.length - 3} more</span>
+              )}
+            </>
+          ) : (
+            <span className="prop-tag">import-free</span>
+          )}
+          {component.docs && (
+            <a
+              className="component-docs-link"
+              href={component.docs}
+              target="_blank"
+              rel="noreferrer"
+              onClick={(e) => e.stopPropagation()}
+            >
+              Docs
+            </a>
           )}
         </div>
       </VStack>
     </BoxNew>
-  );
-};
+  )
+}
+
+const getCategoryLabel = (category: AkselCatalogGroup): string => {
+  const labels: Record<AkselCatalogGroup, string> = {
+    layout: 'Layout',
+    component: 'Component',
+    icon: 'Icon',
+  }
+
+  return labels[category]
+}

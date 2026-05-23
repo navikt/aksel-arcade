@@ -1,7 +1,10 @@
-import type { ComponentSnippet } from '@/types/snippets'
-import { getCatalogSnippets } from '@/data/akselCatalog'
+import type { ComponentSnippet, SnippetCategory } from '@/types/snippets'
+import { getCatalogSnippets, listCatalogEntries } from '@/data/akselCatalog'
 
 const CATALOG_SNIPPETS = getCatalogSnippets()
+const LEGACY_SNIPPET_NAMES = new Set(
+  listCatalogEntries({ statuses: ['legacy'] }).map((entry) => entry.name)
+)
 
 const MANUAL_AKSEL_SNIPPETS: ComponentSnippet[] = [
   // Layout Components
@@ -577,11 +580,13 @@ const catalogSnippetNames = new Set(CATALOG_SNIPPETS.map((snippet) => snippet.na
 
 export const AKSEL_SNIPPETS: ComponentSnippet[] = [
   ...CATALOG_SNIPPETS,
-  ...MANUAL_AKSEL_SNIPPETS.filter((snippet) => !catalogSnippetNames.has(snippet.name)),
+  ...MANUAL_AKSEL_SNIPPETS.filter(
+    (snippet) => !catalogSnippetNames.has(snippet.name) && !LEGACY_SNIPPET_NAMES.has(snippet.name)
+  ),
 ]
 
 interface SearchOptions {
-  category?: 'layout' | 'component'
+  category?: SnippetCategory
   limit?: number
 }
 

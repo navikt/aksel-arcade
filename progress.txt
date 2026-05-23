@@ -45,3 +45,22 @@ Verification:
 
 Next note:
 - #7 and #8 should extend `src/data/akselCatalog.ts` rather than adding new parallel component/snippet/prop lists. Existing manual data is still present for non-starter entries, but the starter subset now has one catalog source of truth.
+
+2026-05-23 - Issue #7: Palette groups, statuses, and docs links
+
+Selected #7 as the highest-priority ready-for-agent feature because it is unblocked by #6 and unlocks later contextual icon autocomplete (#9) and v8 chrome work (#12).
+
+Implemented:
+- Extended the checked-in Aksel catalog with current icon entries, an experimental FormProgress entry, and legacy markers for BoxNew, Stack, and Grid.
+- Updated default palette discovery to expose Layout, Components, and Icons groups while hiding legacy entries from palette and editor autocomplete suggestions.
+- Added visible category badges, an Experimental label, import-free icon snippets, and Docs links to palette cards.
+- Reused catalog docs/package metadata in export component detection so exported metadata can point icons to @navikt/aksel-icons and Aksel docs.
+- Added regression coverage for palette groups, experimental labels, icon snippets, docs metadata, and hidden legacy discovery.
+
+Verification:
+- npm run typecheck
+- CI=1 npm run test -- --run
+- Browser smoke check at http://127.0.0.1:5175/aksel-arcade/ for Icons palette, PlusIcon insertion/rendering, FormProgress experimental label, hidden legacy layout entries, and no console errors.
+
+Next note:
+- #8 should keep using `AKSEL_SNIPPETS`/catalog metadata for component autocomplete, but icons are intentionally palette-only until #9 adds contextual icon autocomplete.

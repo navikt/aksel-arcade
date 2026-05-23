@@ -9,6 +9,7 @@ import {
   listCatalogEntries,
 } from '../../src/data/akselCatalog'
 import { getComponentsByCategory } from '../../src/data/akselComponents'
+import { extractUsedComponents } from '../../src/data/akselMetadata'
 import { getComponentProps, getPropValues } from '../../src/services/akselMetadata'
 import { AKSEL_SNIPPETS, searchSnippets } from '../../src/services/componentLibrary'
 
@@ -19,12 +20,23 @@ describe('Aksel catalog starter path', () => {
 
     const currentLayout = listCatalogEntries({ groups: ['layout'], statuses: ['current'] })
     const currentComponents = listCatalogEntries({ groups: ['component'], statuses: ['current'] })
+    const iconEntries = listCatalogEntries({ groups: ['icon'], statuses: ['current'] })
+    const experimentalComponents = listCatalogEntries({
+      groups: ['component'],
+      statuses: ['experimental'],
+    })
+    const legacyEntries = listCatalogEntries({ statuses: ['legacy'] })
 
     expect(currentLayout.some((entry) => entry.name === 'HStack')).toBe(true)
     expect(currentComponents.some((entry) => entry.name === 'Button')).toBe(true)
+    expect(iconEntries.some((entry) => entry.name === 'PlusIcon')).toBe(true)
+    expect(experimentalComponents.some((entry) => entry.name === 'FormProgress')).toBe(true)
+    expect(legacyEntries.some((entry) => entry.name === 'BoxNew')).toBe(true)
 
     const hstack = currentLayout.find((entry) => entry.name === 'HStack')
+    const plusIcon = iconEntries.find((entry) => entry.name === 'PlusIcon')
     expect(hstack?.docs).toContain('aksel.nav.no')
+    expect(plusIcon?.docs).toContain('aksel.nav.no')
     expect(hstack?.props.find((prop) => prop.name === 'gap')?.values).toContain('space-16')
     expect(getCatalogTokenValues('spacing')).toContain('space-16')
   })
@@ -42,6 +54,43 @@ describe('Aksel catalog starter path', () => {
     expect(buttonPaletteEntry?.snippet).toContain('<Button variant="primary">')
     expect(buttonPaletteEntry?.snippet).not.toContain('${')
     expect(buttonPaletteEntry?.snippet).not.toMatch(/^import\s/m)
+  })
+
+  it('exposes palette groups, experimental labels, docs links, and icon snippets from the catalog', () => {
+    const paletteComponents = getCatalogPaletteComponents()
+    const layoutEntry = paletteComponents.find((component) => component.name === 'HStack')
+    const experimentalEntry = paletteComponents.find(
+      (component) => component.name === 'FormProgress'
+    )
+    const iconEntry = paletteComponents.find((component) => component.name === 'PlusIcon')
+
+    expect(getComponentsByCategory('layout')).toContainEqual(
+      expect.objectContaining({ name: 'HStack' })
+    )
+    expect(getComponentsByCategory('component')).toContainEqual(
+      expect.objectContaining({ name: 'FormProgress', status: 'experimental' })
+    )
+    expect(getComponentsByCategory('icon')).toContainEqual(
+      expect.objectContaining({ name: 'PlusIcon', category: 'icon' })
+    )
+    expect(layoutEntry?.docs).toContain('aksel.nav.no')
+    expect(experimentalEntry?.description).toContain('Experimental')
+    expect(iconEntry?.snippet).toBe('<PlusIcon aria-hidden />')
+  })
+
+  it('keeps legacy entries cataloged but hidden from default palette and autocomplete discovery', () => {
+    const legacyEntries = listCatalogEntries({ statuses: ['legacy'] })
+    const paletteComponents = getCatalogPaletteComponents()
+
+    expect(legacyEntries.map((entry) => entry.name)).toEqual(
+      expect.arrayContaining(['BoxNew', 'Stack', 'Grid'])
+    )
+    expect(paletteComponents.some((component) => component.name === 'BoxNew')).toBe(false)
+    expect(getComponentsByCategory('layout').some((component) => component.name === 'Stack')).toBe(
+      false
+    )
+    expect(AKSEL_SNIPPETS.some((snippet) => snippet.name === 'Grid')).toBe(false)
+    expect(searchSnippets('boxnew')).toHaveLength(0)
   })
 
   it('makes the active palette helpers prefer catalog data for the starter subset', () => {
@@ -65,5 +114,15 @@ describe('Aksel catalog starter path', () => {
     expect(getPropValues('Button', 'variant')).toContain('primary-neutral')
     expect(getComponentProps('Button')).toContain('type')
     expect(getPropValues('Button', 'type')).toContain('submit')
+  })
+
+  it('uses catalog docs metadata when exporting detected components and icons', () => {
+    const usedComponents = extractUsedComponents('<HStack><PlusIcon aria-hidden /></HStack>')
+    const hstack = usedComponents.find((component) => component.name === 'HStack')
+    const plusIcon = usedComponents.find((component) => component.name === 'PlusIcon')
+
+    expect(hstack?.docs).toContain('/hstack')
+    expect(plusIcon?.import).toBe('@navikt/aksel-icons')
+    expect(plusIcon?.docs).toContain('/ikoner')
   })
 })

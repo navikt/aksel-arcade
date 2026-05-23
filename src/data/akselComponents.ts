@@ -3,7 +3,12 @@
  * Complete catalog of Aksel components with props for the Component Palette
  */
 
-import { getCatalogPaletteComponents } from './akselCatalog'
+import {
+  getCatalogPaletteComponents,
+  listCatalogEntries,
+  type AkselCatalogGroup,
+  type AkselCatalogStatus,
+} from './akselCatalog'
 
 export interface ComponentProp {
   name: string
@@ -16,11 +21,13 @@ export interface ComponentProp {
 
 export interface ComponentMetadata {
   name: string
-  category: 'layout' | 'component'
+  category: AkselCatalogGroup
+  status?: AkselCatalogStatus
   import: string // e.g., "@navikt/ds-react"
   props: ComponentProp[]
   snippet: string // Default code snippet
   description?: string
+  docs?: string
 }
 
 // ===== LAYOUT COMPONENTS =====
@@ -1079,16 +1086,25 @@ export const uiComponents: ComponentMetadata[] = [
 
 const catalogComponents = getCatalogPaletteComponents()
 const catalogComponentNames = new Set(catalogComponents.map((component) => component.name))
+const legacyCatalogComponentNames = new Set(
+  listCatalogEntries({ statuses: ['legacy'] }).map((component) => component.name)
+)
 
 // Combined export
 export const allComponents: ComponentMetadata[] = [
   ...catalogComponents,
-  ...layoutComponents.filter((component) => !catalogComponentNames.has(component.name)),
-  ...uiComponents.filter((component) => !catalogComponentNames.has(component.name)),
+  ...layoutComponents.filter(
+    (component) =>
+      !catalogComponentNames.has(component.name) && !legacyCatalogComponentNames.has(component.name)
+  ),
+  ...uiComponents.filter(
+    (component) =>
+      !catalogComponentNames.has(component.name) && !legacyCatalogComponentNames.has(component.name)
+  ),
 ]
 
 // Helper functions
-export const getComponentsByCategory = (category: 'layout' | 'component'): ComponentMetadata[] => {
+export const getComponentsByCategory = (category: AkselCatalogGroup): ComponentMetadata[] => {
   return allComponents.filter((c) => c.category === category)
 }
 
