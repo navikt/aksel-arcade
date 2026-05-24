@@ -208,3 +208,16 @@ Verification:
 
 Next note:
 - #11 can now migrate built-in examples/export metadata on top of the compatibility layer. Keep import-free authoring as the default, and use `src/services/transpiler.ts` for any future supported-import additions rather than adding separate regex stripping paths.
+
+2026-05-24 - PR #19 review and merge history
+
+Reviewed, fixed, and merged PR #19:
+- `492a3e2` implemented #10: supported production-style import stripping, safe `BoxNew`/`Combobox` runtime compatibility, explicit `Grid`/`Stack` guidance, sandbox bundle regeneration, and regression coverage.
+- Review found one robustness gap: supported imports with trailing line or block comments were not stripped, which could break pasted production code before sandbox execution.
+- `f637a5a` fixed that gap by extending the supported static import matcher and covering commented React, Aksel component, icon, CSS, and local hooks imports in the transpiler regression test.
+- Re-ran local validation: `npm run typecheck`, `CI=1 npm run test -- --run`, `npm run lint` (existing `InspectionPopover` hook dependency warning only), `npm run build`, and `git diff --check`.
+- GitHub CodeQL checks refreshed green after the review fix.
+- PR #19 was merged on 2026-05-24, and the remote/local branch `sjur-gr/ready-issue-feature` was deleted.
+
+Next note:
+- #11 can start from `master`; #10's compatibility layer is merged. Future supported-import changes should update `src/services/transpiler.ts` and include regression coverage for aliases, comments, and JSX/Hooks duplicate binding behavior.
