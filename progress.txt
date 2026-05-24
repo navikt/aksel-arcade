@@ -243,3 +243,18 @@ Verification:
 
 Next note:
 - #12 should handle app chrome modernization separately. Keep future built-in examples on current `Box`, `HStack`/`VStack`, `HGrid`, `Page`, and v8 `space-*` tokens; export metadata lives in `src/data/akselMetadata.ts` and must continue to distinguish import-free Arcade authoring from production imports.
+
+### 2026-05-24 - #11 V8 built-ins, export metadata, and project memory
+
+Completed in this branch:
+
+- Selected #11 as the highest-priority `ready-for-agent` feature because #13 remains blocked by #11/#12, and #11 removes stale built-in/export/governance guidance that future migration hardening depends on.
+- Migrated the starter, Hooks demo, and form-summary built-in templates from `BoxNew`, numeric layout gaps, and legacy radius names to current `Box`, v8 `space-*` spacing tokens, and v8 radius fragments.
+- Fixed the form-summary progress example so the summary step renders as step 3 of 3 while keeping the import-free sandbox authoring model intact.
+- Extended exported Aksel metadata with exact package versions, current setup documentation, `@navikt/ds-css` CSS import guidance, explicit import-free playground vs production-import guidance, and current breakpoint metadata including `2xl: 1440px`.
+- Updated visible README guidance and hidden project governance memory/templates to the Aksel v8 CSS, Theme, and current layout primitive model so future work does not inherit old setup paths.
+- Added regression coverage for built-in template migration, built-in sandbox transpilation, exported metadata contents, package version pins, setup docs, and breakpoint metadata.
+
+Verification completed with `npm run typecheck`, `CI=1 npm run test`, `npm run lint` (existing `InspectionPopover` hook dependency warning only), `npm run build`, and browser smoke checks of the default starter, both built-in templates, exported metadata, and console output at the local Vite URL.
+
+Follow-up note: #12 should modernize app chrome separately. Keep #11-style content/export/governance changes separate from the #12 chrome refactor, and keep future built-ins on `Box`, `HStack`/`VStack`, `HGrid`, `Page`, and v8 `space-*` tokens.
