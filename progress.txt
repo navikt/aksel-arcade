@@ -115,3 +115,16 @@ Verification:
 
 Next note:
 - Keep `src/data/akselAutocompleteData.ts` generated with `node scripts/generate-aksel-autocomplete-data.mjs > src/data/akselAutocompleteData.ts` when Aksel docs/package types change; do not hand-edit the generated autocomplete metadata.
+
+2026-05-24 - PR #17 review and merge history
+
+Reviewed, fixed, and merged PR #17:
+- `87051eb` implemented the initial #8 autocomplete contract for catalog-backed tags, subcomponents, props, prop values, v8 spacing, Box tokens, and `data-color`.
+- `faa3e84` completed the coverage follow-up with generated `aksel.nav.no/llm.md` metadata, documented primitives/components/subcomponents/legacy entries, all 949 installed Aksel icons, `Box` `asChild`, and icon prop/value completions.
+- CodeQL then blocked the PR on the generator: broad HTML tag stripping and direct network-data-to-file output.
+- `17068a9` fixed those findings by normalizing docs text without multi-character tag stripping and making `scripts/generate-aksel-autocomplete-data.mjs` write generated TypeScript to stdout.
+- Re-ran `npm run typecheck`, `CI=1 npm run test`, `npm run lint`, and a browser smoke check at the local Vite URL; GitHub CodeQL checks refreshed green.
+- Merged PR #17 on 2026-05-24 and deleted the remote branch `sjur-gr/ready-feature-pr-2`.
+
+Next note:
+- Future autocomplete metadata refreshes should start from `master`, run `node scripts/generate-aksel-autocomplete-data.mjs > src/data/akselAutocompleteData.ts`, and avoid hand-editing generated docs/icon metadata.
