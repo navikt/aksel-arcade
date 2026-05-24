@@ -307,3 +307,16 @@ Completed in this branch:
 Verification completed with `npm run type-check`, `CI=1 npm run test -- --run`, `npm run lint` (existing `InspectionPopover` hook dependency warning only), `npm run build`, and a Playwright browser smoke check of the +Add modal LinkCards, missing arrows, missing Docs links, missing tags, insertion behavior, and console output at `http://127.0.0.1:5173/`.
 
 Follow-up note: the old `src/components/Editor/ComponentPalette.tsx` implementation still exists but is not the active editor palette import. Future palette work should target `src/components/ComponentPalette/ComponentPalette.tsx` unless the legacy file is intentionally revived or removed.
+
+### 2026-05-25 - Issue #25 dependency refresh
+
+Completed for #25:
+
+- Updated the direct Vite dev dependency to `^7.3.3` and refreshed the npm lockfile without adding overrides.
+- Resolved the alert-targeted packages to `vite 7.3.3`, `rollup 4.60.4`, `minimatch 10.2.5`/`3.1.5`, `flatted 3.4.2`, `picomatch 4.0.4`, and `postcss 8.5.15`; no vulnerable `picomatch 2.x` remains.
+- Kept the Aksel package pins at `8.11.0`; `npm audit` reports 0 vulnerabilities after the refresh.
+- Rebuilt the committed sandbox bundle so generated assets match the refreshed dependency graph.
+
+Verification completed with `npm run typecheck`, `npm run test -- --run`, `npm run lint` (existing `InspectionPopover` hook dependency warning only), `npm run build`, and a browser smoke/console check at `http://127.0.0.1:5173/aksel-arcade/` (no errors; existing sandbox iframe warning only).
+
+Follow-up note: no npm overrides were added. If Dependabot still reports any of #8, #9, #11, #14, #16, #18, #19, #20, #22, or #24 after merge, re-check whether the alert is scanning the default-branch lockfile or a cached dependency graph; the patched versions are present in `package-lock.json`.
