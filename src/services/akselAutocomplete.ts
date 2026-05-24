@@ -49,7 +49,6 @@ const completionEntries: CompletionEntry[] = [
   ...docsEntries,
   ...docsAliasEntries,
   ...extraCatalogEntries,
-  ...iconEntries,
 ]
 const docsEntriesByName = new Map(docsEntries.map((entry) => [entry.name, entry]))
 
@@ -167,6 +166,30 @@ function getPropNameContext(openTag: OpenTagContext): {
   }
 }
 
+function getPropExpressionValueContext(openTag: OpenTagContext): {
+  componentName: string
+  propName: string
+  partialValue: string
+} | null {
+  const componentName = openTag.componentName
+  if (!componentName) {
+    return null
+  }
+
+  const propExpressionMatch = openTag.fragment.match(
+    /(?:^|\s)([\w-]+)\s*=\s*\{\s*([A-Z][\w.]*)?$/
+  )
+  if (!propExpressionMatch) {
+    return null
+  }
+
+  return {
+    componentName,
+    propName: propExpressionMatch[1],
+    partialValue: propExpressionMatch[2] ?? '',
+  }
+}
+
 function getTagNameContext(openTag: OpenTagContext): {
   query: string
   from: number
@@ -206,6 +229,46 @@ function normalizeComponentName(componentName: string): string {
 
 function isIconComponent(componentName: string): boolean {
   return catalogEntriesByName.get(componentName)?.group === 'icon'
+}
+
+function isIconProp(componentName: string, propName: string): boolean {
+  const normalizedPropName = propName.toLowerCase()
+  if (normalizedPropName === 'icon' || normalizedPropName.endsWith('icon')) {
+    return true
+  }
+
+  const prop = getPropDefinition(componentName, propName)
+  return Boolean(
+    prop &&
+      prop.type.toLowerCase().includes('reactnode') &&
+      prop.description.toLowerCase().includes('icon')
+  )
+}
+
+function isInsideIconPropExpression(source: string, tagStart: number): boolean {
+  const beforeTag = source.slice(0, tagStart)
+  const propExpressionMatch = beforeTag.match(/(?:^|\s)([\w-]+)\s*=\s*\{\s*$/)
+  return Boolean(propExpressionMatch && isIconProp('', propExpressionMatch[1]))
+}
+
+function isIconLikeTagQuery(query: string, hasComponentMatches: boolean): boolean {
+  if (!query) {
+    return false
+  }
+
+  const normalizedQuery = query.toLowerCase()
+  if (normalizedQuery.includes('icon')) {
+    return true
+  }
+
+  if (query.length < 3) {
+    return false
+  }
+
+  return (
+    !hasComponentMatches &&
+    iconEntries.some((entry) => entry.name.toLowerCase().startsWith(normalizedQuery))
+  )
 }
 
 function getComponentProps(componentName: string): CompletionProp[] {
@@ -282,6 +345,29 @@ function componentOption(entry: CompletionEntry): Completion {
   }
 }
 
+function iconComponentOption(
+  entry: AkselCatalogEntry & { source: 'catalog' },
+  context: 'tag' | 'icon-prop-tag' | 'icon-prop-expression'
+): Completion {
+  const option = componentOption(entry)
+
+  if (context === 'icon-prop-tag') {
+    return {
+      ...option,
+      apply: `${getEntryApply(entry)}}`,
+    }
+  }
+
+  if (context === 'icon-prop-expression') {
+    return {
+      ...option,
+      apply: `${stripSnippetPlaceholders(entry.snippet.code)}}`,
+    }
+  }
+
+  return option
+}
+
 function propOption(componentName: string, prop: CompletionProp): Completion {
   const hasValues = Boolean(prop.values?.length)
 
@@ -328,6 +414,25 @@ export function getAkselCompletionForSource(source: string, pos: number): Comple
     }
   }
 
+  const propExpressionValueContext = getPropExpressionValueContext(openTag)
+  if (
+    propExpressionValueContext &&
+    isIconProp(propExpressionValueContext.componentName, propExpressionValueContext.propName)
+  ) {
+    const { partialValue } = propExpressionValueContext
+    const options = iconEntries
+      .filter((entry) => matchesPartial(entry.name, partialValue))
+      .map((entry) => iconComponentOption(entry, 'icon-prop-expression'))
+
+    if (options.length > 0) {
+      return {
+        from: pos - partialValue.length,
+        options,
+        validFor: TAG_NAME_VALID_FOR,
+      }
+    }
+  }
+
   const propNameContext = getPropNameContext(openTag)
   if (propNameContext) {
     const { componentName, partialProp } = propNameContext
@@ -346,9 +451,21 @@ export function getAkselCompletionForSource(source: string, pos: number): Comple
 
   const tagNameContext = getTagNameContext(openTag)
   if (tagNameContext) {
-    const options = completionEntries
-      .filter((entry) => matchesPartial(entry.name, tagNameContext.query))
-      .map(componentOption)
+    const isIconPropTagContext = isInsideIconPropExpression(source, openTag.tagStart)
+    const componentOptions = isIconPropTagContext
+      ? []
+      : completionEntries
+          .filter((entry) => matchesPartial(entry.name, tagNameContext.query))
+          .map(componentOption)
+    const iconOptions =
+      isIconPropTagContext || isIconLikeTagQuery(tagNameContext.query, componentOptions.length > 0)
+        ? iconEntries
+            .filter((entry) => matchesPartial(entry.name, tagNameContext.query))
+            .map((entry) =>
+              iconComponentOption(entry, isIconPropTagContext ? 'icon-prop-tag' : 'tag')
+            )
+        : []
+    const options = [...componentOptions, ...iconOptions]
 
     if (options.length > 0) {
       return {

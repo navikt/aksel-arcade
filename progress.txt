@@ -128,3 +128,23 @@ Reviewed, fixed, and merged PR #17:
 
 Next note:
 - Future autocomplete metadata refreshes should start from `master`, run `node scripts/generate-aksel-autocomplete-data.mjs > src/data/akselAutocompleteData.ts`, and avoid hand-editing generated docs/icon metadata.
+
+2026-05-24 - Issue #9: Contextual icon autocomplete
+
+Selected #9 as the highest-priority ready-for-agent feature because #7 and #8 had landed, making it fully unblocked, and because the current autocomplete surface still let hundreds of icons flood normal tag suggestions.
+
+Implemented:
+- Removed icon catalog entries from default JSX tag completion so normal component/primitives suggestions stay focused.
+- Added contextual icon suggestions for icon prop JSX/expression contexts such as `icon={<...` and `icon={...`.
+- Added icon suggestions for icon-looking JSX tag identifiers, while keeping short prefixes like `<Pl` and real component matches like `<Link` from pulling in icon results.
+- Preserved SVG prop and prop-value completions for actual icon tags.
+- Kept sandbox icon globals unchanged so all Aksel icons remain available to import-free prototypes at runtime.
+- Added engine-level regression coverage for default icon exclusion, icon prop contexts, icon-looking tag identifiers, normal prop-list exclusion, and icon prop/value behavior.
+
+Verification:
+- npm run typecheck
+- CI=1 npm run test
+- Browser smoke check at http://127.0.0.1:5178/aksel-arcade/ for contextual autocomplete behavior and no runtime console errors.
+
+Next note:
+- #10 should focus on import stripping and compatibility aliases without reintroducing automatic rewrites. #11 remains blocked by #10 per the PRD dependency list.
