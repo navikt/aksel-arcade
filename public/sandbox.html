@@ -154,6 +154,47 @@
     let akselLoaded = false;
     let ThemeComponent = null;
     let lastComponent = null;
+    const reactRuntimeGlobalNames = new Set([
+      'Fragment',
+      'useState',
+      'useEffect',
+      'useContext',
+      'useReducer',
+      'useCallback',
+      'useMemo',
+      'useRef',
+      'useImperativeHandle',
+      'useLayoutEffect',
+      'useDebugValue',
+      'useId',
+      'useTransition',
+      'useDeferredValue',
+      'useSyncExternalStore',
+      'useInsertionEffect',
+      'useActionState',
+      'useOptimistic',
+    ]);
+
+    function exposeReactRuntimeGlobals(React) {
+      window.Fragment = React.Fragment;
+      window.useState = React.useState;
+      window.useEffect = React.useEffect;
+      window.useContext = React.useContext;
+      window.useReducer = React.useReducer;
+      window.useCallback = React.useCallback;
+      window.useMemo = React.useMemo;
+      window.useRef = React.useRef;
+      window.useImperativeHandle = React.useImperativeHandle;
+      window.useLayoutEffect = React.useLayoutEffect;
+      window.useDebugValue = React.useDebugValue;
+      window.useId = React.useId;
+      window.useTransition = React.useTransition;
+      window.useDeferredValue = React.useDeferredValue;
+      window.useSyncExternalStore = React.useSyncExternalStore;
+      window.useInsertionEffect = React.useInsertionEffect;
+      window.useActionState = React.useActionState;
+      window.useOptimistic = React.useOptimistic;
+    }
 
     // Load Aksel + React - detect environment (Vite dev server runs on port 5173)
     const isDev = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') && window.location.port === '5173';
@@ -308,16 +349,7 @@
         window.ReactDOM = { createRoot };
         
         // Make React hooks available globally (for user code)
-        window.useState = React.useState;
-        window.useEffect = React.useEffect;
-        window.useContext = React.useContext;
-        window.useReducer = React.useReducer;
-        window.useCallback = React.useCallback;
-        window.useMemo = React.useMemo;
-        window.useRef = React.useRef;
-        window.useImperativeHandle = React.useImperativeHandle;
-        window.useLayoutEffect = React.useLayoutEffect;
-        window.useDebugValue = React.useDebugValue;
+        exposeReactRuntimeGlobals(React);
         
         // Store Theme component
         ThemeComponent = Theme;
@@ -326,6 +358,7 @@
         // Make all Aksel components available globally
         window.AkselDS = AkselComponents;
         Object.keys(AkselComponents).forEach(key => {
+          if (reactRuntimeGlobalNames.has(key)) return;
           window[key] = AkselComponents[key];
         });
         
@@ -821,6 +854,7 @@
         const componentDeclarations = window.AkselDS 
           ? Object.keys(window.AkselDS)
               .filter(key => typeof window[key] !== 'undefined') // Only include defined components
+              .filter(key => !reactRuntimeGlobalNames.has(key)) // React hooks are declared separately
               .map(key => `const ${key} = window.${key};`)
               .join('\n')
           : '';
@@ -841,6 +875,10 @@
         
         const wrappedCode = `
           (function() {
+            const React = window.React;
+            const AkselDS = window.AkselDS;
+            const AkselIcons = window.AkselIcons;
+
             // Make all Aksel components available
             ${componentDeclarations}
             
@@ -848,8 +886,27 @@
             ${iconDeclarations}
             
             // Make React hooks available
-            const { useState, useEffect, useContext, useReducer, useCallback, useMemo, useRef } = window.React;
-            
+            const {
+              Fragment,
+              useState,
+              useEffect,
+              useContext,
+              useReducer,
+              useCallback,
+              useMemo,
+              useRef,
+              useImperativeHandle,
+              useLayoutEffect,
+              useDebugValue,
+              useId,
+              useTransition,
+              useDeferredValue,
+              useSyncExternalStore,
+              useInsertionEffect,
+              useActionState,
+              useOptimistic
+            } = React;
+
             // Debug log inside eval scope
             console.log('🔍 Inside eval - Button type:', typeof Button);
             console.log('🔍 Inside eval - Button is:', Button);
