@@ -1,7 +1,17 @@
 import { describe, expect, it } from 'vitest'
 import iconMetadata from '@navikt/aksel-icons/metadata'
-import { AKSEL_AUTOCOMPLETE_ENTRIES } from '../../src/data/akselAutocompleteData'
+import {
+  AKSEL_AUTOCOMPLETE_ENTRIES,
+  AKSEL_ICON_PROPS,
+} from '../../src/data/akselAutocompleteData'
+import { listCatalogEntries } from '../../src/data/akselCatalog'
 import { getAkselCompletionForSource } from '../../src/services/akselAutocomplete'
+
+interface PropWithCompletionMetadata {
+  name: string
+  type: string
+  values?: string[]
+}
 
 function completionFor(source: string) {
   return getAkselCompletionForSource(source, source.length)
@@ -15,6 +25,52 @@ function labelsFor(source: string): string[] {
 function applyFor(source: string, label: string): string | undefined {
   const apply = completionFor(source)?.options.find((option) => option.label === label)?.apply
   return typeof apply === 'string' ? apply : undefined
+}
+
+const BOOLEAN_COMPLETION_VALUES = new Set(['true', 'false'])
+const COMPONENT_COMPLETION_NAME = /^[A-Z][\w.]*$/
+
+function isBooleanLikeProp(prop: PropWithCompletionMetadata): boolean {
+  const values = prop.values ?? []
+  const hasNonBooleanValues = values.some((value) => !BOOLEAN_COMPLETION_VALUES.has(value))
+
+  return !hasNonBooleanValues && /\bboolean(?:ish)?\b/i.test(prop.type.replace(/`/g, ''))
+}
+
+function booleanLikePropCases(): Array<[componentName: string, propName: string]> {
+  const cases = new Map<string, [componentName: string, propName: string]>()
+  const addProp = (componentName: string, prop: PropWithCompletionMetadata) => {
+    if (
+      !COMPONENT_COMPLETION_NAME.test(componentName) ||
+      !/^[\w-]+$/.test(prop.name) ||
+      !isBooleanLikeProp(prop)
+    ) {
+      return
+    }
+
+    cases.set(`${componentName}.${prop.name}`, [componentName, prop.name])
+  }
+
+  for (const entry of AKSEL_AUTOCOMPLETE_ENTRIES) {
+    for (const prop of entry.props) {
+      addProp(entry.name, prop)
+    }
+  }
+
+  for (const entry of listCatalogEntries({
+    groups: ['layout', 'component'],
+    statuses: ['current', 'experimental'],
+  })) {
+    for (const prop of entry.props) {
+      addProp(entry.name, prop)
+    }
+  }
+
+  for (const prop of AKSEL_ICON_PROPS) {
+    addProp('PlusIcon', prop)
+  }
+
+  return Array.from(cases.values())
 }
 
 describe('Aksel-aware autocomplete contract', () => {
@@ -104,6 +160,22 @@ describe('Aksel-aware autocomplete contract', () => {
     expect(labelsFor('<DataGrid c')).toContain('columns')
     expect(labelsFor('<UNSAFE_Combobox l')).toContain('label')
     expect(labelsFor('<PlusIcon aria-')).toContain('aria-hidden')
+  })
+
+  it('applies boolean-like props as JSX shorthand instead of empty strings', () => {
+    const booleanProps = booleanLikePropCases()
+
+    expect(booleanProps.length).toBeGreaterThan(0)
+    expect(applyFor('<Box a', 'asChild')).toBe('asChild')
+    expect(applyFor('<Button d', 'disabled')).toBe('disabled')
+    expect(applyFor('<PlusIcon aria-h', 'aria-hidden')).toBe('aria-hidden')
+    expect(applyFor('<Button v', 'variant')).toBe('variant=""')
+
+    for (const [componentName, propName] of booleanProps) {
+      expect(applyFor(`<${componentName} ${propName}`, propName), `${componentName}.${propName}`).toBe(
+        propName
+      )
+    }
   })
 
   it('does not mix icon tags into normal prop suggestions', () => {
