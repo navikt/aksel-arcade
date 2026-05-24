@@ -1,6 +1,5 @@
 import { ToggleGroup } from '@navikt/ds-react'
 import type { EditorTab } from '@/types/editor'
-import './EditorTabs.css'
 
 interface EditorTabsProps {
   activeTab: EditorTab
@@ -9,9 +8,9 @@ interface EditorTabsProps {
 
 export const EditorTabs = ({ activeTab, onTabChange }: EditorTabsProps) => {
   return (
-    <ToggleGroup 
-      size="small" 
-      value={activeTab} 
+    <ToggleGroup
+      size="small"
+      value={activeTab}
       onChange={(value) => onTabChange(value as EditorTab)}
       variant="neutral"
     >

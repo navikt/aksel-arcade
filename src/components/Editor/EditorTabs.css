@@ -1,8 +1,0 @@
-.editor-tabs {
-  background: var(--ax-bg-default);
-  border-bottom: 1px solid var(--ax-border-neutral-default);
-}
-
-.editor-tabs .navds-tabs__tablist {
-  padding: 0 1rem;
-}

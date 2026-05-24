@@ -3,7 +3,6 @@ import { ToggleGroup } from '@navikt/ds-react'
 import { AppContext } from '@/hooks/useProject'
 import { VIEWPORTS } from '@/types/viewports'
 import type { ViewportSize } from '@/types/project'
-import './ViewportToggle.css'
 
 export const ViewportToggle = () => {
   const context = useContext(AppContext)
@@ -16,15 +15,15 @@ export const ViewportToggle = () => {
   }
 
   return (
-    <ToggleGroup 
-      size="small" 
-      value={project.viewportSize} 
+    <ToggleGroup
+      size="small"
+      value={project.viewportSize}
       onChange={handleViewportChange}
       variant="neutral"
     >
       {VIEWPORTS.map((viewport) => (
-        <ToggleGroup.Item 
-          key={viewport.id} 
+        <ToggleGroup.Item
+          key={viewport.id}
           value={viewport.id}
           aria-label={`${viewport.name} (${viewport.width}px)`}
         >

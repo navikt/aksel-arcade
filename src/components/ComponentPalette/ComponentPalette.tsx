@@ -5,9 +5,12 @@ import {
   TextField,
   VStack,
   HStack,
-  BoxNew,
+  Box,
+  HGrid,
   Heading,
   BodyShort,
+  Link,
+  Tag,
 } from '@navikt/ds-react'
 import { MagnifyingGlassIcon } from '@navikt/aksel-icons'
 import {
@@ -72,7 +75,7 @@ export const ComponentPalette = ({ open, onClose, onInsertComponent }: Component
       </Modal.Header>
 
       <Modal.Body className="component-palette-body">
-        <VStack gap="space-4" className="component-palette-content">
+        <VStack gap="space-16" className="component-palette-content">
           {/* Search Field */}
           <TextField
             label="Search components"
@@ -100,11 +103,15 @@ export const ComponentPalette = ({ open, onClose, onInsertComponent }: Component
 
           {/* Component Grid */}
           <div className="component-grid-wrapper">
-            <div className="component-grid">
+            <HGrid
+              columns="repeat(auto-fill, minmax(280px, 1fr))"
+              gap="space-16"
+              className="component-grid"
+            >
               {filteredComponents.length === 0 ? (
-                <BoxNew padding="space-8" className="no-results">
+                <Box padding="space-16" className="no-results">
                   <BodyShort>No components found matching "{searchQuery}"</BodyShort>
-                </BoxNew>
+                </Box>
               ) : (
                 filteredComponents.map((component) => (
                   <ComponentCard
@@ -114,7 +121,7 @@ export const ComponentPalette = ({ open, onClose, onInsertComponent }: Component
                   />
                 ))
               )}
-            </div>
+            </HGrid>
           </div>
         </VStack>
       </Modal.Body>
@@ -129,7 +136,7 @@ interface ComponentCardProps {
 
 const ComponentCard = ({ component, onInsert }: ComponentCardProps) => {
   return (
-    <BoxNew
+    <Box
       className="component-card"
       padding="space-12"
       borderRadius="8"
@@ -149,7 +156,7 @@ const ComponentCard = ({ component, onInsert }: ComponentCardProps) => {
         }
       }}
     >
-      <VStack gap="space-2">
+      <VStack gap="space-8">
         <HStack justify="space-between" align="center">
           <Heading level="3" size="xsmall">
             {component.name}
@@ -160,33 +167,42 @@ const ComponentCard = ({ component, onInsert }: ComponentCardProps) => {
             {component.description}
           </BodyShort>
         )}
-        <div className="component-props">
+        <HStack gap="space-8" align="center" wrap>
           {component.props.length > 0 && (
             <>
               {component.props.slice(0, 3).map((prop) => (
-                <span key={prop.name} className="prop-tag">
+                <Tag
+                  key={prop.name}
+                  size="xsmall"
+                  variant="moderate"
+                  data-color={prop.required ? 'danger' : 'neutral'}
+                  className="prop-tag"
+                >
                   {prop.name}
-                  {prop.required && <span className="required">*</span>}
-                </span>
+                  {prop.required && '*'}
+                </Tag>
               ))}
               {component.props.length > 3 && (
-                <span className="prop-tag more">+{component.props.length - 3} more</span>
+                <Tag size="xsmall" variant="moderate" data-color="info" className="prop-tag">
+                  +{component.props.length - 3} more
+                </Tag>
               )}
             </>
           )}
           {component.docs && (
-            <a
+            <Link
               className="component-docs-link"
               href={component.docs}
+              variant="action"
               target="_blank"
               rel="noreferrer"
               onClick={(e) => e.stopPropagation()}
             >
               Docs
-            </a>
+            </Link>
           )}
-        </div>
+        </HStack>
       </VStack>
-    </BoxNew>
+    </Box>
   )
 }

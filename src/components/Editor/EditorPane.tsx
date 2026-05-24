@@ -1,5 +1,5 @@
 import { useContext, useRef } from 'react'
-import { HStack, BoxNew } from '@navikt/ds-react'
+import { Box, HStack } from '@navikt/ds-react'
 import { AppContext } from '@/hooks/useProject'
 import { CodeEditor, type CodeEditorRef } from './CodeEditor'
 import { EditorTabs } from './EditorTabs'
@@ -12,8 +12,16 @@ export const EditorPane = () => {
   const context = useContext(AppContext)
   if (!context) throw new Error('EditorPane must be used within AppProvider')
 
-  const { project, editorState, isComponentPaletteOpen, updateProject, updateEditorState, toggleComponentPalette, closeComponentPalette } = context
-  
+  const {
+    project,
+    editorState,
+    isComponentPaletteOpen,
+    updateProject,
+    updateEditorState,
+    toggleComponentPalette,
+    closeComponentPalette,
+  } = context
+
   // Ref for the currently active editor to access undo/redo
   const editorRef = useRef<CodeEditorRef>(null)
 
@@ -42,20 +50,20 @@ export const EditorPane = () => {
 
   const handleComponentInsert = (snippet: string) => {
     // Close the component palette immediately
-    closeComponentPalette();
-    
+    closeComponentPalette()
+
     // Insert the snippet at the current cursor position
     const currentContent = currentTab === 'JSX' ? project.jsxCode : project.hooksCode
     const cursor = currentTab === 'JSX' ? editorState.jsxCursor : editorState.hooksCursor
-    
+
     // Simple insertion: add snippet at cursor or end of code
     const lines = currentContent.split('\n')
     const insertLine = cursor?.line ?? lines.length
-    
+
     // Insert with proper indentation
     lines.splice(insertLine, 0, snippet)
     const newContent = lines.join('\n')
-    
+
     handleCodeChange(newContent)
   }
 
@@ -83,15 +91,15 @@ export const EditorPane = () => {
   const canRedo = true
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      <BoxNew
+    <Box as="section" className="editor-pane">
+      <Box
         data-name="Code Header"
         borderWidth="0 1 1 0"
         borderColor="neutral-subtleA"
         paddingInline="space-20"
         paddingBlock="space-8"
       >
-        <HStack justify="space-between">
+        <HStack justify="space-between" align="center" gap="space-16">
           <EditorTabs activeTab={currentTab} onTabChange={handleTabChange} />
           <EditorToolbar
             canUndo={canUndo}
@@ -102,29 +110,29 @@ export const EditorPane = () => {
             onRedo={handleRedo}
           />
         </HStack>
-      </BoxNew>
+      </Box>
 
-      <BoxNew
+      <Box
         data-name="Code editor"
-        style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}
+        className="editor-pane__editor"
         borderWidth="0 1 0 0"
         borderColor="neutral-subtleA"
       >
-        <CodeEditor 
+        <CodeEditor
           ref={editorRef}
           key={currentTab}
-          value={currentContent} 
+          value={currentContent}
           onChange={handleCodeChange}
           onCursorChange={handleCursorChange}
           onFormat={handleFormat}
         />
-      </BoxNew>
+      </Box>
 
       <ComponentPalette
         open={isComponentPaletteOpen}
         onInsertComponent={handleComponentInsert}
         onClose={() => closeComponentPalette()}
       />
-    </div>
+    </Box>
   )
 }

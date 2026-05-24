@@ -1,5 +1,5 @@
 import { useContext, useState, useEffect } from 'react'
-import { Page } from '@navikt/ds-react'
+import { Box, Page } from '@navikt/ds-react'
 import { AppContext } from './hooks/useProject'
 import { useAutoSave } from './hooks/useAutoSave'
 import { ThemeProvider } from './components/Layout/ThemeProvider'
@@ -31,7 +31,7 @@ function App() {
 
   // T097: Auto-save integration
   const { saveStatus, saveError } = useAutoSave(project)
-  
+
   // T094, T095, T096: Project size monitoring
   const [projectSizeBytes, setProjectSizeBytes] = useState(0)
   const [sizeWarning, setSizeWarning] = useState<string | null>(null)
@@ -39,14 +39,14 @@ function App() {
   useEffect(() => {
     const sizeStatus = validateProjectSize(project)
     setProjectSizeBytes(sizeStatus.sizeBytes)
-    
+
     // T095: Show warning when > 4MB
     if (sizeStatus.warning) {
       setSizeWarning(sizeStatus.warning)
     } else {
       setSizeWarning(null)
     }
-    
+
     // T096: Show error if > 5MB (though this should be prevented by save)
     if (!sizeStatus.valid && sizeStatus.message) {
       setSizeWarning(sizeStatus.message)
@@ -64,7 +64,7 @@ function App() {
 
   return (
     <ThemeProvider>
-      <Page.Block gutters={false} style={{ width: '100%', height: '100vh' }}>
+      <Page.Block gutters={false} className="app-shell">
         {shareHydration.status === 'ready' && shareHydration.snapshot && (
           <WarningNotification
             variant="warning"
@@ -88,33 +88,26 @@ function App() {
         )}
 
         {sizeWarning && (
-          <WarningNotification
-            message={sizeWarning}
-            onClose={() => setSizeWarning(null)}
-          />
+          <WarningNotification message={sizeWarning} onClose={() => setSizeWarning(null)} />
         )}
-        
-        {saveError && (
-          <WarningNotification 
-            message={`Save error: ${saveError}`}
-          />
-        )}
-        
-        <AppHeader 
-            projectName={project.name} 
-            onProjectNameChange={handleProjectNameChange}
-            currentProject={project}
+
+        {saveError && <WarningNotification message={`Save error: ${saveError}`} />}
+
+        <AppHeader
+          projectName={project.name}
+          onProjectNameChange={handleProjectNameChange}
+          currentProject={project}
           shareViewport={previewState.currentViewport}
-            onProjectImported={handleProjectImported}
-            saveStatus={saveStatus}
-            projectSizeBytes={projectSizeBytes}
-            onResetToIntro={resetToIntro}
-            onClearStorage={clearStorage}
-            onLoadFormSummaryTemplate={loadFormSummaryTemplate}
-            onLoadHooksDemo={loadHooksDemo}
+          onProjectImported={handleProjectImported}
+          saveStatus={saveStatus}
+          projectSizeBytes={projectSizeBytes}
+          onResetToIntro={resetToIntro}
+          onClearStorage={clearStorage}
+          onLoadFormSummaryTemplate={loadFormSummaryTemplate}
+          onLoadHooksDemo={loadHooksDemo}
         />
 
-        <div style={{ height: 'calc(100vh - 60px)', width: '100%' }}>
+        <Box as="main" className="app-shell__workspace">
           <SplitPane
             left={<EditorPane />}
             right={<PreviewPane />}
@@ -122,7 +115,7 @@ function App() {
             minLeftWidth={20}
             minRightWidth={20}
           />
-        </div>
+        </Box>
       </Page.Block>
     </ThemeProvider>
   )
@@ -140,4 +133,3 @@ const formatShareTimestamp = (timestamp: number): string => {
     return new Date(timestamp).toLocaleString()
   }
 }
-

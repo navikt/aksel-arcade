@@ -1,1 +1,48 @@
-/* PreviewPane styles removed - component now uses Aksel tokens */
+.preview-pane {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: var(--ax-bg-default);
+}
+
+.preview-pane__surface {
+  position: relative;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.preview-pane__error {
+  position: absolute;
+  top: var(--ax-space-16);
+  right: var(--ax-space-16);
+  left: var(--ax-space-16);
+  z-index: 1000;
+}
+
+.preview-pane__error-message {
+  margin-block: var(--ax-space-8) 0;
+  font-family: Monaco, Menlo, Consolas, monospace;
+  font-size: 0.875rem;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.preview-pane__error-details {
+  margin-top: var(--ax-space-12);
+}
+
+.preview-pane__error-summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.preview-pane__component-stack {
+  margin-top: var(--ax-space-8);
+  padding: var(--ax-space-8);
+  overflow-x: auto;
+  background: var(--ax-bg-neutral-moderate);
+  border-radius: var(--ax-radius-4);
+  font-size: 0.75rem;
+}

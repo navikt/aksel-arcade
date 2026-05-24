@@ -1,26 +1,9 @@
 .warning-notification {
   position: fixed;
-  top: var(--ax-space-4);
+  top: var(--ax-space-16);
   left: 50%;
   transform: translateX(-50%);
   z-index: 10000;
   max-width: 600px;
   width: 90%;
-}
-
-.warning-notification__content {
-  display: flex;
-  flex-direction: column;
-  gap: var(--ax-space-2);
-}
-
-.warning-notification__message {
-  font-weight: 600;
-}
-
-.warning-notification__actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--ax-space-2);
-  margin-top: var(--ax-space-2);
 }
