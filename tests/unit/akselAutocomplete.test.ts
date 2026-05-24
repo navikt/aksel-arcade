@@ -63,17 +63,15 @@ describe('Aksel-aware autocomplete contract', () => {
     expect(labelsFor('<Pl')).not.toContain('PlusIcon')
     expect(labelsFor('<Plus')).toContain('PlusIcon')
     expect(labelsFor('<PlusIcon')).toContain('PlusIcon')
+    expect(labelsFor('<DogH')[0]).toBe('DogHarnessIcon')
+    expect(applyFor('<DogHarnessIcon', 'DogHarnessIcon')).toBe(
+      'DogHarnessIcon title="a11y-title" fontSize="1.5rem" />'
+    )
+    expect(labelsFor('<Box><DogH')[0]).toBe('DogHarnessIcon')
+    expect(labelsFor('<Box>DogH')).not.toContain('DogHarnessIcon')
     expect(labelsFor('<Link')).toContain('Link')
     expect(labelsFor('<Link')).not.toContain('LinkIcon')
     expect(labelsFor('<LinkIcon')).toContain('LinkIcon')
-  })
-
-  it('suggests accessible icon snippets for icon-looking child text in containers', () => {
-    expect(labelsFor('<Box>DogH')).toContain('DogHarnessIcon')
-    expect(applyFor('<Box>DogH', 'DogHarnessIcon')).toBe(
-      '<DogHarnessIcon title="a11y-title" fontSize="1.5rem" />'
-    )
-    expect(labelsFor('<div>DogH')).toContain('DogHarnessIcon')
   })
 
   it('suggests catalog subcomponents in JSX tag context', () => {

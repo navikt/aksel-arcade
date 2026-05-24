@@ -58,11 +58,6 @@ interface OpenTagContext {
   componentName?: string
 }
 
-interface IconChildTextContext {
-  query: string
-  from: number
-}
-
 function stripSnippetPlaceholders(template: string): string {
   return template.replace(
     /\$\{(\d+):([^}]+)\}/g,
@@ -214,29 +209,6 @@ function getTagNameContext(openTag: OpenTagContext): {
   }
 }
 
-function getIconChildTextContext(source: string, pos: number): IconChildTextContext | null {
-  const beforeCursor = source.slice(0, pos)
-  const tokenMatch = beforeCursor.match(/(?:^|[\s>])([A-Z][\w]*)$/)
-  if (!tokenMatch) {
-    return null
-  }
-
-  const query = tokenMatch[1]
-  const from = pos - query.length
-  const beforeToken = source.slice(0, from)
-  const lastTagStart = beforeToken.lastIndexOf('<')
-  const lastTagEnd = beforeToken.lastIndexOf('>')
-
-  if (lastTagEnd === -1 || lastTagEnd < lastTagStart) {
-    return null
-  }
-
-  return {
-    query,
-    from,
-  }
-}
-
 function matchesPartial(value: string, partial: string): boolean {
   return value.toLowerCase().startsWith(partial.toLowerCase())
 }
@@ -299,8 +271,24 @@ function isIconLikeTagQuery(query: string, hasComponentMatches: boolean): boolea
   )
 }
 
-function hasComponentMatches(query: string): boolean {
-  return completionEntries.some((entry) => matchesPartial(entry.name, query))
+function compareIconEntries(
+  first: AkselCatalogEntry & { source: 'catalog' },
+  second: AkselCatalogEntry & { source: 'catalog' }
+): number {
+  const firstBaseName = first.name.replace(/FillIcon$/, 'Icon')
+  const secondBaseName = second.name.replace(/FillIcon$/, 'Icon')
+  const baseNameComparison = firstBaseName.localeCompare(secondBaseName)
+  if (baseNameComparison !== 0) {
+    return baseNameComparison
+  }
+
+  const firstIsFill = first.name.endsWith('FillIcon')
+  const secondIsFill = second.name.endsWith('FillIcon')
+  if (firstIsFill !== secondIsFill) {
+    return firstIsFill ? 1 : -1
+  }
+
+  return first.name.localeCompare(second.name)
 }
 
 function getComponentProps(componentName: string): CompletionProp[] {
@@ -383,21 +371,16 @@ function accessibleIconSnippet(iconName: string): string {
 
 function iconComponentOption(
   entry: AkselCatalogEntry & { source: 'catalog' },
-  context: 'tag' | 'child-text' | 'icon-prop-tag' | 'icon-prop-expression'
+  context: 'tag' | 'icon-prop-tag' | 'icon-prop-expression'
 ): Completion {
   const option = componentOption(entry)
   const snippet = accessibleIconSnippet(entry.name)
-
-  if (context === 'child-text') {
-    return {
-      ...option,
-      apply: snippet,
-    }
-  }
+  const boost = entry.name.endsWith('FillIcon') ? 0 : 5
 
   if (context === 'tag') {
     return {
       ...option,
+      boost,
       apply: snippet.slice(1),
     }
   }
@@ -405,6 +388,7 @@ function iconComponentOption(
   if (context === 'icon-prop-tag') {
     return {
       ...option,
+      boost,
       apply: `${snippet.slice(1)}}`,
     }
   }
@@ -412,11 +396,22 @@ function iconComponentOption(
   if (context === 'icon-prop-expression') {
     return {
       ...option,
+      boost,
       apply: `${snippet}}`,
     }
   }
 
   return option
+}
+
+function iconComponentOptions(
+  query: string,
+  context: 'tag' | 'icon-prop-tag' | 'icon-prop-expression'
+): Completion[] {
+  return iconEntries
+    .filter((entry) => matchesPartial(entry.name, query))
+    .sort(compareIconEntries)
+    .map((entry) => iconComponentOption(entry, context))
 }
 
 function propOption(componentName: string, prop: CompletionProp): Completion {
@@ -441,24 +436,6 @@ function valueOption(prop: CompletionProp, value: string): Completion {
 }
 
 export function getAkselCompletionForSource(source: string, pos: number): CompletionResult | null {
-  const iconChildTextContext = getIconChildTextContext(source, pos)
-  if (
-    iconChildTextContext &&
-    isIconLikeTagQuery(iconChildTextContext.query, hasComponentMatches(iconChildTextContext.query))
-  ) {
-    const options = iconEntries
-      .filter((entry) => matchesPartial(entry.name, iconChildTextContext.query))
-      .map((entry) => iconComponentOption(entry, 'child-text'))
-
-    if (options.length > 0) {
-      return {
-        from: iconChildTextContext.from,
-        options,
-        validFor: TAG_NAME_VALID_FOR,
-      }
-    }
-  }
-
   const openTag = getOpenTagContext(source, pos)
   if (!openTag) {
     return null
@@ -489,9 +466,7 @@ export function getAkselCompletionForSource(source: string, pos: number): Comple
     isIconProp(propExpressionValueContext.componentName, propExpressionValueContext.propName)
   ) {
     const { partialValue } = propExpressionValueContext
-    const options = iconEntries
-      .filter((entry) => matchesPartial(entry.name, partialValue))
-      .map((entry) => iconComponentOption(entry, 'icon-prop-expression'))
+    const options = iconComponentOptions(partialValue, 'icon-prop-expression')
 
     if (options.length > 0) {
       return {
@@ -528,11 +503,7 @@ export function getAkselCompletionForSource(source: string, pos: number): Comple
           .map(componentOption)
     const iconOptions =
       isIconPropTagContext || isIconLikeTagQuery(tagNameContext.query, componentOptions.length > 0)
-        ? iconEntries
-            .filter((entry) => matchesPartial(entry.name, tagNameContext.query))
-            .map((entry) =>
-              iconComponentOption(entry, isIconPropTagContext ? 'icon-prop-tag' : 'tag')
-            )
+        ? iconComponentOptions(tagNameContext.query, isIconPropTagContext ? 'icon-prop-tag' : 'tag')
         : []
     const options = [...componentOptions, ...iconOptions]
 
