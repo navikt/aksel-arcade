@@ -1,25 +1,57 @@
-import type {
-  Completion,
-  CompletionContext,
-  CompletionResult,
-} from '@codemirror/autocomplete'
+import type { Completion, CompletionContext, CompletionResult } from '@codemirror/autocomplete'
 import {
   getCatalogComponent,
-  getCatalogPropDefinition,
   listCatalogEntries,
   type AkselCatalogEntry,
   type AkselCatalogProp,
 } from '@/data/akselCatalog'
+import {
+  AKSEL_AUTOCOMPLETE_ENTRIES,
+  AKSEL_ICON_PROPS,
+  type AkselAutocompleteEntry,
+  type AkselAutocompleteProp,
+} from '@/data/akselAutocompleteData'
 
 const COMPONENT_NAME_PATTERN = /^[A-Z][\w.]*$/
 const TAG_NAME_VALID_FOR = /^[\w.]*$/
 const PROP_NAME_VALID_FOR = /^[\w-]*$/
-const PROP_VALUE_VALID_FOR = /^[\w-]*$/
+const PROP_VALUE_VALID_FOR = /^[\w\s./%-]*$/
 
-const COMPLETION_ENTRIES = listCatalogEntries({
-  groups: ['layout', 'component'],
+type CompletionEntry =
+  | (AkselAutocompleteEntry & { source: 'docs' })
+  | (AkselCatalogEntry & { source: 'catalog' })
+
+type CompletionProp = (AkselAutocompleteProp | AkselCatalogProp) & {
+  values?: string[]
+}
+
+const catalogEntries = listCatalogEntries({
+  groups: ['layout', 'component', 'icon'],
   statuses: ['current', 'experimental'],
 })
+const catalogEntriesByName = new Map(catalogEntries.map((entry) => [entry.name, entry]))
+const docsEntries = AKSEL_AUTOCOMPLETE_ENTRIES.map((entry) => ({
+  ...entry,
+  source: 'docs' as const,
+}))
+const comboboxAliasEntry = docsEntries.find((entry) => entry.name === 'Combobox')
+const docsAliasEntries = comboboxAliasEntry
+  ? [{ ...comboboxAliasEntry, name: 'UNSAFE_Combobox' }]
+  : []
+const iconEntries = catalogEntries
+  .filter((entry) => entry.group === 'icon')
+  .map((entry) => ({ ...entry, source: 'catalog' as const }))
+const docsEntryNames = new Set([...docsEntries, ...docsAliasEntries].map((entry) => entry.name))
+const extraCatalogEntries = catalogEntries
+  .filter((entry) => entry.group !== 'icon' && !docsEntryNames.has(entry.name))
+  .map((entry) => ({ ...entry, source: 'catalog' as const }))
+const completionEntries: CompletionEntry[] = [
+  ...docsEntries,
+  ...docsAliasEntries,
+  ...extraCatalogEntries,
+  ...iconEntries,
+]
+const docsEntriesByName = new Map(docsEntries.map((entry) => [entry.name, entry]))
 
 interface OpenTagContext {
   tagStart: number
@@ -28,7 +60,10 @@ interface OpenTagContext {
 }
 
 function stripSnippetPlaceholders(template: string): string {
-  return template.replace(/\$\{(\d+):([^}]+)\}/g, (_match, _num, placeholder: string) => placeholder)
+  return template.replace(
+    /\$\{(\d+):([^}]+)\}/g,
+    (_match, _num, placeholder: string) => placeholder
+  )
 }
 
 function getOpenTagContext(source: string, pos: number): OpenTagContext | null {
@@ -85,13 +120,11 @@ function isInsideQuotedValue(text: string): boolean {
   return quote !== null
 }
 
-function getPropValueContext(openTag: OpenTagContext):
-  | {
-      componentName: string
-      propName: string
-      partialValue: string
-    }
-  | null {
+function getPropValueContext(openTag: OpenTagContext): {
+  componentName: string
+  propName: string
+  partialValue: string
+} | null {
   const componentName = openTag.componentName
   if (!componentName) {
     return null
@@ -109,12 +142,10 @@ function getPropValueContext(openTag: OpenTagContext):
   }
 }
 
-function getPropNameContext(openTag: OpenTagContext):
-  | {
-      componentName: string
-      partialProp: string
-    }
-  | null {
+function getPropNameContext(openTag: OpenTagContext): {
+  componentName: string
+  partialProp: string
+} | null {
   const componentName = openTag.componentName
   if (!componentName) {
     return null
@@ -136,12 +167,10 @@ function getPropNameContext(openTag: OpenTagContext):
   }
 }
 
-function getTagNameContext(openTag: OpenTagContext):
-  | {
-      query: string
-      from: number
-    }
-  | null {
+function getTagNameContext(openTag: OpenTagContext): {
+  query: string
+  from: number
+} | null {
   const tagText = openTag.fragment.slice(1)
   if (/\s/.test(tagText)) {
     return null
@@ -161,24 +190,99 @@ function matchesPartial(value: string, partial: string): boolean {
   return value.toLowerCase().startsWith(partial.toLowerCase())
 }
 
-function componentOption(entry: AkselCatalogEntry): Completion {
-  let apply = stripSnippetPlaceholders(entry.snippet.code)
+function dedupeValues(values: Array<string | undefined>): string[] {
+  return Array.from(new Set(values.filter((value): value is string => Boolean(value)))).sort(
+    (a, b) => a.localeCompare(b)
+  )
+}
+
+function normalizeComponentName(componentName: string): string {
+  if (componentName === 'UNSAFE_Combobox') {
+    return 'Combobox'
+  }
+
+  return componentName
+}
+
+function isIconComponent(componentName: string): boolean {
+  return catalogEntriesByName.get(componentName)?.group === 'icon'
+}
+
+function getComponentProps(componentName: string): CompletionProp[] {
+  const normalizedComponentName = normalizeComponentName(componentName)
+  if (isIconComponent(normalizedComponentName)) {
+    return AKSEL_ICON_PROPS
+  }
+
+  const docsEntry = docsEntriesByName.get(normalizedComponentName)
+  const catalogEntry = getCatalogComponent(normalizedComponentName)
+  const propsByName = new Map<string, CompletionProp>()
+
+  for (const prop of docsEntry?.props ?? []) {
+    propsByName.set(prop.name, prop)
+  }
+
+  for (const prop of catalogEntry?.props ?? []) {
+    const existingProp = propsByName.get(prop.name)
+    propsByName.set(prop.name, {
+      ...prop,
+      ...existingProp,
+      values: dedupeValues([...(existingProp?.values ?? []), ...(prop.values ?? [])]),
+      description: existingProp?.description || prop.description,
+    })
+  }
+
+  return Array.from(propsByName.values())
+}
+
+function getPropDefinition(componentName: string, propName: string): CompletionProp | undefined {
+  return getComponentProps(componentName).find((prop) => prop.name === propName)
+}
+
+function getEntryDescription(entry: CompletionEntry): string {
+  if (entry.source === 'catalog') {
+    return entry.description
+  }
+
+  if (entry.group === 'legacy') {
+    return 'Documented legacy Aksel component.'
+  }
+
+  if (entry.group === 'primitive') {
+    return 'Documented Aksel layout primitive.'
+  }
+
+  return 'Documented Aksel component.'
+}
+
+function getEntryApply(entry: CompletionEntry): string {
+  const catalogEntry = catalogEntriesByName.get(entry.name)
+  let apply = catalogEntry ? stripSnippetPlaceholders(catalogEntry.snippet.code) : entry.name
   if (apply.startsWith('<')) {
     apply = apply.slice(1)
   }
 
+  if (entry.name === 'Combobox') {
+    return apply === 'Combobox' ? 'UNSAFE_Combobox' : apply.replace(/^Combobox/, 'UNSAFE_Combobox')
+  }
+
+  return apply
+}
+
+function componentOption(entry: CompletionEntry): Completion {
   return {
     label: entry.name,
-    type: entry.name.includes('.') ? 'namespace' : 'class',
-    detail:
-      entry.status === 'experimental'
-        ? `${entry.snippet.description} Experimental.`
-        : entry.snippet.description,
-    apply,
+    type: entry.name.includes('.')
+      ? 'namespace'
+      : entry.source === 'catalog' && entry.group === 'icon'
+        ? 'function'
+        : 'class',
+    detail: getEntryDescription(entry),
+    apply: getEntryApply(entry),
   }
 }
 
-function propOption(componentName: string, prop: AkselCatalogProp): Completion {
+function propOption(componentName: string, prop: CompletionProp): Completion {
   const hasValues = Boolean(prop.values?.length)
 
   return {
@@ -190,7 +294,7 @@ function propOption(componentName: string, prop: AkselCatalogProp): Completion {
   }
 }
 
-function valueOption(prop: AkselCatalogProp, value: string): Completion {
+function valueOption(prop: CompletionProp, value: string): Completion {
   return {
     label: value,
     type: 'value',
@@ -208,7 +312,7 @@ export function getAkselCompletionForSource(source: string, pos: number): Comple
   const propValueContext = getPropValueContext(openTag)
   if (propValueContext) {
     const { componentName, propName, partialValue } = propValueContext
-    const prop = getCatalogPropDefinition(componentName, propName)
+    const prop = getPropDefinition(componentName, propName)
     const options =
       prop?.values
         ?.filter((value) => matchesPartial(value, partialValue))
@@ -227,11 +331,9 @@ export function getAkselCompletionForSource(source: string, pos: number): Comple
   const propNameContext = getPropNameContext(openTag)
   if (propNameContext) {
     const { componentName, partialProp } = propNameContext
-    const component = getCatalogComponent(componentName)
-    const options =
-      component?.props
-        .filter((prop) => matchesPartial(prop.name, partialProp))
-        .map((prop) => propOption(componentName, prop)) ?? []
+    const options = getComponentProps(componentName)
+      .filter((prop) => matchesPartial(prop.name, partialProp))
+      .map((prop) => propOption(componentName, prop))
 
     if (options.length > 0) {
       return {
@@ -244,9 +346,9 @@ export function getAkselCompletionForSource(source: string, pos: number): Comple
 
   const tagNameContext = getTagNameContext(openTag)
   if (tagNameContext) {
-    const options = COMPLETION_ENTRIES.filter((entry) =>
-      matchesPartial(entry.name, tagNameContext.query)
-    ).map(componentOption)
+    const options = completionEntries
+      .filter((entry) => matchesPartial(entry.name, tagNameContext.query))
+      .map(componentOption)
 
     if (options.length > 0) {
       return {
@@ -260,9 +362,7 @@ export function getAkselCompletionForSource(source: string, pos: number): Comple
   return null
 }
 
-export function getAkselCompletionForContext(
-  context: CompletionContext
-): CompletionResult | null {
+export function getAkselCompletionForContext(context: CompletionContext): CompletionResult | null {
   return getAkselCompletionForSource(context.state.doc.toString(), context.pos)
 }
 
@@ -278,7 +378,6 @@ export function isAkselPropValueCompletionContext(source: string, pos: number): 
   }
 
   return Boolean(
-    getCatalogPropDefinition(propValueContext.componentName, propValueContext.propName)?.values
-      ?.length
+    getPropDefinition(propValueContext.componentName, propValueContext.propName)?.values?.length
   )
 }

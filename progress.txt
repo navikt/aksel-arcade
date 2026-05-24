@@ -98,3 +98,20 @@ Verification:
 
 Next note:
 - #9 should build on `src/services/akselAutocomplete.ts` for icon-aware contexts instead of reintroducing broad icon suggestions into normal component tag or prop lists.
+
+2026-05-24 - Issue #8 follow-up: Complete Aksel autocomplete coverage
+
+Updated after autocomplete coverage review:
+- Replaced the starter-catalog-only autocomplete surface with generated metadata from `aksel.nav.no/llm.md`, covering documented primitives, components, subcomponents, legacy entries, and docs-backed prop/value tables.
+- Added all installed `@navikt/aksel-icons` icons to JSX tag autocomplete and added SVG icon prop/value completions.
+- Fixed `Box` prop completion so `asChild` is suggested, and kept catalog token fallbacks for spacing/data-color/Box values where docs types are not literal-expanded.
+- Added regression coverage proving all generated docs entries and all 949 installed icons are suggested, plus representative props/values for Box, DataGrid, Combobox, Accordion, and icons.
+
+Verification:
+- npm run typecheck
+- CI=1 npm run test
+- npm run lint (passes with the existing `InspectionPopover` hook dependency warning)
+- Browser smoke check at http://127.0.0.1:5177/aksel-arcade/ for render, console output, and visible `Box` `asChild` autocomplete.
+
+Next note:
+- Keep `src/data/akselAutocompleteData.ts` generated via `scripts/generate-aksel-autocomplete-data.mjs` when Aksel docs/package types change; do not hand-edit the generated autocomplete metadata.
