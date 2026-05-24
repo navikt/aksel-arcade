@@ -128,3 +128,58 @@ Reviewed, fixed, and merged PR #17:
 
 Next note:
 - Future autocomplete metadata refreshes should start from `master`, run `node scripts/generate-aksel-autocomplete-data.mjs > src/data/akselAutocompleteData.ts`, and avoid hand-editing generated docs/icon metadata.
+
+2026-05-24 - Issue #9: Contextual icon autocomplete
+
+Selected #9 as the highest-priority ready-for-agent feature because #7 and #8 had landed, making it fully unblocked, and because the current autocomplete surface still let hundreds of icons flood normal tag suggestions.
+
+Implemented:
+- Removed icon catalog entries from default JSX tag completion so normal component/primitives suggestions stay focused.
+- Added contextual icon suggestions for icon prop JSX/expression contexts such as `icon={<...` and `icon={...`.
+- Added icon suggestions for icon-looking JSX tag identifiers, while keeping short prefixes like `<Pl` and real component matches like `<Link` from pulling in icon results.
+- Preserved SVG prop and prop-value completions for actual icon tags.
+- Kept sandbox icon globals unchanged so all Aksel icons remain available to import-free prototypes at runtime.
+- Added engine-level regression coverage for default icon exclusion, icon prop contexts, icon-looking tag identifiers, normal prop-list exclusion, and icon prop/value behavior.
+
+Verification:
+- npm run typecheck
+- CI=1 npm run test
+- Browser smoke check at http://127.0.0.1:5178/aksel-arcade/ for contextual autocomplete behavior and no runtime console errors.
+
+Next note:
+- #10 should focus on import stripping and compatibility aliases without reintroducing automatic rewrites. #11 remains blocked by #10 per the PRD dependency list.
+
+2026-05-24 - Issue #9 follow-up: DogHarnessIcon tag autocomplete
+
+Fixed after dev testing around `DogHarnessIcon` tag completion:
+- Kept icon completion scoped to valid JSX tag contexts such as `<DogH`, `<DogHarnessIcon`, and `<Box><DogH`.
+- Changed icon completion snippets to insert accessible visible-icon markup when accepted: `<DogHarnessIcon title="a11y-title" fontSize="1.5rem" />`.
+- Sorted filled icon variants after their base icon so `DogH` selects `DogHarnessIcon` before `DogHarnessFillIcon`.
+- Kept the default `<` component list free of icons, so icons still do not flood normal discovery.
+- Added regression coverage for `<DogH`, exact `<DogHarnessIcon`, nested `<Box><DogH`, and icon prop insertion.
+
+Updated definition:
+- Icon-aware context means an icon prop value (`icon={<DogH` / `icon={DogH`) or a valid JSX icon tag prefix (`<DogH`, `<DogHarnessIcon`, or nested forms like `<Box><DogH`) when the typed prefix does not collide with a component prefix.
+
+Verification:
+- npm run typecheck
+- CI=1 npm run test
+- Browser smoke check at http://127.0.0.1:5178/aksel-arcade/ for `<DogH`, `<DogHarnessIcon`, and icon props.
+
+2026-05-24 - Issue #9 follow-up: Browser-tested Dogh autocomplete
+
+Fixed after dev testing showed the real nested editor interaction still missed the intended `DogHarnessIcon` flow:
+- Added browser-level Playwright coverage that types the nested `Page` > `Page.Block` > `Box` snippet into the real CodeMirror editor, then types `<Dogh` and verifies the autocomplete tooltip shows `DogHarnessIcon`.
+- Made icon tag prefix matching case-insensitive for valid JSX tag prefixes, so `<dogh`, `<Dogh`, `<DOGH`, `<DogH`, and nested `<Box><dogh` all resolve to `DogHarnessIcon`.
+- Fixed stale generic tag completion filtering so pausing after `<` and then typing `dogh` refreshes to icon suggestions instead of filtering old component suggestions such as `Dialog.Header`.
+- Kept lowercase non-icon HTML/component prefixes from showing normal component suggestions, so `<div` does not become `Dialog`.
+- Kept plain child text such as `<Box>DogH` out of icon autocomplete because it is not valid JSX component authoring.
+
+Verification:
+- npm run typecheck
+- CI=1 npm run test
+- npm run lint
+- npx playwright test tests/e2e/autocomplete.spec.ts --project=chromium --reporter=line
+
+Next note:
+- If icon autocomplete is reported missing again, start with `tests/e2e/autocomplete.spec.ts`; it now exercises the actual browser/CodeMirror interaction rather than only the pure autocomplete service.

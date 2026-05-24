@@ -13,6 +13,7 @@ import {
 } from '@/data/akselAutocompleteData'
 
 const COMPONENT_NAME_PATTERN = /^[A-Z][\w.]*$/
+const TAG_NAME_PATTERN = /^[A-Za-z][\w.]*$/
 const TAG_NAME_VALID_FOR = /^[\w.]*$/
 const PROP_NAME_VALID_FOR = /^[\w-]*$/
 const PROP_VALUE_VALID_FOR = /^[\w\s./%-]*$/
@@ -49,7 +50,6 @@ const completionEntries: CompletionEntry[] = [
   ...docsEntries,
   ...docsAliasEntries,
   ...extraCatalogEntries,
-  ...iconEntries,
 ]
 const docsEntriesByName = new Map(docsEntries.map((entry) => [entry.name, entry]))
 
@@ -167,6 +167,30 @@ function getPropNameContext(openTag: OpenTagContext): {
   }
 }
 
+function getPropExpressionValueContext(openTag: OpenTagContext): {
+  componentName: string
+  propName: string
+  partialValue: string
+} | null {
+  const componentName = openTag.componentName
+  if (!componentName) {
+    return null
+  }
+
+  const propExpressionMatch = openTag.fragment.match(
+    /(?:^|\s)([\w-]+)\s*=\s*\{\s*([A-Z][\w.]*)?$/
+  )
+  if (!propExpressionMatch) {
+    return null
+  }
+
+  return {
+    componentName,
+    propName: propExpressionMatch[1],
+    partialValue: propExpressionMatch[2] ?? '',
+  }
+}
+
 function getTagNameContext(openTag: OpenTagContext): {
   query: string
   from: number
@@ -176,7 +200,7 @@ function getTagNameContext(openTag: OpenTagContext): {
     return null
   }
 
-  if (tagText.length > 0 && !COMPONENT_NAME_PATTERN.test(tagText)) {
+  if (tagText.length > 0 && !TAG_NAME_PATTERN.test(tagText)) {
     return null
   }
 
@@ -188,6 +212,26 @@ function getTagNameContext(openTag: OpenTagContext): {
 
 function matchesPartial(value: string, partial: string): boolean {
   return value.toLowerCase().startsWith(partial.toLowerCase())
+}
+
+function matchesCaseSensitivePrefix(value: string, partial: string): boolean {
+  return value.startsWith(partial)
+}
+
+function hasComponentPrefix(query: string): boolean {
+  return completionEntries.some((entry) => matchesCaseSensitivePrefix(entry.name, query))
+}
+
+function componentTagValidFor(text: string): boolean {
+  return TAG_NAME_VALID_FOR.test(text) && (text === '' || hasComponentPrefix(text))
+}
+
+function iconTagValidFor(text: string): boolean {
+  return (
+    TAG_NAME_VALID_FOR.test(text) &&
+    isIconLikeTagQuery(text, hasComponentPrefix(text)) &&
+    iconEntries.some((entry) => matchesPartial(entry.name, text))
+  )
 }
 
 function dedupeValues(values: Array<string | undefined>): string[] {
@@ -206,6 +250,66 @@ function normalizeComponentName(componentName: string): string {
 
 function isIconComponent(componentName: string): boolean {
   return catalogEntriesByName.get(componentName)?.group === 'icon'
+}
+
+function isIconProp(componentName: string, propName: string): boolean {
+  const normalizedPropName = propName.toLowerCase()
+  if (normalizedPropName === 'icon' || normalizedPropName.endsWith('icon')) {
+    return true
+  }
+
+  const prop = getPropDefinition(componentName, propName)
+  return Boolean(
+    prop &&
+      prop.type.toLowerCase().includes('reactnode') &&
+      prop.description.toLowerCase().includes('icon')
+  )
+}
+
+function isInsideIconPropExpression(source: string, tagStart: number): boolean {
+  const beforeTag = source.slice(0, tagStart)
+  const propExpressionMatch = beforeTag.match(/(?:^|\s)([\w-]+)\s*=\s*\{\s*$/)
+  return Boolean(propExpressionMatch && isIconProp('', propExpressionMatch[1]))
+}
+
+function isIconLikeTagQuery(query: string, hasComponentMatches: boolean): boolean {
+  if (!query) {
+    return false
+  }
+
+  const normalizedQuery = query.toLowerCase()
+  if (normalizedQuery.includes('icon')) {
+    return true
+  }
+
+  if (query.length < 3) {
+    return false
+  }
+
+  return (
+    !hasComponentMatches &&
+    iconEntries.some((entry) => entry.name.toLowerCase().startsWith(normalizedQuery))
+  )
+}
+
+function compareIconEntries(
+  first: AkselCatalogEntry & { source: 'catalog' },
+  second: AkselCatalogEntry & { source: 'catalog' }
+): number {
+  const firstBaseName = first.name.replace(/FillIcon$/, 'Icon')
+  const secondBaseName = second.name.replace(/FillIcon$/, 'Icon')
+  const baseNameComparison = firstBaseName.localeCompare(secondBaseName)
+  if (baseNameComparison !== 0) {
+    return baseNameComparison
+  }
+
+  const firstIsFill = first.name.endsWith('FillIcon')
+  const secondIsFill = second.name.endsWith('FillIcon')
+  if (firstIsFill !== secondIsFill) {
+    return firstIsFill ? 1 : -1
+  }
+
+  return first.name.localeCompare(second.name)
 }
 
 function getComponentProps(componentName: string): CompletionProp[] {
@@ -282,6 +386,55 @@ function componentOption(entry: CompletionEntry): Completion {
   }
 }
 
+function accessibleIconSnippet(iconName: string): string {
+  return `<${iconName} title="a11y-title" fontSize="1.5rem" />`
+}
+
+function iconComponentOption(
+  entry: AkselCatalogEntry & { source: 'catalog' },
+  context: 'tag' | 'icon-prop-tag' | 'icon-prop-expression'
+): Completion {
+  const option = componentOption(entry)
+  const snippet = accessibleIconSnippet(entry.name)
+  const boost = entry.name.endsWith('FillIcon') ? 0 : 5
+
+  if (context === 'tag') {
+    return {
+      ...option,
+      boost,
+      apply: snippet.slice(1),
+    }
+  }
+
+  if (context === 'icon-prop-tag') {
+    return {
+      ...option,
+      boost,
+      apply: `${snippet.slice(1)}}`,
+    }
+  }
+
+  if (context === 'icon-prop-expression') {
+    return {
+      ...option,
+      boost,
+      apply: `${snippet}}`,
+    }
+  }
+
+  return option
+}
+
+function iconComponentOptions(
+  query: string,
+  context: 'tag' | 'icon-prop-tag' | 'icon-prop-expression'
+): Completion[] {
+  return iconEntries
+    .filter((entry) => matchesPartial(entry.name, query))
+    .sort(compareIconEntries)
+    .map((entry) => iconComponentOption(entry, context))
+}
+
 function propOption(componentName: string, prop: CompletionProp): Completion {
   const hasValues = Boolean(prop.values?.length)
 
@@ -328,6 +481,23 @@ export function getAkselCompletionForSource(source: string, pos: number): Comple
     }
   }
 
+  const propExpressionValueContext = getPropExpressionValueContext(openTag)
+  if (
+    propExpressionValueContext &&
+    isIconProp(propExpressionValueContext.componentName, propExpressionValueContext.propName)
+  ) {
+    const { partialValue } = propExpressionValueContext
+    const options = iconComponentOptions(partialValue, 'icon-prop-expression')
+
+    if (options.length > 0) {
+      return {
+        from: pos - partialValue.length,
+        options,
+        validFor: TAG_NAME_VALID_FOR,
+      }
+    }
+  }
+
   const propNameContext = getPropNameContext(openTag)
   if (propNameContext) {
     const { componentName, partialProp } = propNameContext
@@ -346,15 +516,30 @@ export function getAkselCompletionForSource(source: string, pos: number): Comple
 
   const tagNameContext = getTagNameContext(openTag)
   if (tagNameContext) {
-    const options = completionEntries
-      .filter((entry) => matchesPartial(entry.name, tagNameContext.query))
-      .map(componentOption)
+    const isIconPropTagContext = isInsideIconPropExpression(source, openTag.tagStart)
+    const shouldSuggestComponents =
+      tagNameContext.query === '' || COMPONENT_NAME_PATTERN.test(tagNameContext.query)
+    const componentOptions = isIconPropTagContext || !shouldSuggestComponents
+      ? []
+      : completionEntries
+          .filter((entry) => matchesPartial(entry.name, tagNameContext.query))
+          .map(componentOption)
+    const iconOptions =
+      isIconPropTagContext || isIconLikeTagQuery(tagNameContext.query, componentOptions.length > 0)
+        ? iconComponentOptions(tagNameContext.query, isIconPropTagContext ? 'icon-prop-tag' : 'tag')
+        : []
+    const options = [...componentOptions, ...iconOptions]
 
     if (options.length > 0) {
+      const validFor =
+        iconOptions.length > 0 && componentOptions.length === 0
+          ? iconTagValidFor
+          : componentTagValidFor
+
       return {
         from: tagNameContext.from,
         options,
-        validFor: TAG_NAME_VALID_FOR,
+        validFor,
       }
     }
   }

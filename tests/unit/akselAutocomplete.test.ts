@@ -3,9 +3,18 @@ import iconMetadata from '@navikt/aksel-icons/metadata'
 import { AKSEL_AUTOCOMPLETE_ENTRIES } from '../../src/data/akselAutocompleteData'
 import { getAkselCompletionForSource } from '../../src/services/akselAutocomplete'
 
+function completionFor(source: string) {
+  return getAkselCompletionForSource(source, source.length)
+}
+
 function labelsFor(source: string): string[] {
-  const result = getAkselCompletionForSource(source, source.length)
+  const result = completionFor(source)
   return result?.options.map((option) => option.label) ?? []
+}
+
+function applyFor(source: string, label: string): string | undefined {
+  const apply = completionFor(source)?.options.find((option) => option.label === label)?.apply
+  return typeof apply === 'string' ? apply : undefined
 }
 
 describe('Aksel-aware autocomplete contract', () => {
@@ -33,12 +42,41 @@ describe('Aksel-aware autocomplete contract', () => {
     )
   })
 
-  it('suggests every Aksel icon tag from package metadata', () => {
+  it('keeps Aksel icons out of default component tag suggestions', () => {
     const labels = labelsFor('<')
     const iconNames = Object.values(iconMetadata).map((icon) => `${icon.name}Icon`)
 
     expect(iconNames).toHaveLength(949)
+    expect(labels).not.toEqual(expect.arrayContaining(['AirplaneIcon', 'PlusIcon', 'XMarkIcon']))
+  })
+
+  it('suggests every Aksel icon tag in icon prop contexts', () => {
+    const labels = labelsFor('<Button icon={<')
+    const iconNames = Object.values(iconMetadata).map((icon) => `${icon.name}Icon`)
+
+    expect(iconNames).toHaveLength(949)
     expect(labels).toEqual(expect.arrayContaining(iconNames))
+    expect(labels).not.toContain('Button')
+  })
+
+  it('suggests icons for icon-looking JSX tag identifiers', () => {
+    expect(labelsFor('<Pl')).not.toContain('PlusIcon')
+    expect(labelsFor('<Plus')).toContain('PlusIcon')
+    expect(labelsFor('<PlusIcon')).toContain('PlusIcon')
+    expect(labelsFor('<dogh')[0]).toBe('DogHarnessIcon')
+    expect(labelsFor('<DogH')[0]).toBe('DogHarnessIcon')
+    expect(labelsFor('<Dogh')[0]).toBe('DogHarnessIcon')
+    expect(labelsFor('<DOGH')[0]).toBe('DogHarnessIcon')
+    expect(applyFor('<DogHarnessIcon', 'DogHarnessIcon')).toBe(
+      'DogHarnessIcon title="a11y-title" fontSize="1.5rem" />'
+    )
+    expect(labelsFor('<Box><dogh')[0]).toBe('DogHarnessIcon')
+    expect(labelsFor('<Box><DogH')[0]).toBe('DogHarnessIcon')
+    expect(labelsFor('<Box>DogH')).not.toContain('DogHarnessIcon')
+    expect(labelsFor('<div')).not.toContain('Dialog')
+    expect(labelsFor('<Link')).toContain('Link')
+    expect(labelsFor('<Link')).not.toContain('LinkIcon')
+    expect(labelsFor('<LinkIcon')).toContain('LinkIcon')
   })
 
   it('suggests catalog subcomponents in JSX tag context', () => {
@@ -66,6 +104,13 @@ describe('Aksel-aware autocomplete contract', () => {
     expect(labelsFor('<DataGrid c')).toContain('columns')
     expect(labelsFor('<UNSAFE_Combobox l')).toContain('label')
     expect(labelsFor('<PlusIcon aria-')).toContain('aria-hidden')
+  })
+
+  it('does not mix icon tags into normal prop suggestions', () => {
+    const labels = labelsFor('<Button i')
+
+    expect(labels).toContain('icon')
+    expect(labels).not.toContain('PlusIcon')
   })
 
   it('suggests enum values for component props', () => {
@@ -103,5 +148,13 @@ describe('Aksel-aware autocomplete contract', () => {
   it('suggests SVG prop values for icons', () => {
     expect(labelsFor('<PlusIcon aria-hidden="t')).toContain('true')
     expect(labelsFor('<PlusIcon role="im')).toContain('img')
+  })
+
+  it('suggests icons for icon prop expression values', () => {
+    expect(labelsFor('<Button icon={Pl')).toContain('PlusIcon')
+    expect(labelsFor('<Button icon={<Pl')).toContain('PlusIcon')
+    expect(applyFor('<Button icon={<DogH', 'DogHarnessIcon')).toBe(
+      'DogHarnessIcon title="a11y-title" fontSize="1.5rem" />}'
+    )
   })
 })
