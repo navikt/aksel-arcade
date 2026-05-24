@@ -114,4 +114,4 @@ Verification:
 - Browser smoke check at http://127.0.0.1:5177/aksel-arcade/ for render, console output, and visible `Box` `asChild` autocomplete.
 
 Next note:
-- Keep `src/data/akselAutocompleteData.ts` generated via `scripts/generate-aksel-autocomplete-data.mjs` when Aksel docs/package types change; do not hand-edit the generated autocomplete metadata.
+- Keep `src/data/akselAutocompleteData.ts` generated with `node scripts/generate-aksel-autocomplete-data.mjs > src/data/akselAutocompleteData.ts` when Aksel docs/package types change; do not hand-edit the generated autocomplete metadata.

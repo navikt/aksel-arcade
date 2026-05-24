@@ -1,10 +1,8 @@
 import fs from 'node:fs'
 import path from 'node:path'
-import process from 'node:process'
 import ts from 'typescript'
 
 const LLM_DOCS_URL = 'https://aksel.nav.no/llm.md'
-const OUTPUT_PATH = path.resolve('src/data/akselAutocompleteData.ts')
 const COMPONENT_LINK_PATTERN =
   /- \[([^\]]+)\]\((https:\/\/aksel\.nav\.no\/komponenter\/(?:primitives|core|legacy)\/[^)]+\.md)\)/g
 
@@ -35,15 +33,7 @@ function toAscii(value) {
 }
 
 function normalizeCell(value) {
-  return toAscii(
-    decodeHtml(
-      value
-        .replace(/<br\s*\/?>/g, ' ')
-        .replace(/<[^>]+>/g, '')
-        .replace(/\s+/g, ' ')
-        .trim()
-    )
-  )
+  return toAscii(decodeHtml(value).replace(/[<>]/g, '').replace(/\s+/g, ' ').trim())
 }
 
 function splitMarkdownTableRow(row) {
@@ -355,5 +345,4 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = ${serialize(
 export const AKSEL_ICON_PROPS: AkselAutocompleteProp[] = ${serialize(extractIconProps())}
 `
 
-fs.writeFileSync(OUTPUT_PATH, fileContents, 'utf8')
-console.log(`Wrote ${OUTPUT_PATH}`)
+process.stdout.write(fileContents)

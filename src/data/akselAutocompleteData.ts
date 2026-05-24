@@ -97,7 +97,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'ref',
-        type: '`Ref`',
+        type: '`RefHTMLDivElement`',
         values: [],
         required: false,
         description: '',
@@ -126,7 +126,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'ref',
-        type: '`Ref`',
+        type: '`RefHTMLDivElement`',
         values: [],
         required: false,
         description: '',
@@ -155,7 +155,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'ref',
-        type: '`Ref`',
+        type: '`RefHTMLButtonElement`',
         values: [],
         required: false,
         description: '',
@@ -194,7 +194,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'onOpenChange',
-        type: '`((open: boolean) => void)`',
+        type: '`((open: boolean) = void)`',
         values: ['false', 'true'],
         required: false,
         description: 'Callback for current open-state.',
@@ -208,7 +208,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'ref',
-        type: '`Ref`',
+        type: '`RefHTMLDivElement`',
         values: [],
         required: false,
         description: '',
@@ -231,7 +231,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'onOpenChange',
-        type: '`((open: boolean) => void)`',
+        type: '`((open: boolean) = void)`',
         values: ['false', 'true'],
         required: false,
         description: 'Callback for when the menu is opened or closed.',
@@ -268,7 +268,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'onSelect',
-        type: '`((event: Event) => void)`',
+        type: '`((event: Event) = void)`',
         values: [],
         required: false,
         description: '',
@@ -289,14 +289,14 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'onCheckedChange',
-        type: '`((checked: boolean) => void)`',
+        type: '`((checked: boolean) = void)`',
         values: ['false', 'true'],
         required: false,
         description: '',
       },
       {
         name: 'ref',
-        type: '`Ref`',
+        type: '`RefHTMLDivElement`',
         values: [],
         required: false,
         description: '',
@@ -326,7 +326,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'ref',
-        type: '`Ref`',
+        type: '`RefHTMLDivElement`',
         values: [],
         required: false,
         description: '',
@@ -348,7 +348,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'ref',
-        type: '`Ref`',
+        type: '`RefHTMLDivElement`',
         values: [],
         required: false,
         description: '',
@@ -377,7 +377,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'ref',
-        type: '`Ref`',
+        type: '`RefHTMLDivElement`',
         values: [],
         required: false,
         description: '',
@@ -430,7 +430,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'onSelect',
-        type: '`((event: Event) => void)`',
+        type: '`((event: Event) = void)`',
         values: [],
         required: false,
         description: '',
@@ -444,7 +444,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'ref',
-        type: '`Ref`',
+        type: '`RefHTMLDivElement`',
         values: [],
         required: false,
         description: '',
@@ -473,7 +473,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'ref',
-        type: '`Ref`',
+        type: '`RefHTMLDivElement`',
         values: [],
         required: false,
         description: '',
@@ -517,14 +517,14 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'onValueChange',
-        type: '`((value: string) => void)`',
+        type: '`((value: string) = void)`',
         values: [],
         required: false,
         description: '',
       },
       {
         name: 'ref',
-        type: '`Ref`',
+        type: '`RefHTMLDivElement`',
         values: [],
         required: false,
         description: '',
@@ -546,7 +546,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'onSelect',
-        type: '`((event: Event) => void)`',
+        type: '`((event: Event) = void)`',
         values: [],
         required: false,
         description: '',
@@ -567,7 +567,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'ref',
-        type: '`Ref`',
+        type: '`RefHTMLDivElement`',
         values: [],
         required: false,
         description: '',
@@ -590,7 +590,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'onOpenChange',
-        type: '`((open: boolean) => void)`',
+        type: '`((open: boolean) = void)`',
         values: ['false', 'true'],
         required: false,
         description: 'Callback for when the sub-menu is opened or closed.',
@@ -612,7 +612,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'ref',
-        type: '`Ref`',
+        type: '`RefHTMLDivElement`',
         values: [],
         required: false,
         description: '',
@@ -656,7 +656,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'ref',
-        type: '`Ref`',
+        type: '`RefHTMLDivElement`',
         values: [],
         required: false,
         description: '',
@@ -678,7 +678,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'ref',
-        type: '`Ref`',
+        type: '`RefHTMLButtonElement`',
         values: [],
         required: false,
         description: '',
@@ -747,7 +747,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'onClose',
-        type: '`(() => void)`',
+        type: '`(() = void)`',
         values: [],
         required: false,
         description: 'Callback for alert wanting to close. **Requires closeButton to be true**.',
@@ -768,7 +768,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'ref',
-        type: '`Ref`',
+        type: '`RefHTMLDivElement`',
         values: [],
         required: false,
         description: '',
@@ -783,16 +783,35 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
     props: [
       {
         name: 'marginInline',
-        type: '`ResponsiveProp`',
-        values: [],
+        type: '`ResponsivePropBleedSpacingInline \\| "full full" \\| "full space-0" \\| "full space-1" \\| "full space-2" \\| "full space-4" \\| "full space-6" \\| "full space-8" \\| "full space-12" \\| ... 520 more ... \\| "space-128 space-128"`',
+        values: [
+          'full full',
+          'full space-0',
+          'full space-1',
+          'full space-12',
+          'full space-2',
+          'full space-4',
+          'full space-6',
+          'full space-8',
+          'space-128 space-128',
+        ],
         required: false,
         description:
           '**Negative** horizontal margin around children. Accepts a [spacing token](https://aksel.nav.no/grunnleggende/styling/design-tokens#space) or an object of spacing tokens for different breakpoints. The `px` value is useful to nudge by just 1px. The `full` value is used to extend the margin to the full width of the parent.',
       },
       {
         name: 'marginBlock',
-        type: '`ResponsiveProp`',
-        values: [],
+        type: '`ResponsivePropAkselSpaceToken \\| "space-0 space-0" \\| "space-0 space-1" \\| "space-0 space-2" \\| "space-0 space-4" \\| "space-0 space-6" \\| "space-0 space-8" \\| "space-0 space-12" \\| ... 476 more ... \\| "space-128 space-128"`',
+        values: [
+          'space-0 space-0',
+          'space-0 space-1',
+          'space-0 space-12',
+          'space-0 space-2',
+          'space-0 space-4',
+          'space-0 space-6',
+          'space-0 space-8',
+          'space-128 space-128',
+        ],
         required: false,
         description:
           '**Negative** vertical margin around children. Accepts a [spacing token](https://aksel.nav.no/grunnleggende/styling/design-tokens#space) or an object of spacing tokens for different breakpoints. The `px` value is useful to nudge by just 1px. This prop does **not** accept the `full` value.',
@@ -822,7 +841,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'ref',
-        type: '`Ref`',
+        type: '`RefHTMLDivElement`',
         values: [],
         required: false,
         description: '',
@@ -923,7 +942,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'ref',
-        type: '`Ref`',
+        type: '`RefHTMLParagraphElement`',
         values: [],
         required: false,
         description: '',
@@ -1031,7 +1050,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'ref',
-        type: '`Ref`',
+        type: '`RefHTMLParagraphElement`',
         values: [],
         required: false,
         description: '',
@@ -1187,8 +1206,8 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'borderRadius',
-        type: '`ResponsiveProp>`',
-        values: [],
+        type: '`ResponsivePropSpaceDelimitedAttributeAkselBorderRadiusToken \\| "0"`',
+        values: ['0'],
         required: false,
         description:
           'CSS `border-radius` property. Accepts a [radius token](https://aksel.nav.no/grunnleggende/styling/design-tokens#radius) or an object of radius tokens for different breakpoints. @see {@link BorderRadiusScale }',
@@ -2764,7 +2783,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'padding',
-        type: '`ResponsiveProp`',
+        type: '`ResponsivePropAkselSpaceToken`',
         values: [],
         required: false,
         description:
@@ -2772,23 +2791,41 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'paddingInline',
-        type: '`ResponsiveProp`',
-        values: [],
+        type: '`ResponsivePropAkselSpaceToken \\| "space-0 space-0" \\| "space-0 space-1" \\| "space-0 space-2" \\| "space-0 space-4" \\| "space-0 space-6" \\| "space-0 space-8" \\| "space-0 space-12" \\| ... 476 more ... \\| "space-128 space-128"`',
+        values: [
+          'space-0 space-0',
+          'space-0 space-1',
+          'space-0 space-12',
+          'space-0 space-2',
+          'space-0 space-4',
+          'space-0 space-6',
+          'space-0 space-8',
+          'space-128 space-128',
+        ],
         required: false,
         description:
           'Horizontal padding around children. Accepts a [spacing token](https://aksel.nav.no/grunnleggende/styling/design-tokens#space) or an object of spacing tokens for different breakpoints.',
       },
       {
         name: 'paddingBlock',
-        type: '`ResponsiveProp`',
-        values: [],
+        type: '`ResponsivePropAkselSpaceToken \\| "space-0 space-0" \\| "space-0 space-1" \\| "space-0 space-2" \\| "space-0 space-4" \\| "space-0 space-6" \\| "space-0 space-8" \\| "space-0 space-12" \\| ... 476 more ... \\| "space-128 space-128"`',
+        values: [
+          'space-0 space-0',
+          'space-0 space-1',
+          'space-0 space-12',
+          'space-0 space-2',
+          'space-0 space-4',
+          'space-0 space-6',
+          'space-0 space-8',
+          'space-128 space-128',
+        ],
         required: false,
         description:
           'Vertical padding around children. Accepts a [spacing token](https://aksel.nav.no/grunnleggende/styling/design-tokens#space) or an object of spacing tokens for different breakpoints.',
       },
       {
         name: 'margin',
-        type: '`ResponsiveProp`',
+        type: '`ResponsivePropAkselSpaceToken`',
         values: [],
         required: false,
         description:
@@ -2796,80 +2833,109 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'marginInline',
-        type: '`ResponsiveProp`',
-        values: [],
+        type: '`ResponsiveProp"auto" \\| AkselSpaceToken \\| "space-0 space-0" \\| "space-0 space-1" \\| "space-0 space-2" \\| "space-0 space-4" \\| "space-0 space-6" \\| "space-0 space-8" \\| "space-0 space-12" \\| ... 520 more ... \\| "space-128 auto"`',
+        values: [
+          'auto',
+          'space-0 space-0',
+          'space-0 space-1',
+          'space-0 space-12',
+          'space-0 space-2',
+          'space-0 space-4',
+          'space-0 space-6',
+          'space-0 space-8',
+          'space-128 auto',
+        ],
         required: false,
         description:
           'Horizontal margin around element. Accepts a [spacing token](https://aksel.nav.no/grunnleggende/styling/design-tokens#space) or an object of spacing tokens for different breakpoints.',
       },
       {
         name: 'marginBlock',
-        type: '`ResponsiveProp`',
-        values: [],
+        type: '`ResponsiveProp"auto" \\| AkselSpaceToken \\| "space-0 space-0" \\| "space-0 space-1" \\| "space-0 space-2" \\| "space-0 space-4" \\| "space-0 space-6" \\| "space-0 space-8" \\| "space-0 space-12" \\| ... 520 more ... \\| "space-128 auto"`',
+        values: [
+          'auto',
+          'space-0 space-0',
+          'space-0 space-1',
+          'space-0 space-12',
+          'space-0 space-2',
+          'space-0 space-4',
+          'space-0 space-6',
+          'space-0 space-8',
+          'space-128 auto',
+        ],
         required: false,
         description:
           'Vertical margin around element. Accepts a [spacing token](https://aksel.nav.no/grunnleggende/styling/design-tokens#space) or an object of spacing tokens for different breakpoints.',
       },
       {
         name: 'width',
-        type: '`ResponsiveProp`',
+        type: '`ResponsivePropstring`',
         values: [],
         required: false,
         description: 'CSS `width`',
       },
       {
         name: 'minWidth',
-        type: '`ResponsiveProp`',
+        type: '`ResponsivePropstring`',
         values: [],
         required: false,
         description: 'CSS `min-width`',
       },
       {
         name: 'maxWidth',
-        type: '`ResponsiveProp`',
+        type: '`ResponsivePropstring`',
         values: [],
         required: false,
         description: 'CSS `max-width`',
       },
       {
         name: 'height',
-        type: '`ResponsiveProp`',
+        type: '`ResponsivePropstring`',
         values: [],
         required: false,
         description: 'CSS `height`',
       },
       {
         name: 'minHeight',
-        type: '`ResponsiveProp`',
+        type: '`ResponsivePropstring`',
         values: [],
         required: false,
         description: 'CSS `min-height`',
       },
       {
         name: 'maxHeight',
-        type: '`ResponsiveProp`',
+        type: '`ResponsivePropstring`',
         values: [],
         required: false,
         description: 'CSS `max-height`',
       },
       {
         name: 'position',
-        type: '`ResponsiveProp`',
-        values: [],
+        type: '`ResponsiveProp"static" \\| "relative" \\| "absolute" \\| "fixed" \\| "sticky"`',
+        values: ['absolute', 'fixed', 'relative', 'static', 'sticky'],
         required: false,
         description: 'CSS `position`',
       },
       {
         name: 'inset',
-        type: '`ResponsiveProp`',
-        values: [],
+        type: '`ResponsivePropAkselSpaceToken \\| "space-0 space-0" \\| "space-0 space-1" \\| "space-0 space-2" \\| "space-0 space-4" \\| "space-0 space-6" \\| "space-0 space-8" \\| "space-0 space-12" \\| ... 476 more ... \\| "space-128 space-128"`',
+        values: [
+          'space-0 space-0',
+          'space-0 space-1',
+          'space-0 space-12',
+          'space-0 space-2',
+          'space-0 space-4',
+          'space-0 space-6',
+          'space-0 space-8',
+          'space-128 space-128',
+        ],
         required: false,
         description:
           'CSS `inset`. Accepts a [spacing token](https://aksel.nav.no/grunnleggende/styling/design-tokens#space) or an object of spacing tokens for different breakpoints.',
       },
       {
         name: 'top',
-        type: '`ResponsiveProp`',
+        type: '`ResponsivePropAkselSpaceToken`',
         values: [],
         required: false,
         description:
@@ -2877,7 +2943,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'right',
-        type: '`ResponsiveProp`',
+        type: '`ResponsivePropAkselSpaceToken`',
         values: [],
         required: false,
         description:
@@ -2885,7 +2951,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'bottom',
-        type: '`ResponsiveProp`',
+        type: '`ResponsivePropAkselSpaceToken`',
         values: [],
         required: false,
         description:
@@ -2893,7 +2959,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'left',
-        type: '`ResponsiveProp`',
+        type: '`ResponsivePropAkselSpaceToken`',
         values: [],
         required: false,
         description:
@@ -2901,49 +2967,49 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'overflow',
-        type: '`ResponsiveProp`',
-        values: [],
+        type: '`ResponsiveProp"auto" \\| "visible" \\| "hidden" \\| "clip" \\| "scroll"`',
+        values: ['auto', 'clip', 'hidden', 'scroll', 'visible'],
         required: false,
         description: 'CSS `overflow`',
       },
       {
         name: 'overflowX',
-        type: '`ResponsiveProp`',
-        values: [],
+        type: '`ResponsiveProp"auto" \\| "visible" \\| "hidden" \\| "clip" \\| "scroll"`',
+        values: ['auto', 'clip', 'hidden', 'scroll', 'visible'],
         required: false,
         description: 'CSS `overflow-x`',
       },
       {
         name: 'overflowY',
-        type: '`ResponsiveProp`',
-        values: [],
+        type: '`ResponsiveProp"auto" \\| "visible" \\| "hidden" \\| "clip" \\| "scroll"`',
+        values: ['auto', 'clip', 'hidden', 'scroll', 'visible'],
         required: false,
         description: 'CSS `overflow-y`',
       },
       {
         name: 'flexBasis',
-        type: '`ResponsiveProp`',
+        type: '`ResponsivePropstring`',
         values: [],
         required: false,
         description: 'CSS `flex-basis`',
       },
       {
         name: 'flexShrink',
-        type: '`ResponsiveProp`',
+        type: '`ResponsivePropstring`',
         values: [],
         required: false,
         description: 'CSS `flex-shrink`',
       },
       {
         name: 'flexGrow',
-        type: '`ResponsiveProp`',
+        type: '`ResponsivePropstring`',
         values: [],
         required: false,
         description: 'CSS `flex-grow`',
       },
       {
         name: 'gridColumn',
-        type: '`ResponsiveProp`',
+        type: '`ResponsivePropstring`',
         values: [],
         required: false,
         description: 'CSS `grid-column`',
@@ -2958,7 +3024,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'ref',
-        type: '`Ref`',
+        type: '`RefHTMLDivElement`',
         values: [],
         required: false,
         description: '',
@@ -3061,7 +3127,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'ref',
-        type: '`Ref`',
+        type: '`RefHTMLButtonElement`',
         values: [],
         required: false,
         description: '',
@@ -3086,7 +3152,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
         type: '`ReactNode`',
         values: [],
         required: false,
-        description: 'Children of type ``.',
+        description: 'Children of type `Chat.Bubble /`.',
       },
       {
         name: 'name',
@@ -3174,7 +3240,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'ref',
-        type: '`Ref`',
+        type: '`RefHTMLDivElement`',
         values: [],
         required: false,
         description: '',
@@ -3232,7 +3298,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'ref',
-        type: '`Ref`',
+        type: '`RefHTMLDivElement`',
         values: [],
         required: false,
         description: '',
@@ -3334,7 +3400,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'ref',
-        type: '`Ref`',
+        type: '`RefHTMLInputElement`',
         values: [],
         required: false,
         description: '',
@@ -3352,7 +3418,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
         type: '`ReactNode`',
         values: [],
         required: false,
-        description: 'Collection of ``.',
+        description: 'Collection of `Checkbox/`.',
       },
       {
         name: 'value',
@@ -3370,10 +3436,10 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'onChange',
-        type: '`((value: any[]) => void)`',
+        type: '`((value: any[]) = void)`',
         values: [],
         required: false,
-        default: '() => {}',
+        default: '() = {}',
         description: 'Returns current checked checkboxes in group.',
       },
       {
@@ -3448,7 +3514,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'ref',
-        type: '`Ref`',
+        type: '`RefHTMLFieldSetElement`',
         values: [],
         required: false,
         description: '',
@@ -3478,7 +3544,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'ref',
-        type: '`Ref`',
+        type: '`RefHTMLUListElement`',
         values: [],
         required: false,
         description: '',
@@ -3500,7 +3566,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'onDelete',
-        type: '`(() => void)`',
+        type: '`(() = void)`',
         values: [],
         required: false,
         description: 'Click callback',
@@ -3534,7 +3600,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'ref',
-        type: '`Ref`',
+        type: '`RefHTMLButtonElement`',
         values: [],
         required: false,
         description: '',
@@ -3605,7 +3671,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'ref',
-        type: '`Ref`',
+        type: '`RefHTMLButtonElement`',
         values: [],
         required: false,
         description: '',
@@ -3731,7 +3797,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'onToggleSelected',
-        type: '`((option: string, isSelected: boolean, isCustomOption: boolean) => void)`',
+        type: '`((option: string, isSelected: boolean, isCustomOption: boolean) = void)`',
         values: ['false', 'true'],
         required: false,
         description: 'Callback function triggered whenever an option is selected or de-selected.',
@@ -3799,7 +3865,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'ref',
-        type: '`Ref`',
+        type: '`RefHTMLInputElement`',
         values: [],
         required: false,
         description: '',
@@ -3884,7 +3950,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'ref',
-        type: '`Ref`',
+        type: '`RefHTMLInputElement`',
         values: [],
         required: false,
         description: '',
@@ -3946,7 +4012,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'onActiveChange',
-        type: '`((state: boolean) => void)`',
+        type: '`((state: boolean) = void)`',
         values: ['false', 'true'],
         required: false,
         description: 'Callback that is called when internal copy-state changes.',
@@ -3956,7 +4022,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
         type: '`ReactNode`',
         values: [],
         required: false,
-        default: '',
+        default: 'FilesIcon /',
         description: 'Icon shown when button is not clicked.',
       },
       {
@@ -3964,7 +4030,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
         type: '`ReactNode`',
         values: [],
         required: false,
-        default: '',
+        default: 'CheckmarkIcon /',
         description: 'Icon shown when active.',
       },
       {
@@ -4008,7 +4074,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'ref',
-        type: '`Ref`',
+        type: '`RefHTMLButtonElement`',
         values: [],
         required: false,
         description: '',
@@ -4037,7 +4103,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'columns',
-        type: '`ColumnDefinitions`',
+        type: '`ColumnDefinitionsany`',
         values: [],
         required: false,
         description: 'Definitions of the columns to display.',
@@ -4052,7 +4118,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'getRowId',
-        type: '`((rowData: any) => string)`',
+        type: '`((rowData: any) = string)`',
         values: [],
         required: false,
         description:
@@ -4060,7 +4126,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'selection',
-        type: '`SelectionProps`',
+        type: '`SelectionPropsany`',
         values: [],
         required: false,
         description: 'Object with props related to row selection.',
@@ -4083,7 +4149,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'ref',
-        type: '`Ref`',
+        type: '`RefHTMLDivElement`',
         values: [],
         required: false,
         description: '',
@@ -4116,7 +4182,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'onRowAction',
-        type: '`(({ row, id, event, }: { row: any; id: string; event: MouseEvent; }) => void)`',
+        type: '`(({ row, id, event, }: { row: any; id: string; event: MouseEventHTMLTableRowElement, MouseEvent; }) = void)`',
         values: [],
         required: false,
         description:
@@ -4141,14 +4207,14 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'subRows',
-        type: '`SubRowsProps`',
+        type: '`SubRowsPropsany`',
         values: [],
         required: false,
         description: 'Object with props related to nested rows (sub-rows).',
       },
       {
         name: 'detailsPanel',
-        type: '`DetailsPanelProps`',
+        type: '`DetailsPanelPropsany`',
         values: [],
         required: false,
         description:
@@ -4179,7 +4245,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'ref',
-        type: '`Ref`',
+        type: '`RefHTMLTableElement`',
         values: [],
         required: false,
         description: '',
@@ -4198,7 +4264,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
         values: [],
         required: false,
         description:
-          'Element datepicker anchors to. Use for built-in toggle, or make your own with the open/onClose props',
+          'Element datepicker anchors to. Use DatePicker.Input / for built-in toggle, or make your own with the open/onClose props',
       },
       {
         name: 'className',
@@ -4220,11 +4286,11 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
         values: ['en', 'nb', 'nn'],
         required: false,
         default: '"nb" (norsk bokmal)',
-        description: '**Deprecated:** Use ``-component',
+        description: '**Deprecated:** Use `Provider /`-component',
       },
       {
         name: 'translations',
-        type: '`RecursivePartial`',
+        type: '`RecursivePartial{ chooseDate: string; chooseDates: string; chooseDateRange: string; chooseMonth: string; week: string; weekNumber: string; selectWeekNumber: string; month: string; goToNextMonth: string; ... 7 more ...; closeMonthPicker: string; }`',
         values: [],
         required: false,
         description:
@@ -4296,17 +4362,18 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'onClose',
-        type: '`(() => void)`',
+        type: '`(() = void)`',
         values: [],
         required: false,
         description: 'onClose callback for user-controlled state.',
       },
       {
         name: 'onOpenToggle',
-        type: '`(() => void)`',
+        type: '`(() = void)`',
         values: [],
         required: false,
-        description: 'onOpenToggle callback for user-controlled state. Only called if `` is used.',
+        description:
+          'onOpenToggle callback for user-controlled state. Only called if `DatePicker.Input /` is used.',
       },
       {
         name: 'strategy',
@@ -4343,7 +4410,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'onDayClick',
-        type: '`DayEventHandler>`',
+        type: '`DayEventHandlerMouseEventElement, MouseEvent`',
         values: [],
         required: false,
         description: 'Event handler when a day is clicked.',
@@ -4365,7 +4432,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'onSelect',
-        type: '`((val?: Date) => void) \\| ((val?: Date[]) => void) \\| ((val?: DateRange \\| undefined) => void) \\| undefined`',
+        type: '`((val?: Date) = void) \\| ((val?: Date[]) = void) \\| ((val?: DateRange \\| undefined) = void) \\| undefined`',
         values: [],
         required: false,
         description: '',
@@ -4386,7 +4453,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'onWeekNumberClick',
-        type: '`((week: number, days: Date[]) => void)`',
+        type: '`((week: number, days: Date[]) = void)`',
         values: [],
         required: false,
         description:
@@ -4488,7 +4555,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'ref',
-        type: '`Ref`',
+        type: '`RefHTMLInputElement`',
         values: [],
         required: false,
         description: '',
@@ -4514,7 +4581,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
         values: [],
         required: false,
         description:
-          'Element datepicker anchors to. Use for built-in toggle, or make your own with the open/onClose props',
+          'Element datepicker anchors to. Use DatePicker.Input / for built-in toggle, or make your own with the open/onClose props',
       },
       {
         name: 'month',
@@ -4542,7 +4609,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'onDayClick',
-        type: '`DayEventHandler>`',
+        type: '`DayEventHandlerMouseEventElement, MouseEvent`',
         values: [],
         required: false,
         description: 'Event handler when a day is clicked.',
@@ -4561,11 +4628,11 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
         values: ['en', 'nb', 'nn'],
         required: false,
         default: '"nb" (norsk bokmal)',
-        description: '**Deprecated:** Use ``-component',
+        description: '**Deprecated:** Use `Provider /`-component',
       },
       {
         name: 'translations',
-        type: '`RecursivePartial`',
+        type: '`RecursivePartial{ chooseDate: string; chooseDates: string; chooseDateRange: string; chooseMonth: string; week: string; weekNumber: string; selectWeekNumber: string; month: string; goToNextMonth: string; ... 7 more ...; closeMonthPicker: string; }`',
         values: [],
         required: false,
         description:
@@ -4637,7 +4704,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'onSelect',
-        type: '`((val?: Date) => void) \\| ((val?: Date[]) => void) \\| ((val?: DateRange \\| undefined) => void) \\| undefined`',
+        type: '`((val?: Date) = void) \\| ((val?: Date[]) = void) \\| ((val?: DateRange \\| undefined) = void) \\| undefined`',
         values: [],
         required: false,
         description: '',
@@ -4658,7 +4725,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'onWeekNumberClick',
-        type: '`((week: number, days: Date[]) => void)`',
+        type: '`((week: number, days: Date[]) = void)`',
         values: [],
         required: false,
         description:
@@ -4666,7 +4733,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'ref',
-        type: '`Ref`',
+        type: '`RefHTMLDivElement`',
         values: [],
         required: false,
         description: '',
@@ -4788,7 +4855,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'ref',
-        type: '`Ref`',
+        type: '`RefHTMLParagraphElement`',
         values: [],
         required: false,
         description: '',
@@ -4826,14 +4893,14 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'onOpenChange',
-        type: '`((nextOpen: boolean, event: Event) => void)`',
+        type: '`((nextOpen: boolean, event: Event) = void)`',
         values: ['false', 'true'],
         required: false,
         description: 'Event handler called when the dialog is opened or closed.',
       },
       {
         name: 'onOpenChangeComplete',
-        type: '`((open: boolean) => void)`',
+        type: '`((open: boolean) = void)`',
         values: ['false', 'true'],
         required: false,
         description:
@@ -4864,7 +4931,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'ref',
-        type: '`Ref`',
+        type: '`RefHTMLDivElement`',
         values: [],
         required: false,
         description: '',
@@ -4886,7 +4953,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'ref',
-        type: '`Ref`',
+        type: '`RefHTMLButtonElement`',
         values: [],
         required: false,
         description: '',
@@ -4908,7 +4975,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'ref',
-        type: '`Ref`',
+        type: '`RefHTMLParagraphElement`',
         values: [],
         required: false,
         description: '',
@@ -4930,7 +4997,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'ref',
-        type: '`Ref`',
+        type: '`RefHTMLDivElement`',
         values: [],
         required: false,
         description: '',
@@ -4961,7 +5028,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'ref',
-        type: '`Ref`',
+        type: '`RefHTMLDivElement`',
         values: [],
         required: false,
         description: '',
@@ -4993,7 +5060,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'initialFocusTo',
-        type: '`RefObject \\| (() => HTMLElement \\| null)`',
+        type: '`RefObjectHTMLElement \\| null \\| (() = HTMLElement \\| null)`',
         values: [],
         required: false,
         description:
@@ -5001,7 +5068,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'returnFocusTo',
-        type: '`RefObject \\| (() => HTMLElement \\| null)`',
+        type: '`RefObjectHTMLElement \\| null \\| (() = HTMLElement \\| null)`',
         values: [],
         required: false,
         description:
@@ -5063,7 +5130,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'ref',
-        type: '`Ref`',
+        type: '`RefHTMLDivElement`',
         values: [],
         required: false,
         description: '',
@@ -5085,7 +5152,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'ref',
-        type: '`Ref`',
+        type: '`RefHTMLHeadingElement`',
         values: [],
         required: false,
         description: '',
@@ -5107,7 +5174,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'ref',
-        type: '`Ref`',
+        type: '`RefHTMLButtonElement`',
         values: [],
         required: false,
         description: '',
@@ -5122,7 +5189,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
     props: [
       {
         name: 'onSelect',
-        type: '`((element: MouseEvent) => void)`',
+        type: '`((element: MouseEventElement, MouseEvent) = void)`',
         values: [],
         required: false,
         description: 'Handler called when an item is selected.',
@@ -5153,7 +5220,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'onOpenChange',
-        type: '`((open: boolean) => void)`',
+        type: '`((open: boolean) = void)`',
         values: ['false', 'true'],
         required: false,
         description: 'Change handler for open',
@@ -5175,7 +5242,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'ref',
-        type: '`Ref`',
+        type: '`RefHTMLHRElement`',
         values: [],
         required: false,
         description: '',
@@ -5197,7 +5264,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'onClose',
-        type: '`(() => void)`',
+        type: '`(() = void)`',
         values: [],
         required: false,
         description: 'onClose callback',
@@ -5239,7 +5306,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'ref',
-        type: '`Ref`',
+        type: '`RefHTMLDivElement`',
         values: [],
         required: false,
         description: '',
@@ -5268,7 +5335,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'ref',
-        type: '`Ref`',
+        type: '`RefHTMLDListElement`',
         values: [],
         required: false,
         description: '',
@@ -5297,7 +5364,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'ref',
-        type: '`Ref`',
+        type: '`RefHTMLDetailsElement`',
         values: [],
         required: false,
         description: '',
@@ -5326,7 +5393,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'ref',
-        type: '`Ref`',
+        type: '`RefHTMLButtonElement`',
         values: [],
         required: false,
         description: '',
@@ -5362,7 +5429,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'ref',
-        type: '`Ref`',
+        type: '`RefHTMLUListElement`',
         values: [],
         required: false,
         description: '',
@@ -5391,7 +5458,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'ref',
-        type: '`Ref`',
+        type: '`RefHTMLButtonElement`',
         values: [],
         required: false,
         description: '',
@@ -5420,7 +5487,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'ref',
-        type: '`Ref`',
+        type: '`RefHTMLButtonElement`',
         values: [],
         required: false,
         description: '',
@@ -5479,7 +5546,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'ref',
-        type: '`Ref`',
+        type: '`RefHTMLParagraphElement`',
         values: [],
         required: false,
         description: '',
@@ -5524,7 +5591,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'headingTag',
-        type: '`ElementType`',
+        type: '`ElementTypeany, keyof IntrinsicElements`',
         values: [],
         required: false,
         default: '"h2"',
@@ -5539,7 +5606,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'ref',
-        type: '`Ref`',
+        type: '`RefHTMLDivElement`',
         values: [],
         required: false,
         description: '',
@@ -5575,7 +5642,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'ref',
-        type: '`Ref`',
+        type: '`RefHTMLAnchorElement`',
         values: [],
         required: false,
         description: '',
@@ -5590,7 +5657,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
     props: [
       {
         name: 'onToggle',
-        type: '`((open: boolean) => void)`',
+        type: '`((open: boolean) = void)`',
         values: ['false', 'true'],
         required: false,
         description: 'Callback for when Card is opened/closed.',
@@ -5648,7 +5715,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'ref',
-        type: '`Ref`',
+        type: '`RefHTMLDivElement`',
         values: [],
         required: false,
         description: '',
@@ -5670,7 +5737,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'ref',
-        type: '`Ref`',
+        type: '`RefHTMLDivElement`',
         values: [],
         required: false,
         description: '',
@@ -5692,7 +5759,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'ref',
-        type: '`Ref`',
+        type: '`RefHTMLParagraphElement`',
         values: [],
         required: false,
         description: '',
@@ -5714,7 +5781,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'ref',
-        type: '`Ref`',
+        type: '`RefHTMLDivElement`',
         values: [],
         required: false,
         description: '',
@@ -5744,7 +5811,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'ref',
-        type: '`Ref`',
+        type: '`RefHTMLHeadingElement`',
         values: [],
         required: false,
         description: '',
@@ -5851,7 +5918,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'ref',
-        type: '`Ref`',
+        type: '`RefHTMLFieldSetElement`',
         values: [],
         required: false,
         description: '',
@@ -5866,7 +5933,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
     props: [
       {
         name: 'translations',
-        type: '`RecursivePartial`',
+        type: '`RecursivePartial{ dropzone: { button: string; buttonMultiple: string; dragAndDrop: string; dragAndDropMultiple: string; drop: string; or: string; disabled: string; disabledFilelimit: string; }; item: { retryButtonTitle: string; deleteButtonTitle: string; uploading: string; downloading: string; }; }`',
         values: [],
         required: false,
         description: 'i18n-API for customizing texts and labels',
@@ -5880,7 +5947,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'ref',
-        type: '`Ref`',
+        type: '`RefHTMLDivElement`',
         values: [],
         required: false,
         description: '',
@@ -5902,7 +5969,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'icon',
-        type: '`ComponentType`',
+        type: '`ComponentTypeany`',
         values: [],
         required: false,
         default: 'CloudUpIcon',
@@ -5910,7 +5977,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'translations',
-        type: '`RecursivePartial`',
+        type: '`RecursivePartial{ button: string; buttonMultiple: string; dragAndDrop: string; dragAndDropMultiple: string; drop: string; or: string; disabled: string; disabledFilelimit: string; }`',
         values: [],
         required: false,
         description: 'i18n-API for customizing texts and labels',
@@ -5940,14 +6007,14 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'validator',
-        type: '`((file: File) => string \\| true)`',
+        type: '`((file: File) = string \\| true)`',
         values: [],
         required: false,
         description: 'Custom validator that is used to decide if a file is accepted or rejected.',
       },
       {
         name: 'onSelect',
-        type: '`(files: FileObject[], partitionedFiles: FilesPartitioned) => void`',
+        type: '`(files: FileObject[], partitionedFiles: FilesPartitioned) = void`',
         values: [],
         required: false,
         description: 'Callback triggered on file select',
@@ -5958,7 +6025,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
         values: [],
         required: false,
         description:
-          'Disables the dropzone when current >= max, unless `disabled` prop is set to `false`.',
+          'Disables the dropzone when current = max, unless `disabled` prop is set to `false`.',
       },
       {
         name: 'error',
@@ -6004,7 +6071,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'ref',
-        type: '`Ref`',
+        type: '`RefHTMLInputElement`',
         values: [],
         required: false,
         description: '',
@@ -6019,7 +6086,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
     props: [
       {
         name: 'as',
-        type: '`(("div" \\| "li") & ElementType)`',
+        type: '`(("div" \\| "li") & ElementTypeany, keyof IntrinsicElements)`',
         values: ['div', 'li'],
         required: false,
         default: '"div"',
@@ -6034,7 +6101,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'onFileClick',
-        type: '`((event: MouseEvent) => void)`',
+        type: '`((event: MouseEventHTMLAnchorElement, MouseEvent) = void)`',
         values: [],
         required: false,
         description:
@@ -6073,14 +6140,14 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'button',
-        type: '`{ action: "delete" \\| "retry"; onClick: (event: MouseEvent) => void; id?: string; } \\| ReactNode`',
+        type: '`{ action: "delete" \\| "retry"; onClick: (event: MouseEventHTMLButtonElement, MouseEvent) = void; id?: string; } \\| ReactNode`',
         values: ['delete', 'retry'],
         required: false,
         description: 'Props for the action button.',
       },
       {
         name: 'translations',
-        type: '`RecursivePartial`',
+        type: '`RecursivePartial{ retryButtonTitle: string; deleteButtonTitle: string; uploading: string; downloading: string; }`',
         values: [],
         required: false,
         description: 'i18n-API for customizing texts and labels',
@@ -6094,7 +6161,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'ref',
-        type: '`Ref`',
+        type: '`RefHTMLDivElement`',
         values: [],
         required: false,
         description: '',
@@ -6132,21 +6199,21 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'validator',
-        type: '`((file: File) => string \\| true)`',
+        type: '`((file: File) = string \\| true)`',
         values: [],
         required: false,
         description: 'Custom validator that is used to decide if a file is accepted or rejected.',
       },
       {
         name: 'onSelect',
-        type: '`(files: FileObject[], partitionedFiles: FilesPartitioned) => void`',
+        type: '`(files: FileObject[], partitionedFiles: FilesPartitioned) = void`',
         values: [],
         required: false,
         description: 'Callback triggered on file select',
       },
       {
         name: 'ref',
-        type: '`Ref`',
+        type: '`RefHTMLInputElement`',
         values: [],
         required: false,
         description: '',
@@ -6183,7 +6250,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'onOpenChange',
-        type: '`((open: boolean) => void)`',
+        type: '`((open: boolean) = void)`',
         values: ['false', 'true'],
         required: false,
         description: 'Callback for current open-state',
@@ -6193,11 +6260,11 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
         type: '`ReactNode`',
         values: [],
         required: false,
-        description: 'Should contain elements.',
+        description: 'Should contain FormProgress.Step elements.',
       },
       {
         name: 'onStepChange',
-        type: '`((step: number) => void)`',
+        type: '`((step: number) = void)`',
         values: [],
         required: false,
         description: 'Callback for next `activeStep`. Index starts at 1, not 0.',
@@ -6212,7 +6279,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'translations',
-        type: '`RecursivePartial`',
+        type: '`RecursivePartial{ step: string; showAllSteps: string; hideAllSteps: string; }`',
         values: [],
         required: false,
         description: 'i18n API for customizing texts and labels.',
@@ -6226,7 +6293,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'ref',
-        type: '`Ref`',
+        type: '`RefHTMLDivElement`',
         values: [],
         required: false,
         description: '',
@@ -6261,7 +6328,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
         required: false,
         default: 'true',
         description:
-          'Makes step non-interactive if false. Step will be set to a ``, overriding `as`-prop.',
+          'Makes step non-interactive if false. Step will be set to a `div`, overriding `as`-prop.',
       },
       {
         name: 'className',
@@ -6272,7 +6339,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'ref',
-        type: '`Ref`',
+        type: '`RefHTMLAnchorElement`',
         values: [],
         required: false,
         description: '',
@@ -6290,7 +6357,8 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
         type: '`ReactNode`',
         values: [],
         required: false,
-        description: 'Must include: - `` - `` - `` (optional)',
+        description:
+          'Must include: - `FormSummary.Header` - `FormSummary.Answers` - `FormSummary.Footer` (optional)',
       },
       {
         name: 'className',
@@ -6301,7 +6369,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'ref',
-        type: '`Ref`',
+        type: '`RefHTMLDivElement`',
         values: [],
         required: false,
         description: '',
@@ -6319,7 +6387,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
         type: '`ReactNode`',
         values: [],
         required: false,
-        description: 'Must include: - `` - ``',
+        description: 'Must include: - `FormSummary.Label` - `FormSummary.Value`',
       },
       {
         name: 'className',
@@ -6330,7 +6398,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'ref',
-        type: '`Ref`',
+        type: '`RefHTMLDivElement`',
         values: [],
         required: false,
         description: '',
@@ -6348,7 +6416,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
         type: '`ReactNode`',
         values: [],
         required: false,
-        description: 'Must include one or more of ``.',
+        description: 'Must include one or more of `FormSummary.Answer`.',
       },
       {
         name: 'className',
@@ -6359,7 +6427,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'ref',
-        type: '`Ref`',
+        type: '`RefHTMLDListElement`',
         values: [],
         required: false,
         description: '',
@@ -6397,7 +6465,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'ref',
-        type: '`Ref`',
+        type: '`RefHTMLAnchorElement`',
         values: [],
         required: false,
         description: '',
@@ -6422,7 +6490,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
         type: '`ReactNode`',
         values: [],
         required: false,
-        description: 'Must include ``.',
+        description: 'Must include `FormSummary.Heading`.',
       },
       {
         name: 'className',
@@ -6433,7 +6501,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'ref',
-        type: '`Ref`',
+        type: '`RefHTMLDivElement`',
         values: [],
         required: false,
         description: '',
@@ -6469,7 +6537,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'ref',
-        type: '`Ref`',
+        type: '`RefHTMLHeadingElement`',
         values: [],
         required: false,
         description: '',
@@ -6491,7 +6559,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'ref',
-        type: '`Ref`',
+        type: '`RefHTMLElement`',
         values: [],
         required: false,
         description: '',
@@ -6513,7 +6581,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'ref',
-        type: '`Ref`',
+        type: '`RefHTMLDivElement`',
         values: [],
         required: false,
         description: '',
@@ -6581,7 +6649,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'ref',
-        type: '`Ref`',
+        type: '`RefHTMLDivElement`',
         values: [],
         required: false,
         description: '',
@@ -6603,7 +6671,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'ref',
-        type: '`Ref`',
+        type: '`RefHTMLButtonElement`',
         values: [],
         required: false,
         description: '',
@@ -6625,7 +6693,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'ref',
-        type: '`Ref`',
+        type: '`RefHTMLDivElement`',
         values: [],
         required: false,
         description: '',
@@ -6647,7 +6715,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'ref',
-        type: '`Ref`',
+        type: '`RefHTMLDivElement`',
         values: [],
         required: false,
         description: '',
@@ -6677,7 +6745,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'ref',
-        type: '`Ref`',
+        type: '`RefHTMLHeadingElement`',
         values: [],
         required: false,
         description: '',
@@ -6709,7 +6777,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
         type: '`boolean`',
         values: ['false', 'true'],
         required: false,
-        default: 'true on mobile (<480px)',
+        default: 'true on mobile (480px)',
         description: 'Render illustation above content',
       },
       {
@@ -6721,7 +6789,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'ref',
-        type: '`Ref`',
+        type: '`RefHTMLDivElement`',
         values: [],
         required: false,
         description: '',
@@ -6814,7 +6882,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'ref',
-        type: '`Ref`',
+        type: '`RefHTMLHeadingElement`',
         values: [],
         required: false,
         description: '',
@@ -6889,7 +6957,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'ref',
-        type: '`Ref`',
+        type: '`RefHTMLButtonElement`',
         values: [],
         required: false,
         description: '',
@@ -6911,7 +6979,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'columns',
-        type: '`ResponsiveProp`',
+        type: '`ResponsivePropstring \\| number`',
         values: [],
         required: false,
         description:
@@ -6919,8 +6987,17 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'gap',
-        type: '`ResponsiveProp`',
-        values: [],
+        type: '`ResponsivePropAkselSpaceToken \\| "space-0 space-0" \\| "space-0 space-1" \\| "space-0 space-2" \\| "space-0 space-4" \\| "space-0 space-6" \\| "space-0 space-8" \\| "space-0 space-12" \\| ... 476 more ... \\| "space-128 space-128"`',
+        values: [
+          'space-0 space-0',
+          'space-0 space-1',
+          'space-0 space-12',
+          'space-0 space-2',
+          'space-0 space-4',
+          'space-0 space-6',
+          'space-0 space-8',
+          'space-128 space-128',
+        ],
         required: false,
         description:
           'Spacing between columns. Accepts a [spacing token](https://aksel.nav.no/grunnleggende/styling/design-tokens#space) or an object of spacing tokens for different breakpoints.',
@@ -6935,7 +7012,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'padding',
-        type: '`ResponsiveProp`',
+        type: '`ResponsivePropAkselSpaceToken`',
         values: [],
         required: false,
         description:
@@ -6943,23 +7020,41 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'paddingInline',
-        type: '`ResponsiveProp`',
-        values: [],
+        type: '`ResponsivePropAkselSpaceToken \\| "space-0 space-0" \\| "space-0 space-1" \\| "space-0 space-2" \\| "space-0 space-4" \\| "space-0 space-6" \\| "space-0 space-8" \\| "space-0 space-12" \\| ... 476 more ... \\| "space-128 space-128"`',
+        values: [
+          'space-0 space-0',
+          'space-0 space-1',
+          'space-0 space-12',
+          'space-0 space-2',
+          'space-0 space-4',
+          'space-0 space-6',
+          'space-0 space-8',
+          'space-128 space-128',
+        ],
         required: false,
         description:
           'Horizontal padding around children. Accepts a [spacing token](https://aksel.nav.no/grunnleggende/styling/design-tokens#space) or an object of spacing tokens for different breakpoints.',
       },
       {
         name: 'paddingBlock',
-        type: '`ResponsiveProp`',
-        values: [],
+        type: '`ResponsivePropAkselSpaceToken \\| "space-0 space-0" \\| "space-0 space-1" \\| "space-0 space-2" \\| "space-0 space-4" \\| "space-0 space-6" \\| "space-0 space-8" \\| "space-0 space-12" \\| ... 476 more ... \\| "space-128 space-128"`',
+        values: [
+          'space-0 space-0',
+          'space-0 space-1',
+          'space-0 space-12',
+          'space-0 space-2',
+          'space-0 space-4',
+          'space-0 space-6',
+          'space-0 space-8',
+          'space-128 space-128',
+        ],
         required: false,
         description:
           'Vertical padding around children. Accepts a [spacing token](https://aksel.nav.no/grunnleggende/styling/design-tokens#space) or an object of spacing tokens for different breakpoints.',
       },
       {
         name: 'margin',
-        type: '`ResponsiveProp`',
+        type: '`ResponsivePropAkselSpaceToken`',
         values: [],
         required: false,
         description:
@@ -6967,80 +7062,109 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'marginInline',
-        type: '`ResponsiveProp`',
-        values: [],
+        type: '`ResponsiveProp"auto" \\| AkselSpaceToken \\| "space-0 space-0" \\| "space-0 space-1" \\| "space-0 space-2" \\| "space-0 space-4" \\| "space-0 space-6" \\| "space-0 space-8" \\| "space-0 space-12" \\| ... 520 more ... \\| "space-128 auto"`',
+        values: [
+          'auto',
+          'space-0 space-0',
+          'space-0 space-1',
+          'space-0 space-12',
+          'space-0 space-2',
+          'space-0 space-4',
+          'space-0 space-6',
+          'space-0 space-8',
+          'space-128 auto',
+        ],
         required: false,
         description:
           'Horizontal margin around element. Accepts a [spacing token](https://aksel.nav.no/grunnleggende/styling/design-tokens#space) or an object of spacing tokens for different breakpoints.',
       },
       {
         name: 'marginBlock',
-        type: '`ResponsiveProp`',
-        values: [],
+        type: '`ResponsiveProp"auto" \\| AkselSpaceToken \\| "space-0 space-0" \\| "space-0 space-1" \\| "space-0 space-2" \\| "space-0 space-4" \\| "space-0 space-6" \\| "space-0 space-8" \\| "space-0 space-12" \\| ... 520 more ... \\| "space-128 auto"`',
+        values: [
+          'auto',
+          'space-0 space-0',
+          'space-0 space-1',
+          'space-0 space-12',
+          'space-0 space-2',
+          'space-0 space-4',
+          'space-0 space-6',
+          'space-0 space-8',
+          'space-128 auto',
+        ],
         required: false,
         description:
           'Vertical margin around element. Accepts a [spacing token](https://aksel.nav.no/grunnleggende/styling/design-tokens#space) or an object of spacing tokens for different breakpoints.',
       },
       {
         name: 'width',
-        type: '`ResponsiveProp`',
+        type: '`ResponsivePropstring`',
         values: [],
         required: false,
         description: 'CSS `width`',
       },
       {
         name: 'minWidth',
-        type: '`ResponsiveProp`',
+        type: '`ResponsivePropstring`',
         values: [],
         required: false,
         description: 'CSS `min-width`',
       },
       {
         name: 'maxWidth',
-        type: '`ResponsiveProp`',
+        type: '`ResponsivePropstring`',
         values: [],
         required: false,
         description: 'CSS `max-width`',
       },
       {
         name: 'height',
-        type: '`ResponsiveProp`',
+        type: '`ResponsivePropstring`',
         values: [],
         required: false,
         description: 'CSS `height`',
       },
       {
         name: 'minHeight',
-        type: '`ResponsiveProp`',
+        type: '`ResponsivePropstring`',
         values: [],
         required: false,
         description: 'CSS `min-height`',
       },
       {
         name: 'maxHeight',
-        type: '`ResponsiveProp`',
+        type: '`ResponsivePropstring`',
         values: [],
         required: false,
         description: 'CSS `max-height`',
       },
       {
         name: 'position',
-        type: '`ResponsiveProp`',
-        values: [],
+        type: '`ResponsiveProp"static" \\| "relative" \\| "absolute" \\| "fixed" \\| "sticky"`',
+        values: ['absolute', 'fixed', 'relative', 'static', 'sticky'],
         required: false,
         description: 'CSS `position`',
       },
       {
         name: 'inset',
-        type: '`ResponsiveProp`',
-        values: [],
+        type: '`ResponsivePropAkselSpaceToken \\| "space-0 space-0" \\| "space-0 space-1" \\| "space-0 space-2" \\| "space-0 space-4" \\| "space-0 space-6" \\| "space-0 space-8" \\| "space-0 space-12" \\| ... 476 more ... \\| "space-128 space-128"`',
+        values: [
+          'space-0 space-0',
+          'space-0 space-1',
+          'space-0 space-12',
+          'space-0 space-2',
+          'space-0 space-4',
+          'space-0 space-6',
+          'space-0 space-8',
+          'space-128 space-128',
+        ],
         required: false,
         description:
           'CSS `inset`. Accepts a [spacing token](https://aksel.nav.no/grunnleggende/styling/design-tokens#space) or an object of spacing tokens for different breakpoints.',
       },
       {
         name: 'top',
-        type: '`ResponsiveProp`',
+        type: '`ResponsivePropAkselSpaceToken`',
         values: [],
         required: false,
         description:
@@ -7048,7 +7172,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'right',
-        type: '`ResponsiveProp`',
+        type: '`ResponsivePropAkselSpaceToken`',
         values: [],
         required: false,
         description:
@@ -7056,7 +7180,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'bottom',
-        type: '`ResponsiveProp`',
+        type: '`ResponsivePropAkselSpaceToken`',
         values: [],
         required: false,
         description:
@@ -7064,7 +7188,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'left',
-        type: '`ResponsiveProp`',
+        type: '`ResponsivePropAkselSpaceToken`',
         values: [],
         required: false,
         description:
@@ -7072,49 +7196,49 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'overflow',
-        type: '`ResponsiveProp`',
-        values: [],
+        type: '`ResponsiveProp"auto" \\| "visible" \\| "hidden" \\| "clip" \\| "scroll"`',
+        values: ['auto', 'clip', 'hidden', 'scroll', 'visible'],
         required: false,
         description: 'CSS `overflow`',
       },
       {
         name: 'overflowX',
-        type: '`ResponsiveProp`',
-        values: [],
+        type: '`ResponsiveProp"auto" \\| "visible" \\| "hidden" \\| "clip" \\| "scroll"`',
+        values: ['auto', 'clip', 'hidden', 'scroll', 'visible'],
         required: false,
         description: 'CSS `overflow-x`',
       },
       {
         name: 'overflowY',
-        type: '`ResponsiveProp`',
-        values: [],
+        type: '`ResponsiveProp"auto" \\| "visible" \\| "hidden" \\| "clip" \\| "scroll"`',
+        values: ['auto', 'clip', 'hidden', 'scroll', 'visible'],
         required: false,
         description: 'CSS `overflow-y`',
       },
       {
         name: 'flexBasis',
-        type: '`ResponsiveProp`',
+        type: '`ResponsivePropstring`',
         values: [],
         required: false,
         description: 'CSS `flex-basis`',
       },
       {
         name: 'flexShrink',
-        type: '`ResponsiveProp`',
+        type: '`ResponsivePropstring`',
         values: [],
         required: false,
         description: 'CSS `flex-shrink`',
       },
       {
         name: 'flexGrow',
-        type: '`ResponsiveProp`',
+        type: '`ResponsivePropstring`',
         values: [],
         required: false,
         description: 'CSS `flex-grow`',
       },
       {
         name: 'gridColumn',
-        type: '`ResponsiveProp`',
+        type: '`ResponsivePropstring`',
         values: [],
         required: false,
         description: 'CSS `grid-column`',
@@ -7129,7 +7253,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'ref',
-        type: '`Ref`',
+        type: '`RefHTMLDivElement`',
         values: [],
         required: false,
         description: '',
@@ -7181,7 +7305,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'ref',
-        type: '`Ref`',
+        type: '`RefHTMLDivElement`',
         values: [],
         required: false,
         description: '',
@@ -7211,15 +7335,15 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'justify',
-        type: '`ResponsiveProp`',
-        values: [],
+        type: '`ResponsiveProp"start" \\| "center" \\| "end" \\| "space-around" \\| "space-between" \\| "space-evenly"`',
+        values: ['center', 'end', 'space-around', 'space-between', 'space-evenly', 'start'],
         required: false,
         description: 'CSS `justify-content` property.',
       },
       {
         name: 'align',
-        type: '`ResponsiveProp`',
-        values: [],
+        type: '`ResponsiveProp"start" \\| "center" \\| "end" \\| "baseline" \\| "stretch"`',
+        values: ['baseline', 'center', 'end', 'start', 'stretch'],
         required: false,
         default: '"stretch"',
         description: 'CSS `align-items` property.',
@@ -7233,15 +7357,24 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'gap',
-        type: '`ResponsiveProp`',
-        values: [],
+        type: '`ResponsivePropAkselSpaceToken \\| "space-0 space-0" \\| "space-0 space-1" \\| "space-0 space-2" \\| "space-0 space-4" \\| "space-0 space-6" \\| "space-0 space-8" \\| "space-0 space-12" \\| ... 476 more ... \\| "space-128 space-128"`',
+        values: [
+          'space-0 space-0',
+          'space-0 space-1',
+          'space-0 space-12',
+          'space-0 space-2',
+          'space-0 space-4',
+          'space-0 space-6',
+          'space-0 space-8',
+          'space-128 space-128',
+        ],
         required: false,
         description:
           'CSS `gap` property. Accepts a [spacing token](https://aksel.nav.no/grunnleggende/styling/design-tokens#space) or an object of spacing tokens for different breakpoints.',
       },
       {
         name: 'padding',
-        type: '`ResponsiveProp`',
+        type: '`ResponsivePropAkselSpaceToken`',
         values: [],
         required: false,
         description:
@@ -7249,23 +7382,41 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'paddingInline',
-        type: '`ResponsiveProp`',
-        values: [],
+        type: '`ResponsivePropAkselSpaceToken \\| "space-0 space-0" \\| "space-0 space-1" \\| "space-0 space-2" \\| "space-0 space-4" \\| "space-0 space-6" \\| "space-0 space-8" \\| "space-0 space-12" \\| ... 476 more ... \\| "space-128 space-128"`',
+        values: [
+          'space-0 space-0',
+          'space-0 space-1',
+          'space-0 space-12',
+          'space-0 space-2',
+          'space-0 space-4',
+          'space-0 space-6',
+          'space-0 space-8',
+          'space-128 space-128',
+        ],
         required: false,
         description:
           'Horizontal padding around children. Accepts a [spacing token](https://aksel.nav.no/grunnleggende/styling/design-tokens#space) or an object of spacing tokens for different breakpoints.',
       },
       {
         name: 'paddingBlock',
-        type: '`ResponsiveProp`',
-        values: [],
+        type: '`ResponsivePropAkselSpaceToken \\| "space-0 space-0" \\| "space-0 space-1" \\| "space-0 space-2" \\| "space-0 space-4" \\| "space-0 space-6" \\| "space-0 space-8" \\| "space-0 space-12" \\| ... 476 more ... \\| "space-128 space-128"`',
+        values: [
+          'space-0 space-0',
+          'space-0 space-1',
+          'space-0 space-12',
+          'space-0 space-2',
+          'space-0 space-4',
+          'space-0 space-6',
+          'space-0 space-8',
+          'space-128 space-128',
+        ],
         required: false,
         description:
           'Vertical padding around children. Accepts a [spacing token](https://aksel.nav.no/grunnleggende/styling/design-tokens#space) or an object of spacing tokens for different breakpoints.',
       },
       {
         name: 'margin',
-        type: '`ResponsiveProp`',
+        type: '`ResponsivePropAkselSpaceToken`',
         values: [],
         required: false,
         description:
@@ -7273,80 +7424,109 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'marginInline',
-        type: '`ResponsiveProp`',
-        values: [],
+        type: '`ResponsiveProp"auto" \\| AkselSpaceToken \\| "space-0 space-0" \\| "space-0 space-1" \\| "space-0 space-2" \\| "space-0 space-4" \\| "space-0 space-6" \\| "space-0 space-8" \\| "space-0 space-12" \\| ... 520 more ... \\| "space-128 auto"`',
+        values: [
+          'auto',
+          'space-0 space-0',
+          'space-0 space-1',
+          'space-0 space-12',
+          'space-0 space-2',
+          'space-0 space-4',
+          'space-0 space-6',
+          'space-0 space-8',
+          'space-128 auto',
+        ],
         required: false,
         description:
           'Horizontal margin around element. Accepts a [spacing token](https://aksel.nav.no/grunnleggende/styling/design-tokens#space) or an object of spacing tokens for different breakpoints.',
       },
       {
         name: 'marginBlock',
-        type: '`ResponsiveProp`',
-        values: [],
+        type: '`ResponsiveProp"auto" \\| AkselSpaceToken \\| "space-0 space-0" \\| "space-0 space-1" \\| "space-0 space-2" \\| "space-0 space-4" \\| "space-0 space-6" \\| "space-0 space-8" \\| "space-0 space-12" \\| ... 520 more ... \\| "space-128 auto"`',
+        values: [
+          'auto',
+          'space-0 space-0',
+          'space-0 space-1',
+          'space-0 space-12',
+          'space-0 space-2',
+          'space-0 space-4',
+          'space-0 space-6',
+          'space-0 space-8',
+          'space-128 auto',
+        ],
         required: false,
         description:
           'Vertical margin around element. Accepts a [spacing token](https://aksel.nav.no/grunnleggende/styling/design-tokens#space) or an object of spacing tokens for different breakpoints.',
       },
       {
         name: 'width',
-        type: '`ResponsiveProp`',
+        type: '`ResponsivePropstring`',
         values: [],
         required: false,
         description: 'CSS `width`',
       },
       {
         name: 'minWidth',
-        type: '`ResponsiveProp`',
+        type: '`ResponsivePropstring`',
         values: [],
         required: false,
         description: 'CSS `min-width`',
       },
       {
         name: 'maxWidth',
-        type: '`ResponsiveProp`',
+        type: '`ResponsivePropstring`',
         values: [],
         required: false,
         description: 'CSS `max-width`',
       },
       {
         name: 'height',
-        type: '`ResponsiveProp`',
+        type: '`ResponsivePropstring`',
         values: [],
         required: false,
         description: 'CSS `height`',
       },
       {
         name: 'minHeight',
-        type: '`ResponsiveProp`',
+        type: '`ResponsivePropstring`',
         values: [],
         required: false,
         description: 'CSS `min-height`',
       },
       {
         name: 'maxHeight',
-        type: '`ResponsiveProp`',
+        type: '`ResponsivePropstring`',
         values: [],
         required: false,
         description: 'CSS `max-height`',
       },
       {
         name: 'position',
-        type: '`ResponsiveProp`',
-        values: [],
+        type: '`ResponsiveProp"static" \\| "relative" \\| "absolute" \\| "fixed" \\| "sticky"`',
+        values: ['absolute', 'fixed', 'relative', 'static', 'sticky'],
         required: false,
         description: 'CSS `position`',
       },
       {
         name: 'inset',
-        type: '`ResponsiveProp`',
-        values: [],
+        type: '`ResponsivePropAkselSpaceToken \\| "space-0 space-0" \\| "space-0 space-1" \\| "space-0 space-2" \\| "space-0 space-4" \\| "space-0 space-6" \\| "space-0 space-8" \\| "space-0 space-12" \\| ... 476 more ... \\| "space-128 space-128"`',
+        values: [
+          'space-0 space-0',
+          'space-0 space-1',
+          'space-0 space-12',
+          'space-0 space-2',
+          'space-0 space-4',
+          'space-0 space-6',
+          'space-0 space-8',
+          'space-128 space-128',
+        ],
         required: false,
         description:
           'CSS `inset`. Accepts a [spacing token](https://aksel.nav.no/grunnleggende/styling/design-tokens#space) or an object of spacing tokens for different breakpoints.',
       },
       {
         name: 'top',
-        type: '`ResponsiveProp`',
+        type: '`ResponsivePropAkselSpaceToken`',
         values: [],
         required: false,
         description:
@@ -7354,7 +7534,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'right',
-        type: '`ResponsiveProp`',
+        type: '`ResponsivePropAkselSpaceToken`',
         values: [],
         required: false,
         description:
@@ -7362,7 +7542,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'bottom',
-        type: '`ResponsiveProp`',
+        type: '`ResponsivePropAkselSpaceToken`',
         values: [],
         required: false,
         description:
@@ -7370,7 +7550,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'left',
-        type: '`ResponsiveProp`',
+        type: '`ResponsivePropAkselSpaceToken`',
         values: [],
         required: false,
         description:
@@ -7378,56 +7558,56 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'overflow',
-        type: '`ResponsiveProp`',
-        values: [],
+        type: '`ResponsiveProp"hidden" \\| "auto" \\| "visible" \\| "clip" \\| "scroll"`',
+        values: ['auto', 'clip', 'hidden', 'scroll', 'visible'],
         required: false,
         description: 'CSS `overflow`',
       },
       {
         name: 'overflowX',
-        type: '`ResponsiveProp`',
-        values: [],
+        type: '`ResponsiveProp"hidden" \\| "auto" \\| "visible" \\| "clip" \\| "scroll"`',
+        values: ['auto', 'clip', 'hidden', 'scroll', 'visible'],
         required: false,
         description: 'CSS `overflow-x`',
       },
       {
         name: 'overflowY',
-        type: '`ResponsiveProp`',
-        values: [],
+        type: '`ResponsiveProp"hidden" \\| "auto" \\| "visible" \\| "clip" \\| "scroll"`',
+        values: ['auto', 'clip', 'hidden', 'scroll', 'visible'],
         required: false,
         description: 'CSS `overflow-y`',
       },
       {
         name: 'flexBasis',
-        type: '`ResponsiveProp`',
+        type: '`ResponsivePropstring`',
         values: [],
         required: false,
         description: 'CSS `flex-basis`',
       },
       {
         name: 'flexShrink',
-        type: '`ResponsiveProp`',
+        type: '`ResponsivePropstring`',
         values: [],
         required: false,
         description: 'CSS `flex-shrink`',
       },
       {
         name: 'flexGrow',
-        type: '`ResponsiveProp`',
+        type: '`ResponsivePropstring`',
         values: [],
         required: false,
         description: 'CSS `flex-grow`',
       },
       {
         name: 'gridColumn',
-        type: '`ResponsiveProp`',
+        type: '`ResponsivePropstring`',
         values: [],
         required: false,
         description: 'CSS `grid-column`',
       },
       {
         name: 'ref',
-        type: '`Ref`',
+        type: '`RefHTMLDivElement`',
         values: [],
         required: false,
         description: '',
@@ -7500,7 +7680,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'ref',
-        type: '`Ref`',
+        type: '`RefHTMLDivElement`',
         values: [],
         required: false,
         description: '',
@@ -7522,7 +7702,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'ref',
-        type: '`Ref`',
+        type: '`RefHTMLDivElement`',
         values: [],
         required: false,
         description: '',
@@ -7551,7 +7731,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'ref',
-        type: '`Ref`',
+        type: '`RefHTMLDivElement`',
         values: [],
         required: false,
         description: '',
@@ -7581,7 +7761,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'ref',
-        type: '`Ref`',
+        type: '`RefHTMLHeadingElement`',
         values: [],
         required: false,
         description: '',
@@ -7632,7 +7812,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'ref',
-        type: '`Ref`',
+        type: '`RefHTMLDivElement`',
         values: [],
         required: false,
         description: '',
@@ -7654,7 +7834,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'ref',
-        type: '`Ref`',
+        type: '`RefHTMLElement`',
         values: [],
         required: false,
         description: '',
@@ -7691,7 +7871,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'ref',
-        type: '`Ref`',
+        type: '`RefHTMLButtonElement`',
         values: [],
         required: false,
         description: '',
@@ -7727,7 +7907,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'ref',
-        type: '`Ref`',
+        type: '`RefHTMLAnchorElement`',
         values: [],
         required: false,
         description: '',
@@ -7770,7 +7950,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'ref',
-        type: '`Ref`',
+        type: '`RefHTMLDivElement`',
         values: [],
         required: false,
         description: '',
@@ -7806,7 +7986,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'ref',
-        type: '`Ref`',
+        type: '`RefHTMLButtonElement`',
         values: [],
         required: false,
         description: '',
@@ -7892,7 +8072,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'ref',
-        type: '`Ref`',
+        type: '`RefHTMLLabelElement`',
         values: [],
         required: false,
         description: '',
@@ -7968,7 +8148,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'ref',
-        type: '`Ref`',
+        type: '`RefHTMLAnchorElement`',
         values: [],
         required: false,
         description: '',
@@ -8039,7 +8219,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
         required: false,
         default: 'span',
         description:
-          'Changes the HTML element used for the root element. **When using `section`, provide either `aria-label` or `aria-labelledby` for better accessibility.** `axe-core` might warn about unique landmarks if you have multiple Accordions on page with the same label. In those cases consider updating to unique `aria-label` or `aria-labelledby` props. @see [ Landmarks unique](https://dequeuniversity.com/rules/axe/4.6/landmark-unique) **When using `article`, make sure `` is a heading and not a `span`.**',
+          'Changes the HTML element used for the root element. **When using `section`, provide either `aria-label` or `aria-labelledby` for better accessibility.** `axe-core` might warn about unique landmarks if you have multiple Accordions on page with the same label. In those cases consider updating to unique `aria-label` or `aria-labelledby` props. @see [ Landmarks unique](https://dequeuniversity.com/rules/axe/4.6/landmark-unique) **When using `article`, make sure `LinkCard.Title /` is a heading and not a `span`.**',
       },
       {
         name: 'className',
@@ -8050,7 +8230,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'ref',
-        type: '`Ref`',
+        type: '`RefHTMLDivElement`',
         values: [],
         required: false,
         description: '',
@@ -8080,7 +8260,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'ref',
-        type: '`Ref`',
+        type: '`RefHTMLAnchorElement`',
         values: [],
         required: false,
         description: '',
@@ -8102,7 +8282,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'ref',
-        type: '`Ref`',
+        type: '`RefHTMLDivElement`',
         values: [],
         required: false,
         description: '',
@@ -8124,7 +8304,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'ref',
-        type: '`Ref`',
+        type: '`RefHTMLDivElement`',
         values: [],
         required: false,
         description: '',
@@ -8146,7 +8326,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'ref',
-        type: '`Ref`',
+        type: '`RefHTMLDivElement`',
         values: [],
         required: false,
         description: '',
@@ -8176,7 +8356,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'ref',
-        type: '`Ref`',
+        type: '`RefHTMLDivElement`',
         values: [],
         required: false,
         description: '',
@@ -8207,7 +8387,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'ref',
-        type: '`Ref`',
+        type: '`RefHTMLHeadingElement`',
         values: [],
         required: false,
         description: '',
@@ -8244,7 +8424,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'ref',
-        type: '`Ref`',
+        type: '`RefHTMLAnchorElement`',
         values: [],
         required: false,
         description: '',
@@ -8273,7 +8453,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'ref',
-        type: '`Ref`',
+        type: '`RefHTMLDivElement`',
         values: [],
         required: false,
         description: '',
@@ -8295,7 +8475,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'ref',
-        type: '`Ref`',
+        type: '`RefHTMLDivElement`',
         values: [],
         required: false,
         description: '',
@@ -8328,7 +8508,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
         type: '`undefined`',
         values: [],
         required: false,
-        description: '**Deprecated:** Use instead of `title`.',
+        description: '**Deprecated:** Use Heading instead of `title`.',
       },
       {
         name: 'size',
@@ -8347,7 +8527,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'ref',
-        type: '`Ref`',
+        type: '`RefHTMLDivElement`',
         values: [],
         required: false,
         description: '',
@@ -8390,7 +8570,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'ref',
-        type: '`Ref`',
+        type: '`RefHTMLLIElement`',
         values: [],
         required: false,
         description: '',
@@ -8465,7 +8645,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'ref',
-        type: '`Ref`',
+        type: '`RefSVGSVGElement`',
         values: [],
         required: false,
         description: '',
@@ -8525,7 +8705,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'ref',
-        type: '`Ref`',
+        type: '`RefHTMLDivElement`',
         values: [],
         required: false,
         description: '',
@@ -8547,7 +8727,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'ref',
-        type: '`Ref`',
+        type: '`RefHTMLButtonElement`',
         values: [],
         required: false,
         description: '',
@@ -8569,7 +8749,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'ref',
-        type: '`Ref`',
+        type: '`RefHTMLDivElement`',
         values: [],
         required: false,
         description: '',
@@ -8591,7 +8771,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'ref',
-        type: '`Ref`',
+        type: '`RefHTMLDivElement`',
         values: [],
         required: false,
         description: '',
@@ -8621,7 +8801,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'ref',
-        type: '`Ref`',
+        type: '`RefHTMLHeadingElement`',
         values: [],
         required: false,
         description: '',
@@ -8648,7 +8828,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
         values: ['false', 'medium', 'small', 'true'],
         required: false,
         description:
-          'Content for the header. Alteratively you can use `` instead for more control, but then you have to set `aria-label` or `aria-labelledby` on the modal manually.',
+          'Content for the header. Alteratively you can use `Modal.Header` instead for more control, but then you have to set `aria-label` or `aria-labelledby` on the modal manually.',
       },
       {
         name: 'children',
@@ -8667,14 +8847,14 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'onClose',
-        type: '`ReactEventHandler`',
+        type: '`ReactEventHandlerHTMLDialogElement`',
         values: [],
         required: false,
         description: 'Called when the modal has been closed',
       },
       {
         name: 'onBeforeClose',
-        type: '`(() => boolean)`',
+        type: '`(() = boolean)`',
         values: ['false', 'true'],
         required: false,
         description:
@@ -8682,7 +8862,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'onCancel',
-        type: '`ReactEventHandler`',
+        type: '`ReactEventHandlerHTMLDialogElement`',
         values: [],
         required: false,
         description:
@@ -8747,7 +8927,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'ref',
-        type: '`Ref`',
+        type: '`RefHTMLDialogElement`',
         values: [],
         required: false,
         description: '',
@@ -8769,7 +8949,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'ref',
-        type: '`Ref`',
+        type: '`RefHTMLDivElement`',
         values: [],
         required: false,
         description: '',
@@ -8791,7 +8971,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'ref',
-        type: '`Ref`',
+        type: '`RefHTMLDivElement`',
         values: [],
         required: false,
         description: '',
@@ -8821,7 +9001,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'ref',
-        type: '`Ref`',
+        type: '`RefHTMLDivElement`',
         values: [],
         required: false,
         description: '',
@@ -8840,7 +9020,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
         values: [],
         required: false,
         description:
-          'Element monthpicker anchors to. Use for built-in toggle, or make your own with the open/onClose props',
+          'Element monthpicker anchors to. Use MonthPicker.Input / for built-in toggle, or make your own with the open/onClose props',
       },
       {
         name: 'className',
@@ -8876,11 +9056,11 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
         values: ['en', 'nb', 'nn'],
         required: false,
         default: '"nb" (norsk bokmal)',
-        description: '**Deprecated:** Use ``-component',
+        description: '**Deprecated:** Use `Provider /`-component',
       },
       {
         name: 'translations',
-        type: '`RecursivePartial`',
+        type: '`RecursivePartial{ chooseDate: string; chooseDates: string; chooseDateRange: string; chooseMonth: string; week: string; weekNumber: string; selectWeekNumber: string; month: string; goToNextMonth: string; ... 7 more ...; closeMonthPicker: string; }`',
         values: [],
         required: false,
         description:
@@ -8925,21 +9105,22 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'onClose',
-        type: '`(() => void)`',
+        type: '`(() = void)`',
         values: [],
         required: false,
         description: 'onClose callback for user-controlled state',
       },
       {
         name: 'onOpenToggle',
-        type: '`(() => void)`',
+        type: '`(() = void)`',
         values: [],
         required: false,
-        description: 'onOpenToggle callback for user-controlled-state. Only called if `` is used',
+        description:
+          'onOpenToggle callback for user-controlled-state. Only called if `MonthPicker.Input /` is used',
       },
       {
         name: 'onMonthSelect',
-        type: '`((month?: Date) => void)`',
+        type: '`((month?: Date) = void)`',
         values: [],
         required: false,
         description: 'Callback for user-controlled state',
@@ -8953,7 +9134,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'onYearChange',
-        type: '`((y?: Date) => void)`',
+        type: '`((y?: Date) = void)`',
         values: [],
         required: false,
         description: 'Event fired when the user navigates between years.',
@@ -9049,7 +9230,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'ref',
-        type: '`Ref`',
+        type: '`RefHTMLInputElement`',
         values: [],
         required: false,
         description: '',
@@ -9075,7 +9256,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
         values: [],
         required: false,
         description:
-          'Element monthpicker anchors to. Use for built-in toggle, or make your own with the open/onClose props',
+          'Element monthpicker anchors to. Use MonthPicker.Input / for built-in toggle, or make your own with the open/onClose props',
       },
       {
         name: 'fromDate',
@@ -9097,11 +9278,11 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
         values: ['en', 'nb', 'nn'],
         required: false,
         default: '"nb" (norsk bokmal)',
-        description: '**Deprecated:** Use ``-component',
+        description: '**Deprecated:** Use `Provider /`-component',
       },
       {
         name: 'translations',
-        type: '`RecursivePartial`',
+        type: '`RecursivePartial{ chooseDate: string; chooseDates: string; chooseDateRange: string; chooseMonth: string; week: string; weekNumber: string; selectWeekNumber: string; month: string; goToNextMonth: string; ... 7 more ...; closeMonthPicker: string; }`',
         values: [],
         required: false,
         description:
@@ -9140,7 +9321,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'onMonthSelect',
-        type: '`((month?: Date) => void)`',
+        type: '`((month?: Date) = void)`',
         values: [],
         required: false,
         description: 'Callback for user-controlled state',
@@ -9154,14 +9335,14 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'onYearChange',
-        type: '`((y?: Date) => void)`',
+        type: '`((y?: Date) = void)`',
         values: [],
         required: false,
         description: 'Event fired when the user navigates between years.',
       },
       {
         name: 'ref',
-        type: '`Ref`',
+        type: '`RefHTMLDivElement`',
         values: [],
         required: false,
         description: '',
@@ -9217,7 +9398,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
         values: [],
         required: false,
         description:
-          '**Deprecated:** Deprecated in v8 and no longer has any effect. Use `` wrapped around ``.',
+          '**Deprecated:** Deprecated in v8 and no longer has any effect. Use `Box asChild background="..."` wrapped around `Page`.',
       },
       {
         name: 'className',
@@ -9228,7 +9409,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'ref',
-        type: '`Ref`',
+        type: '`RefHTMLElement`',
         values: [],
         required: false,
         description: '',
@@ -9256,7 +9437,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
         values: ['false', 'true'],
         required: false,
         default: 'false',
-        description: 'Adds a standardised responsive padding-inline 3rem on > md 1rem on < md',
+        description: 'Adds a standardised responsive padding-inline 3rem on md 1rem on md',
       },
       {
         name: 'className',
@@ -9267,7 +9448,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'ref',
-        type: '`Ref`',
+        type: '`RefHTMLDivElement`',
         values: [],
         required: false,
         description: '',
@@ -9312,7 +9493,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'onPageChange',
-        type: '`((page: number) => void)`',
+        type: '`((page: number) = void)`',
         values: [],
         required: false,
         description: 'Callback when current page changes.',
@@ -9342,7 +9523,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'renderItem',
-        type: '`((item: RenderItemProps) => ReactNode \\| Promise)`',
+        type: '`((item: RenderItemProps) = ReactNode \\| PromiseReactNode)`',
         values: [],
         required: false,
         default: 'PaginationItem',
@@ -9365,7 +9546,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'ref',
-        type: '`Ref`',
+        type: '`RefHTMLElement`',
         values: [],
         required: false,
         description: '',
@@ -9408,7 +9589,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'onClose',
-        type: '`() => void`',
+        type: '`() = void`',
         values: [],
         required: false,
         description: 'onClose callback',
@@ -9476,7 +9657,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'ref',
-        type: '`Ref`',
+        type: '`RefHTMLDivElement`',
         values: [],
         required: false,
         description: '',
@@ -9498,7 +9679,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'ref',
-        type: '`Ref`',
+        type: '`RefHTMLDivElement`',
         values: [],
         required: false,
         description: '',
@@ -9516,7 +9697,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
         type: '`ReactNode`',
         values: [],
         required: false,
-        description: '`` elements.',
+        description: '`Process.Event /` elements.',
       },
       {
         name: 'hideStatusText',
@@ -9543,7 +9724,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'ref',
-        type: '`Ref`',
+        type: '`RefHTMLOListElement`',
         values: [],
         required: false,
         description: '',
@@ -9608,7 +9789,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'ref',
-        type: '`Ref`',
+        type: '`RefHTMLLIElement`',
         values: [],
         required: false,
         description: '',
@@ -9647,7 +9828,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'simulated',
-        type: '`{ seconds: number; onTimeout: () => void; }`',
+        type: '`{ seconds: number; onTimeout: () = void; }`',
         values: [],
         required: false,
         description:
@@ -9698,7 +9879,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'ref',
-        type: '`Ref`',
+        type: '`RefHTMLDivElement`',
         values: [],
         required: false,
         description: '',
@@ -9729,7 +9910,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'translations',
-        type: '`RecursivePartial \\| RecursivePartial[]`',
+        type: '`RecursivePartial{ global: { dateLocale: Locale; showMore: string; showLess: string; readOnly: string; close: string; error: string; info: string; success: string; warning: string; announcement: string; }; ... 17 more ...; Tooltip: { ...; }; } \\| RecursivePartial...[]`',
         values: [],
         required: false,
         description:
@@ -9794,7 +9975,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'ref',
-        type: '`Ref`',
+        type: '`RefHTMLInputElement`',
         values: [],
         required: false,
         description: '',
@@ -9812,7 +9993,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
         type: '`ReactNode`',
         values: [],
         required: false,
-        description: 'Collection of ``-elements',
+        description: 'Collection of `Radio /`-elements',
       },
       {
         name: 'name',
@@ -9837,10 +10018,10 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'onChange',
-        type: '`((value: any) => void)`',
+        type: '`((value: any) = void)`',
         values: [],
         required: false,
-        default: '() => {}',
+        default: '() = {}',
         description: 'Returns current checked Radio in group',
       },
       {
@@ -9922,7 +10103,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'ref',
-        type: '`Ref`',
+        type: '`RefHTMLFieldSetElement`',
         values: [],
         required: false,
         description: '',
@@ -9967,7 +10148,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'onOpenChange',
-        type: '`((open: boolean) => void)`',
+        type: '`((open: boolean) = void)`',
         values: ['false', 'true'],
         required: false,
         description: 'Callback for current open-state.',
@@ -9998,7 +10179,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'ref',
-        type: '`Ref`',
+        type: '`RefHTMLButtonElement`',
         values: [],
         required: false,
         description: '',
@@ -10028,21 +10209,21 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'onChange',
-        type: '`((value: string) => void)`',
+        type: '`((value: string) = void)`',
         values: [],
         required: false,
         description: 'Callback for value-change in input.',
       },
       {
         name: 'onClear',
-        type: '`((e: SearchClearEvent) => void)`',
+        type: '`((e: SearchClearEvent) = void)`',
         values: [],
         required: false,
         description: 'Callback for click on clear-button or Escape keydown.',
       },
       {
         name: 'onSearchClick',
-        type: '`((value: string) => void)`',
+        type: '`((value: string) = void)`',
         values: [],
         required: false,
         description: 'Callback for Search-button submit.',
@@ -10053,7 +10234,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
         values: [],
         required: false,
         default: '"Tm feltet"',
-        description: '**Deprecated:** Use ``-component',
+        description: '**Deprecated:** Use `Provider /`-component',
       },
       {
         name: 'clearButton',
@@ -10130,7 +10311,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'ref',
-        type: '`Ref`',
+        type: '`RefHTMLDivElement`',
         values: [],
         required: false,
         description: '',
@@ -10148,7 +10329,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
         type: '`ReactNode`',
         values: [],
         required: false,
-        description: 'Text set after icon',
+        description: 'Text set after Search/ icon',
       },
       {
         name: 'disabled',
@@ -10210,7 +10391,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'ref',
-        type: '`Ref`',
+        type: '`RefHTMLButtonElement`',
         values: [],
         required: false,
         description: '',
@@ -10228,7 +10409,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
         type: '`ReactNode`',
         values: [],
         required: false,
-        description: 'Collection of -elements.',
+        description: 'Collection of option /-elements.',
       },
       {
         name: 'style',
@@ -10309,7 +10490,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'ref',
-        type: '`Ref`',
+        type: '`RefHTMLSelectElement`',
         values: [],
         required: false,
         description: '',
@@ -10361,7 +10542,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'ref',
-        type: '`Ref`',
+        type: '`RefHTMLDivElement`',
         values: [],
         required: false,
         description: '',
@@ -10413,7 +10594,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'ref',
-        type: '`Ref`',
+        type: '`RefHTMLDivElement`',
         values: [],
         required: false,
         description: '',
@@ -10431,7 +10612,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
         type: '`ReactNode`',
         values: [],
         required: false,
-        description: '`` elements.',
+        description: '`Stepper.Step /` elements.',
       },
       {
         name: 'orientation',
@@ -10450,7 +10631,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'onStepChange',
-        type: '`((step: number) => void)`',
+        type: '`((step: number) = void)`',
         values: [],
         required: false,
         description: 'Callback for next `activeStep`. Stepper index starts at 1, not 0.',
@@ -10462,7 +10643,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
         required: false,
         default: 'true',
         description:
-          '**Deprecated:** Use `interactive` prop on `` instead for individual steps. For completely static steppers, use `Process` component instead.',
+          '**Deprecated:** Use `interactive` prop on `Stepper.Step /` instead for individual steps. For completely static steppers, use `Process` component instead.',
       },
       {
         name: 'className',
@@ -10473,7 +10654,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'ref',
-        type: '`Ref`',
+        type: '`RefHTMLOListElement`',
         values: [],
         required: false,
         description: '',
@@ -10508,7 +10689,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
         required: false,
         default: 'true',
         description:
-          'Makes step non-interactive if false. Step will be set to a ``, overriding `as`-prop.',
+          'Makes step non-interactive if false. Step will be set to a `div`, overriding `as`-prop.',
       },
       {
         name: 'className',
@@ -10519,7 +10700,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'ref',
-        type: '`Ref`',
+        type: '`RefHTMLAnchorElement`',
         values: [],
         required: false,
         description: '',
@@ -10612,7 +10793,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'ref',
-        type: '`Ref`',
+        type: '`RefHTMLInputElement`',
         values: [],
         required: false,
         description: '',
@@ -10658,7 +10839,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'onSortChange',
-        type: '`((sortKey: string) => void)`',
+        type: '`((sortKey: string) = void)`',
         values: [],
         required: false,
         description: 'Callback whens sort state changes',
@@ -10672,7 +10853,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'ref',
-        type: '`Ref`',
+        type: '`RefHTMLTableElement`',
         values: [],
         required: false,
         description: '',
@@ -10694,7 +10875,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'ref',
-        type: '`Ref`',
+        type: '`RefHTMLTableSectionElement`',
         values: [],
         required: false,
         description: '',
@@ -10753,7 +10934,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'ref',
-        type: '`Ref`',
+        type: '`RefHTMLTableCellElement`',
         values: [],
         required: false,
         description: '',
@@ -10790,7 +10971,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'ref',
-        type: '`Ref`',
+        type: '`RefHTMLTableCellElement`',
         values: [],
         required: false,
         description: '',
@@ -10836,7 +11017,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'onOpenChange',
-        type: '`((open: boolean) => void)`',
+        type: '`((open: boolean) = void)`',
         values: ['false', 'true'],
         required: false,
         description: 'Change handler for open',
@@ -10898,7 +11079,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'ref',
-        type: '`Ref`',
+        type: '`RefHTMLTableRowElement`',
         values: [],
         required: false,
         description: '',
@@ -10920,7 +11101,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'ref',
-        type: '`Ref`',
+        type: '`RefHTMLTableSectionElement`',
         values: [],
         required: false,
         description: '',
@@ -10964,7 +11145,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'ref',
-        type: '`Ref`',
+        type: '`RefHTMLTableCellElement`',
         values: [],
         required: false,
         description: '',
@@ -10995,7 +11176,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'onRowClick',
-        type: '`((event: MouseEvent) => void)`',
+        type: '`((event: MouseEventHTMLTableRowElement, MouseEvent) = void)`',
         values: [],
         required: false,
         description:
@@ -11010,7 +11191,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'ref',
-        type: '`Ref`',
+        type: '`RefHTMLTableRowElement`',
         values: [],
         required: false,
         description: '',
@@ -11033,7 +11214,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'onChange',
-        type: '`((value: string) => void)`',
+        type: '`((value: string) = void)`',
         values: [],
         required: false,
         description: 'onChange callback for selected Tab.',
@@ -11093,7 +11274,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'ref',
-        type: '`Ref`',
+        type: '`RefHTMLDivElement`',
         values: [],
         required: false,
         description: '',
@@ -11111,7 +11292,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
         type: '`ReactNode`',
         values: [],
         required: false,
-        description: 'elements.',
+        description: 'Tabs.Tab / elements.',
       },
       {
         name: 'className',
@@ -11122,7 +11303,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'ref',
-        type: '`Ref`',
+        type: '`RefHTMLDivElement`',
         values: [],
         required: false,
         description: '',
@@ -11174,7 +11355,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'ref',
-        type: '`Ref`',
+        type: '`RefHTMLDivElement`',
         values: [],
         required: false,
         description: '',
@@ -11225,7 +11406,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'ref',
-        type: '`Ref`',
+        type: '`RefHTMLButtonElement`',
         values: [],
         required: false,
         description: '',
@@ -11297,7 +11478,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'ref',
-        type: '`Ref`',
+        type: '`RefHTMLSpanElement`',
         values: [],
         required: false,
         description: '',
@@ -11380,7 +11561,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
         type: '`{ counterLeft?: string; counterTooMuch?: string; } \\| undefined`',
         values: [],
         required: false,
-        description: '**Deprecated:** Use ``-component',
+        description: '**Deprecated:** Use `Provider /`-component',
       },
       {
         name: 'error',
@@ -11440,7 +11621,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'ref',
-        type: '`Ref`',
+        type: '`RefHTMLTextAreaElement`',
         values: [],
         required: false,
         description: '',
@@ -11555,7 +11736,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'ref',
-        type: '`Ref`',
+        type: '`RefHTMLInputElement`',
         values: [],
         required: false,
         description: '',
@@ -11598,7 +11779,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
         type: '`AxisLabelTemplates`',
         values: [],
         required: false,
-        description: '**Deprecated:** Use ``-component',
+        description: '**Deprecated:** Use `Provider /`-component',
       },
       {
         name: 'className',
@@ -11673,7 +11854,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'onSelectPeriod',
-        type: '`((event: MouseEvent \\| KeyboardEvent) => void)`',
+        type: '`((event: MouseEventElement, MouseEvent \\| KeyboardEventElement) = void)`',
         values: [],
         required: false,
         description: 'Callback when selecting a period.',
@@ -11710,7 +11891,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'ref',
-        type: '`Ref`',
+        type: '`RefHTMLDivElement \\| HTMLButtonElement`',
         values: [],
         required: false,
         description: '',
@@ -11746,7 +11927,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'ref',
-        type: '`Ref`',
+        type: '`RefHTMLButtonElement`',
         values: [],
         required: false,
         description: '',
@@ -11768,7 +11949,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'label',
-        type: '`string \\| number \\| bigint \\| boolean \\| ReactElement> \\| Iterable \\| ReactPortal \\| Promise \\| null \\| undefined`',
+        type: '`string \\| number \\| bigint \\| boolean \\| ReactElementunknown, string \\| JSXElementConstructorany \\| IterableReactNode \\| ReactPortal \\| Promise... \\| null \\| undefined`',
         values: ['false', 'true'],
         required: false,
         description:
@@ -11791,7 +11972,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'ref',
-        type: '`Ref`',
+        type: '`RefHTMLOListElement`',
         values: [],
         required: false,
         description: '',
@@ -11813,7 +11994,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'ref',
-        type: '`Ref`',
+        type: '`RefHTMLUListElement`',
         values: [],
         required: false,
         description: '',
@@ -11850,7 +12031,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'ref',
-        type: '`Ref`',
+        type: '`RefHTMLButtonElement`',
         values: [],
         required: false,
         description: '',
@@ -11894,7 +12075,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'onChange',
-        type: '`(value: string) => void`',
+        type: '`(value: string) = void`',
         values: [],
         required: false,
         description: 'Callback for selected toggle.',
@@ -11946,7 +12127,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'ref',
-        type: '`Ref`',
+        type: '`RefHTMLDivElement`',
         values: [],
         required: false,
         description: '',
@@ -11996,7 +12177,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'ref',
-        type: '`Ref`',
+        type: '`RefHTMLButtonElement`',
         values: [],
         required: false,
         description: '',
@@ -12011,7 +12192,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
     props: [
       {
         name: 'children',
-        type: '`ReactElement> & RefAttributes`',
+        type: '`ReactElementunknown, string \\| JSXElementConstructorany & RefAttributesHTMLElement`',
         values: [],
         required: false,
         description:
@@ -12035,7 +12216,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'onOpenChange',
-        type: '`((open: boolean) => void)`',
+        type: '`((open: boolean) = void)`',
         values: ['false', 'true'],
         required: false,
         description: 'Change handler for open.',
@@ -12113,7 +12294,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'ref',
-        type: '`Ref`',
+        type: '`RefHTMLDivElement`',
         values: [],
         required: false,
         description: '',
@@ -12149,7 +12330,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'onDateChange',
-        type: '`((val?: Date) => void)`',
+        type: '`((val?: Date) = void)`',
         values: [],
         required: false,
         description: 'Callback for changed state',
@@ -12164,7 +12345,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'onValidate',
-        type: '`((val: DateValidationT) => void)`',
+        type: '`((val: DateValidationT) = void)`',
         values: [],
         required: false,
         description: 'validation-callback',
@@ -12184,7 +12365,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
         values: ['en', 'nb', 'nn'],
         required: false,
         default: '"nb" (norsk bokmal)',
-        description: '**Deprecated:** Use ``-component',
+        description: '**Deprecated:** Use `Provider /`-component',
       },
       {
         name: 'fromDate',
@@ -12241,7 +12422,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'onMonthChange',
-        type: '`((date?: Date) => void)`',
+        type: '`((date?: Date) = void)`',
         values: [],
         required: false,
         description: 'Callback for month-change',
@@ -12256,7 +12437,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'onValidate',
-        type: '`((val: MonthValidationT) => void)`',
+        type: '`((val: MonthValidationT) = void)`',
         values: [],
         required: false,
         description: 'validation-callback',
@@ -12283,7 +12464,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
         values: ['en', 'nb', 'nn'],
         required: false,
         default: '"nb" (norsk bokmal)',
-        description: '**Deprecated:** Use ``-component',
+        description: '**Deprecated:** Use `Provider /`-component',
       },
       {
         name: 'fromDate',
@@ -12331,14 +12512,14 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'onRangeChange',
-        type: '`((val?: DateRange) => void)`',
+        type: '`((val?: DateRange) = void)`',
         values: [],
         required: false,
         description: 'Callback for changed state',
       },
       {
         name: 'onValidate',
-        type: '`((val: RangeValidationT) => void)`',
+        type: '`((val: RangeValidationT) = void)`',
         values: [],
         required: false,
         description: 'validation-callback',
@@ -12349,7 +12530,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
         values: ['en', 'nb', 'nn'],
         required: false,
         default: '"nb" (norsk bokmal)',
-        description: '**Deprecated:** Use ``-component',
+        description: '**Deprecated:** Use `Provider /`-component',
       },
       {
         name: 'fromDate',
@@ -12445,30 +12626,39 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'justify',
-        type: '`ResponsiveProp`',
-        values: [],
+        type: '`ResponsiveProp"start" \\| "center" \\| "end" \\| "space-around" \\| "space-between" \\| "space-evenly"`',
+        values: ['center', 'end', 'space-around', 'space-between', 'space-evenly', 'start'],
         required: false,
         description: 'CSS `justify-content` property.',
       },
       {
         name: 'align',
-        type: '`ResponsiveProp`',
-        values: [],
+        type: '`ResponsiveProp"start" \\| "center" \\| "end" \\| "baseline" \\| "stretch"`',
+        values: ['baseline', 'center', 'end', 'start', 'stretch'],
         required: false,
         default: '"stretch"',
         description: 'CSS `align-items` property.',
       },
       {
         name: 'gap',
-        type: '`ResponsiveProp`',
-        values: [],
+        type: '`ResponsivePropAkselSpaceToken \\| "space-0 space-0" \\| "space-0 space-1" \\| "space-0 space-2" \\| "space-0 space-4" \\| "space-0 space-6" \\| "space-0 space-8" \\| "space-0 space-12" \\| ... 476 more ... \\| "space-128 space-128"`',
+        values: [
+          'space-0 space-0',
+          'space-0 space-1',
+          'space-0 space-12',
+          'space-0 space-2',
+          'space-0 space-4',
+          'space-0 space-6',
+          'space-0 space-8',
+          'space-128 space-128',
+        ],
         required: false,
         description:
           'CSS `gap` property. Accepts a [spacing token](https://aksel.nav.no/grunnleggende/styling/design-tokens#space) or an object of spacing tokens for different breakpoints.',
       },
       {
         name: 'padding',
-        type: '`ResponsiveProp`',
+        type: '`ResponsivePropAkselSpaceToken`',
         values: [],
         required: false,
         description:
@@ -12476,23 +12666,41 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'paddingInline',
-        type: '`ResponsiveProp`',
-        values: [],
+        type: '`ResponsivePropAkselSpaceToken \\| "space-0 space-0" \\| "space-0 space-1" \\| "space-0 space-2" \\| "space-0 space-4" \\| "space-0 space-6" \\| "space-0 space-8" \\| "space-0 space-12" \\| ... 476 more ... \\| "space-128 space-128"`',
+        values: [
+          'space-0 space-0',
+          'space-0 space-1',
+          'space-0 space-12',
+          'space-0 space-2',
+          'space-0 space-4',
+          'space-0 space-6',
+          'space-0 space-8',
+          'space-128 space-128',
+        ],
         required: false,
         description:
           'Horizontal padding around children. Accepts a [spacing token](https://aksel.nav.no/grunnleggende/styling/design-tokens#space) or an object of spacing tokens for different breakpoints.',
       },
       {
         name: 'paddingBlock',
-        type: '`ResponsiveProp`',
-        values: [],
+        type: '`ResponsivePropAkselSpaceToken \\| "space-0 space-0" \\| "space-0 space-1" \\| "space-0 space-2" \\| "space-0 space-4" \\| "space-0 space-6" \\| "space-0 space-8" \\| "space-0 space-12" \\| ... 476 more ... \\| "space-128 space-128"`',
+        values: [
+          'space-0 space-0',
+          'space-0 space-1',
+          'space-0 space-12',
+          'space-0 space-2',
+          'space-0 space-4',
+          'space-0 space-6',
+          'space-0 space-8',
+          'space-128 space-128',
+        ],
         required: false,
         description:
           'Vertical padding around children. Accepts a [spacing token](https://aksel.nav.no/grunnleggende/styling/design-tokens#space) or an object of spacing tokens for different breakpoints.',
       },
       {
         name: 'margin',
-        type: '`ResponsiveProp`',
+        type: '`ResponsivePropAkselSpaceToken`',
         values: [],
         required: false,
         description:
@@ -12500,80 +12708,109 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'marginInline',
-        type: '`ResponsiveProp`',
-        values: [],
+        type: '`ResponsiveProp"auto" \\| AkselSpaceToken \\| "space-0 space-0" \\| "space-0 space-1" \\| "space-0 space-2" \\| "space-0 space-4" \\| "space-0 space-6" \\| "space-0 space-8" \\| "space-0 space-12" \\| ... 520 more ... \\| "space-128 auto"`',
+        values: [
+          'auto',
+          'space-0 space-0',
+          'space-0 space-1',
+          'space-0 space-12',
+          'space-0 space-2',
+          'space-0 space-4',
+          'space-0 space-6',
+          'space-0 space-8',
+          'space-128 auto',
+        ],
         required: false,
         description:
           'Horizontal margin around element. Accepts a [spacing token](https://aksel.nav.no/grunnleggende/styling/design-tokens#space) or an object of spacing tokens for different breakpoints.',
       },
       {
         name: 'marginBlock',
-        type: '`ResponsiveProp`',
-        values: [],
+        type: '`ResponsiveProp"auto" \\| AkselSpaceToken \\| "space-0 space-0" \\| "space-0 space-1" \\| "space-0 space-2" \\| "space-0 space-4" \\| "space-0 space-6" \\| "space-0 space-8" \\| "space-0 space-12" \\| ... 520 more ... \\| "space-128 auto"`',
+        values: [
+          'auto',
+          'space-0 space-0',
+          'space-0 space-1',
+          'space-0 space-12',
+          'space-0 space-2',
+          'space-0 space-4',
+          'space-0 space-6',
+          'space-0 space-8',
+          'space-128 auto',
+        ],
         required: false,
         description:
           'Vertical margin around element. Accepts a [spacing token](https://aksel.nav.no/grunnleggende/styling/design-tokens#space) or an object of spacing tokens for different breakpoints.',
       },
       {
         name: 'width',
-        type: '`ResponsiveProp`',
+        type: '`ResponsivePropstring`',
         values: [],
         required: false,
         description: 'CSS `width`',
       },
       {
         name: 'minWidth',
-        type: '`ResponsiveProp`',
+        type: '`ResponsivePropstring`',
         values: [],
         required: false,
         description: 'CSS `min-width`',
       },
       {
         name: 'maxWidth',
-        type: '`ResponsiveProp`',
+        type: '`ResponsivePropstring`',
         values: [],
         required: false,
         description: 'CSS `max-width`',
       },
       {
         name: 'height',
-        type: '`ResponsiveProp`',
+        type: '`ResponsivePropstring`',
         values: [],
         required: false,
         description: 'CSS `height`',
       },
       {
         name: 'minHeight',
-        type: '`ResponsiveProp`',
+        type: '`ResponsivePropstring`',
         values: [],
         required: false,
         description: 'CSS `min-height`',
       },
       {
         name: 'maxHeight',
-        type: '`ResponsiveProp`',
+        type: '`ResponsivePropstring`',
         values: [],
         required: false,
         description: 'CSS `max-height`',
       },
       {
         name: 'position',
-        type: '`ResponsiveProp`',
-        values: [],
+        type: '`ResponsiveProp"static" \\| "relative" \\| "absolute" \\| "fixed" \\| "sticky"`',
+        values: ['absolute', 'fixed', 'relative', 'static', 'sticky'],
         required: false,
         description: 'CSS `position`',
       },
       {
         name: 'inset',
-        type: '`ResponsiveProp`',
-        values: [],
+        type: '`ResponsivePropAkselSpaceToken \\| "space-0 space-0" \\| "space-0 space-1" \\| "space-0 space-2" \\| "space-0 space-4" \\| "space-0 space-6" \\| "space-0 space-8" \\| "space-0 space-12" \\| ... 476 more ... \\| "space-128 space-128"`',
+        values: [
+          'space-0 space-0',
+          'space-0 space-1',
+          'space-0 space-12',
+          'space-0 space-2',
+          'space-0 space-4',
+          'space-0 space-6',
+          'space-0 space-8',
+          'space-128 space-128',
+        ],
         required: false,
         description:
           'CSS `inset`. Accepts a [spacing token](https://aksel.nav.no/grunnleggende/styling/design-tokens#space) or an object of spacing tokens for different breakpoints.',
       },
       {
         name: 'top',
-        type: '`ResponsiveProp`',
+        type: '`ResponsivePropAkselSpaceToken`',
         values: [],
         required: false,
         description:
@@ -12581,7 +12818,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'right',
-        type: '`ResponsiveProp`',
+        type: '`ResponsivePropAkselSpaceToken`',
         values: [],
         required: false,
         description:
@@ -12589,7 +12826,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'bottom',
-        type: '`ResponsiveProp`',
+        type: '`ResponsivePropAkselSpaceToken`',
         values: [],
         required: false,
         description:
@@ -12597,7 +12834,7 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'left',
-        type: '`ResponsiveProp`',
+        type: '`ResponsivePropAkselSpaceToken`',
         values: [],
         required: false,
         description:
@@ -12605,56 +12842,56 @@ export const AKSEL_AUTOCOMPLETE_ENTRIES: AkselAutocompleteEntry[] = [
       },
       {
         name: 'overflow',
-        type: '`ResponsiveProp`',
-        values: [],
+        type: '`ResponsiveProp"hidden" \\| "auto" \\| "visible" \\| "clip" \\| "scroll"`',
+        values: ['auto', 'clip', 'hidden', 'scroll', 'visible'],
         required: false,
         description: 'CSS `overflow`',
       },
       {
         name: 'overflowX',
-        type: '`ResponsiveProp`',
-        values: [],
+        type: '`ResponsiveProp"hidden" \\| "auto" \\| "visible" \\| "clip" \\| "scroll"`',
+        values: ['auto', 'clip', 'hidden', 'scroll', 'visible'],
         required: false,
         description: 'CSS `overflow-x`',
       },
       {
         name: 'overflowY',
-        type: '`ResponsiveProp`',
-        values: [],
+        type: '`ResponsiveProp"hidden" \\| "auto" \\| "visible" \\| "clip" \\| "scroll"`',
+        values: ['auto', 'clip', 'hidden', 'scroll', 'visible'],
         required: false,
         description: 'CSS `overflow-y`',
       },
       {
         name: 'flexBasis',
-        type: '`ResponsiveProp`',
+        type: '`ResponsivePropstring`',
         values: [],
         required: false,
         description: 'CSS `flex-basis`',
       },
       {
         name: 'flexShrink',
-        type: '`ResponsiveProp`',
+        type: '`ResponsivePropstring`',
         values: [],
         required: false,
         description: 'CSS `flex-shrink`',
       },
       {
         name: 'flexGrow',
-        type: '`ResponsiveProp`',
+        type: '`ResponsivePropstring`',
         values: [],
         required: false,
         description: 'CSS `flex-grow`',
       },
       {
         name: 'gridColumn',
-        type: '`ResponsiveProp`',
+        type: '`ResponsivePropstring`',
         values: [],
         required: false,
         description: 'CSS `grid-column`',
       },
       {
         name: 'ref',
-        type: '`Ref`',
+        type: '`RefHTMLDivElement`',
         values: [],
         required: false,
         description: '',
