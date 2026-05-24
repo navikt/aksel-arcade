@@ -171,6 +171,7 @@ Verification:
 Fixed after dev testing showed the real nested editor interaction still missed the intended `DogHarnessIcon` flow:
 - Added browser-level Playwright coverage that types the nested `Page` > `Page.Block` > `Box` snippet into the real CodeMirror editor, then types `<Dogh` and verifies the autocomplete tooltip shows `DogHarnessIcon`.
 - Made icon tag prefix matching case-insensitive for valid JSX tag prefixes, so `<dogh`, `<Dogh`, `<DOGH`, `<DogH`, and nested `<Box><dogh` all resolve to `DogHarnessIcon`.
+- Fixed stale generic tag completion filtering so pausing after `<` and then typing `dogh` refreshes to icon suggestions instead of filtering old component suggestions such as `Dialog.Header`.
 - Kept lowercase non-icon HTML/component prefixes from showing normal component suggestions, so `<div` does not become `Dialog`.
 - Kept plain child text such as `<Box>DogH` out of icon autocomplete because it is not valid JSX component authoring.
 

@@ -46,4 +46,20 @@ test.describe('Aksel autocomplete', () => {
       'DogHarnessIcon'
     )
   })
+
+  test('refreshes stale generic tag suggestions for lowercase icon prefixes', async ({ page }) => {
+    await replaceEditorText(page, nestedIconSnippetStart)
+    await page.keyboard.type('<')
+
+    await expect(page.locator('.cm-tooltip-autocomplete')).toBeVisible()
+
+    await page.keyboard.type('dogh', { delay: 80 })
+
+    const autocomplete = page.locator('.cm-tooltip-autocomplete')
+    await expect(autocomplete).toContainText('DogHarnessIcon')
+    await expect(autocomplete).not.toContainText('Dialog.Header')
+    await expect(page.locator('.cm-tooltip-autocomplete [role="option"]').first()).toContainText(
+      'DogHarnessIcon'
+    )
+  })
 })

@@ -214,6 +214,26 @@ function matchesPartial(value: string, partial: string): boolean {
   return value.toLowerCase().startsWith(partial.toLowerCase())
 }
 
+function matchesCaseSensitivePrefix(value: string, partial: string): boolean {
+  return value.startsWith(partial)
+}
+
+function hasComponentPrefix(query: string): boolean {
+  return completionEntries.some((entry) => matchesCaseSensitivePrefix(entry.name, query))
+}
+
+function componentTagValidFor(text: string): boolean {
+  return TAG_NAME_VALID_FOR.test(text) && (text === '' || hasComponentPrefix(text))
+}
+
+function iconTagValidFor(text: string): boolean {
+  return (
+    TAG_NAME_VALID_FOR.test(text) &&
+    isIconLikeTagQuery(text, hasComponentPrefix(text)) &&
+    iconEntries.some((entry) => matchesPartial(entry.name, text))
+  )
+}
+
 function dedupeValues(values: Array<string | undefined>): string[] {
   return Array.from(new Set(values.filter((value): value is string => Boolean(value)))).sort(
     (a, b) => a.localeCompare(b)
@@ -511,10 +531,15 @@ export function getAkselCompletionForSource(source: string, pos: number): Comple
     const options = [...componentOptions, ...iconOptions]
 
     if (options.length > 0) {
+      const validFor =
+        iconOptions.length > 0 && componentOptions.length === 0
+          ? iconTagValidFor
+          : componentTagValidFor
+
       return {
         from: tagNameContext.from,
         options,
-        validFor: TAG_NAME_VALID_FOR,
+        validFor,
       }
     }
   }
