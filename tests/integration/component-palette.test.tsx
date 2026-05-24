@@ -7,7 +7,7 @@ describe('ComponentPalette', () => {
     cleanup()
   })
 
-  it('does not render redundant category or experimental badge tags on cards', async () => {
+  it('renders palette items as LinkCards without docs links or tags', async () => {
     let container: HTMLElement | undefined
 
     await act(async () => {
@@ -22,6 +22,10 @@ describe('ComponentPalette', () => {
     expect(screen.getByRole('tab', { name: 'Components' })).toBeTruthy()
     expect(screen.getByRole('tab', { name: 'Icons' })).toBeTruthy()
     expect(screen.getByRole('heading', { name: 'FormProgress' })).toBeTruthy()
+    expect(container.querySelectorAll('.aksel-link-card').length).toBeGreaterThan(0)
     expect(container.querySelectorAll('.component-badge')).toHaveLength(0)
+    expect(container.querySelectorAll('.prop-tag')).toHaveLength(0)
+    expect(container.querySelectorAll('.component-docs-link')).toHaveLength(0)
+    expect(screen.queryByRole('link', { name: 'Docs' })).toBeNull()
   })
 })

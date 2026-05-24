@@ -295,3 +295,15 @@ Fixed after reviewing PR #22:
 - Kept the review fix scoped to the migration regression e2e test; no product behavior changed.
 
 Verification completed with `npm run typecheck`, `CI=1 npm run test`, `npm run lint` (existing `InspectionPopover` hook dependency warning only), `npm run build`, `CI=1 npx playwright test tests/e2e/migration-regression.spec.ts --project=chromium --reporter=line`, and `git diff --check`.
+
+### 2026-05-25 - +Add modal LinkCards
+
+Completed in this branch:
+
+- Updated the active +Add component palette cards to render as Aksel `LinkCard` components with `LinkCard.Title` and `LinkCard.Description` only.
+- Disabled the LinkCard arrow icon and removed the previous Docs links and prop tag row from every palette card.
+- Kept card selection working through the LinkCard title anchor, including Space-key activation, and updated component palette tests/selectors for the new card structure.
+
+Verification completed with `npm run type-check`, `CI=1 npm run test -- --run`, `npm run lint` (existing `InspectionPopover` hook dependency warning only), `npm run build`, and a Playwright browser smoke check of the +Add modal LinkCards, missing arrows, missing Docs links, missing tags, insertion behavior, and console output at `http://127.0.0.1:5173/`.
+
+Follow-up note: the old `src/components/Editor/ComponentPalette.tsx` implementation still exists but is not the active editor palette import. Future palette work should target `src/components/ComponentPalette/ComponentPalette.tsx` unless the legacy file is intentionally revived or removed.

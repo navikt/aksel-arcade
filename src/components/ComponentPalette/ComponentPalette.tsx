@@ -4,13 +4,11 @@ import {
   Tabs,
   TextField,
   VStack,
-  HStack,
   Box,
   HGrid,
   Heading,
   BodyShort,
-  Link,
-  Tag,
+  LinkCard,
 } from '@navikt/ds-react'
 import { MagnifyingGlassIcon } from '@navikt/aksel-icons'
 import {
@@ -136,73 +134,31 @@ interface ComponentCardProps {
 
 const ComponentCard = ({ component, onInsert }: ComponentCardProps) => {
   return (
-    <Box
-      className="component-card"
-      padding="space-12"
-      borderRadius="8"
-      borderWidth="1"
-      borderColor="neutral-subtleA"
-      onClick={(e) => {
-        e.stopPropagation()
-        onInsert(component)
-      }}
-      role="button"
-      tabIndex={0}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault()
-          e.stopPropagation()
-          onInsert(component)
-        }
-      }}
-    >
-      <VStack gap="space-8">
-        <HStack justify="space-between" align="center">
-          <Heading level="3" size="xsmall">
-            {component.name}
-          </Heading>
-        </HStack>
-        {component.description && (
-          <BodyShort size="small" className="component-description">
-            {component.description}
-          </BodyShort>
-        )}
-        <HStack gap="space-8" align="center" wrap>
-          {component.props.length > 0 && (
-            <>
-              {component.props.slice(0, 3).map((prop) => (
-                <Tag
-                  key={prop.name}
-                  size="xsmall"
-                  variant="moderate"
-                  data-color={prop.required ? 'danger' : 'neutral'}
-                  className="prop-tag"
-                >
-                  {prop.name}
-                  {prop.required && '*'}
-                </Tag>
-              ))}
-              {component.props.length > 3 && (
-                <Tag size="xsmall" variant="moderate" data-color="info" className="prop-tag">
-                  +{component.props.length - 3} more
-                </Tag>
-              )}
-            </>
-          )}
-          {component.docs && (
-            <Link
-              className="component-docs-link"
-              href={component.docs}
-              variant="action"
-              target="_blank"
-              rel="noreferrer"
-              onClick={(e) => e.stopPropagation()}
-            >
-              Docs
-            </Link>
-          )}
-        </HStack>
-      </VStack>
-    </Box>
+    <LinkCard className="component-card" arrow={false} size="small">
+      <LinkCard.Title as="h3">
+        <LinkCard.Anchor
+          href="#"
+          onClick={(e) => {
+            e.preventDefault()
+            e.stopPropagation()
+            onInsert(component)
+          }}
+          onKeyDown={(e) => {
+            if (e.key === ' ') {
+              e.preventDefault()
+              e.stopPropagation()
+              onInsert(component)
+            }
+          }}
+        >
+          {component.name}
+        </LinkCard.Anchor>
+      </LinkCard.Title>
+      {component.description && (
+        <LinkCard.Description className="component-description">
+          {component.description}
+        </LinkCard.Description>
+      )}
+    </LinkCard>
   )
 }

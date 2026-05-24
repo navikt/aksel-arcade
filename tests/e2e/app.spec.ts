@@ -75,10 +75,11 @@ export default function App() {
     await addButton.click()
 
     // Wait for modal
-    await expect(page.locator('.component-palette')).toBeVisible()
+    const palette = page.getByTestId('component-palette')
+    await expect(palette).toBeVisible()
 
     // Select a button component
-    const buttonSnippet = page.locator('.component-palette__item').filter({ hasText: 'Button' }).first()
+    const buttonSnippet = palette.getByRole('link', { name: /^Button\b/ }).first()
     await buttonSnippet.click()
 
     // Check editor content
