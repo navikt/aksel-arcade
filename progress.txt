@@ -272,3 +272,26 @@ Completed in this branch:
 Verification completed with `npm run typecheck`, `CI=1 npm run test`, `npm run lint` (existing `InspectionPopover` hook dependency warning only), `npm run build`, and a browser smoke check at `http://127.0.0.1:5179/aksel-arcade/` for app render, preview render, component palette, settings theme copy, inspect toggle, and console output.
 
 Follow-up note: #13 can now start from `master` once #12 is merged. Keep chrome work separate from migration hardening; if later polish touches the palette, preserve the current Layout/Components/Icons grouping and avoid reintroducing `BoxNew` or legacy neutral button variants into app chrome.
+
+### 2026-05-25 - #13 Migration regression hardening
+
+Completed in this branch:
+
+- Worked only on #13 and kept the change focused on regression hardening after the v8 migration.
+- Expanded browser-level autocomplete coverage in `tests/e2e/autocomplete.spec.ts` for component tags, subcomponent tags, multi-line JSX props, enum values, v8 spacing tokens, Box styling values, `data-color`, default icon exclusion, and icon-aware contexts.
+- Added `tests/e2e/migration-regression.spec.ts` to cover protected playground flows: saved prototype load, live preview/sandbox readiness, theme updates, viewport updates, component palette insertion, share generation, export metadata, import hydration, and inspect overlays.
+- Covered migration-sensitive runtime behavior in the browser: v8 `--ax` CSS/theme semantics, safe `BoxNew` compatibility, import-free authoring, and both built-in examples rendering without error overlays.
+
+Verification completed with `npm run typecheck`, `CI=1 npm run test`, `npm run lint` (existing `InspectionPopover` hook dependency warning only), `npm run build`, `CI=1 npx playwright test tests/e2e/autocomplete.spec.ts tests/e2e/migration-regression.spec.ts --project=chromium --reporter=line`, and a browser smoke/console check at `http://127.0.0.1:5173/aksel-arcade/`.
+
+Follow-up note: #13 is intentionally test-focused. If future migration regressions appear, start with the two Playwright specs touched here before changing product code; keep autocomplete contract coverage in `tests/e2e/autocomplete.spec.ts` and broader protected-flow coverage in `tests/e2e/migration-regression.spec.ts`.
+
+### 2026-05-25 - PR #22 CodeQL review follow-up
+
+Fixed after reviewing PR #22:
+
+- Reviewed the PR diff and found no product-code regressions in the new #13 coverage.
+- Fixed the blocking CodeQL alert `js/insecure-temporary-file` in `tests/e2e/migration-regression.spec.ts` by replacing the `os.tmpdir()` import fixture path with Playwright's per-test `testInfo.outputPath(...)`.
+- Kept the review fix scoped to the migration regression e2e test; no product behavior changed.
+
+Verification completed with `npm run typecheck`, `CI=1 npm run test`, `npm run lint` (existing `InspectionPopover` hook dependency warning only), `npm run build`, `CI=1 npx playwright test tests/e2e/migration-regression.spec.ts --project=chromium --reporter=line`, and `git diff --check`.
