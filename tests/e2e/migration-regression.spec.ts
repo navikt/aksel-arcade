@@ -1,7 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
 import fs from 'node:fs/promises'
-import os from 'node:os'
-import path from 'node:path'
 
 const STORAGE_KEY = 'aksel-arcade:project'
 const NOW = '2026-05-25T00:00:00.000Z'
@@ -96,7 +94,10 @@ test.describe('Aksel v8 migration regression hardening', () => {
       .toBe('1024px')
   })
 
-  test('keeps palette, share, export, import, and inspect flows covered', async ({ page }) => {
+  test('keeps palette, share, export, import, and inspect flows covered', async (
+    { page },
+    testInfo
+  ) => {
     await page.addInitScript(() => {
       window.__COPIED_SHARE_URL__ = ''
       Object.defineProperty(navigator, 'clipboard', {
@@ -141,7 +142,7 @@ test.describe('Aksel v8 migration regression hardening', () => {
     expect(exportedProject.meta?.designSystem).toBe('Aksel v8')
     expect(exportedProject.meta?.packageVersions?.['@navikt/ds-react']).toBe('8.11.0')
 
-    const importPath = path.join(os.tmpdir(), `aksel-arcade-import-${Date.now()}.json`)
+    const importPath = testInfo.outputPath('aksel-arcade-import.json')
     await fs.writeFile(importPath, JSON.stringify(importedProject), 'utf-8')
     const fileChooserPromise = page.waitForEvent('filechooser')
     await page.getByRole('button', { name: /^Import$/ }).click()
