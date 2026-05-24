@@ -46,9 +46,10 @@ export default function App() {
     await page.waitForTimeout(300)
     
     // Wait for palette modal
-    await expect(page.locator('.component-palette')).toBeVisible()
+    const palette = page.getByTestId('component-palette')
+    await expect(palette).toBeVisible()
     // Select Button component
-    const buttonSnippet = page.locator('.component-palette__item').filter({ hasText: 'Button' }).first()
+    const buttonSnippet = palette.getByRole('link', { name: /^Button\b/ }).first()
     await expect(buttonSnippet).toBeVisible()
     await buttonSnippet.click()
     
@@ -110,7 +111,9 @@ export default function App() {
     await page.getByRole('button', { name: /add component/i }).click()
     await page.waitForTimeout(200)
     
-    const headingSnippet = page.locator('.component-palette__item').filter({ hasText: 'Heading' }).first()
+    const palette = page.getByTestId('component-palette')
+    const headingSnippet = palette.getByRole('link', { name: /^Heading\b/ }).first()
+    await expect(palette).toBeVisible()
     await headingSnippet.click()
     
     await page.waitForTimeout(500)

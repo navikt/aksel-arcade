@@ -118,7 +118,11 @@ test.describe('Aksel v8 migration regression hardening', () => {
 
     await page.getByRole('button', { name: /^Add$/ }).click()
     await expect(page.getByTestId('component-palette')).toBeVisible()
-    await page.getByRole('button', { name: /^Button\b/ }).first().click()
+    await page
+      .getByTestId('component-palette')
+      .getByRole('link', { name: /^Button\b/ })
+      .first()
+      .click()
     await expect(page.locator('.cm-content')).toContainText('<Button')
 
     await page.getByLabel('Share project').click()

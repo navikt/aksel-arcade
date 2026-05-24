@@ -75,7 +75,7 @@ test.describe('Aksel Darkside Components', () => {
     await page.waitForSelector('[data-testid="component-palette"]', { timeout: 5000 })
 
     // Click on Stack component
-    await page.click('text=Stack')
+    await page.getByTestId('component-palette').getByRole('link', { name: /^Stack\b/ }).click()
 
     // Wait for code to be inserted (component palette should close)
     await page.waitForSelector('[data-testid="component-palette"]', { state: 'hidden', timeout: 5000 })
