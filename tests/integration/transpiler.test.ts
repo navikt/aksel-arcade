@@ -22,21 +22,21 @@ export default function App() {
   })
 
   it('should strip supported production-style imports while preserving aliases', async () => {
-    const hooksCode = `import { useState as useReactState } from "react";
+    const hooksCode = `import { useState as useReactState } from "react"; // hook import
 
 export const useToggle = () => {
   const [enabled, setEnabled] = useReactState(false);
   return { enabled, toggle: () => setEnabled((value) => !value) };
 }`
 
-    const jsxCode = `import ReactRuntime, { Fragment as ReactFragment } from "react";
+    const jsxCode = `import ReactRuntime, { Fragment as ReactFragment } from "react"; // React runtime
 import {
   Button as AkselButton,
   type ButtonProps,
-} from "@navikt/ds-react";
-import * as Icons from "@navikt/aksel-icons";
-import "@navikt/ds-css";
-import { useToggle as useLocalToggle } from "./hooks";
+} from "@navikt/ds-react"; /* Aksel components */
+import * as Icons from "@navikt/aksel-icons"; // icons
+import "@navikt/ds-css"; /* Aksel CSS */
+import { useToggle as useLocalToggle } from "./hooks"; // local hooks
 
 export default function App() {
   const toggle = useLocalToggle();

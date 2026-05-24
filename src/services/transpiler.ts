@@ -31,7 +31,7 @@ interface ImportBinding {
 }
 
 const STATIC_IMPORT_PATTERN =
-  /^[ \t]*import(\s+type\b)?(?:\s+['"]([^'"]+)['"]|\s+([\s\S]*?)\s+from\s+['"]([^'"]+)['"])\s*;?[ \t]*(?:\r?\n|$)/gm
+  /^[ \t]*import(\s+type\b)?(?:\s+['"]([^'"]+)['"]|\s+([\s\S]*?)\s+from\s+['"]([^'"]+)['"])\s*;?[ \t]*(?:(?:\/\/[^\r\n]*)|(?:\/\*[\s\S]*?\*\/[ \t]*))?(?:\r?\n|$)/gm
 const LOCAL_HOOKS_IMPORT_PATTERN = /^\.{1,2}\/hooks(?:\/[\w.-]+)?(?:\.(?:[cm]?[jt]sx?))?$/
 const IDENTIFIER_PATTERN = /^[A-Za-z_$][\w$]*$/
 
