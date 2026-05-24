@@ -3,9 +3,18 @@ import iconMetadata from '@navikt/aksel-icons/metadata'
 import { AKSEL_AUTOCOMPLETE_ENTRIES } from '../../src/data/akselAutocompleteData'
 import { getAkselCompletionForSource } from '../../src/services/akselAutocomplete'
 
+function completionFor(source: string) {
+  return getAkselCompletionForSource(source, source.length)
+}
+
 function labelsFor(source: string): string[] {
-  const result = getAkselCompletionForSource(source, source.length)
+  const result = completionFor(source)
   return result?.options.map((option) => option.label) ?? []
+}
+
+function applyFor(source: string, label: string): string | undefined {
+  const apply = completionFor(source)?.options.find((option) => option.label === label)?.apply
+  return typeof apply === 'string' ? apply : undefined
 }
 
 describe('Aksel-aware autocomplete contract', () => {
@@ -57,6 +66,14 @@ describe('Aksel-aware autocomplete contract', () => {
     expect(labelsFor('<Link')).toContain('Link')
     expect(labelsFor('<Link')).not.toContain('LinkIcon')
     expect(labelsFor('<LinkIcon')).toContain('LinkIcon')
+  })
+
+  it('suggests accessible icon snippets for icon-looking child text in containers', () => {
+    expect(labelsFor('<Box>DogH')).toContain('DogHarnessIcon')
+    expect(applyFor('<Box>DogH', 'DogHarnessIcon')).toBe(
+      '<DogHarnessIcon title="a11y-title" fontSize="1.5rem" />'
+    )
+    expect(labelsFor('<div>DogH')).toContain('DogHarnessIcon')
   })
 
   it('suggests catalog subcomponents in JSX tag context', () => {
@@ -133,5 +150,8 @@ describe('Aksel-aware autocomplete contract', () => {
   it('suggests icons for icon prop expression values', () => {
     expect(labelsFor('<Button icon={Pl')).toContain('PlusIcon')
     expect(labelsFor('<Button icon={<Pl')).toContain('PlusIcon')
+    expect(applyFor('<Button icon={<DogH', 'DogHarnessIcon')).toBe(
+      'DogHarnessIcon title="a11y-title" fontSize="1.5rem" />}'
+    )
   })
 })

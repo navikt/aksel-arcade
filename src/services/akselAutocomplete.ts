@@ -58,6 +58,11 @@ interface OpenTagContext {
   componentName?: string
 }
 
+interface IconChildTextContext {
+  query: string
+  from: number
+}
+
 function stripSnippetPlaceholders(template: string): string {
   return template.replace(
     /\$\{(\d+):([^}]+)\}/g,
@@ -209,6 +214,29 @@ function getTagNameContext(openTag: OpenTagContext): {
   }
 }
 
+function getIconChildTextContext(source: string, pos: number): IconChildTextContext | null {
+  const beforeCursor = source.slice(0, pos)
+  const tokenMatch = beforeCursor.match(/(?:^|[\s>])([A-Z][\w]*)$/)
+  if (!tokenMatch) {
+    return null
+  }
+
+  const query = tokenMatch[1]
+  const from = pos - query.length
+  const beforeToken = source.slice(0, from)
+  const lastTagStart = beforeToken.lastIndexOf('<')
+  const lastTagEnd = beforeToken.lastIndexOf('>')
+
+  if (lastTagEnd === -1 || lastTagEnd < lastTagStart) {
+    return null
+  }
+
+  return {
+    query,
+    from,
+  }
+}
+
 function matchesPartial(value: string, partial: string): boolean {
   return value.toLowerCase().startsWith(partial.toLowerCase())
 }
@@ -269,6 +297,10 @@ function isIconLikeTagQuery(query: string, hasComponentMatches: boolean): boolea
     !hasComponentMatches &&
     iconEntries.some((entry) => entry.name.toLowerCase().startsWith(normalizedQuery))
   )
+}
+
+function hasComponentMatches(query: string): boolean {
+  return completionEntries.some((entry) => matchesPartial(entry.name, query))
 }
 
 function getComponentProps(componentName: string): CompletionProp[] {
@@ -345,23 +377,42 @@ function componentOption(entry: CompletionEntry): Completion {
   }
 }
 
+function accessibleIconSnippet(iconName: string): string {
+  return `<${iconName} title="a11y-title" fontSize="1.5rem" />`
+}
+
 function iconComponentOption(
   entry: AkselCatalogEntry & { source: 'catalog' },
-  context: 'tag' | 'icon-prop-tag' | 'icon-prop-expression'
+  context: 'tag' | 'child-text' | 'icon-prop-tag' | 'icon-prop-expression'
 ): Completion {
   const option = componentOption(entry)
+  const snippet = accessibleIconSnippet(entry.name)
+
+  if (context === 'child-text') {
+    return {
+      ...option,
+      apply: snippet,
+    }
+  }
+
+  if (context === 'tag') {
+    return {
+      ...option,
+      apply: snippet.slice(1),
+    }
+  }
 
   if (context === 'icon-prop-tag') {
     return {
       ...option,
-      apply: `${getEntryApply(entry)}}`,
+      apply: `${snippet.slice(1)}}`,
     }
   }
 
   if (context === 'icon-prop-expression') {
     return {
       ...option,
-      apply: `${stripSnippetPlaceholders(entry.snippet.code)}}`,
+      apply: `${snippet}}`,
     }
   }
 
@@ -390,6 +441,24 @@ function valueOption(prop: CompletionProp, value: string): Completion {
 }
 
 export function getAkselCompletionForSource(source: string, pos: number): CompletionResult | null {
+  const iconChildTextContext = getIconChildTextContext(source, pos)
+  if (
+    iconChildTextContext &&
+    isIconLikeTagQuery(iconChildTextContext.query, hasComponentMatches(iconChildTextContext.query))
+  ) {
+    const options = iconEntries
+      .filter((entry) => matchesPartial(entry.name, iconChildTextContext.query))
+      .map((entry) => iconComponentOption(entry, 'child-text'))
+
+    if (options.length > 0) {
+      return {
+        from: iconChildTextContext.from,
+        options,
+        validFor: TAG_NAME_VALID_FOR,
+      }
+    }
+  }
+
   const openTag = getOpenTagContext(source, pos)
   if (!openTag) {
     return null

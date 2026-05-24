@@ -148,3 +148,19 @@ Verification:
 
 Next note:
 - #10 should focus on import stripping and compatibility aliases without reintroducing automatic rewrites. #11 remains blocked by #10 per the PRD dependency list.
+
+2026-05-24 - Issue #9 follow-up: DogHarnessIcon child autocomplete
+
+Fixed after dev testing showed `DogH` inside `Box`/`div` children did not produce icon autocomplete:
+- Added a JSX-child icon text context, so typing an icon-looking PascalCase token such as `DogH` after an opening container tag suggests `DogHarnessIcon`.
+- Changed icon completion snippets to insert accessible visible-icon markup: `<DogHarnessIcon title="a11y-title" fontSize="1.5rem" />`.
+- Kept the default `<` component list free of icons, so icons still do not flood normal discovery.
+- Added regression coverage for `<Box>DogH`, `<div>DogH`, and icon prop insertion.
+
+Updated definition:
+- Icon-aware context means an icon prop value (`icon={<DogH` / `icon={DogH`), an actual icon tag prefix (`<DogHarnessIcon`), or JSX child text in a rendered container when the typed PascalCase token matches an icon prefix and does not collide with a component prefix.
+
+Verification:
+- npm run typecheck
+- CI=1 npm run test
+- Browser smoke check at http://127.0.0.1:5178/aksel-arcade/ for `DogH` in Box/div children and icon props.
