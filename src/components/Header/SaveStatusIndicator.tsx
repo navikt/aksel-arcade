@@ -1,5 +1,5 @@
+import { Tag } from '@navikt/ds-react'
 import type { SaveStatus } from '@/hooks/useAutoSave'
-import './SaveStatusIndicator.css'
 
 interface SaveStatusIndicatorProps {
   status: SaveStatus
@@ -7,37 +7,26 @@ interface SaveStatusIndicatorProps {
 }
 
 export const SaveStatusIndicator = ({ status, sizeInfo }: SaveStatusIndicatorProps) => {
-  const getStatusText = () => {
+  const getStatus = (): { text: string; color: 'neutral' | 'info' | 'success' | 'danger' } => {
     switch (status) {
       case 'idle':
-        return sizeInfo || 'Ready'
+        return { text: sizeInfo || 'Ready', color: 'neutral' }
       case 'saving':
-        return 'Saving...'
+        return { text: 'Saving...', color: 'info' }
       case 'saved':
-        return '✓ Saved'
+        return { text: 'Saved', color: 'success' }
       case 'error':
-        return '⚠ Save failed'
+        return { text: 'Save failed', color: 'danger' }
       default:
-        return 'Ready'
+        return { text: 'Ready', color: 'neutral' }
     }
   }
 
-  const getStatusClass = () => {
-    switch (status) {
-      case 'saving':
-        return 'save-status-indicator--saving'
-      case 'saved':
-        return 'save-status-indicator--saved'
-      case 'error':
-        return 'save-status-indicator--error'
-      default:
-        return ''
-    }
-  }
+  const { text, color } = getStatus()
 
   return (
-    <div className={`save-status-indicator ${getStatusClass()}`}>
-      <span className="save-status-indicator__text">{getStatusText()}</span>
-    </div>
+    <Tag size="small" variant="moderate" data-color={color}>
+      {text}
+    </Tag>
   )
 }

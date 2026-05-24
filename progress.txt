@@ -258,3 +258,17 @@ Completed in this branch:
 Verification completed with `npm run typecheck`, `CI=1 npm run test`, `npm run lint` (existing `InspectionPopover` hook dependency warning only), `npm run build`, and browser smoke checks of the default starter, both built-in templates, exported metadata, and console output at the local Vite URL.
 
 Follow-up note: #12 should modernize app chrome separately. Keep #11-style content/export/governance changes separate from the #12 chrome refactor, and keep future built-ins on `Box`, `HStack`/`VStack`, `HGrid`, `Page`, and v8 `space-*` tokens.
+
+### 2026-05-24 - #12 Modernized v8 playground chrome
+
+Completed in this branch:
+
+- Worked only on #12 and kept the existing split-pane authoring, preview, palette, share, theme, and inspect workflows intact.
+- Replaced app chrome uses of deprecated `BoxNew` with current `Box`, `HStack`, `VStack`, `HGrid`, `Page.Block`, `Tag`, and `Link` primitives across the header, editor toolbar/header, component palette cards, preview chrome, save/project indicators, and notifications.
+- Migrated chrome buttons from legacy neutral button variants to current `variant` plus `data-color="neutral"` usage, and changed settings copy from light/dark "mode" to light/dark "theme".
+- Tightened custom CSS so it now focuses on shell sizing, modal scroll/focus mechanics, palette card interaction, preview error overlay, iframe/split-pane mechanics, and inspect overlays instead of duplicating Aksel layout/spacing primitives.
+- Refreshed the project-controls integration test to assert the new light/dark theme wording while preserving Import -> Share -> Settings order and share metrics.
+
+Verification completed with `npm run typecheck`, `CI=1 npm run test`, `npm run lint` (existing `InspectionPopover` hook dependency warning only), `npm run build`, and a browser smoke check at `http://127.0.0.1:5179/aksel-arcade/` for app render, preview render, component palette, settings theme copy, inspect toggle, and console output.
+
+Follow-up note: #13 can now start from `master` once #12 is merged. Keep chrome work separate from migration hardening; if later polish touches the palette, preserve the current Layout/Components/Icons grouping and avoid reintroducing `BoxNew` or legacy neutral button variants into app chrome.

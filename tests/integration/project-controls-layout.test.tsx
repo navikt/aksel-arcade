@@ -20,7 +20,7 @@ const Harness = () => {
   return (
     <AppHeader
       projectName={project.name}
-      onProjectNameChange={name => updateProject({ name })}
+      onProjectNameChange={(name) => updateProject({ name })}
       currentProject={project}
       shareViewport={previewState.currentViewport}
       onProjectImported={setProject}
@@ -56,12 +56,20 @@ describe('ProjectControls layout', () => {
     const shareButton = screen.getByLabelText(/share project/i)
     const settingsButton = screen.getByRole('button', { name: /settings/i })
 
-    expect(importButton.compareDocumentPosition(shareButton) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
-    expect(shareButton.compareDocumentPosition(settingsButton) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(
+      importButton.compareDocumentPosition(shareButton) & Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy()
+    expect(
+      shareButton.compareDocumentPosition(settingsButton) & Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy()
 
     fireEvent.click(shareButton)
 
     expect(await screen.findByText(/Share URL length/i)).toBeTruthy()
     expect(screen.getByText(/Strategy:/i)).toBeTruthy()
+
+    fireEvent.click(settingsButton)
+    expect(await screen.findByText(/Switch to light theme/i)).toBeTruthy()
+    expect(screen.queryByText(/Switch to light mode/i)).toBeNull()
   })
 })

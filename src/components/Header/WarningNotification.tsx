@@ -1,4 +1,4 @@
-import { Alert, BodyLong, Button } from '@navikt/ds-react'
+import { Alert, BodyLong, BodyShort, Button, HStack, VStack } from '@navikt/ds-react'
 import './WarningNotification.css'
 
 interface WarningNotificationProps {
@@ -15,20 +15,24 @@ interface WarningNotificationAction {
   variant?: 'primary' | 'secondary' | 'tertiary'
 }
 
-export const WarningNotification = ({ message, description, variant = 'warning', actions, onClose }: WarningNotificationProps) => {
+export const WarningNotification = ({
+  message,
+  description,
+  variant = 'warning',
+  actions,
+  onClose,
+}: WarningNotificationProps) => {
   return (
     <div className="warning-notification">
       <Alert variant={variant} size="small" closeButton={!!onClose} onClose={onClose}>
-        <div className="warning-notification__content">
-          <span className="warning-notification__message">{message}</span>
-          {description && (
-            <BodyLong size="small">
-              {description}
-            </BodyLong>
-          )}
+        <VStack gap="space-8">
+          <BodyShort size="small" weight="semibold">
+            {message}
+          </BodyShort>
+          {description && <BodyLong size="small">{description}</BodyLong>}
           {actions?.length ? (
-            <div className="warning-notification__actions">
-              {actions.map(action => (
+            <HStack gap="space-8" wrap>
+              {actions.map((action) => (
                 <Button
                   key={action.label}
                   size="small"
@@ -38,9 +42,9 @@ export const WarningNotification = ({ message, description, variant = 'warning',
                   {action.label}
                 </Button>
               ))}
-            </div>
+            </HStack>
           ) : null}
-        </div>
+        </VStack>
       </Alert>
     </div>
   )

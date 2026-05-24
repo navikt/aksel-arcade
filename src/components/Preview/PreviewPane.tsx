@@ -1,5 +1,5 @@
 import { useContext, useEffect, useState, useRef } from 'react'
-import { HStack, VStack, BoxNew, Alert } from '@navikt/ds-react'
+import { Alert, Box, HStack } from '@navikt/ds-react'
 import { AppContext } from '@/hooks/useProject'
 import { transpileCode } from '@/services/transpiler'
 import { useSettings } from '@/contexts/SettingsContext'
@@ -36,7 +36,7 @@ export const PreviewPane = () => {
       transpileCode(project.jsxCode, project.hooksCode)
         .then((result) => {
           if (isCancelled) return
-          
+
           if (result.success && result.code) {
             setTranspiledCode(result.code)
             setCompileError(null)
@@ -97,96 +97,67 @@ export const PreviewPane = () => {
   }
 
   return (
-    <>
-      <HStack gap="space-12" justify="end" align="center" asChild>
-        <BoxNew
-          data-name="Preview Header"
-          borderWidth="0 0 1 0"
-          borderColor="neutral-subtleA"
-          paddingInline="space-20"
-          paddingBlock="space-8"
-        >
-          <InspectMode 
-            iframeRef={iframeRef}
-            onInspectToggle={handleInspectToggle}
-          />
+    <Box as="section" className="preview-pane">
+      <Box
+        data-name="Preview Header"
+        borderWidth="0 0 1 0"
+        borderColor="neutral-subtleA"
+        paddingInline="space-20"
+        paddingBlock="space-8"
+      >
+        <HStack gap="space-12" justify="end" align="center">
+          <InspectMode iframeRef={iframeRef} onInspectToggle={handleInspectToggle} />
           <ViewportToggle />
-        </BoxNew>
-      </HStack>
+        </HStack>
+      </Box>
 
-      <VStack asChild style={{ flex: 1, minHeight: 0 }}>
-        <BoxNew 
-          data-name="Preview" 
-          paddingBlock="space-16" 
-          paddingInline="space-16" 
-          background="sunken"
-          className={theme}
-          style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, position: 'relative' }}
-        >
-          {/* Error Display - Using Aksel Alert */}
-          {(compileError || runtimeError) && (
-            <div style={{
-              position: 'absolute',
-              top: '16px',
-              left: '16px',
-              right: '16px',
-              zIndex: 1000,
-            }}>
-              <Alert
-                variant="error"
-                closeButton
-                onClose={() => {
-                  setCompileError(null)
-                  setRuntimeError(null)
-                }}
-              >
-                <strong>
-                  {compileError ? 'Compile Error' : 'Runtime Error'}
-                  {compileError && compileError.line !== null && ` (line ${(compileError.line || 0) + 1})`}
-                </strong>
-                <pre style={{
-                  marginTop: '0.5rem',
-                  marginBottom: 0,
-                  fontFamily: 'Monaco, Menlo, Consolas, monospace',
-                  fontSize: '0.875rem',
-                  whiteSpace: 'pre-wrap',
-                  wordBreak: 'break-word',
-                }}>
-                  {(compileError || runtimeError)?.message}
-                </pre>
-                {runtimeError?.componentStack && (
-                  <details style={{ marginTop: '0.75rem' }}>
-                    <summary style={{ cursor: 'pointer', fontWeight: 600 }}>
-                      Component Stack
-                    </summary>
-                    <pre style={{
-                      marginTop: '0.5rem',
-                      padding: '0.5rem',
-                      background: 'var(--ax-bg-neutral-moderate)',
-                      borderRadius: 'var(--ax-radius-4)',
-                      fontSize: '0.75rem',
-                      overflowX: 'auto',
-                    }}>
-                      {runtimeError.componentStack}
-                    </pre>
-                  </details>
-                )}
-              </Alert>
-            </div>
-          )}
+      <Box
+        data-name="Preview"
+        paddingBlock="space-16"
+        paddingInline="space-16"
+        background="sunken"
+        className={`preview-pane__surface ${theme}`}
+      >
+        {(compileError || runtimeError) && (
+          <div className="preview-pane__error error-overlay">
+            <Alert
+              variant="error"
+              closeButton
+              onClose={() => {
+                setCompileError(null)
+                setRuntimeError(null)
+              }}
+            >
+              <strong>
+                {compileError ? 'Compile Error' : 'Runtime Error'}
+                {compileError &&
+                  compileError.line !== null &&
+                  ` (line ${(compileError.line || 0) + 1})`}
+              </strong>
+              <pre className="preview-pane__error-message">
+                {(compileError || runtimeError)?.message}
+              </pre>
+              {runtimeError?.componentStack && (
+                <details className="preview-pane__error-details">
+                  <summary className="preview-pane__error-summary">Component Stack</summary>
+                  <pre className="preview-pane__component-stack">{runtimeError.componentStack}</pre>
+                </details>
+              )}
+            </Alert>
+          </div>
+        )}
 
-          <LivePreview
-            iframeRef={iframeRef}
-            transpiledCode={transpiledCode}
-            onRenderSuccess={handleRenderSuccess}
-            onCompileError={handleCompileError}
-            onRuntimeError={handleRuntimeError}
-            viewportWidth={project.viewportSize}
-            isInspectMode={isInspectMode}
-            theme={theme}
-          />
-        </BoxNew>
-      </VStack>
-    </>
+        <LivePreview
+          iframeRef={iframeRef}
+          transpiledCode={transpiledCode}
+          onRenderSuccess={handleRenderSuccess}
+          onCompileError={handleCompileError}
+          onRuntimeError={handleRuntimeError}
+          viewportWidth={project.viewportSize}
+          isInspectMode={isInspectMode}
+          theme={theme}
+        />
+      </Box>
+    </Box>
   )
 }

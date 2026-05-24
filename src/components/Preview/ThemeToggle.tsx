@@ -37,7 +37,7 @@ export const ThemeToggle = ({ iframeRef, onThemeChange }: ThemeToggleProps) => {
   const handleToggle = () => {
     const newTheme = theme === 'light' ? 'dark' : 'light'
     setTheme(newTheme)
-    
+
     // Send UPDATE_THEME message to sandbox
     if (iframeRef.current?.contentWindow) {
       const message: MainToSandboxMessage = {
@@ -46,18 +46,22 @@ export const ThemeToggle = ({ iframeRef, onThemeChange }: ThemeToggleProps) => {
       }
       iframeRef.current.contentWindow.postMessage(message, window.location.origin)
     }
-    
+
     // Notify parent component
     onThemeChange?.(newTheme)
   }
 
   return (
     <Button
-      variant="tertiary-neutral"
+      variant="tertiary"
+      data-color="neutral"
       size="small"
-      icon={theme === 'light' 
-        ? <MoonIcon title="Switch to dark theme" /> 
-        : <SunIcon title="Switch to light theme" />
+      icon={
+        theme === 'light' ? (
+          <MoonIcon title="Switch to dark theme" />
+        ) : (
+          <SunIcon title="Switch to light theme" />
+        )
       }
       onClick={handleToggle}
       aria-label={theme === 'light' ? 'Switch to dark theme' : 'Switch to light theme'}

@@ -21,7 +21,8 @@ export const EditorToolbar = ({
   return (
     <HStack data-name="Right group" gap="space-12" align="center">
       <Button
-        variant="primary-neutral"
+        variant="primary"
+        data-color="neutral"
         size="small"
         icon={<PlusIcon aria-hidden />}
         onClick={onAddComponent}
@@ -30,9 +31,10 @@ export const EditorToolbar = ({
       </Button>
 
       {onFormat && (
-        <Button 
-          variant="tertiary-neutral" 
-          size="small" 
+        <Button
+          variant="tertiary"
+          data-color="neutral"
+          size="small"
           icon={<CodeIcon aria-hidden />}
           onClick={onFormat}
         >
@@ -41,21 +43,23 @@ export const EditorToolbar = ({
       )}
 
       {onUndo && (
-        <Button 
-          variant="tertiary-neutral" 
-          size="small" 
+        <Button
+          variant="tertiary"
+          data-color="neutral"
+          size="small"
           icon={<ArrowUndoIcon title="Undo" />}
-          onClick={onUndo} 
+          onClick={onUndo}
           disabled={!canUndo}
         />
       )}
 
       {onRedo && (
-        <Button 
-          variant="tertiary-neutral" 
-          size="small" 
+        <Button
+          variant="tertiary"
+          data-color="neutral"
+          size="small"
           icon={<ArrowRedoIcon title="Redo" />}
-          onClick={onRedo} 
+          onClick={onRedo}
           disabled={!canRedo}
         />
       )}

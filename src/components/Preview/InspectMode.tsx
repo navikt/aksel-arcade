@@ -3,7 +3,6 @@ import { Button } from '@navikt/ds-react'
 import { FileSearchIcon } from '@navikt/aksel-icons'
 import { AppContext } from '@/hooks/useProject'
 import type { MainToSandboxMessage } from '@/types/messages'
-import './InspectMode.css'
 
 interface InspectModeProps {
   iframeRef: React.RefObject<HTMLIFrameElement | null>
@@ -19,7 +18,7 @@ export const InspectMode = ({ iframeRef, onInspectToggle }: InspectModeProps) =>
   const handleToggle = () => {
     const newMode = !isInspectMode
     setIsInspectMode(newMode)
-    
+
     // Send TOGGLE_INSPECT message to sandbox (T076)
     if (iframeRef.current?.contentWindow) {
       const message: MainToSandboxMessage = {
@@ -28,16 +27,19 @@ export const InspectMode = ({ iframeRef, onInspectToggle }: InspectModeProps) =>
       }
       iframeRef.current.contentWindow.postMessage(message, window.location.origin)
     }
-    
+
     // Notify parent component
     onInspectToggle?.(newMode)
   }
 
   return (
     <Button
-      variant="tertiary-neutral"
+      variant={isInspectMode ? 'secondary' : 'tertiary'}
+      data-color="neutral"
       size="small"
-      icon={<FileSearchIcon title={isInspectMode ? 'Disable inspect mode' : 'Enable inspect mode'} />}
+      icon={
+        <FileSearchIcon title={isInspectMode ? 'Disable inspect mode' : 'Enable inspect mode'} />
+      }
       onClick={handleToggle}
       aria-label={isInspectMode ? 'Disable inspect mode' : 'Enable inspect mode'}
       aria-pressed={isInspectMode}
