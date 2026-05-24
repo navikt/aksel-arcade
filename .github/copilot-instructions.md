@@ -3,22 +3,13 @@
 Auto-generated from all feature plans. Last updated: 2025-11-06
 
 ## Active Technologies
-- TypeScript 5.x with React 19 (Vite toolchain) + React, @navikt/ds-react v7.25+ (Popover, CopyButton, Theme), react-codemirror, Aksel Darkside tokens, local crypto APIs (001-share-project-url)
-- Browser localStorage for baseline persistence + encoded query-string payload for sharing (no backend) (001-share-project-url)
-- TypeScript 5.x targeting React 19 with Vite bundling. + React + @navikt/ds-react v7.25+, @navikt/ds-css/darkside, `@uiw/react-codemirror`, `lz-string`, Web Crypto API (`crypto.subtle`), local `telemetry` service, Playwright for E2E. (001-share-project-url)
-- Browser-only (localStorage for persistence, URL query string/fragment for share payloads). (001-share-project-url)
-- TypeScript 5.x, React 19, Vite toolchain + @navikt/ds-react v7.25+ with Darkside tokens, @navikt/ds-css/darkside, existing inspect/preview services, react testing stack (Vitest + Testing Library), Playwright for E2E (001-inspect-overlay-gaps)
-- Browser localStorage only (unchanged) (001-inspect-overlay-gaps)
-
-- TypeScript 5.x / JavaScript ES2022+ + React 19+ (1-aksel-arcade)
-- react-codemirror (@uiw/react-codemirror) (1-aksel-arcade)
-- @navikt/ds-css/darkside (v7.25+) + @navikt/ds-react (v7.25+) (1-aksel-arcade)
-  - **CRITICAL**: Minimum version is 7.25 for Darkside support
-  - **ALWAYS use latest version** - Aksel team bugfixes frequently, latest is safest
-  - **MUST use Theme component** from @navikt/ds-react/Theme to wrap app
-- @babel/standalone (1-aksel-arcade)
-- Vite (1-aksel-arcade)
-- LocalStorage (5MB limit enforced) (1-aksel-arcade)
+- TypeScript 5.x / JavaScript ES2022+ with React 19 and Vite.
+- Aksel v8.11.0 packages pinned exactly: `@navikt/ds-react`, `@navikt/ds-css`, and `@navikt/aksel-icons`.
+- `@navikt/ds-css` is the runtime CSS import; do not use legacy CSS subpaths as the setup path.
+- `@navikt/ds-css` includes Aksel CSS variables from tokens; do not add a direct runtime `@navikt/ds-tokens` dependency unless a development-only tool explicitly needs it.
+- `@uiw/react-codemirror`, `@babel/standalone`, Web Crypto APIs, local telemetry, Vitest + Testing Library, and Playwright.
+- Browser-only persistence and sharing: localStorage plus encoded URL payloads; no backend.
+- Aksel Arcade authoring is import-free in the sandbox. Production imports belong in export metadata and copied-out app code.
 
 ## Project Structure
 
@@ -74,11 +65,12 @@ npm run preview          # Preview production build
 - Custom hooks in `src/hooks/`
 - Avoid prop drilling (use Context or Zustand for global state)
 
-**Aksel Darkside Usage**:
+**Aksel v8 Usage**:
 - Import from `@navikt/ds-react` for components
-- Import `@navikt/ds-css/darkside` for styles
-- Use `<Theme>` provider for Darkside theme
-- CSS variables use `--ax` prefix (not `--a` or `--ac`)
+- Import `@navikt/ds-css` once for styles, resets, fonts, and Aksel CSS variables
+- Use `<Theme>` from `@navikt/ds-react/Theme` for light/dark theme semantics
+- Use current layout primitives such as `Box`, `HStack`, `VStack`, `HGrid`, `Page`, and `Bleed`
+- CSS variables use the `--ax` prefix (not `--a` or `--ac`)
 
 **Security**:
 - Execute user code only in sandboxed iframe
@@ -99,9 +91,9 @@ npm run preview          # Preview production build
 - No over-testing (pragmatic approach per Constitution)
 
 ## Recent Changes
-- 001-inspect-overlay-gaps: Added TypeScript 5.x, React 19, Vite toolchain + @navikt/ds-react v7.25+ with Darkside tokens, @navikt/ds-css/darkside, existing inspect/preview services, react testing stack (Vitest + Testing Library), Playwright for E2E
-- 001-share-project-url: Added TypeScript 5.x targeting React 19 with Vite bundling. + React + @navikt/ds-react v7.25+, @navikt/ds-css/darkside, `@uiw/react-codemirror`, `lz-string`, Web Crypto API (`crypto.subtle`), local `telemetry` service, Playwright for E2E.
-- 001-share-project-url: Added TypeScript 5.x with React 19 (Vite toolchain) + React, @navikt/ds-react v7.25+ (Popover, CopyButton, Theme), react-codemirror, Aksel Darkside tokens, local crypto APIs
+- 001-aksel-v8-migration: Updated project memory to the Aksel v8 playground model with exact 8.11.0 package pins, current `@navikt/ds-css` setup, import-free sandbox authoring, and production import guidance in exports.
+- 001-inspect-overlay-gaps: Added inspect/preview services, React testing stack (Vitest + Testing Library), and Playwright E2E coverage.
+- 001-share-project-url: Added encoded share payloads, `lz-string`, Web Crypto API (`crypto.subtle`), local telemetry service, and share-link guard rails.
 
 
 <!-- MANUAL ADDITIONS START -->

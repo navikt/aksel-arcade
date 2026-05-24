@@ -1,9 +1,12 @@
 <!--
 Sync Impact Report - Constitution Update
 =========================================
-Version: 1.0.0 → 1.1.2
+Version: 1.0.0 → 1.1.3
 Ratification: 2025-11-06
-Last Amended: 2025-12-12
+Last Amended: 2026-05-24
+
+Changes (v1.1.3):
+- ✅ PATCH: Updated Aksel governance to the Aksel v8 CSS, Theme, and current layout primitive model
 
 Changes (v1.1.2):
 - 🔴 HIGH: Locked the project to the Aksel design system with tokens, layout primitives, and components as the only styling and UI source
@@ -29,7 +32,7 @@ Changes (v1.0.0):
 
 Templates requiring updates:
 - ✅ plan-template.md: Constitution Check references all 8 principles (incl. Preservation of Proven Features and Aksel Design System Exclusivity)
-- ✅ spec-template.md: Checkpoints added for Principles VII and VIII
+- ✅ spec-template.md: Checkpoints added for Principles VII and VIII and updated to Aksel v8 setup language
 - ✅ tasks-template.md: Tasks call out guards for protected features and Aksel-only implementation
 
 Follow-up TODOs:
@@ -143,10 +146,10 @@ When new development could alter any feature or UX that is already validated as 
 
 This project MUST use only the Aksel design system for all styling and UI. Implementation requirements:
 
-- Styling and theming come solely from Aksel design tokens (e.g., via `@navikt/ds-css/darkside` and `@navikt/ds-tokens`) and Darkside variables (`--ax-*`); no alternative token sources or ad-hoc theme palettes
-- Layouts use Aksel layout primitives (e.g., Box, Stack, Grid) as the default building blocks; custom layout CSS MUST be token-based and justified
+- Styling and theming come from current Aksel v8 CSS (`@navikt/ds-css`) and Aksel CSS variables (`--ax-*`); no alternative token sources or ad-hoc theme palettes. Do not add a direct runtime `@navikt/ds-tokens` dependency unless a development-only tool explicitly needs it.
+- Layouts use current Aksel layout primitives (e.g., Box, HStack, VStack, HGrid, Page, Bleed) as the default building blocks; custom layout CSS MUST be token-based and justified
 - Interactive UI uses `@navikt/ds-react` components as the baseline; bespoke components MUST wrap or extend Aksel primitives without breaking token fidelity
-- The entire app, including sandboxed user renders, MUST be wrapped in the Aksel `<Theme>` provider to ensure consistent Darkside theming
+- The entire app, including sandboxed user renders, MUST be wrapped in the Aksel `<Theme>` provider to ensure consistent light/dark theme semantics
 
 **Rationale**: Aksel provides unified tokens, primitives, and components. Exclusivity guarantees visual consistency, predictable theming, and reduces maintenance overhead.
 
@@ -181,7 +184,7 @@ User experience MUST be recognizable, smart, and delightful. The application MUS
 - **Framework**: React 18+ (hooks-based components, functional style preferred)
 - **Languages**: TypeScript (strongly encouraged for type safety), JavaScript (ES2022+)
 - **State Management**: React Context, Zustand, or Jotai (avoid Redux unless justified)
-- **Styling**: Aksel design tokens and Darkside styles only (e.g., `@navikt/ds-css/darkside`, `@navikt/ds-tokens`); custom CSS must remain token-based. Do not introduce Tailwind, styled-components, or non-Aksel design systems.
+- **Styling**: Current Aksel v8 CSS (`@navikt/ds-css`) and Aksel CSS variables only; custom CSS must remain token-based. Do not introduce Tailwind, styled-components, or non-Aksel design systems.
 - **Build**: Vite (preferred for fast HMR and optimized builds)
 - **Testing**: Vitest + React Testing Library (component + integration focus)
 
@@ -224,4 +227,4 @@ This constitution supersedes all other development practices and guidelines. All
 
 This constitution is a living document. As the project evolves, principles may be refined based on learnings. Amendments follow the versioning policy above.
 
-**Version**: 1.1.2 | **Ratified**: 2025-11-06 | **Last Amended**: 2025-12-12
+**Version**: 1.1.3 | **Ratified**: 2025-11-06 | **Last Amended**: 2026-05-24

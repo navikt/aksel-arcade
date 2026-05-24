@@ -17,8 +17,8 @@ import {
 import * as Babel from '@babel/standalone'
 import './CodeEditor.css'
 
-// Custom Aksel Darkside theme for CodeMirror
-const akselDarksideTheme = createTheme({
+// Custom Aksel-token theme for CodeMirror
+const akselEditorTheme = createTheme({
   theme: 'dark',
   settings: {
     background: 'var(--ax-bg-default)',
@@ -261,7 +261,7 @@ export const CodeEditor = forwardRef<CodeEditorRef, CodeEditorProps>(({
           }
         }}
         readOnly={readOnly}
-        theme={akselDarksideTheme}
+        theme={akselEditorTheme}
         basicSetup={{
           lineNumbers: true,
           highlightActiveLineGutter: true,

@@ -10,7 +10,11 @@ import {
   listCatalogEntries,
 } from '../../src/data/akselCatalog'
 import { getComponentsByCategory } from '../../src/data/akselComponents'
-import { extractUsedComponents } from '../../src/data/akselMetadata'
+import {
+  AI_INSTRUCTIONS,
+  AKSEL_METADATA,
+  extractUsedComponents,
+} from '../../src/data/akselMetadata'
 import { getComponentProps, getPropValues } from '../../src/services/akselMetadata'
 import { AKSEL_SNIPPETS, searchSnippets } from '../../src/services/componentLibrary'
 
@@ -140,5 +144,19 @@ describe('Aksel catalog starter path', () => {
     expect(hstack?.docs).toContain('/hstack')
     expect(plusIcon?.import).toBe('@navikt/aksel-icons')
     expect(plusIcon?.docs).toContain('/ikoner')
+  })
+
+  it('keeps exported Aksel metadata current for v8 setup and breakpoint guidance', () => {
+    expect(AKSEL_METADATA.designSystem).toBe('Aksel v8')
+    expect(AKSEL_METADATA.packageVersions['@navikt/ds-react']).toBe('8.11.0')
+    expect(AKSEL_METADATA.packageVersions['@navikt/ds-css']).toBe('8.11.0')
+    expect(AKSEL_METADATA.packageVersions['@navikt/aksel-icons']).toBe('8.11.0')
+    expect(AKSEL_METADATA.setup.cssImport).toBe("import '@navikt/ds-css';")
+    expect(AKSEL_METADATA.setup.install).toContain('--save-exact')
+    expect(AKSEL_METADATA.breakpoints['2xl']).toBe('1440px')
+    expect(AKSEL_METADATA.documentation.setup).toContain('kom-i-gang-med-kodepakkene')
+    expect(AKSEL_METADATA.authoring.playground).toContain('import-free')
+    expect(AI_INSTRUCTIONS).toContain('Arcade source code is intentionally import-free')
+    expect(AI_INSTRUCTIONS).toContain('@navikt/ds-react@8.11.0')
   })
 })
