@@ -183,3 +183,28 @@ Verification:
 
 Next note:
 - If icon autocomplete is reported missing again, start with `tests/e2e/autocomplete.spec.ts`; it now exercises the actual browser/CodeMirror interaction rather than only the pure autocomplete service.
+
+2026-05-24 - Issue #10: Prototype compatibility and import-free sandbox
+
+Selected #10 as the highest-priority ready-for-agent feature because it is unblocked by #5 and gates both #11 built-ins/export metadata work and #13 migration hardening. Worked only on #10.
+
+Implemented:
+- Replaced the narrow import stripping with support for production-style React, Aksel component/theme/CSS, Aksel icon, and local hooks imports, including aliases, namespace imports, side-effect CSS imports, and type-only named imports.
+- Preserved saved/shared source code as-is; imports are stripped only in the transpiled runtime code sent to the sandbox.
+- Added explicit compile guidance for unsupported imports instead of letting them reach the sandbox as opaque runtime syntax errors.
+- Deduped stripped-import runtime bindings across JSX and Hooks tabs so importing the same alias in both tabs does not create duplicate `const` declarations.
+- Added sandbox runtime compatibility aliases for safe old prototype terms: `BoxNew` resolves to current `Box`, and docs-style `Combobox` resolves to `UNSAFE_Combobox`.
+- Kept ambiguous legacy layout terms (`Grid`, `Stack`) as clear runtime guidance errors rather than silently aliasing them to `HGrid`, `HStack`, or `VStack`.
+- Exposed the full React hook/runtime set used by stripped imports and prevented Aksel component declarations from colliding with React hook names such as `useId`.
+- Regenerated the checked-in sandbox bundle so production uses the same compatibility bindings.
+- Added regression coverage for import stripping, alias preservation, unsupported import guidance, safe compatibility aliases, and ambiguous legacy guidance.
+
+Verification:
+- npm run typecheck
+- CI=1 npm run test -- --run
+- npm run lint (passes with the existing `InspectionPopover` hook dependency warning)
+- npm run build
+- Browser smoke check at http://127.0.0.1:5173/aksel-arcade/ for production-style imports, `BoxNew` compatibility, local hook alias imports, and no runtime console errors.
+
+Next note:
+- #11 can now migrate built-in examples/export metadata on top of the compatibility layer. Keep import-free authoring as the default, and use `src/services/transpiler.ts` for any future supported-import additions rather than adding separate regex stripping paths.

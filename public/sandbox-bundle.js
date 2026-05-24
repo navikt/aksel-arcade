@@ -21728,11 +21728,16 @@ var sandboxBundle = (() => {
   // src/sandboxAksel.ts
   var sandboxAksel_exports = {};
   __export(sandboxAksel_exports, {
-    AkselComponents: () => esm_exports2,
+    AKSEL_RUNTIME_NAME_ALIASES: () => AKSEL_RUNTIME_NAME_ALIASES,
+    AKSEL_SAFE_COMPATIBILITY_ALIASES: () => AKSEL_SAFE_COMPATIBILITY_ALIASES,
+    AKSEL_UNSUPPORTED_LEGACY_GUIDANCE: () => AKSEL_UNSUPPORTED_LEGACY_GUIDANCE,
+    AkselComponents: () => AkselComponents,
     AkselIcons: () => esm_exports,
     React: () => React1206,
     Theme: () => Theme,
+    applyAkselRuntimeCompatibility: () => applyAkselRuntimeCompatibility,
     createRoot: () => import_client.createRoot,
+    createUnsupportedAkselComponent: () => createUnsupportedAkselComponent,
     default: () => sandboxAksel_default
   });
   var React1206 = __toESM(require_react(), 1);
@@ -74016,11 +74021,46 @@ Element: `, elementRef.current);
   var LinkPanel_default = LinkPanel;
 
   // src/sandboxAksel.ts
+  var AKSEL_SAFE_COMPATIBILITY_ALIASES = {
+    BoxNew: "Box"
+  };
+  var AKSEL_RUNTIME_NAME_ALIASES = {
+    Combobox: "UNSAFE_Combobox"
+  };
+  var AKSEL_UNSUPPORTED_LEGACY_GUIDANCE = {
+    Grid: "Grid is a legacy Aksel layout name and is not automatically aliased because grid migration can change layout behavior. Use HGrid with current v8 props instead.",
+    Stack: "Stack is a legacy Aksel layout name and is not automatically aliased because direction and spacing migration can change layout behavior. Use HStack or VStack with current v8 props instead."
+  };
+  function createUnsupportedAkselComponent(name, message2) {
+    const UnsupportedAkselComponent = () => {
+      throw new Error(message2);
+    };
+    UnsupportedAkselComponent.displayName = name;
+    return UnsupportedAkselComponent;
+  }
+  function applyAkselRuntimeCompatibility(components) {
+    const runtimeComponents = Object.fromEntries(Object.entries(components));
+    for (const [alias, target] of Object.entries({
+      ...AKSEL_SAFE_COMPATIBILITY_ALIASES,
+      ...AKSEL_RUNTIME_NAME_ALIASES
+    })) {
+      if (runtimeComponents[target]) {
+        runtimeComponents[alias] = runtimeComponents[target];
+      }
+    }
+    for (const [name, message2] of Object.entries(AKSEL_UNSUPPORTED_LEGACY_GUIDANCE)) {
+      if (!runtimeComponents[name]) {
+        runtimeComponents[name] = createUnsupportedAkselComponent(name, message2);
+      }
+    }
+    return runtimeComponents;
+  }
+  var AkselComponents = applyAkselRuntimeCompatibility(esm_exports2);
   var sandboxAksel_default = {
     React: React1206,
     createRoot: import_client.createRoot,
     Theme,
-    AkselComponents: esm_exports2,
+    AkselComponents,
     AkselIcons: esm_exports
   };
   return __toCommonJS(sandboxAksel_exports);
