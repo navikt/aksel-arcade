@@ -165,3 +165,20 @@ Verification:
 - npm run typecheck
 - CI=1 npm run test
 - Browser smoke check at http://127.0.0.1:5178/aksel-arcade/ for `<DogH`, `<DogHarnessIcon`, and icon props.
+
+2026-05-24 - Issue #9 follow-up: Browser-tested Dogh autocomplete
+
+Fixed after dev testing showed the real nested editor interaction still missed the intended `DogHarnessIcon` flow:
+- Added browser-level Playwright coverage that types the nested `Page` > `Page.Block` > `Box` snippet into the real CodeMirror editor, then types `<Dogh` and verifies the autocomplete tooltip shows `DogHarnessIcon`.
+- Made icon tag prefix matching case-insensitive for valid JSX tag prefixes, so `<dogh`, `<Dogh`, `<DOGH`, `<DogH`, and nested `<Box><dogh` all resolve to `DogHarnessIcon`.
+- Kept lowercase non-icon HTML/component prefixes from showing normal component suggestions, so `<div` does not become `Dialog`.
+- Kept plain child text such as `<Box>DogH` out of icon autocomplete because it is not valid JSX component authoring.
+
+Verification:
+- npm run typecheck
+- CI=1 npm run test
+- npm run lint
+- npx playwright test tests/e2e/autocomplete.spec.ts --project=chromium --reporter=line
+
+Next note:
+- If icon autocomplete is reported missing again, start with `tests/e2e/autocomplete.spec.ts`; it now exercises the actual browser/CodeMirror interaction rather than only the pure autocomplete service.

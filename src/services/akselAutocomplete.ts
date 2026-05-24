@@ -13,6 +13,7 @@ import {
 } from '@/data/akselAutocompleteData'
 
 const COMPONENT_NAME_PATTERN = /^[A-Z][\w.]*$/
+const TAG_NAME_PATTERN = /^[A-Za-z][\w.]*$/
 const TAG_NAME_VALID_FOR = /^[\w.]*$/
 const PROP_NAME_VALID_FOR = /^[\w-]*$/
 const PROP_VALUE_VALID_FOR = /^[\w\s./%-]*$/
@@ -199,7 +200,7 @@ function getTagNameContext(openTag: OpenTagContext): {
     return null
   }
 
-  if (tagText.length > 0 && !COMPONENT_NAME_PATTERN.test(tagText)) {
+  if (tagText.length > 0 && !TAG_NAME_PATTERN.test(tagText)) {
     return null
   }
 
@@ -496,7 +497,9 @@ export function getAkselCompletionForSource(source: string, pos: number): Comple
   const tagNameContext = getTagNameContext(openTag)
   if (tagNameContext) {
     const isIconPropTagContext = isInsideIconPropExpression(source, openTag.tagStart)
-    const componentOptions = isIconPropTagContext
+    const shouldSuggestComponents =
+      tagNameContext.query === '' || COMPONENT_NAME_PATTERN.test(tagNameContext.query)
+    const componentOptions = isIconPropTagContext || !shouldSuggestComponents
       ? []
       : completionEntries
           .filter((entry) => matchesPartial(entry.name, tagNameContext.query))

@@ -63,12 +63,17 @@ describe('Aksel-aware autocomplete contract', () => {
     expect(labelsFor('<Pl')).not.toContain('PlusIcon')
     expect(labelsFor('<Plus')).toContain('PlusIcon')
     expect(labelsFor('<PlusIcon')).toContain('PlusIcon')
+    expect(labelsFor('<dogh')[0]).toBe('DogHarnessIcon')
     expect(labelsFor('<DogH')[0]).toBe('DogHarnessIcon')
+    expect(labelsFor('<Dogh')[0]).toBe('DogHarnessIcon')
+    expect(labelsFor('<DOGH')[0]).toBe('DogHarnessIcon')
     expect(applyFor('<DogHarnessIcon', 'DogHarnessIcon')).toBe(
       'DogHarnessIcon title="a11y-title" fontSize="1.5rem" />'
     )
+    expect(labelsFor('<Box><dogh')[0]).toBe('DogHarnessIcon')
     expect(labelsFor('<Box><DogH')[0]).toBe('DogHarnessIcon')
     expect(labelsFor('<Box>DogH')).not.toContain('DogHarnessIcon')
+    expect(labelsFor('<div')).not.toContain('Dialog')
     expect(labelsFor('<Link')).toContain('Link')
     expect(labelsFor('<Link')).not.toContain('LinkIcon')
     expect(labelsFor('<LinkIcon')).toContain('LinkIcon')
