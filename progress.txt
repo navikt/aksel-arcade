@@ -221,3 +221,25 @@ Reviewed, fixed, and merged PR #19:
 
 Next note:
 - #11 can start from `master`; #10's compatibility layer is merged. Future supported-import changes should update `src/services/transpiler.ts` and include regression coverage for aliases, comments, and JSX/Hooks duplicate binding behavior.
+
+2026-05-24 - Issue #11: V8 built-ins, export metadata, and project memory
+
+Selected #11 as the highest-priority ready-for-agent feature because #13 is still blocked by #11/#12, and #11 removes stale built-in/export/governance guidance that future migration hardening depends on. Worked only on #11.
+
+Implemented:
+- Migrated the default starter, Hooks demo, and form-summary built-ins from `BoxNew`, numeric layout gaps, and legacy radius names to current `Box`, v8 `space-*` spacing tokens, and v8 radius fragments.
+- Fixed the form-summary built-in to render the summary progress state as step 3 of 3 while preserving import-free sandbox authoring.
+- Extended exported Aksel metadata with exact package versions, current setup docs, `@navikt/ds-css` setup guidance, explicit import-free playground vs production-import guidance, and Aksel breakpoint metadata with `2xl` at `1440px`.
+- Updated README and project governance memory/templates to the Aksel v8 CSS, Theme, and current layout primitive model so future agents do not inherit old setup paths.
+- Added regression coverage for built-in template migration/transpilation and exported metadata/package/breakpoint guidance.
+- Updated PRD issue #4 with the #11 implementation progress.
+
+Verification:
+- npm run typecheck
+- CI=1 npm run test
+- npm run lint (passes with the existing `InspectionPopover` hook dependency warning)
+- npm run build
+- Browser smoke check at http://127.0.0.1:5178/aksel-arcade/ for default starter render, both built-in templates, exported metadata, and no console errors.
+
+Next note:
+- #12 should handle app chrome modernization separately. Keep future built-in examples on current `Box`, `HStack`/`VStack`, `HGrid`, `Page`, and v8 `space-*` tokens; export metadata lives in `src/data/akselMetadata.ts` and must continue to distinguish import-free Arcade authoring from production imports.

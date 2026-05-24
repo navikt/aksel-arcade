@@ -5,7 +5,7 @@ import {
 } from '@/data/akselCatalog'
 
 /**
- * Aksel Darkside Component Metadata
+ * Aksel v8 Component Metadata
  *
  * Accurate prop definitions for autocomplete, sourced from official Aksel documentation.
  * Last updated: 2025-11-09
@@ -32,7 +32,7 @@ export interface ComponentMetadata {
 }
 
 /**
- * Aksel Darkside spacing scale tokens
+ * Aksel v8 spacing scale tokens
  * Based on: https://aksel.nav.no/grunnleggende/styling/design-tokens
  */
 const SPACING_TOKENS = [
@@ -63,7 +63,7 @@ const SPACING_TOKENS = [
 const SPACING_TOKENS_WITH_AUTO = [...SPACING_TOKENS, 'auto']
 
 /**
- * Aksel Darkside background color tokens
+ * Aksel v8 background color tokens
  * Based on: https://aksel.nav.no/grunnleggende/styling/design-tokens
  *
  * **CRITICAL**: Token fragments only (no "bg-" prefix)
@@ -212,13 +212,13 @@ const BACKGROUND_TOKENS = [
 ]
 
 /**
- * Aksel Darkside text color intensity values for textColor prop
+ * Aksel v8 text color intensity values for textColor prop
  * Based on: https://aksel.nav.no/grunnleggende/styling/design-tokens
  */
 const TEXT_COLOR_INTENSITY = ['default', 'subtle', 'decoration', 'contrast']
 
 /**
- * Aksel Darkside color types for data-color attribute
+ * Aksel v8 color types for data-color attribute
  * Used in combination with textColor to define the final text color
  */
 const DATA_COLOR_VALUES = [
@@ -236,9 +236,9 @@ const DATA_COLOR_VALUES = [
 ]
 
 /**
- * Aksel Darkside border color tokens (token fragment only, NO prefix)
- * Based on: https://aksel.nav.no/grunnleggende/darkside/design-tokens
- * CRITICAL: Box.darkside automatically adds `--ax-border-` prefix to these values.
+ * Aksel v8 border color tokens (token fragment only, NO prefix)
+ * Based on: https://aksel.nav.no/grunnleggende/styling/design-tokens
+ * CRITICAL: Box automatically adds `--ax-border-` prefix to these values.
  * Example: Use `"neutral-subtle"` NOT `"border-neutral-subtle"`
  * The component will transform it to `var(--ax-border-neutral-subtle)`.
  * Using "border-" prefix causes double-prefixing bug: `var(--ax-border-border-neutral-subtle)` ❌
@@ -567,7 +567,7 @@ export const AKSEL_COMPONENTS: Record<string, ComponentMetadata> = {
   BoxNew: {
     name: 'BoxNew',
     description:
-      'Layout container with spacing control and Darkside support (borderColor, background, shadow)',
+      'Layout container with spacing control and Aksel v8 token support (borderColor, background, shadow)',
     props: [
       {
         name: 'padding',

@@ -1,6 +1,6 @@
 # 🎮 Aksel Arcade
 
-**A browser-based React playground for the Aksel Darkside design system**
+**A browser-based React playground for the Aksel v8 design system**
 
 Build and experiment with UI components instantly—no setup, no installation, no backend. Just open your browser and start creating.
 
@@ -32,7 +32,7 @@ Perfect for:
 ### 👁️ Live Preview
 - **Instant updates**: See your UI render as you type (250ms debounce)
 - **Responsive testing**: Toggle between 6 viewport sizes (XS 320px → 2XL 1440px)
-- **Darkside theme**: Preview components with authentic Aksel styling
+- **Light/dark themes**: Preview components with current Aksel styling
 - **Error overlay**: Friendly error messages when something goes wrong
 
 ### 🔍 Inspect Mode ⭐
@@ -86,7 +86,7 @@ Aksel Arcade features intelligent autocomplete to speed up your workflow:
 - **Component names**: Type `<But` and see `Button` suggested
 - **Props**: Type `<Button var` to get `variant` suggestions
 - **Prop values**: See available options like `primary`, `secondary`, `tertiary` for the `variant` prop
-- **Imports**: Get suggestions for Aksel components when typing import statements
+- **Import-free authoring**: Aksel components and icons are available in the playground without setup, while exports include production import guidance
 
 **Pro tip**: Press `Ctrl+Space` to manually trigger autocomplete at any time.
 
@@ -114,10 +114,11 @@ Inspect mode helps you understand your UI structure:
 1. Click the **"Export"** button in the header
 2. A JSON file downloads with your project name (e.g., `My Project.json`)
 3. The file contains:
-   - Project name
-   - JSX code
-   - Hooks code
-   - Viewport settings
+    - Project name
+    - JSX code
+    - Hooks code
+    - Viewport settings
+    - Aksel v8 metadata with exact package versions, docs links, and production setup guidance
 
 **To Import:**
 1. Click the **"Import"** button in the header
@@ -164,7 +165,8 @@ npm run format           # Format code with Prettier
 - **Vite** - Build tool and dev server
 - **CodeMirror 6** - Code editor
 - **Babel Standalone** - In-browser JSX transpilation
-- **@navikt/ds-react** - Aksel Darkside components
+- **@navikt/ds-react** - Aksel v8 React components
+- **@navikt/ds-css** - Aksel CSS, tokens, resets, and theme styles
 - **Vitest + Playwright** - Testing
 
 ---

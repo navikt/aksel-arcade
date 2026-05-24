@@ -1,5 +1,5 @@
 /**
- * Aksel Darkside Component Metadata
+ * Aksel v8 Component Metadata
  * Complete catalog of Aksel components with props for the Component Palette
  */
 
@@ -185,7 +185,7 @@ export const layoutComponents: ComponentMetadata[] = [
     name: 'BoxNew',
     category: 'layout',
     import: '@navikt/ds-react',
-    description: 'Enhanced container with full Darkside styling and asChild support',
+    description: 'Legacy container name retained for compatibility; prefer Box for v8 prototypes',
     props: [
       { name: 'padding', type: 'SpacingScale', description: 'Padding around children' },
       { name: 'paddingInline', type: 'SpacingScale', description: 'Horizontal padding' },

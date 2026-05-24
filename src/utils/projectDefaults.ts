@@ -6,10 +6,10 @@ import { generateSecureUUID } from '@/utils/crypto'
 // Intro content that showcases features
 export const INTRO_JSX_CODE = `export default function App() {
   return (
-    <BoxNew
+    <Box
       padding="space-16"
       background="raised"
-      borderRadius="xlarge"
+      borderRadius="12"
       borderWidth="1"
       borderColor="neutral-subtleA"
     >
@@ -52,7 +52,7 @@ export const INTRO_JSX_CODE = `export default function App() {
           Settings → Reset editor.
         </Alert>
       </VStack>
-    </BoxNew>
+    </Box>
   )
 }`
 
@@ -149,7 +149,7 @@ export default function App() {
   };
 
   return (
-    <BoxNew padding="space-16" background="default">
+    <Box padding="space-16" background="default">
       <VStack gap="space-12">
         <Heading size="xlarge" level="1">
           🎮 Aksel Arcade Demo
@@ -160,10 +160,10 @@ export default function App() {
         </BodyLong>
 
         {/* Counter Demo */}
-        <BoxNew
+        <Box
           padding="space-8"
           background="raised"
-          borderRadius="large"
+          borderRadius="8"
           borderWidth="1"
           borderColor="neutral-subtleA"
         >
@@ -183,13 +183,13 @@ export default function App() {
               </Button>
             </HStack>
           </VStack>
-        </BoxNew>
+        </Box>
 
         {/* Toggle Demo */}
-        <BoxNew
+        <Box
           padding="space-8"
           background="raised"
-          borderRadius="large"
+          borderRadius="8"
           borderWidth="1"
           borderColor="neutral-subtleA"
         >
@@ -217,13 +217,13 @@ export default function App() {
               </Alert>
             )}
           </VStack>
-        </BoxNew>
+        </Box>
 
         {/* Form Demo */}
-        <BoxNew
+        <Box
           padding="space-8"
           background="raised"
-          borderRadius="large"
+          borderRadius="8"
           borderWidth="1"
           borderColor="neutral-subtleA"
         >
@@ -276,7 +276,7 @@ export default function App() {
               )}
             </VStack>
           </form>
-        </BoxNew>
+        </Box>
 
         <Alert variant="success">
           <Heading size="small" level="3" spacing>
@@ -288,24 +288,26 @@ export default function App() {
           </BodyShort>
         </Alert>
       </VStack>
-    </BoxNew>
+    </Box>
   );
 }`
 
-export const FORM_SUMMARY_JSX_CODE = `<BoxNew asChild background="default" paddingBlock="space-12">
+export const FORM_SUMMARY_JSX_CODE = `<Box asChild background="default" paddingBlock="space-12">
       <Page>
         <Page.Block as="main" width="text" gutters>
-          <VStack gap="8">
-            <VStack gap="3">
-              <Bleed asChild marginInline={{ lg: 'space-32' }}>
-                <BoxNew
+          <VStack gap="space-32">
+            <VStack gap="space-12">
+              <Bleed marginInline={{ lg: 'space-32' }}>
+                <Box
                   width={{ xs: '64px', lg: '96px' }}
                   height={{ xs: '64px', lg: '96px' }}
-                  asChild
+                  background="accent-soft"
+                  borderRadius="full"
+                  aria-hidden
                   position={{ xs: 'relative', lg: 'absolute' }}
                 />
               </Bleed>
-              <VStack gap="1">
+              <VStack gap="space-4">
                 <BodyShort size="small">Nav 10-07.03 (Om søknaden har ID)</BodyShort>
                 <Heading level="1" size="xlarge">
                   Søknad om [ytelse]
@@ -317,11 +319,11 @@ export const FORM_SUMMARY_JSX_CODE = `<BoxNew asChild background="default" paddi
               <Link href="#">
                 <ArrowLeftIcon aria-hidden /> Forrige steg
               </Link>
-              <BoxNew paddingBlock="space-6">
+              <Box paddingBlock="space-6">
                 <Heading level="2" size="large">
                   Oppsummering
                 </Heading>
-              </BoxNew>
+              </Box>
               <FormProgress activeStep={3} totalSteps={3}>
                 <FormProgress.Step href="#">Steg 1</FormProgress.Step>
                 <FormProgress.Step href="#">Steg 2</FormProgress.Step>
@@ -451,7 +453,7 @@ export const FORM_SUMMARY_JSX_CODE = `<BoxNew asChild background="default" paddi
                   </Button>
                 </Show>
 
-                <BoxNew asChild marginBlock={{ xs: 'space-16', sm: 'space-0' }}>
+                <Box asChild marginBlock={{ xs: 'space-16', sm: 'space-0' }}>
                   <Button
                     variant="tertiary"
                     icon={<FloppydiskIcon aria-hidden />}
@@ -459,7 +461,7 @@ export const FORM_SUMMARY_JSX_CODE = `<BoxNew asChild background="default" paddi
                   >
                     Fortsett senere
                   </Button>
-                </BoxNew>
+                </Box>
                 <Button variant="tertiary" icon={<TrashIcon aria-hidden />} iconPosition="left">
                   Slett søknaden
                 </Button>
@@ -468,7 +470,7 @@ export const FORM_SUMMARY_JSX_CODE = `<BoxNew asChild background="default" paddi
           </VStack>
         </Page.Block>
       </Page>
-    </BoxNew>`
+    </Box>`
 
 export const createDefaultProject = (): Project => ({
   id: generateSecureUUID(),

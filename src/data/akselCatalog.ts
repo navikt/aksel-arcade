@@ -795,7 +795,7 @@ export const AKSEL_CATALOG: AkselCatalogEntry[] = [
     importGuidance: "import { BoxNew } from '@navikt/ds-react';",
     docs: `${COMPONENT_DOCS_BASE}/box`,
     description: 'Legacy container name retained only for compatibility; prefer Box.',
-    keywords: ['boxnew', 'box', 'legacy', 'darkside'],
+    keywords: ['boxnew', 'box', 'legacy'],
     props: [],
     snippet: {
       code: '<Box padding="space-16">Content</Box>',

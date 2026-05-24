@@ -85,7 +85,7 @@
 ### Constitution Checkpoints (must be satisfied in this spec)
 
 - Principle VII: Preservation of Proven Features — enumerate protected behaviors/flows; define regression guards (tests, visual snapshots, flags)
-- Principle VIII: Aksel Design System Exclusivity — confirm all UI uses Aksel tokens (`@navikt/ds-css/darkside`, `@navikt/ds-tokens`), layout primitives (Box/Stack/Grid), `@navikt/ds-react` components, and `<Theme>` wrapping for app/sandbox
+- Principle VIII: Aksel Design System Exclusivity — confirm all UI uses current Aksel v8 CSS (`@navikt/ds-css`) and `--ax-*` variables, current layout primitives (Box/HStack/VStack/HGrid/Page/Bleed), `@navikt/ds-react` components, and `<Theme>` wrapping for app/sandbox
 
 ### Functional Requirements
 

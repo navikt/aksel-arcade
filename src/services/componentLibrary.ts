@@ -57,9 +57,9 @@ const MANUAL_AKSEL_SNIPPETS: ComponentSnippet[] = [
     id: 'box-new',
     name: 'BoxNew',
     category: 'layout',
-    keywords: ['box', 'container', 'layout', 'padding', 'wrapper', 'darkside', 'border', 'shadow'],
+    keywords: ['box', 'container', 'layout', 'padding', 'wrapper', 'border', 'shadow'],
     template: '<BoxNew padding="4">\n  ${1:Content}\n</BoxNew>',
-    description: 'Layout container with Darkside support (borderColor, background, shadow)',
+    description: 'Legacy container name retained for compatibility; prefer Box for v8 prototypes',
     import: "import { BoxNew } from '@navikt/ds-react';",
   },
   {

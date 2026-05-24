@@ -20,16 +20,22 @@ export interface AkselMetadata {
   runtime: string
   packages: {
     react: string
+    reactDom: string
     css: string
     tokens: string | null
     icons: string
   }
+  packageVersions: Record<string, string>
   setup: {
     install: string
     cssImport: string
     themeWrapper: string
     themeImport: string
     minVersion: string
+  }
+  authoring: {
+    playground: string
+    production: string
   }
   tokens: {
     prefix: string
@@ -63,9 +69,17 @@ export const AKSEL_METADATA: AkselMetadata = {
 
   packages: {
     react: '@navikt/ds-react',
+    reactDom: 'react-dom',
     css: '@navikt/ds-css',
     tokens: null,
     icons: '@navikt/aksel-icons',
+  },
+  packageVersions: {
+    react: '19.2.0',
+    'react-dom': '19.2.0',
+    '@navikt/ds-react': '8.11.0',
+    '@navikt/ds-css': '8.11.0',
+    '@navikt/aksel-icons': '8.11.0',
   },
 
   setup: {
@@ -75,6 +89,13 @@ export const AKSEL_METADATA: AkselMetadata = {
     themeWrapper: '<Theme theme="dark">{app}</Theme>',
     themeImport: "import { Theme } from '@navikt/ds-react/Theme';",
     minVersion: '@navikt/ds-react 8.11.0',
+  },
+
+  authoring: {
+    playground:
+      'Aksel Arcade authoring is import-free: React, Aksel components, Aksel icons, and supported hooks are injected by the sandbox runtime.',
+    production:
+      'When moving a prototype into a production app, add explicit imports from @navikt/ds-react, @navikt/aksel-icons, @navikt/ds-react/Theme, and import @navikt/ds-css once at the app root.',
   },
 
   tokens: {
@@ -106,19 +127,19 @@ export const AKSEL_METADATA: AkselMetadata = {
   },
 
   breakpoints: {
-    XS: '320px',
-    SM: '480px',
-    MD: '768px',
-    LG: '1024px',
-    XL: '1280px',
-    '2XL': '1536px',
+    xs: '320px',
+    sm: '480px',
+    md: '768px',
+    lg: '1024px',
+    xl: '1280px',
+    '2xl': '1440px',
   },
 
   documentation: {
     main: 'https://aksel.nav.no',
     components: 'https://aksel.nav.no/komponenter',
     tokens: 'https://aksel.nav.no/grunnleggende/styling/design-tokens',
-    setup: 'https://aksel.nav.no/grunnleggende/kode/migration-guide',
+    setup: 'https://aksel.nav.no/grunnleggende/introduksjon/kom-i-gang-med-kodepakkene',
     migration: 'https://aksel.nav.no/grunnleggende/kode/migration-guide',
   },
 }
@@ -128,9 +149,12 @@ export const AKSEL_METADATA: AkselMetadata = {
  */
 export const AI_INSTRUCTIONS = `This is a React prototype built with the Aksel v8 design system.
 
+Arcade source code is intentionally import-free while you prototype:
+${AKSEL_METADATA.authoring.playground}
+
 To build a standalone production app:
 
-1. Install dependencies:
+1. Install exact dependencies:
    ${AKSEL_METADATA.setup.install}
 
 2. Import Aksel CSS in your root file:
@@ -146,13 +170,19 @@ To build a standalone production app:
 5. Use design tokens with ${AKSEL_METADATA.tokens.prefix} prefix:
    Examples: ${AKSEL_METADATA.tokens.examples.colors.slice(0, 3).join(', ')}
 
-6. Responsive breakpoints:
+6. Use production imports when copying code out of Arcade:
+   ${AKSEL_METADATA.authoring.production}
+
+7. Responsive breakpoints:
    ${Object.entries(AKSEL_METADATA.breakpoints)
      .map(([key, val]) => `${key}: ${val}`)
      .join(', ')}
 
 Important constraints:
 - Pinned Aksel package version: ${AKSEL_METADATA.designSystemVersion}
+- Exact package versions: ${Object.entries(AKSEL_METADATA.packageVersions)
+  .map(([name, version]) => `${name}@${version}`)
+  .join(', ')}
 - All CSS variables use ${AKSEL_METADATA.tokens.prefix} prefix (not --a or --ac)
 - Theme wrapper is required for light/dark theme semantics
 - Components must be imported from ${AKSEL_METADATA.packages.react}

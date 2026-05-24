@@ -114,7 +114,7 @@ describe('Storage Service', () => {
 
       const stored = localStorage.getItem('aksel-arcade:project')
       const parsed = JSON.parse(stored!)
-      
+
       // lastModified should be updated to current time
       expect(parsed.lastModified).not.toBe('2025-01-01T00:00:00.000Z')
       expect(new Date(parsed.lastModified).getTime()).toBeGreaterThan(
@@ -250,15 +250,25 @@ describe('Storage Service', () => {
       let capturedHref = ''
       let capturedDownload = ''
       let clickCalled = false
-      
+
       const mockAnchor = {
-        set href(value: string) { capturedHref = value },
-        get href() { return capturedHref },
-        set download(value: string) { capturedDownload = value },
-        get download() { return capturedDownload },
-        click: () => { clickCalled = true },
+        set href(value: string) {
+          capturedHref = value
+        },
+        get href() {
+          return capturedHref
+        },
+        set download(value: string) {
+          capturedDownload = value
+        },
+        get download() {
+          return capturedDownload
+        },
+        click: () => {
+          clickCalled = true
+        },
       }
-      
+
       const originalCreateElement = document.createElement.bind(document)
       document.createElement = ((tagName: string) => {
         if (tagName === 'a') return mockAnchor as unknown as HTMLAnchorElement
@@ -287,7 +297,74 @@ describe('Storage Service', () => {
       // Cleanup
       document.createElement = originalCreateElement
     })
+
+    it('includes current Aksel v8 metadata in exported JSON', async () => {
+      const mockUrl = 'blob:mock-url'
+      let capturedBlob: Blob | null = null
+      const originalCreateObjectURL = global.URL.createObjectURL
+      const originalRevokeObjectURL = global.URL.revokeObjectURL
+
+      global.URL.createObjectURL = ((blob: Blob | MediaSource) => {
+        if (blob instanceof Blob) {
+          capturedBlob = blob
+        }
+        return mockUrl
+      }) as typeof URL.createObjectURL
+      global.URL.revokeObjectURL = () => {}
+
+      const project: Project = {
+        id: crypto.randomUUID(),
+        name: 'Export Metadata Test',
+        jsxCode: '<HStack><Button>Click</Button></HStack>',
+        hooksCode: '',
+        viewportSize: 'MD',
+        panelLayout: 'editor-left',
+        version: '1.0.0',
+        createdAt: new Date().toISOString(),
+        lastModified: new Date().toISOString(),
+      }
+
+      try {
+        exportProject(project)
+
+        if (!capturedBlob) {
+          throw new Error('Expected exportProject to create a JSON blob')
+        }
+
+        const exportedText = await readBlobText(capturedBlob)
+        const exported = JSON.parse(exportedText) as {
+          meta: {
+            designSystem: string
+            packageVersions: Record<string, string>
+            setup: { cssImport: string; install: string }
+            authoring: { playground: string; production: string }
+            breakpoints: Record<string, string>
+          }
+        }
+
+        expect(exported.meta.designSystem).toBe('Aksel v8')
+        expect(exported.meta.packageVersions['@navikt/ds-react']).toBe('8.11.0')
+        expect(exported.meta.packageVersions['@navikt/ds-css']).toBe('8.11.0')
+        expect(exported.meta.packageVersions['@navikt/aksel-icons']).toBe('8.11.0')
+        expect(exported.meta.setup.cssImport).toBe("import '@navikt/ds-css';")
+        expect(exported.meta.setup.install).toContain('--save-exact')
+        expect(exported.meta.authoring.playground).toContain('import-free')
+        expect(exported.meta.authoring.production).toContain('@navikt/ds-react')
+        expect(exported.meta.breakpoints['2xl']).toBe('1440px')
+      } finally {
+        global.URL.createObjectURL = originalCreateObjectURL
+        global.URL.revokeObjectURL = originalRevokeObjectURL
+      }
+    })
   })
+
+  const readBlobText = (blob: Blob): Promise<string> =>
+    new Promise((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onload = () => resolve(String(reader.result))
+      reader.onerror = () => reject(reader.error)
+      reader.readAsText(blob)
+    })
 
   describe('importProject', () => {
     // Helper to create a mock File with working .text() method
@@ -323,13 +400,15 @@ describe('Storage Service', () => {
       expect(result.project).toBeTruthy()
       expect(result.project!.name).toBe('Import Test')
       expect(result.project!.jsxCode).toBe('<Box>Imported</Box>')
-      
+
       // Should have new ID
       expect(result.project!.id).not.toBe(project.id)
-      
+
       // lastModified should be updated (or at least be a valid ISO date)
       const lastModified = new Date(result.project!.lastModified)
-      expect(lastModified.getTime()).toBeGreaterThanOrEqual(new Date(project.lastModified).getTime())
+      expect(lastModified.getTime()).toBeGreaterThanOrEqual(
+        new Date(project.lastModified).getTime()
+      )
     })
 
     it('should reject invalid JSON', async () => {
