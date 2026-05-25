@@ -28,6 +28,7 @@ import {
 } from '@navikt/aksel-icons'
 import { SaveStatusIndicator } from './SaveStatusIndicator'
 import { ProjectSizeIndicator } from './ProjectSizeIndicator'
+import { AgentSessionMenu } from './AgentSessionMenu'
 import { useSettings } from '@/contexts/SettingsContext'
 import type { Project, ViewportSize } from '@/types/project'
 import type { SaveStatus } from '@/hooks/useAutoSave'
@@ -474,6 +475,7 @@ export const AppHeader = ({
               </VStack>
             </Popover.Content>
           </Popover>
+          <AgentSessionMenu />
           <ActionMenu>
             <ActionMenu.Trigger>
               <Button

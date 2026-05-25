@@ -30,6 +30,14 @@
   max-width: 320px;
 }
 
+.agent-menu {
+  max-width: 360px;
+}
+
+.agent-menu__status {
+  color: var(--ax-text-neutral-subtle);
+}
+
 .share-popover__estimate-tag {
   text-transform: none;
 }

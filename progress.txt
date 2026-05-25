@@ -332,3 +332,29 @@ Completed for #23:
 Verification completed with `npm run typecheck`, `CI=1 npm run test`, and a browser smoke/console check at `http://127.0.0.1:5173/aksel-arcade/`.
 
 Follow-up note: the fix is centralized in `src/services/akselAutocomplete.ts` inside prop option generation. If new prop metadata sources are added, make sure boolean-like types still flow through the same `isBooleanLikeProp` handling instead of adding source-specific apply strings.
+
+### 2026-05-25 - #31 Temporary Agent session header entry
+
+Selected #31 as the highest-priority `ready-for-agent` feature from #31-#38 because it is the only unblocked foundation issue; #32-#38 depend on #31 directly or through the later Agent bridge chain. Worked only on #31.
+
+Completed in this branch:
+
+- Added the first user-visible Agent ActionMenu immediately left of Settings, with start/stop access and permission checkbox controls.
+- Added default Agent permissions: source changes on, preview setting changes on, Preview evidence on, and project metadata changes off.
+- Published the browser bridge only while temporary Agent access is active at `window.__AKSEL_ARCADE_AGENT_BRIDGE__`, and removed it on stop, component unmount, and page reload.
+- Kept status copy activity-based, including revoked/inactive states, without implying durable socket connectivity.
+- Added integration coverage for header placement, default permissions, bridge absence before start, start/stop lifecycle, unmount cleanup, reload-style inactive behavior, mandatory read-access copy, and status wording.
+
+Verification completed with `npm run typecheck`, `CI=1 npm run test -- --run`, `npm run lint` (existing `InspectionPopover` hook dependency warning only), and a browser smoke/console check at `http://127.0.0.1:5173/aksel-arcade/`.
+
+Follow-up note: #32 should build on `src/services/agentBridge.ts` and `src/hooks/useAgentSession.ts` by adding read commands and copyable instructions. Keep share/export out of the bridge command list until the fallback-packaging issue explicitly asks for regression coverage.
+
+### 2026-05-25 - PR #39 CodeQL check follow-up
+
+Fixed after PR #39 checks failed:
+
+- Reproduced the failed gate from the CodeQL annotations: `js/insecure-randomness` flagged the Agent session ID fallback because it used `Math.random()`.
+- Replaced the Agent session ID generator with the existing `generateSecureUUID()` Web Crypto helper so the bridge session ID never falls back to insecure randomness.
+- Added integration coverage that starts Agent access through the header and verifies the bridge uses the mocked `crypto.randomUUID()` session id.
+
+Verification completed with `npm run typecheck`, `CI=1 npm run test -- --run`, `npm run lint` (existing `InspectionPopover` hook dependency warning only), and a browser smoke/console check at `http://127.0.0.1:5174/aksel-arcade/`.
