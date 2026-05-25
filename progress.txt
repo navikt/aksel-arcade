@@ -373,6 +373,18 @@ Completed in this branch:
 
 Verification completed with `npm run typecheck`, `CI=1 npm run test -- --run`, `npm run lint` (existing `InspectionPopover` hook dependency warning only), and a browser smoke/console check at `http://127.0.0.1:5175/aksel-arcade/`.
 
+### 2026-05-25 - PR #40 build failure follow-up
+
+Fixed after the merged PR #40 broke the GitHub Pages build:
+
+- Reproduced the failing workflow locally with `npm run build`.
+- Root cause: `tsc -b` checks `tsconfig.test.json`, and TypeScript build-mode control-flow analysis could not prove bridge command result variables assigned inside React Testing Library `act()` callbacks were initialized before use. It also prevented clean narrowing of the bridge command success/error union.
+- Added a small `callBridgeCommand` test helper that wraps the command in `act()` and returns a definitely-assigned result.
+- Added `expectBridgeSuccess` so the test keeps a sharp assertion for successful read commands while preserving TypeScript narrowing.
+- Kept the fix scoped to `tests/integration/project-controls-layout.test.tsx`; product bridge behavior was unchanged.
+
+Verification completed with `npm run build`, `CI=1 npm run test -- --run tests/integration/project-controls-layout.test.tsx`, `npm run typecheck`, `CI=1 npm run test -- --run`, `npm run lint` (existing `InspectionPopover` hook dependency warning only), and a browser smoke/console check at `http://127.0.0.1:5175/aksel-arcade/`.
+
 Follow-up note: #33 should build source replacement and automatic Checkpoints on top of these bridge/session primitives. Keep share/export out of the bridge command list, and keep read commands constrained to Arcade-scoped state unless a later issue explicitly expands the command contract.
 
 ### 2026-05-25 - PR #40 code review follow-up
