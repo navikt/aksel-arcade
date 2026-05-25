@@ -107,6 +107,7 @@ Completed:
 - Updated Agent status after bridge read activity and preserved revoked-session errors for stale bridge references after access is stopped.
 - Added integration coverage for instruction contents, bridge absence before start, active read command success, revoked-session read errors, activity recording, and scoped read shape.
 - PR #40 code review follow-up tightened and covered current-state reads: captured bridge references now report updated project source/name, preview theme/viewport, and active permission state after in-session changes.
+- PR #40 build follow-up fixed the failing `tsc -b` path by removing test variables assigned only inside `act()` callbacks; bridge command calls now use a typed helper so build-mode control-flow analysis can prove assignment and union narrowing.
 
 Next:
 

@@ -3,6 +3,7 @@ import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
 import { AppProvider, useProject } from '@/hooks/useProject'
 import { SettingsProvider, useSettings } from '@/contexts/SettingsContext'
 import { AppHeader } from '@/components/Header/AppHeader'
+import type { AgentBridgeCommandResult } from '@/services/agentBridge'
 
 const noop = () => {}
 
@@ -74,6 +75,30 @@ const collectObjectKeys = (value: unknown): string[] => {
     key,
     ...collectObjectKeys(nestedValue),
   ])
+}
+
+const callBridgeCommand = <TResult,>(command: () => TResult): TResult => {
+  let result: TResult | undefined
+
+  act(() => {
+    result = command()
+  })
+
+  if (result === undefined) {
+    throw new Error('Expected bridge command to return a result.')
+  }
+
+  return result
+}
+
+const expectBridgeSuccess = <TData,>(result: AgentBridgeCommandResult<TData>): TData => {
+  expect(result.ok).toBe(true)
+
+  if (!result.ok) {
+    throw new Error(result.error.message)
+  }
+
+  return result.data
 }
 
 describe('ProjectControls layout', () => {
@@ -257,32 +282,24 @@ describe('ProjectControls layout', () => {
       throw new Error('Expected Agent bridge to be published after access starts.')
     }
 
-    let projectResult: ReturnType<typeof bridge.getProject>
-    act(() => {
-      projectResult = bridge.getProject()
-    })
+    const projectResult = callBridgeCommand(() => bridge.getProject())
     expect(projectResult).toMatchObject({
       ok: true,
       command: 'getProject',
     })
-    if (!projectResult.ok) {
-      throw new Error(projectResult.error.message)
-    }
-    expect(projectResult.data).toEqual({
+    const projectData = expectBridgeSuccess(projectResult)
+    expect(projectData).toEqual({
       name: expect.any(String),
       jsxCode: expect.any(String),
       hooksCode: expect.any(String),
     })
-    expect(projectResult.data).not.toHaveProperty('id')
+    expect(projectData).not.toHaveProperty('id')
 
     await waitFor(() => {
       expect(screen.getByRole('status').textContent).toMatch(/Last agent read: getProject/i)
     })
 
-    let previewResult: ReturnType<typeof bridge.getPreviewContext>
-    act(() => {
-      previewResult = bridge.getPreviewContext()
-    })
+    const previewResult = callBridgeCommand(() => bridge.getPreviewContext())
     expect(previewResult).toMatchObject({
       ok: true,
       command: 'getPreviewContext',
@@ -292,10 +309,7 @@ describe('ProjectControls layout', () => {
       },
     })
 
-    let sessionResult: ReturnType<typeof bridge.getSessionState>
-    act(() => {
-      sessionResult = bridge.getSessionState()
-    })
+    const sessionResult = callBridgeCommand(() => bridge.getSessionState())
     expect(sessionResult).toMatchObject({
       ok: true,
       command: 'getSessionState',
@@ -313,7 +327,7 @@ describe('ProjectControls layout', () => {
     })
 
     const exposedReadKeys = collectObjectKeys({
-      project: projectResult.data,
+      project: projectData,
       preview: previewResult.ok ? previewResult.data : null,
       session: sessionResult.ok ? sessionResult.data : null,
     }).join(' ')
@@ -335,10 +349,7 @@ describe('ProjectControls layout', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /update agent read fixture/i }))
 
-    let updatedProject: ReturnType<typeof bridge.getProject>
-    act(() => {
-      updatedProject = bridge.getProject()
-    })
+    const updatedProject = callBridgeCommand(() => bridge.getProject())
     expect(updatedProject).toMatchObject({
       ok: true,
       data: {
@@ -348,10 +359,7 @@ describe('ProjectControls layout', () => {
       },
     })
 
-    let updatedPreview: ReturnType<typeof bridge.getPreviewContext>
-    act(() => {
-      updatedPreview = bridge.getPreviewContext()
-    })
+    const updatedPreview = callBridgeCommand(() => bridge.getPreviewContext())
     expect(updatedPreview).toMatchObject({
       ok: true,
       data: {
@@ -365,10 +373,7 @@ describe('ProjectControls layout', () => {
     expect(bridge.permissions.projectMetadata).toBe(true)
     expect(window.__AKSEL_ARCADE_AGENT_BRIDGE__?.permissions.projectMetadata).toBe(true)
 
-    let updatedSession: ReturnType<typeof bridge.getSessionState>
-    act(() => {
-      updatedSession = bridge.getSessionState()
-    })
+    const updatedSession = callBridgeCommand(() => bridge.getSessionState())
     expect(updatedSession).toMatchObject({
       ok: true,
       data: {
