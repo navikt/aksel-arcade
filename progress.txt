@@ -374,3 +374,14 @@ Completed in this branch:
 Verification completed with `npm run typecheck`, `CI=1 npm run test -- --run`, `npm run lint` (existing `InspectionPopover` hook dependency warning only), and a browser smoke/console check at `http://127.0.0.1:5175/aksel-arcade/`.
 
 Follow-up note: #33 should build source replacement and automatic Checkpoints on top of these bridge/session primitives. Keep share/export out of the bridge command list, and keep read commands constrained to Arcade-scoped state unless a later issue explicitly expands the command contract.
+
+### 2026-05-25 - PR #40 code review follow-up
+
+Fixed after reviewing PR #40:
+
+- Found that the #32 tests did not prove captured bridge references return current project/preview data after in-session changes.
+- Found that captured bridge references exposed stale `permissions` snapshots after permission changes, even though `getSessionState()` used current permissions.
+- Changed the bridge `permissions` member to a current-state getter backed by the active session controller.
+- Added integration coverage proving captured bridge references return updated project source/name, preview theme/viewport, and active permission state after the human changes them during an Agent session.
+
+Verification completed with `npm run typecheck`, `CI=1 npm run test -- --run`, `npm run lint` (existing `InspectionPopover` hook dependency warning only), and a browser smoke/console check at `http://127.0.0.1:5175/aksel-arcade/`.

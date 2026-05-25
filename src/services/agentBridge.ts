@@ -102,7 +102,6 @@ export const DEFAULT_AGENT_PERMISSIONS: AgentPermissions = {
 
 export const createAgentBridge = (
   session: AgentBridgeSession,
-  permissions: AgentPermissions,
   controller: AgentBridgeController
 ): AgentBridge => {
   const readCommand = <TData>(
@@ -135,7 +134,9 @@ export const createAgentBridge = (
     sessionId: session.id,
     status: 'active',
     startedAt: session.startedAt,
-    permissions: { ...permissions },
+    get permissions() {
+      return { ...controller.getPermissions() }
+    },
     readScope: 'arcade-session',
     commandNames: [...AGENT_BRIDGE_COMMAND_NAMES],
     getProject: () =>
@@ -157,17 +158,15 @@ export const createAgentBridge = (
       })),
   }
 }
-
 export const publishAgentBridge = (
   session: AgentBridgeSession,
-  permissions: AgentPermissions,
   controller: AgentBridgeController
 ): void => {
   if (typeof window === 'undefined') {
     return
   }
 
-  window[AGENT_BRIDGE_GLOBAL] = createAgentBridge(session, permissions, controller)
+  window[AGENT_BRIDGE_GLOBAL] = createAgentBridge(session, controller)
 }
 
 export const removeAgentBridge = (sessionId?: string): void => {

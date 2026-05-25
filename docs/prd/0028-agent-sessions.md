@@ -106,6 +106,7 @@ Completed:
 - Kept read commands out of share/export/browser state by not exposing share payloads, export data, browser storage, clipboard data, cookies, or unrelated page state.
 - Updated Agent status after bridge read activity and preserved revoked-session errors for stale bridge references after access is stopped.
 - Added integration coverage for instruction contents, bridge absence before start, active read command success, revoked-session read errors, activity recording, and scoped read shape.
+- PR #40 code review follow-up tightened and covered current-state reads: captured bridge references now report updated project source/name, preview theme/viewport, and active permission state after in-session changes.
 
 Next:
 

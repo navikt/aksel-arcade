@@ -75,7 +75,7 @@ export const useAgentSession = ({ project, theme }: UseAgentSessionOptions) => {
     }
 
     activeSessionIdRef.current = session.id
-    publishAgentBridge(session, permissions, {
+    publishAgentBridge(session, {
       getReadContext: () => readContextRef.current,
       getPermissions: () => permissionsRef.current,
       isSessionActive: () => activeSessionIdRef.current === session.id,
@@ -87,7 +87,7 @@ export const useAgentSession = ({ project, theme }: UseAgentSessionOptions) => {
     return () => {
       removeAgentBridge(session.id)
     }
-  }, [activeSessionIdRef, permissions, permissionsRef, readContextRef, session])
+  }, [activeSessionIdRef, permissionsRef, readContextRef, session])
 
   const startAgentSession = useCallback(() => {
     const startedAt = createTimestamp()

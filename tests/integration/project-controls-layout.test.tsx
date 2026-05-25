@@ -1,7 +1,7 @@
 import { describe, expect, it, beforeEach, afterEach, vi } from 'vitest'
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
 import { AppProvider, useProject } from '@/hooks/useProject'
-import { SettingsProvider } from '@/contexts/SettingsContext'
+import { SettingsProvider, useSettings } from '@/contexts/SettingsContext'
 import { AppHeader } from '@/components/Header/AppHeader'
 
 const noop = () => {}
@@ -16,21 +16,38 @@ const Harness = () => {
     loadFormSummaryTemplate,
     loadHooksDemo,
   } = useProject()
+  const { setTheme } = useSettings()
 
   return (
-    <AppHeader
-      projectName={project.name}
-      onProjectNameChange={(name) => updateProject({ name })}
-      currentProject={project}
-      shareViewport={previewState.currentViewport}
-      onProjectImported={setProject}
-      saveStatus="idle"
-      projectSizeBytes={0}
-      onResetToIntro={resetToIntro}
-      onClearStorage={noop}
-      onLoadFormSummaryTemplate={loadFormSummaryTemplate}
-      onLoadHooksDemo={loadHooksDemo}
-    />
+    <>
+      <AppHeader
+        projectName={project.name}
+        onProjectNameChange={(name) => updateProject({ name })}
+        currentProject={project}
+        shareViewport={previewState.currentViewport}
+        onProjectImported={setProject}
+        saveStatus="idle"
+        projectSizeBytes={0}
+        onResetToIntro={resetToIntro}
+        onClearStorage={noop}
+        onLoadFormSummaryTemplate={loadFormSummaryTemplate}
+        onLoadHooksDemo={loadHooksDemo}
+      />
+      <button
+        type="button"
+        onClick={() => {
+          updateProject({
+            name: 'Updated Agent Project',
+            jsxCode: 'export default function App() { return <Heading>Updated</Heading> }',
+            hooksCode: 'export const useAgentFixture = () => "updated"',
+            viewportSize: 'LG',
+          })
+          setTheme('light')
+        }}
+      >
+        Update Agent read fixture
+      </button>
+    </>
   )
 }
 
@@ -301,5 +318,64 @@ describe('ProjectControls layout', () => {
       session: sessionResult.ok ? sessionResult.data : null,
     }).join(' ')
     expect(exposedReadKeys).not.toMatch(/share|export|storage|clipboard|cookie/i)
+  })
+
+  it('returns current project, preview, and permission state through captured bridge references', async () => {
+    renderHeader()
+
+    fireEvent.click(screen.getByRole('button', { name: /agent access/i }))
+    expect(await screen.findByText(/Agent session/i)).toBeTruthy()
+    fireEvent.click(screen.getByRole('menuitemcheckbox', { name: /start temporary agent access/i }))
+
+    const bridge = window.__AKSEL_ARCADE_AGENT_BRIDGE__
+    expect(bridge).toBeDefined()
+    if (!bridge) {
+      throw new Error('Expected Agent bridge to be published after access starts.')
+    }
+
+    fireEvent.click(screen.getByRole('button', { name: /update agent read fixture/i }))
+
+    let updatedProject: ReturnType<typeof bridge.getProject>
+    act(() => {
+      updatedProject = bridge.getProject()
+    })
+    expect(updatedProject).toMatchObject({
+      ok: true,
+      data: {
+        name: 'Updated Agent Project',
+        jsxCode: 'export default function App() { return <Heading>Updated</Heading> }',
+        hooksCode: 'export const useAgentFixture = () => "updated"',
+      },
+    })
+
+    let updatedPreview: ReturnType<typeof bridge.getPreviewContext>
+    act(() => {
+      updatedPreview = bridge.getPreviewContext()
+    })
+    expect(updatedPreview).toMatchObject({
+      ok: true,
+      data: {
+        theme: 'light',
+        viewportSize: 'LG',
+      },
+    })
+
+    fireEvent.click(screen.getByRole('menuitemcheckbox', { name: /allow project metadata changes/i }))
+
+    expect(bridge.permissions.projectMetadata).toBe(true)
+    expect(window.__AKSEL_ARCADE_AGENT_BRIDGE__?.permissions.projectMetadata).toBe(true)
+
+    let updatedSession: ReturnType<typeof bridge.getSessionState>
+    act(() => {
+      updatedSession = bridge.getSessionState()
+    })
+    expect(updatedSession).toMatchObject({
+      ok: true,
+      data: {
+        permissions: {
+          projectMetadata: true,
+        },
+      },
+    })
   })
 })
