@@ -320,3 +320,15 @@ Completed for #25:
 Verification completed with `npm run typecheck`, `npm run test -- --run`, `npm run lint` (existing `InspectionPopover` hook dependency warning only), `npm run build`, and a browser smoke/console check at `http://127.0.0.1:5173/aksel-arcade/` (no errors; existing sandbox iframe warning only).
 
 Follow-up note: no npm overrides were added. If Dependabot still reports any of #8, #9, #11, #14, #16, #18, #19, #20, #22, or #24 after merge, re-check whether the alert is scanning the default-branch lockfile or a cached dependency graph; the patched versions are present in `package-lock.json`.
+
+### 2026-05-25 - Issue #23 boolean prop autocomplete
+
+Completed for #23:
+
+- Fixed Aksel prop-name autocomplete so boolean-like props apply as JSX shorthand, e.g. `asChild`, instead of the invalid empty string form `asChild=""`.
+- Kept enum/string props with value suggestions applying as `prop=""`, so existing value autocomplete behavior remains unchanged.
+- Added regression coverage across generated docs props, catalog props, and icon SVG Booleanish props to catch future boolean autocomplete regressions.
+
+Verification completed with `npm run typecheck`, `CI=1 npm run test`, and a browser smoke/console check at `http://127.0.0.1:5173/aksel-arcade/`.
+
+Follow-up note: the fix is centralized in `src/services/akselAutocomplete.ts` inside prop option generation. If new prop metadata sources are added, make sure boolean-like types still flow through the same `isBooleanLikeProp` handling instead of adding source-specific apply strings.

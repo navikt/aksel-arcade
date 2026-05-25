@@ -435,14 +435,23 @@ function iconComponentOptions(
     .map((entry) => iconComponentOption(entry, context))
 }
 
+const BOOLEAN_PROP_VALUES = new Set(['true', 'false'])
+
+function isBooleanLikeProp(prop: CompletionProp): boolean {
+  const hasNonBooleanValues = prop.values?.some((value) => !BOOLEAN_PROP_VALUES.has(value)) ?? false
+
+  return !hasNonBooleanValues && /\bboolean(?:ish)?\b/i.test(prop.type.replace(/`/g, ''))
+}
+
 function propOption(componentName: string, prop: CompletionProp): Completion {
   const hasValues = Boolean(prop.values?.length)
+  const shouldApplyBareProp = !hasValues || isBooleanLikeProp(prop)
 
   return {
     label: prop.name,
     type: 'property',
     detail: prop.description || `${componentName} prop`,
-    apply: hasValues ? `${prop.name}=""` : prop.name,
+    apply: shouldApplyBareProp ? prop.name : `${prop.name}=""`,
     boost: prop.required ? 10 : 0,
   }
 }
