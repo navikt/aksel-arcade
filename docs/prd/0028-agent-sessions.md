@@ -8,7 +8,7 @@ Without an Agent session, a human must copy code back and forth, use share/expor
 
 ## Solution
 
-Add browser-only Agent sessions to Aksel Arcade. A human starts an Agent session from a new header ActionMenu, controls Agent permissions with checkbox items, copies agent instructions into their external agent chat, and can stop access at any time. While active, Aksel Arcade exposes a temporary `window.__AKSEL_ARCADE_AGENT__` bridge that lets the external agent read Arcade-scoped state, inspect diagnostics, request scoped Preview evidence, and apply allowed Agent changes.
+Add browser-only Agent sessions to Aksel Arcade. A human starts an Agent session from a new header ActionMenu, controls Agent permissions with checkbox items, copies agent instructions into their external agent chat, and can stop access at any time. While active, Aksel Arcade exposes a temporary `window.__AKSEL_ARCADE_AGENT_BRIDGE__` bridge that lets the external agent read Arcade-scoped state, inspect diagnostics, request scoped Preview evidence, and apply allowed Agent changes.
 
 Agent changes use apply-then-review with rollback. The bridge validates payload shape, permissions, project size, and enum values before mutating the active Arcade project. It does not compile-gate or render-gate the change. Instead, Aksel Arcade creates an automatic Checkpoint before every accepted Agent change, applies the allowed full-field replacements atomically, and lets the human review the result in the live preview. If the human does not want the result, they restore a Checkpoint from the Agent ActionMenu.
 
@@ -70,7 +70,7 @@ The MVP keeps the feature browser-only. It does not introduce in-app LLM provide
 ## Implementation Decisions
 
 - Build an Agent session state module as a deep module. It owns whether the Agent session is active, the default Agent permissions, permission toggles, activity timestamps, status derivation, Checkpoint creation, Checkpoint capping, and human rollback.
-- Build an Agent bridge module as a deep module. It owns installing and removing `window.__AKSEL_ARCADE_AGENT__`, exposes the bridge commands, normalizes return shapes, records activity, and delegates mutation only through validated session operations.
+- Build an Agent bridge module as a deep module. It owns installing and removing `window.__AKSEL_ARCADE_AGENT_BRIDGE__`, exposes the bridge commands, normalizes return shapes, records activity, and delegates mutation only through validated session operations.
 - Build an Agent change validator as a deep module. It accepts unknown bridge input and returns either a valid Agent change or a structured error. It enforces payload shape, allowed fields, project size, enum values, and permission requirements before mutation.
 - Use full-field replacements only for Agent changes. The allowed replacements are project name, JSX source, Hooks source, viewport, and theme, plus a human-readable summary. Text patches, cursor edits, editor selection changes, active tab changes, panel layout changes, settings changes, share data, and export data are not part of the Agent change contract.
 - Reject an Agent change as a whole when it contains a field that is not permitted. Do not apply the allowed subset.
@@ -93,6 +93,24 @@ The MVP keeps the feature browser-only. It does not introduce in-app LLM provide
 - Copy agent instructions includes the bridge global name, command names, active permission state, the Arcade authoring contract, and the reminder that the human must start access before the bridge exists.
 - Preserve existing share/export behavior. Do not add bridge commands for share URL generation or JSON export. Exclude Checkpoints from share/export by default.
 - Respect the existing ADRs: the MVP uses a browser-only page bridge, and Agent changes use apply-then-review with rollback.
+
+## Implementation Progress
+
+### 2026-05-25 - Issue #32 Copy agent instructions and read Arcade-scoped state
+
+Completed:
+
+- Selected #32 as the highest-priority `ready-for-agent` feature from #32-#38 because it is the first unblocked capability after #31; #33-#38 depend on #32 directly or through the later Agent bridge chain.
+- Added copyable external-agent instructions to the Agent menu, including the bridge global, available read commands, active permission state, the Arcade authoring contract, scoped-read boundaries, and the reminder that the human must start Agent access before the bridge exists.
+- Added active bridge read commands: `getProject()`, `getPreviewContext()`, and `getSessionState()`. They return only Arcade-scoped project source/name, preview theme/viewport, session status, active permissions, read scope, and command names.
+- Kept read commands out of share/export/browser state by not exposing share payloads, export data, browser storage, clipboard data, cookies, or unrelated page state.
+- Updated Agent status after bridge read activity and preserved revoked-session errors for stale bridge references after access is stopped.
+- Added integration coverage for instruction contents, bridge absence before start, active read command success, revoked-session read errors, activity recording, and scoped read shape.
+- PR #40 code review follow-up tightened and covered current-state reads: captured bridge references now report updated project source/name, preview theme/viewport, and active permission state after in-session changes.
+
+Next:
+
+- #33 can build source replacement, automatic Checkpoints, and human rollback on top of the read command/session primitives.
 
 ## Testing Decisions
 
