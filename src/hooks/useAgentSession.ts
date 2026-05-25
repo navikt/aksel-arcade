@@ -7,20 +7,13 @@ import {
   type AgentPermissionKey,
   type AgentPermissions,
 } from '@/services/agentBridge'
+import { generateSecureUUID } from '@/utils/crypto'
 
 type AgentSessionActivity = 'inactive' | 'started' | 'permission-updated' | 'revoked'
 
 interface AgentSessionEvent {
   type: AgentSessionActivity
   at: string | null
-}
-
-const createSessionId = (): string => {
-  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
-    return crypto.randomUUID()
-  }
-
-  return `agent-${Date.now()}-${Math.random().toString(36).slice(2)}`
 }
 
 const createTimestamp = (): string => new Date().toISOString()
@@ -49,7 +42,7 @@ export const useAgentSession = () => {
   const startAgentSession = useCallback(() => {
     const startedAt = createTimestamp()
     setSession({
-      id: createSessionId(),
+      id: generateSecureUUID(),
       startedAt,
     })
     setLastEvent({ type: 'started', at: startedAt })

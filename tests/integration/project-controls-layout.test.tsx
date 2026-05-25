@@ -1,4 +1,4 @@
-import { describe, expect, it, beforeEach, vi } from 'vitest'
+import { describe, expect, it, beforeEach, afterEach, vi } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { AppProvider, useProject } from '@/hooks/useProject'
 import { SettingsProvider } from '@/contexts/SettingsContext'
@@ -50,6 +50,11 @@ describe('ProjectControls layout', () => {
     delete window.__AKSEL_ARCADE_AGENT_BRIDGE__
   })
 
+  afterEach(() => {
+    vi.restoreAllMocks()
+    delete window.__AKSEL_ARCADE_AGENT_BRIDGE__
+  })
+
   it('keeps Import → Share → Agent → Settings order and surfaces share metrics', async () => {
     renderHeader()
 
@@ -79,6 +84,9 @@ describe('ProjectControls layout', () => {
   })
 
   it('keeps Agent bridge inactive by default and publishes it only for a temporary session', async () => {
+    vi.spyOn(globalThis.crypto, 'randomUUID').mockReturnValue(
+      '11111111-1111-4111-8111-111111111111'
+    )
     const { unmount } = renderHeader()
 
     expect(window.__AKSEL_ARCADE_AGENT_BRIDGE__).toBeUndefined()
@@ -117,6 +125,7 @@ describe('ProjectControls layout', () => {
 
     expect((await screen.findByRole('status')).textContent).toMatch(/active/i)
     expect(window.__AKSEL_ARCADE_AGENT_BRIDGE__).toMatchObject({
+      sessionId: '11111111-1111-4111-8111-111111111111',
       status: 'active',
       readScope: 'arcade-session',
       permissions: {
