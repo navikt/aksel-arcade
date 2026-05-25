@@ -358,3 +358,19 @@ Fixed after PR #39 checks failed:
 - Added integration coverage that starts Agent access through the header and verifies the bridge uses the mocked `crypto.randomUUID()` session id.
 
 Verification completed with `npm run typecheck`, `CI=1 npm run test -- --run`, `npm run lint` (existing `InspectionPopover` hook dependency warning only), and a browser smoke/console check at `http://127.0.0.1:5174/aksel-arcade/`.
+
+### 2026-05-25 - #32 Copy agent instructions and read Arcade-scoped state
+
+Selected #32 as the highest-priority `ready-for-agent` feature from #32-#38 because it is the first unblocked Agent bridge capability after #31. Worked only on #32.
+
+Completed in this branch:
+
+- Added a Copy agent instructions action to the Agent menu. The copied text includes `window.__AKSEL_ARCADE_AGENT_BRIDGE__`, current command names, active permissions, the Arcade authoring contract, scoped-read boundaries, and the reminder that the human must start access before the bridge exists.
+- Added read-only bridge commands `getProject()`, `getPreviewContext()`, and `getSessionState()` while Agent access is active.
+- Kept read output limited to Arcade project source/name, preview theme/viewport, session status, active permissions, read scope, and command names. It does not expose share/export data, browser storage, clipboard data, cookies, or unrelated page state.
+- Recorded Agent read activity in the menu status and kept stale bridge references returning structured `session-revoked` errors after access is stopped.
+- Added integration coverage for copied instruction contents, inactive bridge state before start, active read command success, revoked-session errors after stop, activity status, and scoped read shape.
+
+Verification completed with `npm run typecheck`, `CI=1 npm run test -- --run`, `npm run lint` (existing `InspectionPopover` hook dependency warning only), and a browser smoke/console check at `http://127.0.0.1:5175/aksel-arcade/`.
+
+Follow-up note: #33 should build source replacement and automatic Checkpoints on top of these bridge/session primitives. Keep share/export out of the bridge command list, and keep read commands constrained to Arcade-scoped state unless a later issue explicitly expands the command contract.

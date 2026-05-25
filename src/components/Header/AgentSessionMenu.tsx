@@ -2,6 +2,8 @@ import { ActionMenu, BodyShort, Box, Button, Detail, VStack } from '@navikt/ds-r
 import { RobotIcon } from '@navikt/aksel-icons'
 import { useAgentSession } from '@/hooks/useAgentSession'
 import { AGENT_BRIDGE_GLOBAL, type AgentPermissionKey } from '@/services/agentBridge'
+import { useSettings } from '@/contexts/SettingsContext'
+import { useProject } from '@/hooks/useProject'
 
 interface PermissionItem {
   key: AgentPermissionKey
@@ -16,14 +18,36 @@ const permissionItems: PermissionItem[] = [
 ]
 
 export const AgentSessionMenu = () => {
-  const { isActive, permissions, statusText, startAgentSession, stopAgentSession, setPermission } =
-    useAgentSession()
+  const { project } = useProject()
+  const { theme } = useSettings()
+  const {
+    agentInstructions,
+    isActive,
+    permissions,
+    statusText,
+    startAgentSession,
+    stopAgentSession,
+    setPermission,
+  } = useAgentSession({ project, theme })
 
   const handleAccessChange = (checked: boolean) => {
     if (checked) {
       startAgentSession()
     } else {
       stopAgentSession()
+    }
+  }
+
+  const handleCopyInstructions = async () => {
+    if (!navigator.clipboard?.writeText) {
+      console.error('Agent instructions could not be copied: clipboard API is unavailable.')
+      return
+    }
+
+    try {
+      await navigator.clipboard.writeText(agentInstructions)
+    } catch (error) {
+      console.error('Agent instructions could not be copied.', error)
     }
   }
 
@@ -53,6 +77,14 @@ export const AgentSessionMenu = () => {
               Arcade-scoped read access is mandatory while active so an authorized agent can
               understand the current project and preview context.
             </BodyShort>
+            <Button
+              type="button"
+              size="small"
+              variant="secondary"
+              onClick={handleCopyInstructions}
+            >
+              Copy agent instructions
+            </Button>
           </VStack>
         </Box>
         <ActionMenu.Divider />
