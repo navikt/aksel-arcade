@@ -373,6 +373,23 @@ Completed in this branch:
 
 Verification completed with `npm run typecheck`, `CI=1 npm run test -- --run`, `npm run lint` (existing `InspectionPopover` hook dependency warning only), and a browser smoke/console check at `http://127.0.0.1:5175/aksel-arcade/`.
 
+### 2026-05-25 - #33 Apply source Agent changes with Checkpoints and rollback
+
+Selected #33 as the highest-priority `ready-for-agent` feature from #33-#38 because it is the first unblocked source-mutation feature after #32 and unlocks the later validation, preview/metadata, diagnostics/evidence, and share/export follow-ups. Worked only on #33.
+
+Completed in this branch:
+
+- Added the `applySourceChange({ summary, jsxCode?, hooksCode? })` Agent bridge command for full-field JSX and/or Hooks source replacements when source-change permission is enabled.
+- Required a non-empty human-readable summary, returned structured success data with changed fields and the automatic Checkpoint id, and kept stale bridge references returning `session-revoked`.
+- Captured an in-memory Checkpoint before every accepted source change, capped automatic rollback history at 10 entries, and cleared Checkpoints when Agent access is stopped or a new temporary session starts.
+- Added human-only rollback controls in the Agent menu; the bridge command list intentionally does not expose a restore command.
+- Let accepted schema-valid source changes apply immediately without waiting for compile/render success, so the normal preview flow reports later compile/runtime failures.
+- Added integration coverage for bridge command shape, successful source apply, atomic JSX+Hooks updates, Checkpoint creation/capping, human rollback, permission denial, absence of bridge rollback commands, and preview compile-error behavior after an accepted invalid source change.
+
+Verification completed with `npm run typecheck`, `CI=1 npm run test -- --run`, and a browser smoke/console check at `http://127.0.0.1:5175/aksel-arcade/`.
+
+Follow-up note: #34 should harden `applySourceChange` validation around malformed/oversized/unknown-field payloads and whole-command rejection. #35 can extend the same command path to preview settings and project metadata; keep rollback human-only unless a later issue explicitly changes that contract.
+
 ### 2026-05-25 - PR #40 build failure follow-up
 
 Fixed after the merged PR #40 broke the GitHub Pages build:

@@ -3,11 +3,16 @@ import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
 import { AppProvider, useProject } from '@/hooks/useProject'
 import { SettingsProvider, useSettings } from '@/contexts/SettingsContext'
 import { AppHeader } from '@/components/Header/AppHeader'
+import { PreviewPane } from '@/components/Preview/PreviewPane'
 import type { AgentBridgeCommandResult } from '@/services/agentBridge'
 
 const noop = () => {}
 
-const Harness = () => {
+interface HarnessProps {
+  includePreview?: boolean
+}
+
+const Harness = ({ includePreview = false }: HarnessProps) => {
   const {
     project,
     setProject,
@@ -48,15 +53,16 @@ const Harness = () => {
       >
         Update Agent read fixture
       </button>
+      {includePreview && <PreviewPane />}
     </>
   )
 }
 
-const renderHeader = () => {
+const renderHeader = (options?: HarnessProps) => {
   return render(
     <SettingsProvider>
       <AppProvider>
-        <Harness />
+        <Harness {...options} />
       </AppProvider>
     </SettingsProvider>
   )
@@ -101,9 +107,24 @@ const expectBridgeSuccess = <TData,>(result: AgentBridgeCommandResult<TData>): T
   return result.data
 }
 
+const startAgentAccess = async () => {
+  fireEvent.click(screen.getByRole('button', { name: /agent access/i }))
+  expect(await screen.findByText(/Agent session/i)).toBeTruthy()
+  fireEvent.click(screen.getByRole('menuitemcheckbox', { name: /start temporary agent access/i }))
+
+  const bridge = window.__AKSEL_ARCADE_AGENT_BRIDGE__
+  expect(bridge).toBeDefined()
+  if (!bridge) {
+    throw new Error('Expected Agent bridge to be published after access starts.')
+  }
+
+  return bridge
+}
+
 describe('ProjectControls layout', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    window.localStorage.clear()
     delete window.__AKSEL_ARCADE_AGENT_BRIDGE__
   })
 
@@ -192,11 +213,16 @@ describe('ProjectControls layout', () => {
         previewEvidence: true,
         projectMetadata: false,
       },
-      commandNames: ['getProject', 'getPreviewContext', 'getSessionState'],
+      commandNames: ['getProject', 'getPreviewContext', 'getSessionState', 'applySourceChange'],
     })
     expect(activeBridge?.getProject).toEqual(expect.any(Function))
     expect(activeBridge?.getPreviewContext).toEqual(expect.any(Function))
     expect(activeBridge?.getSessionState).toEqual(expect.any(Function))
+    expect(activeBridge?.applySourceChange).toEqual(expect.any(Function))
+    expect(activeBridge?.commandNames).not.toContain('restoreCheckpoint')
+    expect(activeBridge as unknown as Record<string, unknown>).not.toHaveProperty(
+      'restoreCheckpoint'
+    )
 
     fireEvent.click(screen.getByRole('menuitemcheckbox', { name: /stop temporary agent access/i }))
 
@@ -256,6 +282,7 @@ describe('ProjectControls layout', () => {
     expect(instructions).toContain('getProject()')
     expect(instructions).toContain('getPreviewContext()')
     expect(instructions).toContain('getSessionState()')
+    expect(instructions).toContain('applySourceChange()')
     expect(instructions).toContain('sourceChanges: true')
     expect(instructions).toContain('previewSettings: true')
     expect(instructions).toContain('previewEvidence: true')
@@ -322,7 +349,7 @@ describe('ProjectControls layout', () => {
           projectMetadata: false,
         },
         readScope: 'arcade-session',
-        commandNames: ['getProject', 'getPreviewContext', 'getSessionState'],
+        commandNames: ['getProject', 'getPreviewContext', 'getSessionState', 'applySourceChange'],
       },
     })
 
@@ -368,7 +395,9 @@ describe('ProjectControls layout', () => {
       },
     })
 
-    fireEvent.click(screen.getByRole('menuitemcheckbox', { name: /allow project metadata changes/i }))
+    fireEvent.click(
+      screen.getByRole('menuitemcheckbox', { name: /allow project metadata changes/i })
+    )
 
     expect(bridge.permissions.projectMetadata).toBe(true)
     expect(window.__AKSEL_ARCADE_AGENT_BRIDGE__?.permissions.projectMetadata).toBe(true)
@@ -382,5 +411,129 @@ describe('ProjectControls layout', () => {
         },
       },
     })
+  })
+
+  it('applies source replacements with automatic Checkpoints and human rollback', async () => {
+    renderHeader()
+
+    const bridge = await startAgentAccess()
+    const originalProject = expectBridgeSuccess(callBridgeCommand(() => bridge.getProject()))
+    const nextJsx = 'export default function App() { return <Heading>Agent update</Heading> }'
+    const nextHooks = 'export const useAgentFixture = () => "changed"'
+
+    const changeResult = callBridgeCommand(() =>
+      bridge.applySourceChange({
+        summary: 'Replace source for demo',
+        jsxCode: nextJsx,
+        hooksCode: nextHooks,
+      })
+    )
+
+    const changeData = expectBridgeSuccess(changeResult)
+    expect(changeResult).toMatchObject({
+      ok: true,
+      command: 'applySourceChange',
+    })
+    expect(changeData).toEqual({
+      checkpointId: expect.any(String),
+      changedFields: ['jsxCode', 'hooksCode'],
+    })
+    await waitFor(() => {
+      expect(screen.getByRole('status').textContent).toMatch(
+        /Last agent change: applySourceChange/i
+      )
+    })
+
+    await waitFor(() => {
+      const updatedProject = expectBridgeSuccess(callBridgeCommand(() => bridge.getProject()))
+      expect(updatedProject.jsxCode).toBe(nextJsx)
+      expect(updatedProject.hooksCode).toBe(nextHooks)
+    })
+
+    fireEvent.click(
+      await screen.findByRole('menuitem', {
+        name: /restore replace source for demo \(JSX \+ Hooks\)/i,
+      })
+    )
+
+    await waitFor(() => {
+      const restoredProject = expectBridgeSuccess(callBridgeCommand(() => bridge.getProject()))
+      expect(restoredProject.jsxCode).toBe(originalProject.jsxCode)
+      expect(restoredProject.hooksCode).toBe(originalProject.hooksCode)
+    })
+  })
+
+  it('caps automatic source Checkpoints at ten recent entries', async () => {
+    renderHeader()
+
+    const bridge = await startAgentAccess()
+
+    for (let index = 1; index <= 11; index += 1) {
+      const result = callBridgeCommand(() =>
+        bridge.applySourceChange({
+          summary: `change ${index}`,
+          jsxCode: `export default function App() { return <Heading>Change ${index}</Heading> }`,
+        })
+      )
+      expectBridgeSuccess(result)
+    }
+
+    await waitFor(() => {
+      const rollbackItems = screen
+        .getAllByRole('menuitem')
+        .filter((item) => item.textContent?.startsWith('Restore change'))
+      expect(rollbackItems).toHaveLength(10)
+    })
+    expect(screen.queryByRole('menuitem', { name: /^Restore change 1 \(/i })).toBeNull()
+    expect(screen.getByRole('menuitem', { name: /^Restore change 11 \(/i })).toBeTruthy()
+  })
+
+  it('rejects source replacements when source change permission is disabled', async () => {
+    renderHeader()
+
+    const bridge = await startAgentAccess()
+    const originalProject = expectBridgeSuccess(callBridgeCommand(() => bridge.getProject()))
+
+    fireEvent.click(screen.getByRole('menuitemcheckbox', { name: /allow source changes/i }))
+    expect(bridge.permissions.sourceChanges).toBe(false)
+
+    const deniedResult = callBridgeCommand(() =>
+      bridge.applySourceChange({
+        summary: 'Denied source update',
+        jsxCode: 'export default function App() { return <Heading>Denied</Heading> }',
+      })
+    )
+
+    expect(deniedResult).toMatchObject({
+      ok: false,
+      command: 'applySourceChange',
+      error: {
+        code: 'permission-denied',
+      },
+    })
+    const unchangedProject = expectBridgeSuccess(callBridgeCommand(() => bridge.getProject()))
+    expect(unchangedProject).toEqual(originalProject)
+    expect(screen.queryByRole('menuitem', { name: /restore denied source update/i })).toBeNull()
+  })
+
+  it('applies schema-valid invalid source and lets the normal preview report compile errors', async () => {
+    renderHeader({ includePreview: true })
+
+    const bridge = await startAgentAccess()
+    const invalidJsx = `export default function App() {
+  return <Button>Broken
+}`
+
+    const result = callBridgeCommand(() =>
+      bridge.applySourceChange({
+        summary: 'Introduce invalid JSX',
+        jsxCode: invalidJsx,
+      })
+    )
+
+    expectBridgeSuccess(result)
+    const appliedProject = expectBridgeSuccess(callBridgeCommand(() => bridge.getProject()))
+    expect(appliedProject.jsxCode).toBe(invalidJsx)
+    expect(await screen.findByText(/Compile Error/i, undefined, { timeout: 5000 })).toBeTruthy()
   })
 })

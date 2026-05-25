@@ -18,17 +18,19 @@ const permissionItems: PermissionItem[] = [
 ]
 
 export const AgentSessionMenu = () => {
-  const { project } = useProject()
+  const { project, updateProject } = useProject()
   const { theme } = useSettings()
   const {
     agentInstructions,
+    checkpoints,
     isActive,
     permissions,
+    restoreCheckpoint,
     statusText,
     startAgentSession,
     stopAgentSession,
     setPermission,
-  } = useAgentSession({ project, theme })
+  } = useAgentSession({ project, theme, onSourceChange: updateProject })
 
   const handleAccessChange = (checked: boolean) => {
     if (checked) {
@@ -77,12 +79,7 @@ export const AgentSessionMenu = () => {
               Arcade-scoped read access is mandatory while active so an authorized agent can
               understand the current project and preview context.
             </BodyShort>
-            <Button
-              type="button"
-              size="small"
-              variant="secondary"
-              onClick={handleCopyInstructions}
-            >
+            <Button type="button" size="small" variant="secondary" onClick={handleCopyInstructions}>
               Copy agent instructions
             </Button>
           </VStack>
@@ -105,7 +102,25 @@ export const AgentSessionMenu = () => {
             </ActionMenu.CheckboxItem>
           ))}
         </ActionMenu.Group>
+        {checkpoints.length > 0 && (
+          <>
+            <ActionMenu.Divider />
+            <ActionMenu.Group label="Rollback Checkpoints">
+              {checkpoints.map((checkpoint) => (
+                <ActionMenu.Item
+                  key={checkpoint.id}
+                  onSelect={() => restoreCheckpoint(checkpoint.id)}
+                >
+                  {`Restore ${checkpoint.summary} (${formatChangedFields(checkpoint.changedFields)})`}
+                </ActionMenu.Item>
+              ))}
+            </ActionMenu.Group>
+          </>
+        )}
       </ActionMenu.Content>
     </ActionMenu>
   )
 }
+
+const formatChangedFields = (fields: Array<'jsxCode' | 'hooksCode'>): string =>
+  fields.map((field) => (field === 'jsxCode' ? 'JSX' : 'Hooks')).join(' + ')

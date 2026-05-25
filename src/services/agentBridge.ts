@@ -37,10 +37,24 @@ export interface AgentBridgeReadContext {
   preview: AgentPreviewReadState
 }
 
+export type AgentSourceField = 'jsxCode' | 'hooksCode'
+
+export interface AgentSourceChangeRequest {
+  summary: string
+  jsxCode?: string
+  hooksCode?: string
+}
+
+export interface AgentSourceChangeResult {
+  checkpointId: string
+  changedFields: AgentSourceField[]
+}
+
 export const AGENT_BRIDGE_COMMAND_NAMES = [
   'getProject',
   'getPreviewContext',
   'getSessionState',
+  'applySourceChange',
 ] as const
 
 export type AgentBridgeCommandName = (typeof AGENT_BRIDGE_COMMAND_NAMES)[number]
@@ -64,7 +78,7 @@ interface AgentBridgeCommandFailure {
   ok: false
   command: AgentBridgeCommandName
   error: {
-    code: 'session-revoked'
+    code: 'session-revoked' | 'permission-denied' | 'invalid-request'
     message: string
   }
 }
@@ -78,6 +92,7 @@ export interface AgentBridgeController {
   getPermissions: () => AgentPermissions
   isSessionActive: () => boolean
   recordActivity: (command: AgentBridgeCommandName) => void
+  applySourceChange: (request: unknown) => AgentBridgeCommandResult<AgentSourceChangeResult>
 }
 
 export interface AgentBridge {
@@ -91,6 +106,9 @@ export interface AgentBridge {
   getProject: () => AgentBridgeCommandResult<AgentProjectReadState>
   getPreviewContext: () => AgentBridgeCommandResult<AgentPreviewReadState>
   getSessionState: () => AgentBridgeCommandResult<AgentSessionReadState>
+  applySourceChange: (
+    request: AgentSourceChangeRequest
+  ) => AgentBridgeCommandResult<AgentSourceChangeResult>
 }
 
 export const DEFAULT_AGENT_PERMISSIONS: AgentPermissions = {
@@ -156,6 +174,27 @@ export const createAgentBridge = (
         readScope: 'arcade-session',
         commandNames: [...AGENT_BRIDGE_COMMAND_NAMES],
       })),
+    applySourceChange: (request) => {
+      const command: AgentBridgeCommandName = 'applySourceChange'
+
+      if (!controller.isSessionActive()) {
+        return {
+          ok: false,
+          command,
+          error: {
+            code: 'session-revoked',
+            message: 'Agent access has been revoked. Ask the human to start a new Agent session.',
+          },
+        }
+      }
+
+      const result = controller.applySourceChange(request)
+      if (result.ok) {
+        controller.recordActivity(command)
+      }
+
+      return result
+    },
   }
 }
 export const publishAgentBridge = (
@@ -194,6 +233,7 @@ export const createAgentInstructions = (permissions: AgentPermissions): string =
     'The human must start temporary Agent access before this global exists. If it is missing, ask the human to start access from the Agent menu.',
     '',
     `Currently available command names: ${AGENT_BRIDGE_COMMAND_NAMES.map((command) => `${command}()`).join(', ')}`,
+    'To replace source, call applySourceChange({ summary, jsxCode?, hooksCode? }). A non-empty human-readable summary is required, and the human controls rollback from the Agent menu.',
     '',
     'Active permission state:',
     ...permissionLines,
