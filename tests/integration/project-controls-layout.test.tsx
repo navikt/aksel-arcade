@@ -4,7 +4,11 @@ import { AppProvider, useProject } from '@/hooks/useProject'
 import { SettingsProvider, useSettings } from '@/contexts/SettingsContext'
 import { AppHeader } from '@/components/Header/AppHeader'
 import { PreviewPane } from '@/components/Preview/PreviewPane'
-import type { AgentBridgeCommandResult } from '@/services/agentBridge'
+import type {
+  AgentBridge,
+  AgentBridgeCommandResult,
+  AgentBridgeErrorCode,
+} from '@/services/agentBridge'
 
 const noop = () => {}
 
@@ -105,6 +109,46 @@ const expectBridgeSuccess = <TData,>(result: AgentBridgeCommandResult<TData>): T
   }
 
   return result.data
+}
+
+const expectBridgeFailure = <TData,>(
+  result: AgentBridgeCommandResult<TData>,
+  code: AgentBridgeErrorCode
+) => {
+  expect(result).toMatchObject({
+    ok: false,
+    error: {
+      code,
+      message: expect.any(String),
+    },
+  })
+
+  if (result.ok) {
+    throw new Error('Expected bridge command to fail.')
+  }
+
+  expect(result.error.message.trim().length).toBeGreaterThan(0)
+  return result.error
+}
+
+const getRollbackLabels = (): string[] =>
+  screen
+    .queryAllByRole('menuitem')
+    .map((item) => item.textContent ?? '')
+    .filter((label) => label.startsWith('Restore '))
+
+const captureAgentState = (bridge: AgentBridge) => {
+  const project = expectBridgeSuccess(callBridgeCommand(() => bridge.getProject()))
+  const preview = expectBridgeSuccess(callBridgeCommand(() => bridge.getPreviewContext()))
+  const session = expectBridgeSuccess(callBridgeCommand(() => bridge.getSessionState()))
+
+  return {
+    project,
+    preview,
+    permissions: session.permissions,
+    statusText: screen.getByRole('status').textContent,
+    rollbackLabels: getRollbackLabels(),
+  }
 }
 
 const startAgentAccess = async () => {
@@ -505,15 +549,134 @@ describe('ProjectControls layout', () => {
     )
 
     expect(deniedResult).toMatchObject({
-      ok: false,
       command: 'applySourceChange',
-      error: {
-        code: 'permission-denied',
-      },
     })
+    expectBridgeFailure(deniedResult, 'permission-denied')
     const unchangedProject = expectBridgeSuccess(callBridgeCommand(() => bridge.getProject()))
     expect(unchangedProject).toEqual(originalProject)
     expect(screen.queryByRole('menuitem', { name: /restore denied source update/i })).toBeNull()
+  })
+
+  it('rejects malformed and unsupported source change requests without mutating Agent state', async () => {
+    renderHeader()
+
+    const bridge = await startAgentAccess()
+    expectBridgeSuccess(
+      callBridgeCommand(() =>
+        bridge.applySourceChange({
+          summary: 'Seed checkpoint',
+          jsxCode: 'export default function App() { return <Heading>Seed</Heading> }',
+        })
+      )
+    )
+    const before = captureAgentState(bridge)
+
+    const invalidRequests: Array<{
+      request: unknown
+      code: AgentBridgeErrorCode
+      message: RegExp
+    }> = [
+      {
+        request: undefined,
+        code: 'invalid-request',
+        message: /provided as an object/i,
+      },
+      {
+        request: null,
+        code: 'invalid-request',
+        message: /provided as an object/i,
+      },
+      {
+        request: [],
+        code: 'invalid-request',
+        message: /provided as an object/i,
+      },
+      {
+        request: { summary: 'No fields' },
+        code: 'invalid-request',
+        message: /jsxCode and\/or hooksCode/i,
+      },
+      {
+        request: {
+          summary: '   ',
+          jsxCode: 'export default function App() { return <Heading>Blank</Heading> }',
+        },
+        code: 'invalid-request',
+        message: /non-empty/i,
+      },
+      {
+        request: { summary: 'Wrong type', jsxCode: 123 },
+        code: 'invalid-request',
+        message: /jsxCode must be a full-field string/i,
+      },
+      {
+        request: { summary: 'Empty JSX', jsxCode: '' },
+        code: 'invalid-request',
+        message: /jsxCode must be a non-empty full-field string/i,
+      },
+      {
+        request: { summary: 'Blank Hooks', hooksCode: '   ' },
+        code: 'invalid-request',
+        message: /hooksCode must be a non-empty full-field string/i,
+      },
+      {
+        request: {
+          summary: 'Unknown field',
+          jsxCode: 'export default function App() { return <Heading>Changed</Heading> }',
+          name: 'Renamed by agent',
+        },
+        code: 'unsupported-field',
+        message: /Unsupported Agent source change field: name/i,
+      },
+      {
+        request: {
+          summary: 'Unsupported viewport',
+          jsxCode: 'export default function App() { return <Heading>Changed</Heading> }',
+          viewportSize: 'XXL',
+        },
+        code: 'unsupported-field',
+        message: /viewportSize/i,
+      },
+      {
+        request: {
+          summary: 'Unsupported theme',
+          hooksCode: 'export const useAgentFixture = () => "theme"',
+          theme: 'system',
+        },
+        code: 'unsupported-field',
+        message: /theme/i,
+      },
+    ]
+
+    for (const { request, code, message } of invalidRequests) {
+      const result = callBridgeCommand(() => bridge.applySourceChange(request))
+      const error = expectBridgeFailure(result, code)
+      expect(error.message).toMatch(message)
+      expect(screen.getByRole('status').textContent).toBe(before.statusText)
+      expect(captureAgentState(bridge)).toEqual(before)
+    }
+  })
+
+  it('rejects oversized source changes before mutation or Checkpoint creation', async () => {
+    renderHeader()
+
+    const bridge = await startAgentAccess()
+    const before = captureAgentState(bridge)
+    const oversizedJsx = `export default function App() {
+  return <Heading>${'x'.repeat(5 * 1024 * 1024)}</Heading>
+}`
+
+    const result = callBridgeCommand(() =>
+      bridge.applySourceChange({
+        summary: 'Oversized source replacement',
+        jsxCode: oversizedJsx,
+      })
+    )
+
+    const error = expectBridgeFailure(result, 'payload-too-large')
+    expect(error.message).toMatch(/exceeds 5MB limit/i)
+    expect(screen.getByRole('status').textContent).toBe(before.statusText)
+    expect(captureAgentState(bridge)).toEqual(before)
   })
 
   it('applies schema-valid invalid source and lets the normal preview report compile errors', async () => {

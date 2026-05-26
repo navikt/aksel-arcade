@@ -50,6 +50,13 @@ export interface AgentSourceChangeResult {
   changedFields: AgentSourceField[]
 }
 
+export type AgentBridgeErrorCode =
+  | 'session-revoked'
+  | 'permission-denied'
+  | 'invalid-request'
+  | 'unsupported-field'
+  | 'payload-too-large'
+
 export const AGENT_BRIDGE_COMMAND_NAMES = [
   'getProject',
   'getPreviewContext',
@@ -78,7 +85,7 @@ interface AgentBridgeCommandFailure {
   ok: false
   command: AgentBridgeCommandName
   error: {
-    code: 'session-revoked' | 'permission-denied' | 'invalid-request'
+    code: AgentBridgeErrorCode
     message: string
   }
 }
@@ -106,9 +113,7 @@ export interface AgentBridge {
   getProject: () => AgentBridgeCommandResult<AgentProjectReadState>
   getPreviewContext: () => AgentBridgeCommandResult<AgentPreviewReadState>
   getSessionState: () => AgentBridgeCommandResult<AgentSessionReadState>
-  applySourceChange: (
-    request: AgentSourceChangeRequest
-  ) => AgentBridgeCommandResult<AgentSourceChangeResult>
+  applySourceChange: (request: unknown) => AgentBridgeCommandResult<AgentSourceChangeResult>
 }
 
 export const DEFAULT_AGENT_PERMISSIONS: AgentPermissions = {
