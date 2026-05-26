@@ -367,6 +367,13 @@ const parseSourceChangeRequest = (request: unknown): SourceChangeParseResult => 
         message: `${field} must be a full-field string replacement.`,
       }
     }
+    if (value.trim().length === 0) {
+      return {
+        ok: false,
+        code: 'invalid-request',
+        message: `${field} must be a non-empty full-field string replacement.`,
+      }
+    }
 
     updates[field] = value
     changedFields.push(field)

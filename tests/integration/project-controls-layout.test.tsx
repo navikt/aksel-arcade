@@ -610,6 +610,16 @@ describe('ProjectControls layout', () => {
         message: /jsxCode must be a full-field string/i,
       },
       {
+        request: { summary: 'Empty JSX', jsxCode: '' },
+        code: 'invalid-request',
+        message: /jsxCode must be a non-empty full-field string/i,
+      },
+      {
+        request: { summary: 'Blank Hooks', hooksCode: '   ' },
+        code: 'invalid-request',
+        message: /hooksCode must be a non-empty full-field string/i,
+      },
+      {
         request: {
           summary: 'Unknown field',
           jsxCode: 'export default function App() { return <Heading>Changed</Heading> }',

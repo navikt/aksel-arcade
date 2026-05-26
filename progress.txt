@@ -430,3 +430,15 @@ Completed in this branch:
 Verification completed with `npm run typecheck`, `CI=1 npm run test`, and a browser smoke/console check at `http://127.0.0.1:5176/aksel-arcade/`.
 
 Follow-up note: #35 can extend the same guarded command path to permitted `viewportSize`, `theme`, and `name` replacements. Reuse the unsupported-field whole-request behavior when adding those fields so mixed invalid or unauthorized Agent changes stay atomic.
+
+### 2026-05-26 - PR #43 code review follow-up
+
+Fixed after reviewing PR #43:
+
+- Found that `applySourceChange` accepted empty or whitespace-only `jsxCode`/`hooksCode` string replacements, which could mutate the project source and create a Checkpoint for unusable source content.
+- Added non-empty source field validation before mutation and Checkpoint creation.
+- Added regression coverage proving empty JSX and blank Hooks replacements return structured `invalid-request` errors and leave project, preview, permissions, status, and Checkpoint history unchanged.
+
+Verification completed with `npm run typecheck`, `CI=1 npm run test`, and a browser smoke/console check at `http://127.0.0.1:5176/aksel-arcade/`.
+
+Follow-up note: #35 should preserve this non-empty source validation when it extends the guarded Agent change path to preview settings and metadata.
