@@ -1,20 +1,56 @@
 # Aksel Arcade
 
-Aksel Arcade is a browser playground for creating Aksel-based React prototypes with live human review.
+Aksel Arcade is a playground for creating Aksel-based React prototypes with live human review, available through web and desktop product surfaces.
 
 ## Language
 
 **Arcade project**:
-A user-owned prototype in Aksel Arcade, including its editable source and preview preferences.
+A shell-neutral user-owned prototype in Aksel Arcade, including its editable source and preview preferences.
 _Avoid_: File, document, artifact
 
+**Arcade project package**:
+A portable share artifact, usually named with the `.akselarcade` extension, that contains one **Arcade project** for import, export, or desktop file opening.
+_Avoid_: Arcade project, save file, document
+
+**Web Arcade**:
+The browser-hosted product surface for working with **Arcade projects**.
+_Avoid_: Browser-only Arcade, original Arcade
+
+**Desktop Arcade**:
+The desktop product surface for working with the same **Arcade projects** as **Web Arcade**.
+_Avoid_: Electron app, native app
+
 **Agent session**:
-A revocable, consent-gated pairing relationship where an authorized external agent can inspect and change the active **Arcade project** while the human can stop access and roll back changes.
+A Desktop Arcade-only revocable, consent-gated pairing relationship where an authorized external agent can inspect and change the active **Arcade project** while the human can stop access and roll back changes.
 _Avoid_: Chat, bot session, automation session
 
+**Agent access**:
+The user-facing consent state for giving an **External agent** access to the current **Arcade project** through an **Agent session**.
+_Avoid_: Local server, transport, pairing token
+
 **Agent bridge**:
-The user-authorized connection point between an external agent and an active **Agent session**; it lets agents read **Arcade-scoped state** and submit **Agent changes**.
+The Desktop Arcade user-authorized connection point between an external agent and an active **Agent session**; it lets agents read **Arcade-scoped state** and submit **Agent changes**.
 _Avoid_: Provider integration, backend API, browser extension
+
+**Agent transport**:
+The Desktop Arcade-only same-device mechanism an **External agent** uses to reach the **Agent bridge** during an active **Agent session**.
+_Avoid_: Agent bridge, permission model, browser access
+
+**Agent pairing**:
+The user-approved act of giving an **External agent** access to one active **Agent session** through an **Agent pairing credential**.
+_Avoid_: Installation, login, persistent trust
+
+**Agent pairing credential**:
+A short-lived secret that authorizes one **External agent** to use the **Agent transport** for one active **Agent session**.
+_Avoid_: API key, installation token, persistent trust
+
+**External agent**:
+A user-directed AI agent outside Desktop Arcade that works on an active **Arcade project** through the **Agent bridge**.
+_Avoid_: In-app chat, provider integration, browser automation
+
+**Copilot agent surface**:
+A GitHub Copilot product surface that can act as an **External agent**, such as the GitHub Copilot app, Copilot CLI, or Copilot in VS Code.
+_Avoid_: Copilot provider, single Copilot integration
 
 **Agent permission**:
 A human-controlled capability that limits what an external agent may change or capture during an **Agent session**.
