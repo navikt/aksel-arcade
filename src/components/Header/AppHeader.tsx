@@ -30,7 +30,7 @@ import { SaveStatusIndicator } from './SaveStatusIndicator'
 import { ProjectSizeIndicator } from './ProjectSizeIndicator'
 import { AgentSessionMenu } from './AgentSessionMenu'
 import { useSettings } from '@/contexts/SettingsContext'
-import type { Project, ViewportSize } from '@/types/project'
+import type { Project } from '@/types/project'
 import type { SaveStatus } from '@/hooks/useAutoSave'
 import { exportProject, importProject } from '@/services/storage'
 import {
@@ -62,7 +62,6 @@ interface AppHeaderProps {
   projectName: string
   onProjectNameChange: (name: string) => void
   currentProject: Project
-  shareViewport: ViewportSize
   onProjectImported: (project: Project) => void
   saveStatus: SaveStatus
   projectSizeBytes: number
@@ -77,7 +76,6 @@ export const AppHeader = ({
   projectName,
   onProjectNameChange,
   currentProject,
-  shareViewport,
   onProjectImported,
   saveStatus,
   projectSizeBytes,
@@ -140,7 +138,7 @@ export const AppHeader = ({
 
   const handleShareButtonClick = () => {
     if (shareOpen) {
-      generateShareLink()
+      generateShareLink(true)
       return
     }
 
@@ -189,12 +187,12 @@ export const AppHeader = ({
     const lastModified = currentProject.lastModified ?? 'unknown'
     const jsxLength = currentProject.jsxCode.length
     const hooksLength = currentProject.hooksCode.length
-    return `${lastModified}|${jsxLength}|${hooksLength}|${shareViewport}|${theme}`
+    return `${lastModified}|${jsxLength}|${hooksLength}|${currentProject.viewportSize}|${theme}`
   }, [
     currentProject.hooksCode.length,
     currentProject.jsxCode.length,
     currentProject.lastModified,
-    shareViewport,
+    currentProject.viewportSize,
     theme,
   ])
   const showOversizeMessage =
