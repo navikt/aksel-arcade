@@ -442,3 +442,15 @@ Fixed after reviewing PR #43:
 Verification completed with `npm run typecheck`, `CI=1 npm run test`, and a browser smoke/console check at `http://127.0.0.1:5176/aksel-arcade/`.
 
 Follow-up note: #35 should preserve this non-empty source validation when it extends the guarded Agent change path to preview settings and metadata.
+
+### 2026-05-26 - PR #43 build failure follow-up
+
+Fixed after the merged PR #43 broke the GitHub Pages build:
+
+- Reproduced the failing workflow locally with `npm run build` and confirmed the CI error from run `26434521486`.
+- Root cause: `useAgentSession` typed its `project` option as a narrow Arcade read-context subset, but the oversize validation path passed that value to `validateProjectSize(Project)`. `npm run typecheck` missed this because the CI build uses `tsc -b`, which checks the referenced app/test configs.
+- Changed `UseAgentSessionOptions.project` to the full `Project`, matching the actual caller while keeping the bridge read context scoped to `{ name, jsxCode, hooksCode }` and preview state.
+
+Verification completed with `npm run build`, `npm run typecheck`, `CI=1 npm run test`, and a browser smoke/console check at `http://127.0.0.1:5176/aksel-arcade/`.
+
+Follow-up note: when Agent bridge validation uses project-wide helpers, run `npm run build` before merge because `npm run typecheck` does not catch all build-mode referenced-project errors.

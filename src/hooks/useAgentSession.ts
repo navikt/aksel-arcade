@@ -50,7 +50,7 @@ export type AgentSourceCheckpointListItem = Pick<
 >
 
 interface UseAgentSessionOptions {
-  project: Pick<Project, 'name' | 'jsxCode' | 'hooksCode' | 'viewportSize'>
+  project: Project
   theme: ThemeMode
   onSourceChange: (updates: AgentSourceUpdates) => void
 }
