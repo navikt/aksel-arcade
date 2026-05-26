@@ -530,3 +530,13 @@ Completed in this branch:
 Verification completed with `npm run typecheck`, `CI=1 npm run test`, targeted share/Agent integration coverage, and a headless browser smoke check of Agent change -> preview render -> Share URL copy -> Export JSON download.
 
 Follow-up note: keep share/export as human-triggered fallback flows. If future Agent artifacts move into project-level state, extend the share/export exclusion regression checks before exposing those artifacts anywhere near fallback payloads.
+
+### 2026-05-26 - PR #49 build follow-up
+
+Fixed after the post-merge master build failed:
+
+- Reproduced the GitHub Actions failure from run 26449614261: `tsc -b` rejected the share popover retry button because `generateShareLink` now accepts an optional `forceRegeneration` boolean, but React `onClick` passes a mouse event.
+- Wrapped the retry action in a zero-argument click handler so retry keeps normal generation semantics without passing the event into share-link generation.
+- Updated the Agent sessions PRD history with the #38 fallback export/share implementation and the PR #49 build follow-up.
+
+Verification completed with `npm run build`.

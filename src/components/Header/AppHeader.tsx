@@ -400,7 +400,9 @@ export const AppHeader = ({
                             <Button
                               size="xsmall"
                               variant="tertiary"
-                              onClick={generateShareLink}
+                              onClick={() => {
+                                void generateShareLink()
+                              }}
                               className="share-popover__retry"
                             >
                               Retry generation
