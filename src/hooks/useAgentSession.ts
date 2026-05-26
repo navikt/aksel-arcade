@@ -6,6 +6,7 @@ import {
   removeAgentBridge,
   type AgentBridgeCommandResult,
   type AgentBridgeCommandName,
+  type AgentBridgeErrorCode,
   type AgentBridgeReadContext,
   type AgentBridgeSession,
   type AgentPermissionKey,
@@ -15,6 +16,7 @@ import {
 } from '@/services/agentBridge'
 import type { ThemeMode } from '@/contexts/SettingsContext'
 import type { Project } from '@/types/project'
+import { validateProjectSize } from '@/services/storage'
 import { generateSecureUUID } from '@/utils/crypto'
 
 type AgentSessionActivity =
@@ -66,6 +68,7 @@ export const useAgentSession = ({ project, theme, onSourceChange }: UseAgentSess
   })
   const activeSessionIdRef = useRef<string | null>(null)
   const permissionsRef = useRef<AgentPermissions>(permissions)
+  const projectRef = useRef(project)
   const readContextRef = useRef<AgentBridgeReadContext>({
     project: {
       name: project.name,
@@ -94,6 +97,7 @@ export const useAgentSession = ({ project, theme, onSourceChange }: UseAgentSess
   )
 
   permissionsRef.current = permissions
+  projectRef.current = project
   readContextRef.current = readContext
 
   const applyAgentSourceChange = useCallback(
@@ -107,7 +111,18 @@ export const useAgentSession = ({ project, theme, onSourceChange }: UseAgentSess
 
       const parsedRequest = parseSourceChangeRequest(request)
       if (!parsedRequest.ok) {
-        return createSourceChangeFailure('invalid-request', parsedRequest.message)
+        return createSourceChangeFailure(parsedRequest.code, parsedRequest.message)
+      }
+
+      const sizeStatus = validateProjectSize({
+        ...projectRef.current,
+        ...parsedRequest.updates,
+      })
+      if (!sizeStatus.valid) {
+        return createSourceChangeFailure(
+          'payload-too-large',
+          sizeStatus.message ?? 'Agent source change exceeds the project size limit.'
+        )
       }
 
       const currentSource = readContextRef.current.project
@@ -283,13 +298,14 @@ interface ParsedSourceChangeRequest {
 
 interface InvalidSourceChangeRequest {
   ok: false
+  code: AgentBridgeErrorCode
   message: string
 }
 
 type SourceChangeParseResult = ParsedSourceChangeRequest | InvalidSourceChangeRequest
 
 const createSourceChangeFailure = (
-  code: 'permission-denied' | 'invalid-request',
+  code: AgentBridgeErrorCode,
   message: string
 ): AgentBridgeCommandResult<AgentSourceChangeResult> => ({
   ok: false,
@@ -300,15 +316,39 @@ const createSourceChangeFailure = (
   },
 })
 
+const SOURCE_CHANGE_REQUEST_KEYS = ['summary', 'jsxCode', 'hooksCode'] as const
+const SOURCE_CHANGE_REQUEST_KEY_SET = new Set<string>(SOURCE_CHANGE_REQUEST_KEYS)
+
 const parseSourceChangeRequest = (request: unknown): SourceChangeParseResult => {
   if (!request || typeof request !== 'object' || Array.isArray(request)) {
-    return { ok: false, message: 'Source changes must be provided as an object.' }
+    return {
+      ok: false,
+      code: 'invalid-request',
+      message: 'Source changes must be provided as an object.',
+    }
   }
 
   const candidate = request as Record<string, unknown>
+  const unsupportedFields = Object.keys(candidate).filter(
+    (field) => !SOURCE_CHANGE_REQUEST_KEY_SET.has(field)
+  )
+  if (unsupportedFields.length > 0) {
+    return {
+      ok: false,
+      code: 'unsupported-field',
+      message: `Unsupported Agent source change field${
+        unsupportedFields.length === 1 ? '' : 's'
+      }: ${unsupportedFields.join(', ')}. applySourceChange accepts only summary, jsxCode, and hooksCode.`,
+    }
+  }
+
   const summary = candidate.summary
   if (typeof summary !== 'string' || summary.trim().length === 0) {
-    return { ok: false, message: 'A non-empty human-readable summary is required.' }
+    return {
+      ok: false,
+      code: 'invalid-request',
+      message: 'A non-empty human-readable summary is required.',
+    }
   }
 
   const updates: AgentSourceUpdates = {}
@@ -321,7 +361,11 @@ const parseSourceChangeRequest = (request: unknown): SourceChangeParseResult => 
 
     const value = candidate[field]
     if (typeof value !== 'string') {
-      return { ok: false, message: `${field} must be a full-field string replacement.` }
+      return {
+        ok: false,
+        code: 'invalid-request',
+        message: `${field} must be a full-field string replacement.`,
+      }
     }
 
     updates[field] = value
@@ -329,7 +373,11 @@ const parseSourceChangeRequest = (request: unknown): SourceChangeParseResult => 
   }
 
   if (changedFields.length === 0) {
-    return { ok: false, message: 'Provide jsxCode and/or hooksCode to replace source.' }
+    return {
+      ok: false,
+      code: 'invalid-request',
+      message: 'Provide jsxCode and/or hooksCode to replace source.',
+    }
   }
 
   return {

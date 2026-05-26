@@ -414,3 +414,19 @@ Fixed after reviewing PR #40:
 - Added integration coverage proving captured bridge references return updated project source/name, preview theme/viewport, and active permission state after the human changes them during an Agent session.
 
 Verification completed with `npm run typecheck`, `CI=1 npm run test -- --run`, `npm run lint` (existing `InspectionPopover` hook dependency warning only), and a browser smoke/console check at `http://127.0.0.1:5175/aksel-arcade/`.
+
+### 2026-05-26 - #34 Reject invalid or unauthorized Agent changes as structured errors
+
+Selected #34 as the highest-priority `ready-for-agent` feature from #34-#38 because it is the next PRD follow-up after #33 and unblocks #35's atomic preview/metadata replacement work. Worked only on #34.
+
+Completed in this branch:
+
+- Hardened `applySourceChange` so malformed, unsupported, unauthorized, or oversized requests fail before source mutation or Checkpoint creation.
+- Added stable structured Agent error codes for `invalid-request`, `unsupported-field`, and `payload-too-large`, alongside the existing `permission-denied` and `session-revoked` errors.
+- Rejected non-object/array payloads, missing summaries, empty changes, non-string source fields, fields outside the current source-change contract, unsupported preview/metadata fields such as `viewportSize`, `theme`, and `name`, and source updates that would exceed the existing 5MB project size limit.
+- Preserved project source/name, preview context, active permissions, menu status, and Checkpoint history after rejected bridge calls.
+- Added integration coverage for valid changes, malformed payloads, permission denial, unsupported viewport/theme/name fields, oversize rejection, structured error shape, whole-command rejection, and unchanged state after failures.
+
+Verification completed with `npm run typecheck`, `CI=1 npm run test`, and a browser smoke/console check at `http://127.0.0.1:5176/aksel-arcade/`.
+
+Follow-up note: #35 can extend the same guarded command path to permitted `viewportSize`, `theme`, and `name` replacements. Reuse the unsupported-field whole-request behavior when adding those fields so mixed invalid or unauthorized Agent changes stay atomic.
