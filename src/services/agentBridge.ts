@@ -38,16 +38,22 @@ export interface AgentBridgeReadContext {
 }
 
 export type AgentSourceField = 'jsxCode' | 'hooksCode'
+export type AgentPreviewField = 'viewportSize' | 'theme'
+export type AgentMetadataField = 'name'
+export type AgentChangeField = AgentSourceField | AgentPreviewField | AgentMetadataField
 
 export interface AgentSourceChangeRequest {
   summary: string
   jsxCode?: string
   hooksCode?: string
+  viewportSize?: ViewportSize
+  theme?: ThemeMode
+  name?: string
 }
 
 export interface AgentSourceChangeResult {
   checkpointId: string
-  changedFields: AgentSourceField[]
+  changedFields: AgentChangeField[]
 }
 
 export type AgentBridgeErrorCode =
@@ -238,7 +244,7 @@ export const createAgentInstructions = (permissions: AgentPermissions): string =
     'The human must start temporary Agent access before this global exists. If it is missing, ask the human to start access from the Agent menu.',
     '',
     `Currently available command names: ${AGENT_BRIDGE_COMMAND_NAMES.map((command) => `${command}()`).join(', ')}`,
-    'To replace source, call applySourceChange({ summary, jsxCode?, hooksCode? }). A non-empty human-readable summary is required, and the human controls rollback from the Agent menu.',
+    'To replace allowed fields, call applySourceChange({ summary, jsxCode?, hooksCode?, viewportSize?, theme?, name? }). A non-empty human-readable summary is required, and the human controls rollback from the Agent menu.',
     '',
     'Active permission state:',
     ...permissionLines,

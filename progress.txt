@@ -454,3 +454,29 @@ Fixed after the merged PR #43 broke the GitHub Pages build:
 Verification completed with `npm run build`, `npm run typecheck`, `CI=1 npm run test`, and a browser smoke/console check at `http://127.0.0.1:5176/aksel-arcade/`.
 
 Follow-up note: when Agent bridge validation uses project-wide helpers, run `npm run build` before merge because `npm run typecheck` does not catch all build-mode referenced-project errors.
+
+### 2026-05-26 - #35 Allow permitted preview and metadata replacements
+
+Selected #35 as the highest-priority `ready-for-agent` feature from #35-#38 because #34 is closed, #35 is the next Agent mutation capability in the PRD chain, and it unblocks #37's Preview evidence work. Worked only on #35.
+
+Completed in this branch:
+
+- Extended the existing guarded `applySourceChange` command to accept permitted `viewportSize`, `theme`, and `name` full-field replacements alongside `jsxCode` and `hooksCode`.
+- Kept permission enforcement atomic: source fields require `sourceChanges`, viewport/theme require `previewSettings`, and project name requires `projectMetadata`, which remains disabled by default.
+- Rejected unsupported fields, invalid viewport/theme values, invalid names, malformed source fields, empty changes, missing summaries, and oversized project updates before any mutation or Checkpoint creation.
+- Created a Checkpoint before every accepted Agent change and extended human rollback so source/name/viewport/theme fields restore only when they were changed by that Checkpoint.
+- Updated copied Agent instructions and integration coverage for active permission toggles, preview setting apply, metadata default denial, metadata opt-in apply, combined source/preview/metadata apply, whole-change rejection, invalid value handling, Checkpoint capping, and combined rollback.
+
+Verification completed with `npm run typecheck`, `npm run test -- --run`, `npm run build`, and a browser smoke/console check at `http://127.0.0.1:5177/aksel-arcade/`.
+
+Follow-up note: #36 should add diagnostics as a read-only bridge command over preview status/errors/console history. #37 can now rely on preview settings being safely agent-changeable while building sanitized Preview evidence.
+
+### 2026-05-26 - PR #45 code review follow-up
+
+Fixed after reviewing PR #45:
+
+- Found that rapid sequential Agent changes could create a later Checkpoint from stale pre-render state, causing human rollback to jump back too far.
+- Synchronized the Agent session's current project/preview refs immediately after accepted Agent changes and human rollback, so subsequent bridge calls capture the latest accepted state even before React flushes a render.
+- Added regression coverage that applies two Agent changes in the same React act batch, restores the second Checkpoint back to the first change, then restores the first Checkpoint back to the original source.
+
+Verification completed with `npm run typecheck`, `npm run test -- --run`, `npm run build`, and a browser smoke/console check at `http://127.0.0.1:5177/aksel-arcade/`.

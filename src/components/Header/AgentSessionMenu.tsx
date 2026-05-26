@@ -1,7 +1,11 @@
 import { ActionMenu, BodyShort, Box, Button, Detail, VStack } from '@navikt/ds-react'
 import { RobotIcon } from '@navikt/aksel-icons'
 import { useAgentSession } from '@/hooks/useAgentSession'
-import { AGENT_BRIDGE_GLOBAL, type AgentPermissionKey } from '@/services/agentBridge'
+import {
+  AGENT_BRIDGE_GLOBAL,
+  type AgentChangeField,
+  type AgentPermissionKey,
+} from '@/services/agentBridge'
 import { useSettings } from '@/contexts/SettingsContext'
 import { useProject } from '@/hooks/useProject'
 
@@ -19,7 +23,7 @@ const permissionItems: PermissionItem[] = [
 
 export const AgentSessionMenu = () => {
   const { project, updateProject } = useProject()
-  const { theme } = useSettings()
+  const { theme, setTheme } = useSettings()
   const {
     agentInstructions,
     checkpoints,
@@ -30,7 +34,12 @@ export const AgentSessionMenu = () => {
     startAgentSession,
     stopAgentSession,
     setPermission,
-  } = useAgentSession({ project, theme, onSourceChange: updateProject })
+  } = useAgentSession({
+    project,
+    theme,
+    onProjectChange: updateProject,
+    onThemeChange: setTheme,
+  })
 
   const handleAccessChange = (checked: boolean) => {
     if (checked) {
@@ -122,5 +131,20 @@ export const AgentSessionMenu = () => {
   )
 }
 
-const formatChangedFields = (fields: Array<'jsxCode' | 'hooksCode'>): string =>
-  fields.map((field) => (field === 'jsxCode' ? 'JSX' : 'Hooks')).join(' + ')
+const formatChangedFields = (fields: AgentChangeField[]): string =>
+  fields.map(formatChangedField).join(' + ')
+
+const formatChangedField = (field: AgentChangeField): string => {
+  switch (field) {
+    case 'jsxCode':
+      return 'JSX'
+    case 'hooksCode':
+      return 'Hooks'
+    case 'viewportSize':
+      return 'Viewport'
+    case 'theme':
+      return 'Theme'
+    case 'name':
+      return 'Name'
+  }
+}
