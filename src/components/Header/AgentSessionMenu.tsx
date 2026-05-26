@@ -1,3 +1,4 @@
+import { useCallback } from 'react'
 import { ActionMenu, BodyShort, Box, Button, Detail, VStack } from '@navikt/ds-react'
 import { RobotIcon } from '@navikt/aksel-icons'
 import { useAgentSession } from '@/hooks/useAgentSession'
@@ -6,6 +7,7 @@ import {
   type AgentChangeField,
   type AgentPermissionKey,
 } from '@/services/agentBridge'
+import { collectPreviewEvidenceFromFrame } from '@/services/previewEvidence'
 import { useSettings } from '@/contexts/SettingsContext'
 import { useProject } from '@/hooks/useProject'
 
@@ -22,8 +24,12 @@ const permissionItems: PermissionItem[] = [
 ]
 
 export const AgentSessionMenu = () => {
-  const { project, previewState, updateProject } = useProject()
+  const { project, previewIframeRef, previewState, updateProject } = useProject()
   const { theme, setTheme } = useSettings()
+  const getPreviewEvidence = useCallback(
+    () => collectPreviewEvidenceFromFrame(previewIframeRef.current),
+    [previewIframeRef]
+  )
   const {
     agentInstructions,
     checkpoints,
@@ -40,6 +46,7 @@ export const AgentSessionMenu = () => {
     theme,
     onProjectChange: updateProject,
     onThemeChange: setTheme,
+    getPreviewEvidence,
   })
 
   const handleAccessChange = (checked: boolean) => {

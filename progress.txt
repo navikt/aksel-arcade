@@ -497,3 +497,21 @@ Completed in this branch:
 Verification completed with `npm run typecheck`, `CI=1 npm run test -- --run tests/unit/services/previewDiagnostics.test.ts tests/integration/project-controls-layout.test.tsx`, the full required `CI=1 npm run typecheck && CI=1 npm run test` check, and a browser smoke check of the active Agent `getDiagnostics()` command.
 
 Follow-up note: #37 should reuse the same active-session/read-activity bridge pattern for permission-gated Preview evidence. Keep diagnostics scoped to preview state only; do not add share/export, browser storage, cookies, clipboard, or unrelated page state to diagnostics.
+
+### 2026-05-26 - #37 Return sanitized Preview evidence from the sandbox
+
+Selected #37 as the only feature for this branch because #35 and #36 are complete, so the Agent bridge already has permission state, active-session reads, diagnostics, and preview-setting foundations.
+
+Completed in this branch:
+
+- Added `src/services/previewEvidence.ts`, a deterministic serializer for the sandboxed Preview iframe root that returns frame viewport/scroll metadata plus a sanitized element tree.
+- Included useful visual reasoning facts: tag names, direct text, allowed `id`/`role`/`title`/`aria-*`/`data-*` attributes, sorted class names, bounding boxes, and selected computed layout/style values.
+- Excluded scripts, style elements, handler attributes, React internals, full CSS text, arbitrary object props, browser storage/cookie/clipboard references, and DOM outside the Preview iframe.
+- Added the active Agent bridge command `getPreviewEvidence()`, gated by the existing `previewEvidence` permission and returning structured `permission-denied`, `preview-unavailable`, and `session-revoked` failures.
+- Shared the Preview iframe ref through `AppProvider` so the Agent menu reads evidence only from the sandboxed frame, not from unrelated Arcade chrome.
+- Updated copied Agent instructions and command discovery to include `getPreviewEvidence()`.
+- Added unit serializer coverage plus integration coverage for successful evidence reads, permission denial without evidence, stale bridge revocation, deterministic output, included facts, excluded unsafe data, and read activity status.
+
+Verification completed with `npm run typecheck`, `npm run test -- --run`, targeted `npm run test -- --run tests/integration/project-controls-layout.test.tsx`, `git diff --check`, and a headless browser smoke check of the active `getPreviewEvidence()` bridge command at the local Vite URL.
+
+Follow-up note: #38 should verify share/export artifacts still exclude Agent session state, permissions, activity, bridge metadata, Preview evidence, and Checkpoints. Keep Preview evidence as a live, permission-gated bridge read rather than adding it to share/export payloads.
