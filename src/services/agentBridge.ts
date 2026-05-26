@@ -135,7 +135,7 @@ export const DEFAULT_AGENT_PERMISSIONS: AgentPermissions = {
   sourceChanges: true,
   previewSettings: true,
   previewEvidence: true,
-  projectMetadata: false,
+  projectMetadata: true,
 }
 
 export const createAgentBridge = (
