@@ -549,7 +549,8 @@ describe('ProjectControls layout', () => {
 
     const diagnostics = expectBridgeSuccess(callBridgeCommand(() => bridge.getDiagnostics()))
     const firstMessage = diagnostics.sandboxConsoleMessages[0]
-    const lastMessage = diagnostics.sandboxConsoleMessages.at(-1)
+    const lastMessage =
+      diagnostics.sandboxConsoleMessages[diagnostics.sandboxConsoleMessages.length - 1]
 
     expect(firstMessage).toMatchObject({
       level: 'log',

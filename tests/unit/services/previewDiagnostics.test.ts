@@ -40,7 +40,9 @@ describe('preview diagnostics', () => {
 
     expect(bounded).toHaveLength(MAX_SANDBOX_CONSOLE_MESSAGES)
     expect(bounded[0]?.message).toBe('message 2')
-    expect(bounded.at(-1)?.message).toBe(`message ${MAX_SANDBOX_CONSOLE_MESSAGES + 1}`)
+    expect(bounded[bounded.length - 1]?.message).toBe(
+      `message ${MAX_SANDBOX_CONSOLE_MESSAGES + 1}`
+    )
   })
 
   it('bounds individual console entries by argument length and count', () => {
@@ -54,7 +56,7 @@ describe('preview diagnostics', () => {
 
     expect(message.args).toHaveLength(11)
     expect(message.args[0]).toBe(`${'x'.repeat(1_000)}...`)
-    expect(message.args.at(-1)).toBe('... 2 more')
+    expect(message.args[message.args.length - 1]).toBe('... 2 more')
   })
 
   it('collects diagnostics from preview state without exposing mutable state references', () => {
