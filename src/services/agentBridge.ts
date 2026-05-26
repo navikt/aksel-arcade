@@ -1,6 +1,7 @@
 import type { ThemeMode } from '@/contexts/SettingsContext'
 import type { ViewportSize } from '@/types/project'
 import { clonePreviewDiagnostics, type PreviewDiagnostics } from '@/services/previewDiagnostics'
+import type { PreviewEvidence, PreviewEvidenceCaptureResult } from '@/services/previewEvidence'
 
 export const AGENT_BRIDGE_GLOBAL = '__AKSEL_ARCADE_AGENT_BRIDGE__'
 
@@ -64,11 +65,13 @@ export type AgentBridgeErrorCode =
   | 'invalid-request'
   | 'unsupported-field'
   | 'payload-too-large'
+  | 'preview-unavailable'
 
 export const AGENT_BRIDGE_COMMAND_NAMES = [
   'getProject',
   'getPreviewContext',
   'getDiagnostics',
+  'getPreviewEvidence',
   'getSessionState',
   'applySourceChange',
 ] as const
@@ -109,6 +112,7 @@ export interface AgentBridgeController {
   isSessionActive: () => boolean
   recordActivity: (command: AgentBridgeCommandName) => void
   applySourceChange: (request: unknown) => AgentBridgeCommandResult<AgentSourceChangeResult>
+  getPreviewEvidence: () => PreviewEvidenceCaptureResult
 }
 
 export interface AgentBridge {
@@ -122,6 +126,7 @@ export interface AgentBridge {
   getProject: () => AgentBridgeCommandResult<AgentProjectReadState>
   getPreviewContext: () => AgentBridgeCommandResult<AgentPreviewReadState>
   getDiagnostics: () => AgentBridgeCommandResult<PreviewDiagnostics>
+  getPreviewEvidence: () => AgentBridgeCommandResult<PreviewEvidence>
   getSessionState: () => AgentBridgeCommandResult<AgentSessionReadState>
   applySourceChange: (request: unknown) => AgentBridgeCommandResult<AgentSourceChangeResult>
 }
@@ -137,19 +142,29 @@ export const createAgentBridge = (
   session: AgentBridgeSession,
   controller: AgentBridgeController
 ): AgentBridge => {
+  const createFailure = (
+    command: AgentBridgeCommandName,
+    code: AgentBridgeErrorCode,
+    message: string
+  ): AgentBridgeCommandResult<never> => ({
+    ok: false,
+    command,
+    error: {
+      code,
+      message,
+    },
+  })
+
   const readCommand = <TData>(
     command: AgentBridgeCommandName,
     read: () => TData
   ): AgentBridgeCommandResult<TData> => {
     if (!controller.isSessionActive()) {
-      return {
-        ok: false,
+      return createFailure(
         command,
-        error: {
-          code: 'session-revoked',
-          message: 'Agent access has been revoked. Ask the human to start a new Agent session.',
-        },
-      }
+        'session-revoked',
+        'Agent access has been revoked. Ask the human to start a new Agent session.'
+      )
     }
 
     const data = read()
@@ -184,6 +199,38 @@ export const createAgentBridge = (
       readCommand('getDiagnostics', () =>
         clonePreviewDiagnostics(controller.getReadContext().diagnostics)
       ),
+    getPreviewEvidence: () => {
+      const command: AgentBridgeCommandName = 'getPreviewEvidence'
+
+      if (!controller.isSessionActive()) {
+        return createFailure(
+          command,
+          'session-revoked',
+          'Agent access has been revoked. Ask the human to start a new Agent session.'
+        )
+      }
+
+      if (!controller.getPermissions().previewEvidence) {
+        return createFailure(
+          command,
+          'permission-denied',
+          'Preview evidence reads require the Preview evidence permission.'
+        )
+      }
+
+      const result = controller.getPreviewEvidence()
+      if (!result.ok) {
+        return createFailure(command, result.error.code, result.error.message)
+      }
+
+      controller.recordActivity(command)
+
+      return {
+        ok: true,
+        command,
+        data: result.evidence,
+      }
+    },
     getSessionState: () =>
       readCommand('getSessionState', () => ({
         sessionId: session.id,
@@ -197,14 +244,11 @@ export const createAgentBridge = (
       const command: AgentBridgeCommandName = 'applySourceChange'
 
       if (!controller.isSessionActive()) {
-        return {
-          ok: false,
+        return createFailure(
           command,
-          error: {
-            code: 'session-revoked',
-            message: 'Agent access has been revoked. Ask the human to start a new Agent session.',
-          },
-        }
+          'session-revoked',
+          'Agent access has been revoked. Ask the human to start a new Agent session.'
+        )
       }
 
       const result = controller.applySourceChange(request)
@@ -253,6 +297,7 @@ export const createAgentInstructions = (permissions: AgentPermissions): string =
     '',
     `Currently available command names: ${AGENT_BRIDGE_COMMAND_NAMES.map((command) => `${command}()`).join(', ')}`,
     'Use getDiagnostics() to read preview status, compile errors, runtime errors, and bounded sandbox console messages after changes.',
+    'Use getPreviewEvidence() to read permission-gated, sanitized layout evidence from only the sandboxed Preview frame.',
     'To replace allowed fields, call applySourceChange({ summary, jsxCode?, hooksCode?, viewportSize?, theme?, name? }). A non-empty human-readable summary is required, and the human controls rollback from the Agent menu.',
     '',
     'Active permission state:',

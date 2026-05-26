@@ -154,8 +154,23 @@ Completed:
 
 Next:
 
-- #37 can add the permission-gated Preview evidence command using the same active-session/read-activity bridge pattern.
 - #38 should keep share/export regression coverage focused on excluding Agent session state, permissions, activity, bridge metadata, and Checkpoints.
+
+### 2026-05-26 - Issue #37 Return sanitized Preview evidence from the sandbox
+
+Completed:
+
+- Selected #37 as the single feature to implement because #35 and #36 are complete, making the permission and diagnostics bridge foundations available for Preview evidence.
+- Added a bounded deterministic Preview evidence serializer that reads the sandboxed Preview iframe root only and returns frame metadata plus a sanitized element tree.
+- Included useful visual facts for external agents: tag names, direct text content, sorted class names, allowed `id`/`role`/`title`/`aria-*`/`data-*` attributes, bounding boxes, viewport/scroll metadata, and selected computed layout/style values.
+- Excluded unsafe or unrelated data from evidence: scripts, styles, handlers, React internals, full CSS text, arbitrary object props, browser storage/cookies/clipboard references, and outer Arcade UI DOM.
+- Added the active Agent bridge command `getPreviewEvidence()`, gated by the existing `previewEvidence` permission, with structured `permission-denied`, `preview-unavailable`, and `session-revoked` failures.
+- Updated copied Agent instructions and command discovery so external agents know to request sanitized Preview evidence only through the bridge command.
+- Added unit and integration coverage for deterministic serialization, included layout facts, excluded unsafe data, permission denial without evidence, revoked-session errors, and read activity recording.
+
+Next:
+
+- #38 should keep share/export regression coverage focused on excluding Agent session state, permissions, activity, bridge metadata, Preview evidence, and Checkpoints.
 
 ## Testing Decisions
 

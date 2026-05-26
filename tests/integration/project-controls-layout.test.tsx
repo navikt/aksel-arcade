@@ -13,6 +13,7 @@ import type {
   AgentBridgeCommandResult,
   AgentBridgeErrorCode,
 } from '@/services/agentBridge'
+import type { PreviewEvidenceElement } from '@/services/previewEvidence'
 
 const noop = () => {}
 
@@ -186,6 +187,109 @@ const dispatchSandboxMessage = (data: unknown) => {
   })
 }
 
+const setupPreviewEvidenceFrame = () => {
+  const iframe = screen.getByTestId('preview-iframe') as HTMLIFrameElement
+  const frameDocument = iframe.contentDocument
+  const frameWindow = iframe.contentWindow
+  if (!frameDocument || !frameWindow) {
+    throw new Error('Expected preview iframe document to be available.')
+  }
+
+  if (!frameDocument.body) {
+    frameDocument.open()
+    frameDocument.write('<!doctype html><html><body></body></html>')
+    frameDocument.close()
+  }
+  const frameBody = frameDocument.body
+  if (!frameBody) {
+    throw new Error('Expected preview iframe body to be available.')
+  }
+
+  Object.defineProperties(frameWindow, {
+    innerWidth: { configurable: true, value: 640 },
+    innerHeight: { configurable: true, value: 480 },
+    devicePixelRatio: { configurable: true, value: 1 },
+    scrollX: { configurable: true, value: 0 },
+    scrollY: { configurable: true, value: 0 },
+  })
+
+  frameBody.innerHTML = `
+    <div
+      id="root"
+      class="aksel-theme dark"
+      data-color="accent"
+      data-reactroot=""
+      onclick="evil()"
+      style="display: flex; padding: 8px; row-gap: 12px;"
+    >
+      Preview root text
+      <section class="aksel-box custom-card" data-color="info" data-agent-note="safe">
+        <h1 class="aksel-heading" aria-label="Evidence title">Evidence title</h1>
+        <button
+          class="aksel-button"
+          data-color="accent"
+          onclick="steal()"
+          style="background-color: rgb(4, 5, 6);"
+        >
+          Continue
+        </button>
+        <script>window.localStorage.secret = document.cookie</script>
+        <style>.unsafe-css { color: red; }</style>
+      </section>
+    </div>
+  `
+
+  const root = frameDocument.getElementById('root')
+  const section = frameDocument.querySelector('section')
+  const button = frameDocument.querySelector('button')
+  if (!root || !section || !button) {
+    throw new Error('Expected preview evidence fixture to render.')
+  }
+
+  mockElementRect(root, { x: 10, y: 20, width: 300, height: 200 })
+  mockElementRect(section, { x: 18, y: 28, width: 260, height: 140 })
+  mockElementRect(button, { x: 24, y: 86, width: 96, height: 32 })
+
+  return { button, root, section }
+}
+
+const findEvidenceElement = (
+  element: PreviewEvidenceElement,
+  tagName: string
+): PreviewEvidenceElement | null => {
+  if (element.tagName === tagName) {
+    return element
+  }
+
+  for (const child of element.children ?? []) {
+    const match = findEvidenceElement(child, tagName)
+    if (match) {
+      return match
+    }
+  }
+
+  return null
+}
+
+const mockElementRect = (element: Element, rect: Pick<DOMRect, 'x' | 'y' | 'width' | 'height'>) => {
+  const fullRect = {
+    ...rect,
+    top: rect.y,
+    right: rect.x + rect.width,
+    bottom: rect.y + rect.height,
+    left: rect.x,
+    toJSON: () => ({
+      ...rect,
+      top: rect.y,
+      right: rect.x + rect.width,
+      bottom: rect.y + rect.height,
+      left: rect.x,
+    }),
+  } as DOMRect
+
+  element.getBoundingClientRect = () => fullRect
+}
+
 describe('ProjectControls layout', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -282,6 +386,7 @@ describe('ProjectControls layout', () => {
         'getProject',
         'getPreviewContext',
         'getDiagnostics',
+        'getPreviewEvidence',
         'getSessionState',
         'applySourceChange',
       ],
@@ -289,6 +394,7 @@ describe('ProjectControls layout', () => {
     expect(activeBridge?.getProject).toEqual(expect.any(Function))
     expect(activeBridge?.getPreviewContext).toEqual(expect.any(Function))
     expect(activeBridge?.getDiagnostics).toEqual(expect.any(Function))
+    expect(activeBridge?.getPreviewEvidence).toEqual(expect.any(Function))
     expect(activeBridge?.getSessionState).toEqual(expect.any(Function))
     expect(activeBridge?.applySourceChange).toEqual(expect.any(Function))
     expect(activeBridge?.commandNames).not.toContain('restoreCheckpoint')
@@ -297,7 +403,9 @@ describe('ProjectControls layout', () => {
     )
 
     fireEvent.click(screen.getByRole('menuitemcheckbox', { name: /allow source changes/i }))
-    fireEvent.click(screen.getByRole('menuitemcheckbox', { name: /allow preview setting changes/i }))
+    fireEvent.click(
+      screen.getByRole('menuitemcheckbox', { name: /allow preview setting changes/i })
+    )
     fireEvent.click(screen.getByRole('menuitemcheckbox', { name: /allow preview evidence reads/i }))
     fireEvent.click(
       screen.getByRole('menuitemcheckbox', { name: /allow project metadata changes/i })
@@ -370,9 +478,11 @@ describe('ProjectControls layout', () => {
     expect(instructions).toContain('getProject()')
     expect(instructions).toContain('getPreviewContext()')
     expect(instructions).toContain('getDiagnostics()')
+    expect(instructions).toContain('getPreviewEvidence()')
     expect(instructions).toContain('getSessionState()')
     expect(instructions).toContain('applySourceChange()')
     expect(instructions).toMatch(/preview status, compile errors, runtime errors/i)
+    expect(instructions).toMatch(/sanitized layout evidence/i)
     expect(instructions).toContain('viewportSize?')
     expect(instructions).toContain('theme?')
     expect(instructions).toContain('name?')
@@ -446,6 +556,7 @@ describe('ProjectControls layout', () => {
           'getProject',
           'getPreviewContext',
           'getDiagnostics',
+          'getPreviewEvidence',
           'getSessionState',
           'applySourceChange',
         ],
@@ -479,7 +590,9 @@ describe('ProjectControls layout', () => {
 
     const diagnostics = expectBridgeSuccess(diagnosticsResult)
     const exposedDiagnosticsKeys = collectObjectKeys({ diagnostics }).join(' ')
-    expect(exposedDiagnosticsKeys).not.toMatch(/share|export|storage|clipboard|cookie|document|window/i)
+    expect(exposedDiagnosticsKeys).not.toMatch(
+      /share|export|storage|clipboard|cookie|document|window/i
+    )
 
     await waitFor(() => {
       expect(screen.getByRole('status').textContent).toMatch(/Last agent read: getDiagnostics/i)
@@ -490,6 +603,120 @@ describe('ProjectControls layout', () => {
     expect(callBridgeCommand(() => bridge.getDiagnostics())).toMatchObject({
       ok: false,
       command: 'getDiagnostics',
+      error: {
+        code: 'session-revoked',
+      },
+    })
+  })
+
+  it('returns sanitized Preview evidence from only the sandboxed frame and records reads', async () => {
+    renderHeader({ includePreview: true })
+
+    const bridge = await startAgentAccess()
+    const { button } = setupPreviewEvidenceFrame()
+    const firstResult = callBridgeCommand(() => bridge.getPreviewEvidence())
+
+    expect(firstResult).toMatchObject({
+      ok: true,
+      command: 'getPreviewEvidence',
+    })
+    const evidence = expectBridgeSuccess(firstResult)
+    expect(evidence.frame).toMatchObject({
+      rootSelector: '#root',
+      viewport: {
+        width: 640,
+        height: 480,
+      },
+      capturedElementCount: 4,
+      truncated: false,
+    })
+    expect(evidence.tree).toMatchObject({
+      tagName: 'div',
+      text: 'Preview root text',
+      attributes: {
+        'data-color': 'accent',
+        id: 'root',
+      },
+      classNames: ['aksel-theme', 'dark'],
+      boundingBox: {
+        x: 10,
+        y: 20,
+        width: 300,
+        height: 200,
+      },
+      computedStyle: {
+        display: 'flex',
+        paddingTop: '8px',
+        rowGap: '12px',
+      },
+    })
+
+    const section = findEvidenceElement(evidence.tree, 'section')
+    const heading = findEvidenceElement(evidence.tree, 'h1')
+    const evidenceButton = findEvidenceElement(evidence.tree, 'button')
+    expect(section).toMatchObject({
+      attributes: {
+        'data-agent-note': 'safe',
+        'data-color': 'info',
+      },
+      classNames: ['aksel-box', 'custom-card'],
+    })
+    expect(heading).toMatchObject({
+      text: 'Evidence title',
+      attributes: {
+        'aria-label': 'Evidence title',
+      },
+    })
+    expect(evidenceButton).toMatchObject({
+      text: 'Continue',
+      attributes: {
+        'data-color': 'accent',
+      },
+      computedStyle: {
+        backgroundColor: 'rgb(4, 5, 6)',
+      },
+    })
+    expect(button.getAttribute('onclick')).toBe('steal()')
+
+    const serialized = JSON.stringify(evidence)
+    expect(serialized).not.toContain('Aksel Arcade')
+    expect(serialized).not.toContain('onclick')
+    expect(serialized).not.toContain('steal()')
+    expect(serialized).not.toContain('data-reactroot')
+    expect(serialized).not.toContain('__reactFiber')
+    expect(serialized).not.toContain('localStorage')
+    expect(serialized).not.toContain('document.cookie')
+    expect(serialized).not.toContain('clipboard')
+    expect(serialized).not.toContain('.unsafe-css')
+
+    await waitFor(() => {
+      expect(screen.getByRole('status').textContent).toMatch(/Last agent read: getPreviewEvidence/i)
+    })
+
+    expect(expectBridgeSuccess(callBridgeCommand(() => bridge.getPreviewEvidence()))).toEqual(
+      evidence
+    )
+  })
+
+  it('denies Preview evidence when permission is disabled and revokes stale evidence reads', async () => {
+    renderHeader({ includePreview: true })
+
+    const bridge = await startAgentAccess()
+    setupPreviewEvidenceFrame()
+    fireEvent.click(screen.getByRole('menuitemcheckbox', { name: /allow preview evidence reads/i }))
+    const permissionStatusText = screen.getByRole('status').textContent
+
+    const deniedResult = callBridgeCommand(() => bridge.getPreviewEvidence())
+
+    expectBridgeFailure(deniedResult, 'permission-denied')
+    expect(deniedResult).not.toHaveProperty('data')
+    expect(screen.getByRole('status').textContent).toBe(permissionStatusText)
+
+    fireEvent.click(screen.getByRole('menuitemcheckbox', { name: /stop temporary agent access/i }))
+
+    expect(callBridgeCommand(() => bridge.getPreviewEvidence())).toMatchObject({
+      ok: false,
+      command: 'getPreviewEvidence',
       error: {
         code: 'session-revoked',
       },
@@ -779,7 +1006,9 @@ describe('ProjectControls layout', () => {
     expect(expectBridgeSuccess(callBridgeCommand(() => bridge.getProject()))).toEqual(
       originalProject
     )
-    expect(screen.queryByRole('menuitem', { name: /restore rename project by default/i })).toBeNull()
+    expect(
+      screen.queryByRole('menuitem', { name: /restore rename project by default/i })
+    ).toBeNull()
 
     fireEvent.click(
       screen.getByRole('menuitemcheckbox', { name: /allow project metadata changes/i })
@@ -835,7 +1064,9 @@ describe('ProjectControls layout', () => {
 
     await waitFor(() => {
       const updatedProject = expectBridgeSuccess(callBridgeCommand(() => bridge.getProject()))
-      const updatedPreview = expectBridgeSuccess(callBridgeCommand(() => bridge.getPreviewContext()))
+      const updatedPreview = expectBridgeSuccess(
+        callBridgeCommand(() => bridge.getPreviewContext())
+      )
 
       expect(updatedProject).toMatchObject({
         name: 'Combined Agent Project',
@@ -856,7 +1087,9 @@ describe('ProjectControls layout', () => {
 
     await waitFor(() => {
       const restoredProject = expectBridgeSuccess(callBridgeCommand(() => bridge.getProject()))
-      const restoredPreview = expectBridgeSuccess(callBridgeCommand(() => bridge.getPreviewContext()))
+      const restoredPreview = expectBridgeSuccess(
+        callBridgeCommand(() => bridge.getPreviewContext())
+      )
 
       expect(restoredProject).toEqual(original.project)
       expect(restoredPreview).toEqual(original.preview)
@@ -1035,7 +1268,9 @@ describe('ProjectControls layout', () => {
     const bridge = await startAgentAccess()
     const before = captureAgentState(bridge)
 
-    fireEvent.click(screen.getByRole('menuitemcheckbox', { name: /allow preview setting changes/i }))
+    fireEvent.click(
+      screen.getByRole('menuitemcheckbox', { name: /allow preview setting changes/i })
+    )
     expect(bridge.permissions.previewSettings).toBe(false)
 
     const result = callBridgeCommand(() =>

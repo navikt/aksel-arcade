@@ -17,14 +17,13 @@ export const PreviewPane = () => {
   const context = useContext(AppContext)
   if (!context) throw new Error('PreviewPane must be used within AppProvider')
 
-  const { project, updatePreviewState, recordSandboxConsoleMessage } = context
+  const { project, previewIframeRef, updatePreviewState, recordSandboxConsoleMessage } = context
   const { theme } = useSettings() // Use centralized theme from Settings
   const [transpiledCode, setTranspiledCode] = useState<string | null>(null)
   const [compileError, setCompileError] = useState<CompileError | null>(null)
   const [runtimeError, setRuntimeError] = useState<RuntimeError | null>(null)
   const [isInspectMode, setIsInspectMode] = useState(false)
   const debounceTimerRef = useRef<number | undefined>(undefined)
-  const iframeRef = useRef<HTMLIFrameElement | null>(null)
 
   // Transpile code when JSX or hooks code changes (debounced to avoid errors while typing)
   useEffect(() => {
@@ -144,7 +143,7 @@ export const PreviewPane = () => {
         paddingBlock="space-8"
       >
         <HStack gap="space-12" justify="end" align="center">
-          <InspectMode iframeRef={iframeRef} onInspectToggle={handleInspectToggle} />
+          <InspectMode iframeRef={previewIframeRef} onInspectToggle={handleInspectToggle} />
           <ViewportToggle />
         </HStack>
       </Box>
@@ -186,7 +185,7 @@ export const PreviewPane = () => {
         )}
 
         <LivePreview
-          iframeRef={iframeRef}
+          iframeRef={previewIframeRef}
           transpiledCode={transpiledCode}
           onRenderSuccess={handleRenderSuccess}
           onCompileError={handleCompileError}

@@ -21,10 +21,8 @@ import type { PreviewState } from '@/types/preview'
 import { VIEWPORTS } from '@/types/viewports'
 import { validateProjectSize } from '@/services/storage'
 import { generateSecureUUID } from '@/utils/crypto'
-import {
-  collectPreviewDiagnostics,
-  type PreviewDiagnostics,
-} from '@/services/previewDiagnostics'
+import { collectPreviewDiagnostics, type PreviewDiagnostics } from '@/services/previewDiagnostics'
+import type { PreviewEvidenceCaptureResult } from '@/services/previewEvidence'
 
 type AgentSessionActivity =
   | 'inactive'
@@ -64,6 +62,7 @@ interface UseAgentSessionOptions {
   theme: ThemeMode
   onProjectChange: (updates: AgentProjectUpdates) => void
   onThemeChange: (theme: ThemeMode) => void
+  getPreviewEvidence: () => PreviewEvidenceCaptureResult
 }
 
 const createTimestamp = (): string => new Date().toISOString()
@@ -75,6 +74,7 @@ export const useAgentSession = ({
   theme,
   onProjectChange,
   onThemeChange,
+  getPreviewEvidence,
 }: UseAgentSessionOptions) => {
   const [session, setSession] = useState<AgentBridgeSession | null>(null)
   const [permissions, setPermissions] = useState<AgentPermissions>(DEFAULT_AGENT_PERMISSIONS)
@@ -234,12 +234,20 @@ export const useAgentSession = ({
         })
       },
       applySourceChange: applyAgentChange,
+      getPreviewEvidence,
     })
 
     return () => {
       removeAgentBridge(session.id)
     }
-  }, [activeSessionIdRef, applyAgentChange, permissionsRef, readContextRef, session])
+  }, [
+    activeSessionIdRef,
+    applyAgentChange,
+    getPreviewEvidence,
+    permissionsRef,
+    readContextRef,
+    session,
+  ])
 
   const startAgentSession = useCallback(() => {
     const startedAt = createTimestamp()
@@ -558,9 +566,7 @@ const isThemeMode = (value: unknown): value is ThemeMode => value === 'light' ||
 const isAgentSourceField = (field: AgentChangeField): field is AgentSourceField =>
   field === 'jsxCode' || field === 'hooksCode'
 
-const createPendingSourceDiagnostics = (
-  diagnostics: PreviewDiagnostics
-): PreviewDiagnostics => ({
+const createPendingSourceDiagnostics = (diagnostics: PreviewDiagnostics): PreviewDiagnostics => ({
   status: 'transpiling',
   compileError: null,
   runtimeError: null,

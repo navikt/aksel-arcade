@@ -1,4 +1,12 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+  type ReactNode,
+  type RefObject,
+} from 'react'
 
 /* eslint-disable react-refresh/only-export-components */
 // Context providers intentionally export both context and hooks
@@ -6,12 +14,24 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from '
 import type { Project, ProjectSnapshot, ShareUrlMetadata } from '@/types/project'
 import type { EditorState } from '@/types/editor'
 import type { PreviewState, SandboxConsoleMessage } from '@/types/preview'
-import { createDefaultProject, createDefaultEditorState, createDefaultPreviewState, FORM_SUMMARY_JSX_CODE, HOOKS_DEMO_JSX_CODE, HOOKS_DEMO_HOOKS_CODE } from '@/utils/projectDefaults'
+import {
+  createDefaultProject,
+  createDefaultEditorState,
+  createDefaultPreviewState,
+  FORM_SUMMARY_JSX_CODE,
+  HOOKS_DEMO_JSX_CODE,
+  HOOKS_DEMO_HOOKS_CODE,
+} from '@/utils/projectDefaults'
 import { loadProject, SNAPSHOT_FILE_IDS } from '@/services/storage'
 import type { ComponentSnippet } from '@/types/snippets'
 import { useSettings } from '@/contexts/SettingsContext'
 import { getViewportWidth } from '@/types/viewports'
-import { decodeShareToken, getShareTokenFromLocation, stripShareQueryParam, type ShareDecodeError } from '@/utils/shareDecoding'
+import {
+  decodeShareToken,
+  getShareTokenFromLocation,
+  stripShareQueryParam,
+  type ShareDecodeError,
+} from '@/utils/shareDecoding'
 import { appendSandboxConsoleMessage } from '@/services/previewDiagnostics'
 
 interface ShareHydrationState {
@@ -29,6 +49,7 @@ interface AppState {
   // Ephemeral state
   editorState: EditorState
   previewState: PreviewState
+  previewIframeRef: RefObject<HTMLIFrameElement | null>
 
   // UI state
   isComponentPaletteOpen: boolean
@@ -76,9 +97,10 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     }
     return result.project || createDefaultProject()
   })
-  
+
   const [editorState, setEditorState] = useState<EditorState>(createDefaultEditorState())
   const [previewState, setPreviewState] = useState<PreviewState>(createDefaultPreviewState())
+  const previewIframeRef = useRef<HTMLIFrameElement | null>(null)
   const [isComponentPaletteOpen, setIsComponentPaletteOpen] = useState(false)
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   const { setTheme } = useSettings()
@@ -182,7 +204,10 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
     // Parse template: replace ${N:placeholder} with placeholder text
     let parsedTemplate = snippet.template
-    parsedTemplate = parsedTemplate.replace(/\$\{(\d+):([^}]+)\}/g, (_match, _num, placeholder) => placeholder)
+    parsedTemplate = parsedTemplate.replace(
+      /\$\{(\d+):([^}]+)\}/g,
+      (_match, _num, placeholder) => placeholder
+    )
 
     // Simply append at end with proper spacing
     const newCode = currentCode.trimEnd() + '\n\n' + parsedTemplate
@@ -230,9 +255,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   }
 
   const loadHooksDemo = () => {
-    const confirmed = window.confirm(
-      'Load Hooks demo? This will replace your current code.'
-    )
+    const confirmed = window.confirm('Load Hooks demo? This will replace your current code.')
     if (confirmed) {
       setProjectState({
         ...project,
@@ -261,7 +284,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         snapshot.activeFileId === SNAPSHOT_FILE_IDS.hooks ? 'Hooks' : 'JSX'
       setEditorState(nextEditorState)
 
-      setPreviewState(prev => ({
+      setPreviewState((prev) => ({
         ...prev,
         currentViewport: snapshot.preview.viewport,
         viewportWidth: getViewportWidth(snapshot.preview.viewport),
@@ -283,6 +306,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     project,
     editorState,
     previewState,
+    previewIframeRef,
     isComponentPaletteOpen,
     isSettingsOpen,
     updateProject,
@@ -325,5 +349,5 @@ const buildProjectFromSnapshot = (snapshot: ProjectSnapshot, previous: Project):
 }
 
 const findSnapshotContent = (snapshot: ProjectSnapshot, fileId: string): string | undefined => {
-  return snapshot.files.find(file => file.id === fileId)?.content
+  return snapshot.files.find((file) => file.id === fileId)?.content
 }
