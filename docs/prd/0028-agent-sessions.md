@@ -8,7 +8,7 @@ Without an Agent session, a human must copy code back and forth, use share/expor
 
 ## Solution
 
-Add browser-only Agent sessions to Aksel Arcade. A human starts an Agent session from a new header ActionMenu, controls Agent permissions with checkbox items, copies agent instructions into their external agent chat, and can stop access at any time. While active, Aksel Arcade exposes a temporary `window.__AKSEL_ARCADE_AGENT_BRIDGE__` bridge that lets the external agent read Arcade-scoped state, inspect diagnostics, request scoped Preview evidence, and apply allowed Agent changes.
+Add browser-only Agent sessions to Aksel Arcade. A human starts or stops an Agent session from a header ActionMenu, copies agent instructions into their external agent chat, and can stop access at any time. While active, Aksel Arcade enables all Agent permissions by default and exposes a temporary `window.__AKSEL_ARCADE_AGENT_BRIDGE__` bridge that lets the external agent read Arcade-scoped state, inspect diagnostics, request scoped Preview evidence, and apply allowed Agent changes.
 
 Agent changes use apply-then-review with rollback. The bridge validates payload shape, permissions, project size, and enum values before mutating the active Arcade project. It does not compile-gate or render-gate the change. Instead, Aksel Arcade creates an automatic Checkpoint before every accepted Agent change, applies the allowed full-field replacements atomically, and lets the human review the result in the live preview. If the human does not want the result, they restore a Checkpoint from the Agent ActionMenu.
 
@@ -22,16 +22,16 @@ The MVP keeps the feature browser-only. It does not introduce in-app LLM provide
 4. As an Arcade user, I want Agent access to disappear on page reload, so that access does not persist accidentally.
 5. As an Arcade user, I want the Agent controls near the existing settings controls, so that I can find them without leaving the editor and preview workspace.
 6. As an Arcade user, I want Agent controls in an ActionMenu, so that the feature stays lightweight and does not take over the workspace.
-7. As an Arcade user, I want the Agent session start/stop control to use an ActionMenu checkbox item, so that it fits the Aksel component constraints.
-8. As an Arcade user, I want permission checkbox items for Agent capabilities, so that I can decide what the agent may change or capture.
+7. As an Arcade user, I want the Agent session start/stop control to use an ActionMenu checkbox item with the static label "Agent-tilgang", so that it fits the Aksel component constraints and does not change meaning while toggled.
+8. As an Arcade user, I want Agent capabilities enabled automatically while access is active, so that the menu stays simple and the copied instructions match what the agent can do.
 9. As an Arcade user, I want source changes enabled by default, so that the main agent co-creation workflow works immediately.
 10. As an Arcade user, I want preview setting changes enabled by default, so that the agent can adjust viewport and theme while designing.
 11. As an Arcade user, I want Preview evidence capture enabled by default, so that the agent can inspect the rendered result when needed.
-12. As an Arcade user, I want project metadata changes disabled by default, so that the agent does not rename my Arcade project unless I opt in.
+12. As an Arcade user, I want project metadata changes enabled by default while Agent access is active, so that the agent can keep names aligned with the work when needed.
 13. As an Arcade user, I want the menu to explain that reading Arcade-scoped state is mandatory while active, so that I understand the baseline access.
-14. As an Arcade user, I want an activity-based Agent status, so that I can tell whether the session is inactive, waiting, recently used, or stopped.
-15. As an Arcade user, I want the status to avoid pretending there is a persistent connection, so that I do not get misleading connected/disconnected signals.
-16. As an Arcade user, I want to copy agent instructions from the menu, so that I can paste the correct bridge contract into my external agent chat.
+14. As an Arcade user, I want the menu status translated to Norwegian and limited to active/inactive, so that it is easy to understand.
+15. As an Arcade user, I want the status to avoid pretending there is a persistent connection or separate revoked state, so that I do not get misleading connected/disconnected signals.
+16. As an Arcade user, I want to copy agent instructions from an ActionMenu item, so that I can paste the correct bridge contract into my external agent chat.
 17. As an Arcade user, I want copied agent instructions to include the bridge name, commands, active permissions, and Arcade authoring contract, so that the external agent knows how to interact safely.
 18. As an external agent, I want to detect the browser bridge only while an Agent session is active, so that I know whether I am authorized to work.
 19. As an external agent, I want to read the current Arcade project, so that I can understand the source I am editing.
@@ -69,7 +69,7 @@ The MVP keeps the feature browser-only. It does not introduce in-app LLM provide
 
 ## Implementation Decisions
 
-- Build an Agent session state module as a deep module. It owns whether the Agent session is active, the default Agent permissions, permission toggles, activity timestamps, status derivation, Checkpoint creation, Checkpoint capping, and human rollback.
+- Build an Agent session state module as a deep module. It owns whether the Agent session is active, the all-on default Agent permissions, simplified status derivation, Checkpoint creation, Checkpoint capping, and human rollback.
 - Build an Agent bridge module as a deep module. It owns installing and removing `window.__AKSEL_ARCADE_AGENT_BRIDGE__`, exposes the bridge commands, normalizes return shapes, records activity, and delegates mutation only through validated session operations.
 - Build an Agent change validator as a deep module. It accepts unknown bridge input and returns either a valid Agent change or a structured error. It enforces payload shape, allowed fields, project size, enum values, and permission requirements before mutation.
 - Use full-field replacements only for Agent changes. The allowed replacements are project name, JSX source, Hooks source, viewport, and theme, plus a human-readable summary. Text patches, cursor edits, editor selection changes, active tab changes, panel layout changes, settings changes, share data, and export data are not part of the Agent change contract.
@@ -86,10 +86,10 @@ The MVP keeps the feature browser-only. It does not introduce in-app LLM provide
 - Sanitized Preview evidence includes tag names, text content, Aksel/data attributes, class names, bounding boxes, and selected computed layout/style values. It excludes scripts, event handlers, React internals, full CSS text, arbitrary object props, browser cookies, local storage, clipboard data, and unrelated Arcade UI DOM.
 - Keep the Agent bridge browser-only for MVP. Do not add in-app provider calls, server persistence, a backend API, a localhost process, MCP, or browser extension support.
 - Expose the bridge only while an Agent session is active. Remove it when the human stops the Agent session and rely on page reload to clear it naturally.
-- Add a new Agent ActionMenu button immediately left of the settings cog. The ActionMenu contains start/stop, Agent permission checkbox items, activity-based status, rollback history, and Copy agent instructions.
-- Use `ActionMenu.CheckboxItem` for the start/stop control and permission controls.
+- Add a new Agent ActionMenu button immediately left of the settings cog. The ActionMenu contains a static `Agent-tilgang` start/stop checkbox, simplified Norwegian status, context copy guidance, rollback history, and Copy agent instructions.
+- Use `ActionMenu.CheckboxItem` for the start/stop control and `ActionMenu.Item` for copying agent instructions. Do not expose separate permission controls in the menu.
 - Reading Arcade-scoped state is mandatory while an Agent session is active and is explained in the ActionMenu rather than exposed as a permission toggle.
-- Status is activity-based: inactive, active and waiting for agent activity, active with last agent activity, and stopped/revoked. Do not imply durable socket connectivity.
+- Status is simplified and translated for the UI: `Status: inaktiv` when access is off and `Status: aktiv` when access is on. Do not show a separate revoked state or imply durable socket connectivity.
 - Copy agent instructions includes the bridge global name, command names, active permission state, the Arcade authoring contract, and the reminder that the human must start access before the bridge exists.
 - Preserve existing share/export behavior. Do not add bridge commands for share URL generation or JSON export. Exclude Checkpoints from share/export by default.
 - Respect the existing ADRs: the MVP uses a browser-only page bridge, and Agent changes use apply-then-review with rollback.
@@ -183,6 +183,16 @@ Completed:
 
 Verification completed with `npm run build`, which covers sandbox bundling, `tsc -b`, and Vite production bundling.
 
+### 2026-05-26 - Issue #51 Agent ActionMenu simplification
+
+Completed:
+
+- Updated the Agent ActionMenu to match the new design direction: Norwegian section labels, a static `Agent-tilgang` checkbox, `Status: aktiv` / `Status: inaktiv`, contextual copy guidance, and a `Kopier instruksjoner` `ActionMenu.Item`.
+- Removed the separate Agent permission controls from the UI.
+- Changed the default active Agent permission state to all-on, including project metadata changes, so copied instructions and bridge session state report all permissions as available while Agent access is active.
+- Kept the existing bridge commands, validation, Checkpoints, rollback, diagnostics, Preview evidence, and share/export exclusions in place.
+- Updated integration coverage for the simplified menu, static checkbox label, all-on permission state, ActionMenu copy item, simplified status, metadata replacement default, and share/export fallback helper.
+
 ## Testing Decisions
 
 - Good tests should assert external behavior and user-visible outcomes, not internal implementation details. Tests should prove that agents can only do what the human authorized, that invalid bridge calls fail safely, that accepted changes update the Arcade project atomically, and that rollback restores the prior state.
@@ -191,9 +201,9 @@ Verification completed with `npm run build`, which covers sandbox bundling, `tsc
 - Unit-test the Agent bridge module for install/remove behavior, command availability only while active, structured command results, activity recording, whole-change rejection, and revoked-session errors.
 - Unit-test the Preview evidence serializer with representative preview DOM to ensure it includes useful layout/style facts and excludes scripts, handlers, React internals, full CSS, storage, and unrelated page data.
 - Unit-test the diagnostics collector to ensure compile errors, runtime errors, preview status, and bounded sandbox console messages are returned consistently.
-- Integration-test the Agent ActionMenu UI using the same style as existing header/share/settings tests. Cover menu placement, `ActionMenu.CheckboxItem` defaults, permission toggles, status text, rollback entries, and Copy agent instructions.
+- Integration-test the Agent ActionMenu UI using the same style as existing header/share/settings tests. Cover menu placement, the static `Agent-tilgang` checkbox, all-on default permissions, simplified status text, rollback entries, and Copy agent instructions as an `ActionMenu.Item`.
 - Integration-test app wiring by applying Agent changes through the bridge and asserting the editor, preview settings, diagnostics state, and rollback history reflect the external behavior.
-- E2E-test the browser bridge with page evaluation. Cover bridge absence before Start, bridge presence after Start, source-code application, Hooks-code application, permission rejection, preview setting application, metadata permission default-off behavior, diagnostics retrieval, Preview evidence retrieval, Stop removing the bridge, and human rollback.
+- E2E-test the browser bridge with page evaluation. Cover bridge absence before Start, bridge presence after Start, source-code application, Hooks-code application, preview setting application, metadata replacement with default permissions, diagnostics retrieval, Preview evidence retrieval, Stop removing the bridge, and human rollback.
 - E2E-test that applying invalid code is allowed when schema and permissions are valid, and that the normal live preview reports compile/runtime diagnostics afterward.
 - E2E-test that Checkpoints are not included in Share URL or Export JSON by default.
 - Prior art in the codebase includes unit tests for storage, share encoding/decoding, compression strategies, security message validation, snapshot packing, and autocomplete; integration tests for share popovers, project controls, sandbox behavior, and inspection popovers; and e2e tests for share links, themes, autocomplete, component palette behavior, inspect overlays, and sandboxed Aksel rendering.

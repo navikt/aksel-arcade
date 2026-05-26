@@ -156,8 +156,8 @@ const captureAgentState = (bridge: AgentBridge) => {
 
 const startAgentAccess = async () => {
   fireEvent.click(screen.getByRole('button', { name: /agent access/i }))
-  expect(await screen.findByText(/Agent session/i)).toBeTruthy()
-  fireEvent.click(screen.getByRole('menuitemcheckbox', { name: /start temporary agent access/i }))
+  expect(await screen.findByText(/Gi agenter tilgang/i)).toBeTruthy()
+  fireEvent.click(screen.getByRole('menuitemcheckbox', { name: /agent-tilgang/i }))
 
   const bridge = window.__AKSEL_ARCADE_AGENT_BRIDGE__
   expect(bridge).toBeDefined()
@@ -338,37 +338,32 @@ describe('ProjectControls layout', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /agent access/i }))
 
-    expect(await screen.findByText(/Agent session/i)).toBeTruthy()
-    expect(screen.getByText(/Arcade-scoped read access is mandatory/i)).toBeTruthy()
+    expect(await screen.findByText(/Gi agenter tilgang/i)).toBeTruthy()
+    expect(screen.getByText(/Klikk på knappen nedenfor/i)).toBeTruthy()
+    expect(screen.getByRole('menuitem', { name: /Kopier instruksjoner/i })).toBeTruthy()
     const inactiveStatus = screen.getByRole('status').textContent ?? ''
-    expect(inactiveStatus).toMatch(/inactive/i)
+    expect(inactiveStatus).toBe('Status: inaktiv')
     expect(inactiveStatus).not.toMatch(/connected|disconnected/i)
 
     const accessItem = screen.getByRole('menuitemcheckbox', {
-      name: /start temporary agent access/i,
-    })
-    const sourcePermission = screen.getByRole('menuitemcheckbox', {
-      name: /allow source changes/i,
-    })
-    const previewPermission = screen.getByRole('menuitemcheckbox', {
-      name: /allow preview setting changes/i,
-    })
-    const evidencePermission = screen.getByRole('menuitemcheckbox', {
-      name: /allow preview evidence reads/i,
-    })
-    const metadataPermission = screen.getByRole('menuitemcheckbox', {
-      name: /allow project metadata changes/i,
+      name: /agent-tilgang/i,
     })
 
     expect(accessItem.getAttribute('aria-checked')).toBe('false')
-    expect(sourcePermission.getAttribute('aria-checked')).toBe('true')
-    expect(previewPermission.getAttribute('aria-checked')).toBe('true')
-    expect(evidencePermission.getAttribute('aria-checked')).toBe('true')
-    expect(metadataPermission.getAttribute('aria-checked')).toBe('false')
+    expect(screen.queryByRole('menuitemcheckbox', { name: /allow source changes/i })).toBeNull()
+    expect(
+      screen.queryByRole('menuitemcheckbox', { name: /allow preview setting changes/i })
+    ).toBeNull()
+    expect(
+      screen.queryByRole('menuitemcheckbox', { name: /allow preview evidence reads/i })
+    ).toBeNull()
+    expect(
+      screen.queryByRole('menuitemcheckbox', { name: /allow project metadata changes/i })
+    ).toBeNull()
 
     fireEvent.click(accessItem)
 
-    expect((await screen.findByRole('status')).textContent).toMatch(/active/i)
+    expect((await screen.findByRole('status')).textContent).toBe('Status: aktiv')
     const activeBridge = window.__AKSEL_ARCADE_AGENT_BRIDGE__
     expect(activeBridge).toMatchObject({
       sessionId: '11111111-1111-4111-8111-111111111111',
@@ -378,7 +373,7 @@ describe('ProjectControls layout', () => {
         sourceChanges: true,
         previewSettings: true,
         previewEvidence: true,
-        projectMetadata: false,
+        projectMetadata: true,
       },
       commandNames: [
         'getProject',
@@ -406,27 +401,16 @@ describe('ProjectControls layout', () => {
       'restoreCheckpoint'
     )
 
-    fireEvent.click(screen.getByRole('menuitemcheckbox', { name: /allow source changes/i }))
-    fireEvent.click(
-      screen.getByRole('menuitemcheckbox', { name: /allow preview setting changes/i })
-    )
-    fireEvent.click(screen.getByRole('menuitemcheckbox', { name: /allow preview evidence reads/i }))
-    fireEvent.click(
-      screen.getByRole('menuitemcheckbox', { name: /allow project metadata changes/i })
-    )
-
-    await waitFor(() => {
-      expect(activeBridge?.permissions).toMatchObject({
-        sourceChanges: false,
-        previewSettings: false,
-        previewEvidence: false,
-        projectMetadata: true,
-      })
+    expect(activeBridge?.permissions).toMatchObject({
+      sourceChanges: true,
+      previewSettings: true,
+      previewEvidence: true,
+      projectMetadata: true,
     })
 
-    fireEvent.click(screen.getByRole('menuitemcheckbox', { name: /stop temporary agent access/i }))
+    fireEvent.click(screen.getByRole('menuitemcheckbox', { name: /agent-tilgang/i }))
 
-    expect(screen.getByRole('status').textContent).toMatch(/access revoked/i)
+    expect(screen.getByRole('status').textContent).toBe('Status: inaktiv')
     expect(window.__AKSEL_ARCADE_AGENT_BRIDGE__).toBeUndefined()
     expect(activeBridge?.getProject()).toMatchObject({
       ok: false,
@@ -436,7 +420,7 @@ describe('ProjectControls layout', () => {
       },
     })
 
-    fireEvent.click(screen.getByRole('menuitemcheckbox', { name: /start temporary agent access/i }))
+    fireEvent.click(screen.getByRole('menuitemcheckbox', { name: /agent-tilgang/i }))
     expect(window.__AKSEL_ARCADE_AGENT_BRIDGE__).toBeDefined()
 
     unmount()
@@ -449,14 +433,14 @@ describe('ProjectControls layout', () => {
     expect(
       (
         await screen.findByRole('menuitemcheckbox', {
-          name: /start temporary agent access/i,
+          name: /agent-tilgang/i,
         })
       ).getAttribute('aria-checked')
     ).toBe('false')
-    expect(screen.getByRole('status').textContent).toMatch(/inactive/i)
+    expect(screen.getByRole('status').textContent).toBe('Status: inaktiv')
   })
 
-  it('copies external-agent instructions with commands, permissions, and the Arcade contract', async () => {
+  it('copies external-agent instructions with commands, all permissions, and the Arcade contract', async () => {
     const writeText = vi.fn().mockResolvedValue(undefined)
     Object.defineProperty(navigator, 'clipboard', {
       configurable: true,
@@ -466,14 +450,9 @@ describe('ProjectControls layout', () => {
     renderHeader()
 
     fireEvent.click(screen.getByRole('button', { name: /agent access/i }))
-    expect(await screen.findByText(/Agent session/i)).toBeTruthy()
+    expect(await screen.findByText(/Gi agenter tilgang/i)).toBeTruthy()
 
-    fireEvent.click(
-      screen.getByRole('menuitemcheckbox', {
-        name: /allow project metadata changes/i,
-      })
-    )
-    fireEvent.click(screen.getByRole('button', { name: /copy agent instructions/i }))
+    fireEvent.click(screen.getByRole('menuitem', { name: /kopier instruksjoner/i }))
 
     await waitFor(() => expect(writeText).toHaveBeenCalledTimes(1))
 
@@ -499,14 +478,14 @@ describe('ProjectControls layout', () => {
     expect(instructions).toMatch(/import-free Arcade JSX and Hooks code/i)
   })
 
-  it('returns Arcade-scoped read state and records Agent read activity', async () => {
+  it('returns Arcade-scoped read state with simplified Agent status', async () => {
     renderHeader()
 
     fireEvent.click(screen.getByRole('button', { name: /agent access/i }))
-    expect(await screen.findByText(/Agent session/i)).toBeTruthy()
+    expect(await screen.findByText(/Gi agenter tilgang/i)).toBeTruthy()
     fireEvent.click(
       screen.getByRole('menuitemcheckbox', {
-        name: /start temporary agent access/i,
+        name: /agent-tilgang/i,
       })
     )
 
@@ -529,9 +508,7 @@ describe('ProjectControls layout', () => {
     })
     expect(projectData).not.toHaveProperty('id')
 
-    await waitFor(() => {
-      expect(screen.getByRole('status').textContent).toMatch(/Last agent read: getProject/i)
-    })
+    expect(screen.getByRole('status').textContent).toBe('Status: aktiv')
 
     const previewResult = callBridgeCommand(() => bridge.getPreviewContext())
     expect(previewResult).toMatchObject({
@@ -553,7 +530,7 @@ describe('ProjectControls layout', () => {
           sourceChanges: true,
           previewSettings: true,
           previewEvidence: true,
-          projectMetadata: false,
+          projectMetadata: true,
         },
         readScope: 'arcade-session',
         commandNames: [
@@ -578,7 +555,7 @@ describe('ProjectControls layout', () => {
     )
   })
 
-  it('returns preview diagnostics, records diagnostics reads, and revokes stale reads', async () => {
+  it('returns preview diagnostics, keeps simplified status, and revokes stale reads', async () => {
     renderHeader({ includePreview: true })
 
     const bridge = await startAgentAccess()
@@ -601,11 +578,9 @@ describe('ProjectControls layout', () => {
       /share|export|storage|clipboard|cookie|document|window/i
     )
 
-    await waitFor(() => {
-      expect(screen.getByRole('status').textContent).toMatch(/Last agent read: getDiagnostics/i)
-    })
+    expect(screen.getByRole('status').textContent).toBe('Status: aktiv')
 
-    fireEvent.click(screen.getByRole('menuitemcheckbox', { name: /stop temporary agent access/i }))
+    fireEvent.click(screen.getByRole('menuitemcheckbox', { name: /agent-tilgang/i }))
 
     expect(callBridgeCommand(() => bridge.getDiagnostics())).toMatchObject({
       ok: false,
@@ -616,7 +591,7 @@ describe('ProjectControls layout', () => {
     })
   })
 
-  it('returns sanitized Preview evidence from only the sandboxed frame and records reads', async () => {
+  it('returns sanitized Preview evidence from only the sandboxed frame', async () => {
     renderHeader({ includePreview: true })
 
     const bridge = await startAgentAccess()
@@ -696,30 +671,24 @@ describe('ProjectControls layout', () => {
     expect(serialized).not.toContain('clipboard')
     expect(serialized).not.toContain('.unsafe-css')
 
-    await waitFor(() => {
-      expect(screen.getByRole('status').textContent).toMatch(/Last agent read: getPreviewEvidence/i)
-    })
+    expect(screen.getByRole('status').textContent).toBe('Status: aktiv')
 
     expect(expectBridgeSuccess(callBridgeCommand(() => bridge.getPreviewEvidence()))).toEqual(
       evidence
     )
   })
 
-  it('denies Preview evidence when permission is disabled and revokes stale evidence reads', async () => {
+  it('revokes stale Preview evidence reads after Agent access stops', async () => {
     renderHeader({ includePreview: true })
 
     const bridge = await startAgentAccess()
     setupPreviewEvidenceFrame()
-    fireEvent.click(screen.getByRole('menuitemcheckbox', { name: /allow preview evidence reads/i }))
-    const permissionStatusText = screen.getByRole('status').textContent
 
-    const deniedResult = callBridgeCommand(() => bridge.getPreviewEvidence())
+    expectBridgeSuccess(callBridgeCommand(() => bridge.getPreviewEvidence()))
+    expect(screen.getByRole('status').textContent).toBe('Status: aktiv')
 
-    expectBridgeFailure(deniedResult, 'permission-denied')
-    expect(deniedResult).not.toHaveProperty('data')
-    expect(screen.getByRole('status').textContent).toBe(permissionStatusText)
-
-    fireEvent.click(screen.getByRole('menuitemcheckbox', { name: /stop temporary agent access/i }))
+    fireEvent.click(screen.getByRole('menuitemcheckbox', { name: /agent-tilgang/i }))
+    expect(screen.getByRole('status').textContent).toBe('Status: inaktiv')
 
     expect(callBridgeCommand(() => bridge.getPreviewEvidence())).toMatchObject({
       ok: false,
@@ -803,8 +772,8 @@ describe('ProjectControls layout', () => {
     renderHeader()
 
     fireEvent.click(screen.getByRole('button', { name: /agent access/i }))
-    expect(await screen.findByText(/Agent session/i)).toBeTruthy()
-    fireEvent.click(screen.getByRole('menuitemcheckbox', { name: /start temporary agent access/i }))
+    expect(await screen.findByText(/Gi agenter tilgang/i)).toBeTruthy()
+    fireEvent.click(screen.getByRole('menuitemcheckbox', { name: /agent-tilgang/i }))
 
     const bridge = window.__AKSEL_ARCADE_AGENT_BRIDGE__
     expect(bridge).toBeDefined()
@@ -832,10 +801,6 @@ describe('ProjectControls layout', () => {
         viewportSize: 'LG',
       },
     })
-
-    fireEvent.click(
-      screen.getByRole('menuitemcheckbox', { name: /allow project metadata changes/i })
-    )
 
     expect(bridge.permissions.projectMetadata).toBe(true)
     expect(window.__AKSEL_ARCADE_AGENT_BRIDGE__?.permissions.projectMetadata).toBe(true)
@@ -876,11 +841,7 @@ describe('ProjectControls layout', () => {
       checkpointId: expect.any(String),
       changedFields: ['jsxCode', 'hooksCode'],
     })
-    await waitFor(() => {
-      expect(screen.getByRole('status').textContent).toMatch(
-        /Last agent change: applySourceChange/i
-      )
-    })
+    expect(screen.getByRole('status').textContent).toBe('Status: aktiv')
 
     await waitFor(() => {
       const updatedProject = expectBridgeSuccess(callBridgeCommand(() => bridge.getProject()))
@@ -961,7 +922,7 @@ describe('ProjectControls layout', () => {
     })
   })
 
-  it('applies preview setting replacements when the preview permission is enabled', async () => {
+  it('applies preview setting replacements with default Agent permissions', async () => {
     renderHeader()
 
     const bridge = await startAgentAccess()
@@ -996,34 +957,15 @@ describe('ProjectControls layout', () => {
     ).toBeTruthy()
   })
 
-  it('keeps project metadata denied by default and applies names after opt-in', async () => {
+  it('applies project metadata replacements with default Agent permissions', async () => {
     renderHeader()
 
     const bridge = await startAgentAccess()
-    const originalProject = expectBridgeSuccess(callBridgeCommand(() => bridge.getProject()))
-
-    const deniedResult = callBridgeCommand(() =>
-      bridge.applySourceChange({
-        summary: 'Rename project by default',
-        name: 'Denied Agent Project',
-      })
-    )
-
-    expectBridgeFailure(deniedResult, 'permission-denied')
-    expect(expectBridgeSuccess(callBridgeCommand(() => bridge.getProject()))).toEqual(
-      originalProject
-    )
-    expect(
-      screen.queryByRole('menuitem', { name: /restore rename project by default/i })
-    ).toBeNull()
-
-    fireEvent.click(
-      screen.getByRole('menuitemcheckbox', { name: /allow project metadata changes/i })
-    )
+    expect(bridge.permissions.projectMetadata).toBe(true)
 
     const acceptedResult = callBridgeCommand(() =>
       bridge.applySourceChange({
-        summary: 'Rename project after opt-in',
+        summary: 'Rename project',
         name: 'Agent Named Project',
       })
     )
@@ -1047,10 +989,6 @@ describe('ProjectControls layout', () => {
     const original = captureAgentState(bridge)
     const nextJsx = 'export default function App() { return <Heading>Combined</Heading> }'
     const nextHooks = 'export const useAgentFixture = () => "combined"'
-
-    fireEvent.click(
-      screen.getByRole('menuitemcheckbox', { name: /allow project metadata changes/i })
-    )
 
     const result = callBridgeCommand(() =>
       bridge.applySourceChange({
@@ -1126,31 +1064,6 @@ describe('ProjectControls layout', () => {
     })
     expect(screen.queryByRole('menuitem', { name: /^Restore change 1 \(/i })).toBeNull()
     expect(screen.getByRole('menuitem', { name: /^Restore change 11 \(/i })).toBeTruthy()
-  })
-
-  it('rejects source replacements when source change permission is disabled', async () => {
-    renderHeader()
-
-    const bridge = await startAgentAccess()
-    const originalProject = expectBridgeSuccess(callBridgeCommand(() => bridge.getProject()))
-
-    fireEvent.click(screen.getByRole('menuitemcheckbox', { name: /allow source changes/i }))
-    expect(bridge.permissions.sourceChanges).toBe(false)
-
-    const deniedResult = callBridgeCommand(() =>
-      bridge.applySourceChange({
-        summary: 'Denied source update',
-        jsxCode: 'export default function App() { return <Heading>Denied</Heading> }',
-      })
-    )
-
-    expect(deniedResult).toMatchObject({
-      command: 'applySourceChange',
-    })
-    expectBridgeFailure(deniedResult, 'permission-denied')
-    const unchangedProject = expectBridgeSuccess(callBridgeCommand(() => bridge.getProject()))
-    expect(unchangedProject).toEqual(originalProject)
-    expect(screen.queryByRole('menuitem', { name: /restore denied source update/i })).toBeNull()
   })
 
   it('rejects malformed and unsupported Agent change requests without mutating Agent state', async () => {
@@ -1267,38 +1180,6 @@ describe('ProjectControls layout', () => {
       expect(screen.getByRole('status').textContent).toBe(before.statusText)
       expect(captureAgentState(bridge)).toEqual(before)
     }
-  })
-
-  it('rejects mixed Agent changes atomically when any requested permission is disabled', async () => {
-    renderHeader()
-
-    const bridge = await startAgentAccess()
-    const before = captureAgentState(bridge)
-
-    fireEvent.click(
-      screen.getByRole('menuitemcheckbox', { name: /allow preview setting changes/i })
-    )
-    expect(bridge.permissions.previewSettings).toBe(false)
-
-    const result = callBridgeCommand(() =>
-      bridge.applySourceChange({
-        summary: 'Source plus denied preview',
-        jsxCode: 'export default function App() { return <Heading>Changed</Heading> }',
-        viewportSize: 'SM',
-      })
-    )
-
-    const error = expectBridgeFailure(result, 'permission-denied')
-    expect(error.message).toMatch(/preview setting changes/i)
-    expect(screen.getByRole('status').textContent).toMatch(/permissions changed/i)
-    expect(captureAgentState(bridge)).toEqual({
-      ...before,
-      permissions: {
-        ...before.permissions,
-        previewSettings: false,
-      },
-      statusText: screen.getByRole('status').textContent,
-    })
   })
 
   it('rejects oversized source changes before mutation or Checkpoint creation', async () => {

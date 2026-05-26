@@ -150,11 +150,8 @@ const readBlobText = (blob: Blob): Promise<string> =>
 
 const startAgentAccess = async () => {
   fireEvent.click(screen.getByRole('button', { name: /agent access/i }))
-  expect(await screen.findByText(/Agent session/i)).toBeTruthy()
-  fireEvent.click(
-    screen.getByRole('menuitemcheckbox', { name: /allow project metadata changes/i })
-  )
-  fireEvent.click(screen.getByRole('menuitemcheckbox', { name: /start temporary agent access/i }))
+  expect(await screen.findByText(/Gi agenter tilgang/i)).toBeTruthy()
+  fireEvent.click(screen.getByRole('menuitemcheckbox', { name: /agent-tilgang/i }))
 
   const bridge = window.__AKSEL_ARCADE_AGENT_BRIDGE__
   expect(bridge).toBeDefined()

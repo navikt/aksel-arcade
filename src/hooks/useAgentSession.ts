@@ -5,12 +5,10 @@ import {
   publishAgentBridge,
   removeAgentBridge,
   type AgentBridgeCommandResult,
-  type AgentBridgeCommandName,
   type AgentBridgeErrorCode,
   type AgentBridgeReadContext,
   type AgentChangeField,
   type AgentBridgeSession,
-  type AgentPermissionKey,
   type AgentPermissions,
   type AgentSourceField,
   type AgentSourceChangeResult,
@@ -23,21 +21,6 @@ import { validateProjectSize } from '@/services/storage'
 import { generateSecureUUID } from '@/utils/crypto'
 import { collectPreviewDiagnostics, type PreviewDiagnostics } from '@/services/previewDiagnostics'
 import type { PreviewEvidenceCaptureResult } from '@/services/previewEvidence'
-
-type AgentSessionActivity =
-  | 'inactive'
-  | 'started'
-  | 'permission-updated'
-  | 'read'
-  | 'change'
-  | 'rollback'
-  | 'revoked'
-
-interface AgentSessionEvent {
-  type: AgentSessionActivity
-  at: string | null
-  command?: AgentBridgeCommandName
-}
 
 type AgentProjectUpdates = Partial<Pick<Project, 'name' | 'jsxCode' | 'hooksCode' | 'viewportSize'>>
 
@@ -77,12 +60,8 @@ export const useAgentSession = ({
   getPreviewEvidence,
 }: UseAgentSessionOptions) => {
   const [session, setSession] = useState<AgentBridgeSession | null>(null)
-  const [permissions, setPermissions] = useState<AgentPermissions>(DEFAULT_AGENT_PERMISSIONS)
+  const [permissions, setPermissions] = useState<AgentPermissions>({ ...DEFAULT_AGENT_PERMISSIONS })
   const [checkpoints, setCheckpoints] = useState<AgentCheckpoint[]>([])
-  const [lastEvent, setLastEvent] = useState<AgentSessionEvent>({
-    type: 'inactive',
-    at: null,
-  })
   const activeSessionIdRef = useRef<string | null>(null)
   const permissionsRef = useRef<AgentPermissions>(permissions)
   const projectRef = useRef(project)
@@ -226,13 +205,7 @@ export const useAgentSession = ({
       getReadContext: () => readContextRef.current,
       getPermissions: () => permissionsRef.current,
       isSessionActive: () => activeSessionIdRef.current === session.id,
-      recordActivity: (command) => {
-        setLastEvent({
-          type: command === 'applySourceChange' ? 'change' : 'read',
-          at: createTimestamp(),
-          command,
-        })
-      },
+      recordActivity: () => undefined,
       applySourceChange: applyAgentChange,
       getPreviewEvidence,
     })
@@ -257,9 +230,9 @@ export const useAgentSession = ({
     }
 
     activeSessionIdRef.current = nextSession.id
+    setPermissions({ ...DEFAULT_AGENT_PERMISSIONS })
     setCheckpoints([])
     setSession(nextSession)
-    setLastEvent({ type: 'started', at: startedAt })
   }, [activeSessionIdRef])
 
   const stopAgentSession = useCallback(() => {
@@ -268,22 +241,7 @@ export const useAgentSession = ({
     removeAgentBridge(sessionId)
     setCheckpoints([])
     setSession(null)
-    setLastEvent({ type: 'revoked', at: createTimestamp() })
   }, [activeSessionIdRef, session?.id])
-
-  const setPermission = useCallback((key: AgentPermissionKey, checked: boolean) => {
-    setPermissions((current) => {
-      if (current[key] === checked) {
-        return current
-      }
-
-      return {
-        ...current,
-        [key]: checked,
-      }
-    })
-    setLastEvent({ type: 'permission-updated', at: createTimestamp() })
-  }, [])
 
   const restoreCheckpoint = useCallback(
     (checkpointId: string) => {
@@ -333,7 +291,6 @@ export const useAgentSession = ({
       if (themeToRestore) {
         onThemeChange(themeToRestore)
       }
-      setLastEvent({ type: 'rollback', at: createTimestamp() })
     },
     [checkpoints, onProjectChange, onThemeChange, syncCurrentContext]
   )
@@ -349,33 +306,7 @@ export const useAgentSession = ({
     [checkpoints]
   )
 
-  const statusText = useMemo(() => {
-    if (session) {
-      if (lastEvent.type === 'read' && lastEvent.command) {
-        return `Status: active. Last agent read: ${lastEvent.command}; this is activity, not socket connectivity.`
-      }
-
-      if (lastEvent.type === 'change' && lastEvent.command) {
-        return `Status: active. Last agent change: ${lastEvent.command}; this is activity, not socket connectivity.`
-      }
-
-      if (lastEvent.type === 'rollback') {
-        return 'Status: active. Human restored an Agent Checkpoint; status reflects recent activity, not socket connectivity.'
-      }
-
-      if (lastEvent.type === 'permission-updated') {
-        return 'Status: active. Permissions changed; status reflects recent activity, not socket connectivity.'
-      }
-
-      return 'Status: active. No agent activity yet; this temporary bridge is not a durable socket.'
-    }
-
-    if (lastEvent.type === 'revoked') {
-      return 'Status: access revoked. The browser bridge was removed.'
-    }
-
-    return 'Status: inactive. Agent access is off and no browser bridge is published.'
-  }, [lastEvent.command, lastEvent.type, session])
+  const statusText = session ? 'Status: aktiv' : 'Status: inaktiv'
 
   const agentInstructions = useMemo(() => createAgentInstructions(permissions), [permissions])
 
@@ -383,12 +314,10 @@ export const useAgentSession = ({
     agentInstructions,
     checkpoints: rollbackCheckpoints,
     isActive: Boolean(session),
-    permissions,
     restoreCheckpoint,
     statusText,
     startAgentSession,
     stopAgentSession,
-    setPermission,
   }
 }
 

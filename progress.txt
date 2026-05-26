@@ -540,3 +540,17 @@ Fixed after the post-merge master build failed:
 - Updated the Agent sessions PRD history with the #38 fallback export/share implementation and the PR #49 build follow-up.
 
 Verification completed with `npm run build`.
+
+### 2026-05-26 - #51 Changes to the new Agent ActionMenu
+
+Selected #51 as the only feature for this branch. Used the issue description and the provided screenshot because the Figma link was not accessible from this environment.
+
+Completed in this branch:
+
+- Simplified the Agent ActionMenu to match the new design: Norwegian section labels, a static `Agent-tilgang` checkbox, `Status: aktiv` / `Status: inaktiv`, contextual copy guidance, and `Kopier instruksjoner` as an `ActionMenu.Item`.
+- Removed the separate permission controls from the UI.
+- Changed the default Agent permission state to all-on while Agent access is active, including project metadata changes.
+- Kept the active browser bridge, scoped read commands, apply/change validation, Checkpoints, rollback, diagnostics, Preview evidence, and share/export artifact exclusions intact.
+- Updated integration coverage for the simplified menu, static checkbox label, all-on permission state, ActionMenu copy item, simplified status, metadata replacement default, and share/export fallback helper.
+
+Next note: #51 intentionally changes the earlier Agent session PRD assumption that project metadata is opt-in and permission toggles are user-visible. Future Agent ActionMenu work should treat the menu as a simple access/context surface unless a new issue reintroduces granular controls.
