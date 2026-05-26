@@ -2,6 +2,7 @@ import { useRef, useEffect, useState } from 'react'
 import type { MainToSandboxMessage, SandboxToMainMessage } from '@/types/messages'
 import type { ViewportSize } from '@/types/project'
 import type { InspectionData } from '@/types/inspection'
+import type { SandboxConsolePayload } from '@/services/previewDiagnostics'
 import { getViewportWidth } from '@/types/viewports'
 import { validateSandboxToMainMessage } from '@/utils/security'
 import { InspectionPopover } from './InspectionPopover'
@@ -13,6 +14,7 @@ interface LivePreviewProps {
   onRenderSuccess: () => void
   onCompileError: (error: { message: string; line: number | null; column: number | null; stack: string | null }) => void
   onRuntimeError: (error: { message: string; componentStack: string | null; stack: string }) => void
+  onConsoleMessage: (message: SandboxConsolePayload) => void
   viewportWidth: ViewportSize
   isInspectMode: boolean
   theme: 'light' | 'dark'
@@ -24,6 +26,7 @@ export const LivePreview = ({
   onRenderSuccess,
   onCompileError,
   onRuntimeError,
+  onConsoleMessage,
   viewportWidth,
   isInspectMode,
   theme,
@@ -90,14 +93,21 @@ export const LivePreview = ({
           break
         case 'CONSOLE_LOG':
           // Forward console logs to main console
-          console[message.payload.level](...message.payload.args)
+          if (message.payload.level === 'warn') {
+            console.warn(...message.payload.args)
+          } else if (message.payload.level === 'error') {
+            console.error(...message.payload.args)
+          } else {
+            console.log(...message.payload.args)
+          }
+          onConsoleMessage(message.payload)
           break
       }
     }
 
     window.addEventListener('message', handleMessage)
     return () => window.removeEventListener('message', handleMessage)
-  }, [onRenderSuccess, onCompileError, onRuntimeError, iframeRef])
+  }, [onRenderSuccess, onCompileError, onRuntimeError, onConsoleMessage, iframeRef])
 
   // T083: Clear inspection popover when inspect mode disabled
   useEffect(() => {

@@ -4,6 +4,10 @@ import { AppProvider, useProject } from '@/hooks/useProject'
 import { SettingsProvider, useSettings } from '@/contexts/SettingsContext'
 import { AppHeader } from '@/components/Header/AppHeader'
 import { PreviewPane } from '@/components/Preview/PreviewPane'
+import {
+  MAX_SANDBOX_CONSOLE_MESSAGES,
+  type PreviewDiagnostics,
+} from '@/services/previewDiagnostics'
 import type {
   AgentBridge,
   AgentBridgeCommandResult,
@@ -165,6 +169,23 @@ const startAgentAccess = async () => {
   return bridge
 }
 
+const dispatchSandboxMessage = (data: unknown) => {
+  const iframe = screen.getByTestId('preview-iframe') as HTMLIFrameElement
+  if (!iframe.contentWindow) {
+    throw new Error('Expected preview iframe to have a contentWindow.')
+  }
+
+  act(() => {
+    window.dispatchEvent(
+      new MessageEvent('message', {
+        data,
+        origin: window.location.origin,
+        source: iframe.contentWindow,
+      })
+    )
+  })
+}
+
 describe('ProjectControls layout', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -257,10 +278,17 @@ describe('ProjectControls layout', () => {
         previewEvidence: true,
         projectMetadata: false,
       },
-      commandNames: ['getProject', 'getPreviewContext', 'getSessionState', 'applySourceChange'],
+      commandNames: [
+        'getProject',
+        'getPreviewContext',
+        'getDiagnostics',
+        'getSessionState',
+        'applySourceChange',
+      ],
     })
     expect(activeBridge?.getProject).toEqual(expect.any(Function))
     expect(activeBridge?.getPreviewContext).toEqual(expect.any(Function))
+    expect(activeBridge?.getDiagnostics).toEqual(expect.any(Function))
     expect(activeBridge?.getSessionState).toEqual(expect.any(Function))
     expect(activeBridge?.applySourceChange).toEqual(expect.any(Function))
     expect(activeBridge?.commandNames).not.toContain('restoreCheckpoint')
@@ -341,8 +369,10 @@ describe('ProjectControls layout', () => {
     expect(instructions).toContain('window.__AKSEL_ARCADE_AGENT_BRIDGE__')
     expect(instructions).toContain('getProject()')
     expect(instructions).toContain('getPreviewContext()')
+    expect(instructions).toContain('getDiagnostics()')
     expect(instructions).toContain('getSessionState()')
     expect(instructions).toContain('applySourceChange()')
+    expect(instructions).toMatch(/preview status, compile errors, runtime errors/i)
     expect(instructions).toContain('viewportSize?')
     expect(instructions).toContain('theme?')
     expect(instructions).toContain('name?')
@@ -412,7 +442,13 @@ describe('ProjectControls layout', () => {
           projectMetadata: false,
         },
         readScope: 'arcade-session',
-        commandNames: ['getProject', 'getPreviewContext', 'getSessionState', 'applySourceChange'],
+        commandNames: [
+          'getProject',
+          'getPreviewContext',
+          'getDiagnostics',
+          'getSessionState',
+          'applySourceChange',
+        ],
       },
     })
 
@@ -422,6 +458,110 @@ describe('ProjectControls layout', () => {
       session: sessionResult.ok ? sessionResult.data : null,
     }).join(' ')
     expect(exposedReadKeys).not.toMatch(/share|export|storage|clipboard|cookie/i)
+  })
+
+  it('returns preview diagnostics, records diagnostics reads, and revokes stale reads', async () => {
+    renderHeader({ includePreview: true })
+
+    const bridge = await startAgentAccess()
+    const diagnosticsResult = callBridgeCommand(() => bridge.getDiagnostics())
+
+    expect(diagnosticsResult).toMatchObject({
+      ok: true,
+      command: 'getDiagnostics',
+      data: {
+        status: expect.any(String),
+        compileError: null,
+        runtimeError: null,
+        sandboxConsoleMessages: [],
+      },
+    })
+
+    const diagnostics = expectBridgeSuccess(diagnosticsResult)
+    const exposedDiagnosticsKeys = collectObjectKeys({ diagnostics }).join(' ')
+    expect(exposedDiagnosticsKeys).not.toMatch(/share|export|storage|clipboard|cookie|document|window/i)
+
+    await waitFor(() => {
+      expect(screen.getByRole('status').textContent).toMatch(/Last agent read: getDiagnostics/i)
+    })
+
+    fireEvent.click(screen.getByRole('menuitemcheckbox', { name: /stop temporary agent access/i }))
+
+    expect(callBridgeCommand(() => bridge.getDiagnostics())).toMatchObject({
+      ok: false,
+      command: 'getDiagnostics',
+      error: {
+        code: 'session-revoked',
+      },
+    })
+  })
+
+  it('returns runtime error diagnostics from normal preview state', async () => {
+    renderHeader({ includePreview: true })
+
+    const bridge = await startAgentAccess()
+    const runtimeError = {
+      message: 'Agent runtime exploded',
+      componentStack: '\n    at App',
+      stack: 'Error: Agent runtime exploded',
+    }
+
+    dispatchSandboxMessage({
+      type: 'RUNTIME_ERROR',
+      payload: runtimeError,
+    })
+
+    expect(await screen.findByText(/Runtime Error/i)).toBeTruthy()
+
+    await waitFor(() => {
+      const diagnostics = expectBridgeSuccess(callBridgeCommand(() => bridge.getDiagnostics()))
+      expect(diagnostics).toMatchObject({
+        status: 'error',
+        compileError: null,
+        runtimeError,
+      })
+    })
+  })
+
+  it('returns bounded sandbox console history in diagnostics', async () => {
+    vi.spyOn(console, 'log').mockImplementation(() => {})
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    renderHeader({ includePreview: true })
+
+    const bridge = await startAgentAccess()
+    const levels = ['log', 'warn', 'error'] as const
+
+    for (let index = 0; index < MAX_SANDBOX_CONSOLE_MESSAGES + 3; index += 1) {
+      dispatchSandboxMessage({
+        type: 'CONSOLE_LOG',
+        payload: {
+          level: levels[index % levels.length],
+          args: [`sandbox message ${index}`, { index }],
+        },
+      })
+    }
+
+    await waitFor(() => {
+      const diagnostics = expectBridgeSuccess(callBridgeCommand(() => bridge.getDiagnostics()))
+      expect(diagnostics.sandboxConsoleMessages).toHaveLength(MAX_SANDBOX_CONSOLE_MESSAGES)
+    })
+
+    const diagnostics = expectBridgeSuccess(callBridgeCommand(() => bridge.getDiagnostics()))
+    const firstMessage = diagnostics.sandboxConsoleMessages[0]
+    const lastMessage = diagnostics.sandboxConsoleMessages.at(-1)
+
+    expect(firstMessage).toMatchObject({
+      level: 'log',
+      message: 'sandbox message 3 {"index":3}',
+      args: ['sandbox message 3', '{"index":3}'],
+      timestamp: expect.any(String),
+    })
+    expect(lastMessage).toMatchObject({
+      level: 'log',
+      message: `sandbox message ${MAX_SANDBOX_CONSOLE_MESSAGES + 2} {"index":${MAX_SANDBOX_CONSOLE_MESSAGES + 2}}`,
+      timestamp: expect.any(String),
+    })
   })
 
   it('returns current project, preview, and permission state through captured bridge references', async () => {
@@ -958,6 +1098,27 @@ describe('ProjectControls layout', () => {
     expectBridgeSuccess(result)
     const appliedProject = expectBridgeSuccess(callBridgeCommand(() => bridge.getProject()))
     expect(appliedProject.jsxCode).toBe(invalidJsx)
+
+    expect(expectBridgeSuccess(callBridgeCommand(() => bridge.getDiagnostics()))).toMatchObject({
+      status: 'transpiling',
+      compileError: null,
+      runtimeError: null,
+    })
+
     expect(await screen.findByText(/Compile Error/i, undefined, { timeout: 5000 })).toBeTruthy()
+
+    const diagnostics = expectBridgeSuccess(
+      callBridgeCommand<AgentBridgeCommandResult<PreviewDiagnostics>>(() => bridge.getDiagnostics())
+    )
+    expect(diagnostics).toMatchObject({
+      status: 'error',
+      compileError: {
+        message: expect.stringMatching(/Unterminated JSX contents/i),
+        line: expect.any(Number),
+        column: expect.any(Number),
+        stack: expect.any(String),
+      },
+      runtimeError: null,
+    })
   })
 })

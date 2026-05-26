@@ -480,3 +480,20 @@ Fixed after reviewing PR #45:
 - Added regression coverage that applies two Agent changes in the same React act batch, restores the second Checkpoint back to the first change, then restores the first Checkpoint back to the original source.
 
 Verification completed with `npm run typecheck`, `npm run test -- --run`, `npm run build`, and a browser smoke/console check at `http://127.0.0.1:5177/aksel-arcade/`.
+
+### 2026-05-26 - #36 Return diagnostics with bounded sandbox console history
+
+Selected #36 as the highest-priority `ready-for-agent` feature from #36-#38 because #35 is complete, diagnostics are the next PRD feedback-loop capability, and agents need compile/runtime/console visibility before Preview evidence and share/export hardening. Worked only on #36.
+
+Completed in this branch:
+
+- Added bounded sandbox console history to preview state and normalized console payloads into stable strings with capped history length, argument count, and argument length.
+- Added the active Agent bridge command `getDiagnostics()` returning only Arcade-scoped preview status, compile error, runtime error, and recent sandbox console messages.
+- Updated Agent command discovery and copied instructions to include `getDiagnostics()` as the post-change preview feedback command.
+- Marked accepted source changes as `transpiling` immediately in diagnostics while the debounced preview pipeline reprocesses, avoiding stale pre-change diagnostics in the post-apply gap.
+- Kept schema-valid Agent source changes apply-then-review: compile/render failures are still not blocked by apply, and diagnostics reports the resulting normal preview errors afterward.
+- Added unit and integration coverage for diagnostics normalization, bounded console history, command shape, revoked-session errors, read activity status, runtime errors, and compile errors.
+
+Verification completed with `npm run typecheck`, `CI=1 npm run test -- --run tests/unit/services/previewDiagnostics.test.ts tests/integration/project-controls-layout.test.tsx`, the full required `CI=1 npm run typecheck && CI=1 npm run test` check, and a browser smoke check of the active Agent `getDiagnostics()` command.
+
+Follow-up note: #37 should reuse the same active-session/read-activity bridge pattern for permission-gated Preview evidence. Keep diagnostics scoped to preview state only; do not add share/export, browser storage, cookies, clipboard, or unrelated page state to diagnostics.

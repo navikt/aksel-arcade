@@ -501,6 +501,7 @@ export const createDefaultPreviewState = (): PreviewState => ({
   transpiledCode: null,
   compileError: null,
   runtimeError: null,
+  sandboxConsoleMessages: [],
   inspectEnabled: false,
   inspectedElement: null,
   currentViewport: 'MD',
