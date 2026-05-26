@@ -12,6 +12,7 @@ import {
   type AgentBridgeSession,
   type AgentPermissionKey,
   type AgentPermissions,
+  type AgentSourceField,
   type AgentSourceChangeResult,
 } from '@/services/agentBridge'
 import type { ThemeMode } from '@/contexts/SettingsContext'
