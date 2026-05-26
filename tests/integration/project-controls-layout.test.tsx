@@ -526,6 +526,66 @@ describe('ProjectControls layout', () => {
     })
   })
 
+  it('captures rapid sequential Checkpoints against the latest accepted Agent state', async () => {
+    renderHeader()
+
+    const bridge = await startAgentAccess()
+    const originalProject = expectBridgeSuccess(callBridgeCommand(() => bridge.getProject()))
+    const firstJsx = 'export default function App() { return <Heading>First rapid</Heading> }'
+    const secondJsx = 'export default function App() { return <Heading>Second rapid</Heading> }'
+    const results: AgentBridgeCommandResult<unknown>[] = []
+
+    act(() => {
+      results.push(
+        bridge.applySourceChange({
+          summary: 'First rapid change',
+          jsxCode: firstJsx,
+        })
+      )
+      results.push(
+        bridge.applySourceChange({
+          summary: 'Second rapid change',
+          jsxCode: secondJsx,
+        })
+      )
+    })
+
+    for (const result of results) {
+      expectBridgeSuccess(result)
+    }
+
+    await waitFor(() => {
+      expect(expectBridgeSuccess(callBridgeCommand(() => bridge.getProject())).jsxCode).toBe(
+        secondJsx
+      )
+    })
+
+    fireEvent.click(
+      await screen.findByRole('menuitem', {
+        name: /restore second rapid change \(JSX\)/i,
+      })
+    )
+
+    await waitFor(() => {
+      expect(expectBridgeSuccess(callBridgeCommand(() => bridge.getProject())).jsxCode).toBe(
+        firstJsx
+      )
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: /agent access/i }))
+    fireEvent.click(
+      await screen.findByRole('menuitem', {
+        name: /restore first rapid change \(JSX\)/i,
+      })
+    )
+
+    await waitFor(() => {
+      expect(expectBridgeSuccess(callBridgeCommand(() => bridge.getProject())).jsxCode).toBe(
+        originalProject.jsxCode
+      )
+    })
+  })
+
   it('applies preview setting replacements when the preview permission is enabled', async () => {
     renderHeader()
 

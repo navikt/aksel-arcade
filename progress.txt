@@ -470,3 +470,13 @@ Completed in this branch:
 Verification completed with `npm run typecheck`, `npm run test -- --run`, `npm run build`, and a browser smoke/console check at `http://127.0.0.1:5177/aksel-arcade/`.
 
 Follow-up note: #36 should add diagnostics as a read-only bridge command over preview status/errors/console history. #37 can now rely on preview settings being safely agent-changeable while building sanitized Preview evidence.
+
+### 2026-05-26 - PR #45 code review follow-up
+
+Fixed after reviewing PR #45:
+
+- Found that rapid sequential Agent changes could create a later Checkpoint from stale pre-render state, causing human rollback to jump back too far.
+- Synchronized the Agent session's current project/preview refs immediately after accepted Agent changes and human rollback, so subsequent bridge calls capture the latest accepted state even before React flushes a render.
+- Added regression coverage that applies two Agent changes in the same React act batch, restores the second Checkpoint back to the first change, then restores the first Checkpoint back to the original source.
+
+Verification completed with `npm run typecheck`, `npm run test -- --run`, `npm run build`, and a browser smoke/console check at `http://127.0.0.1:5177/aksel-arcade/`.

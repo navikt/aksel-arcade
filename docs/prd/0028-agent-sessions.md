@@ -130,6 +130,16 @@ Next:
 - #36 can expose diagnostics from compile/runtime/console preview state without changing the mutation contract.
 - #37 can build sanitized Preview evidence on top of the now-permitted preview-setting workflow.
 
+### 2026-05-26 - PR #45 code review follow-up
+
+Fixed after reviewing PR #45:
+
+- Found that rapid sequential Agent changes could create a later Checkpoint from stale pre-render state, causing human rollback to jump back too far.
+- Synchronized the Agent session's current project/preview refs immediately after accepted Agent changes and human rollback, so subsequent bridge calls capture the latest accepted state even before React flushes a render.
+- Added regression coverage that applies two Agent changes in the same React act batch, restores the second Checkpoint back to the first change, then restores the first Checkpoint back to the original source.
+
+Verification completed with `npm run typecheck`, `npm run test -- --run`, `npm run build`, and a browser smoke/console check at `http://127.0.0.1:5177/aksel-arcade/`.
+
 ## Testing Decisions
 
 - Good tests should assert external behavior and user-visible outcomes, not internal implementation details. Tests should prove that agents can only do what the human authorized, that invalid bridge calls fail safely, that accepted changes update the Arcade project atomically, and that rollback restores the prior state.

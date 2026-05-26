@@ -109,6 +109,21 @@ export const useAgentSession = ({
   projectRef.current = project
   readContextRef.current = readContext
 
+  const syncCurrentContext = useCallback((nextProject: Project, nextTheme: ThemeMode) => {
+    projectRef.current = nextProject
+    readContextRef.current = {
+      project: {
+        name: nextProject.name,
+        jsxCode: nextProject.jsxCode,
+        hooksCode: nextProject.hooksCode,
+      },
+      preview: {
+        theme: nextTheme,
+        viewportSize: nextProject.viewportSize,
+      },
+    }
+  }, [])
+
   const applyAgentChange = useCallback(
     (request: unknown): AgentBridgeCommandResult<AgentSourceChangeResult> => {
       const parsedRequest = parseAgentChangeRequest(request)
@@ -129,10 +144,12 @@ export const useAgentSession = ({
         )
       }
 
-      const sizeStatus = validateProjectSize({
+      const nextProject = {
         ...projectRef.current,
         ...parsedRequest.projectUpdates,
-      })
+      }
+      const nextTheme = parsedRequest.theme ?? readContextRef.current.preview.theme
+      const sizeStatus = validateProjectSize(nextProject)
       if (!sizeStatus.valid) {
         return createAgentChangeFailure(
           'payload-too-large',
@@ -155,6 +172,7 @@ export const useAgentSession = ({
         },
       }
 
+      syncCurrentContext(nextProject, nextTheme)
       setCheckpoints((current) => [checkpoint, ...current].slice(0, MAX_AGENT_SOURCE_CHECKPOINTS))
       if (Object.keys(parsedRequest.projectUpdates).length > 0) {
         onProjectChange(parsedRequest.projectUpdates)
@@ -172,7 +190,7 @@ export const useAgentSession = ({
         },
       }
     },
-    [onProjectChange, onThemeChange]
+    [onProjectChange, onThemeChange, syncCurrentContext]
   )
 
   useEffect(() => {
@@ -271,14 +289,23 @@ export const useAgentSession = ({
       }
 
       if (Object.keys(updates).length > 0) {
+        syncCurrentContext(
+          {
+            ...projectRef.current,
+            ...updates,
+          },
+          themeToRestore ?? readContextRef.current.preview.theme
+        )
         onProjectChange(updates)
+      } else if (themeToRestore) {
+        syncCurrentContext(projectRef.current, themeToRestore)
       }
       if (themeToRestore) {
         onThemeChange(themeToRestore)
       }
       setLastEvent({ type: 'rollback', at: createTimestamp() })
     },
-    [checkpoints, onProjectChange, onThemeChange]
+    [checkpoints, onProjectChange, onThemeChange, syncCurrentContext]
   )
 
   const rollbackCheckpoints = useMemo<AgentSourceCheckpointListItem[]>(
