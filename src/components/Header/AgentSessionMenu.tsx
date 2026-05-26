@@ -22,7 +22,7 @@ const permissionItems: PermissionItem[] = [
 ]
 
 export const AgentSessionMenu = () => {
-  const { project, updateProject } = useProject()
+  const { project, previewState, updateProject } = useProject()
   const { theme, setTheme } = useSettings()
   const {
     agentInstructions,
@@ -36,6 +36,7 @@ export const AgentSessionMenu = () => {
     setPermission,
   } = useAgentSession({
     project,
+    previewState,
     theme,
     onProjectChange: updateProject,
     onThemeChange: setTheme,

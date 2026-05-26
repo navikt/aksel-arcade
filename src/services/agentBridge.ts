@@ -1,5 +1,6 @@
 import type { ThemeMode } from '@/contexts/SettingsContext'
 import type { ViewportSize } from '@/types/project'
+import { clonePreviewDiagnostics, type PreviewDiagnostics } from '@/services/previewDiagnostics'
 
 export const AGENT_BRIDGE_GLOBAL = '__AKSEL_ARCADE_AGENT_BRIDGE__'
 
@@ -35,6 +36,7 @@ export interface AgentPreviewReadState {
 export interface AgentBridgeReadContext {
   project: AgentProjectReadState
   preview: AgentPreviewReadState
+  diagnostics: PreviewDiagnostics
 }
 
 export type AgentSourceField = 'jsxCode' | 'hooksCode'
@@ -66,6 +68,7 @@ export type AgentBridgeErrorCode =
 export const AGENT_BRIDGE_COMMAND_NAMES = [
   'getProject',
   'getPreviewContext',
+  'getDiagnostics',
   'getSessionState',
   'applySourceChange',
 ] as const
@@ -118,6 +121,7 @@ export interface AgentBridge {
   commandNames: readonly AgentBridgeCommandName[]
   getProject: () => AgentBridgeCommandResult<AgentProjectReadState>
   getPreviewContext: () => AgentBridgeCommandResult<AgentPreviewReadState>
+  getDiagnostics: () => AgentBridgeCommandResult<PreviewDiagnostics>
   getSessionState: () => AgentBridgeCommandResult<AgentSessionReadState>
   applySourceChange: (request: unknown) => AgentBridgeCommandResult<AgentSourceChangeResult>
 }
@@ -176,6 +180,10 @@ export const createAgentBridge = (
       readCommand('getPreviewContext', () => ({
         ...controller.getReadContext().preview,
       })),
+    getDiagnostics: () =>
+      readCommand('getDiagnostics', () =>
+        clonePreviewDiagnostics(controller.getReadContext().diagnostics)
+      ),
     getSessionState: () =>
       readCommand('getSessionState', () => ({
         sessionId: session.id,
@@ -244,6 +252,7 @@ export const createAgentInstructions = (permissions: AgentPermissions): string =
     'The human must start temporary Agent access before this global exists. If it is missing, ask the human to start access from the Agent menu.',
     '',
     `Currently available command names: ${AGENT_BRIDGE_COMMAND_NAMES.map((command) => `${command}()`).join(', ')}`,
+    'Use getDiagnostics() to read preview status, compile errors, runtime errors, and bounded sandbox console messages after changes.',
     'To replace allowed fields, call applySourceChange({ summary, jsxCode?, hooksCode?, viewportSize?, theme?, name? }). A non-empty human-readable summary is required, and the human controls rollback from the Agent menu.',
     '',
     'Active permission state:',

@@ -16,9 +16,14 @@ import {
 } from '@/services/agentBridge'
 import type { ThemeMode } from '@/contexts/SettingsContext'
 import type { Project, ViewportSize } from '@/types/project'
+import type { PreviewState } from '@/types/preview'
 import { VIEWPORTS } from '@/types/viewports'
 import { validateProjectSize } from '@/services/storage'
 import { generateSecureUUID } from '@/utils/crypto'
+import {
+  collectPreviewDiagnostics,
+  type PreviewDiagnostics,
+} from '@/services/previewDiagnostics'
 
 type AgentSessionActivity =
   | 'inactive'
@@ -54,6 +59,7 @@ export type AgentSourceCheckpointListItem = Pick<
 
 interface UseAgentSessionOptions {
   project: Project
+  previewState: PreviewState
   theme: ThemeMode
   onProjectChange: (updates: AgentProjectUpdates) => void
   onThemeChange: (theme: ThemeMode) => void
@@ -64,6 +70,7 @@ const MAX_AGENT_SOURCE_CHECKPOINTS = 10
 
 export const useAgentSession = ({
   project,
+  previewState,
   theme,
   onProjectChange,
   onThemeChange,
@@ -88,6 +95,7 @@ export const useAgentSession = ({
       theme,
       viewportSize: project.viewportSize,
     },
+    diagnostics: collectPreviewDiagnostics(previewState),
   })
 
   const readContext = useMemo<AgentBridgeReadContext>(
@@ -101,28 +109,37 @@ export const useAgentSession = ({
         theme,
         viewportSize: project.viewportSize,
       },
+      diagnostics: collectPreviewDiagnostics(previewState),
     }),
-    [project.hooksCode, project.jsxCode, project.name, project.viewportSize, theme]
+    [project.hooksCode, project.jsxCode, project.name, project.viewportSize, previewState, theme]
   )
 
   permissionsRef.current = permissions
   projectRef.current = project
   readContextRef.current = readContext
 
-  const syncCurrentContext = useCallback((nextProject: Project, nextTheme: ThemeMode) => {
-    projectRef.current = nextProject
-    readContextRef.current = {
-      project: {
-        name: nextProject.name,
-        jsxCode: nextProject.jsxCode,
-        hooksCode: nextProject.hooksCode,
-      },
-      preview: {
-        theme: nextTheme,
-        viewportSize: nextProject.viewportSize,
-      },
-    }
-  }, [])
+  const syncCurrentContext = useCallback(
+    (
+      nextProject: Project,
+      nextTheme: ThemeMode,
+      nextDiagnostics: PreviewDiagnostics = readContextRef.current.diagnostics
+    ) => {
+      projectRef.current = nextProject
+      readContextRef.current = {
+        project: {
+          name: nextProject.name,
+          jsxCode: nextProject.jsxCode,
+          hooksCode: nextProject.hooksCode,
+        },
+        preview: {
+          theme: nextTheme,
+          viewportSize: nextProject.viewportSize,
+        },
+        diagnostics: nextDiagnostics,
+      }
+    },
+    []
+  )
 
   const applyAgentChange = useCallback(
     (request: unknown): AgentBridgeCommandResult<AgentSourceChangeResult> => {
@@ -172,7 +189,11 @@ export const useAgentSession = ({
         },
       }
 
-      syncCurrentContext(nextProject, nextTheme)
+      const nextDiagnostics = parsedRequest.changedFields.some(isAgentSourceField)
+        ? createPendingSourceDiagnostics(readContextRef.current.diagnostics)
+        : readContextRef.current.diagnostics
+
+      syncCurrentContext(nextProject, nextTheme, nextDiagnostics)
       setCheckpoints((current) => [checkpoint, ...current].slice(0, MAX_AGENT_SOURCE_CHECKPOINTS))
       if (Object.keys(parsedRequest.projectUpdates).length > 0) {
         onProjectChange(parsedRequest.projectUpdates)
@@ -532,6 +553,21 @@ const isViewportSize = (value: unknown): value is ViewportSize =>
   typeof value === 'string' && VALID_VIEWPORT_SIZES.some((viewport) => viewport === value)
 
 const isThemeMode = (value: unknown): value is ThemeMode => value === 'light' || value === 'dark'
+
+const isAgentSourceField = (field: AgentChangeField): field is AgentSourceField =>
+  field === 'jsxCode' || field === 'hooksCode'
+
+const createPendingSourceDiagnostics = (
+  diagnostics: PreviewDiagnostics
+): PreviewDiagnostics => ({
+  status: 'transpiling',
+  compileError: null,
+  runtimeError: null,
+  sandboxConsoleMessages: diagnostics.sandboxConsoleMessages.map((message) => ({
+    ...message,
+    args: [...message.args],
+  })),
+})
 
 const getDeniedAgentChangePermissions = (
   changedFields: AgentChangeField[],

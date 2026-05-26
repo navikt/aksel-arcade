@@ -7,13 +7,17 @@ import { LivePreview } from './LivePreview'
 import { ViewportToggle } from './ViewportToggle'
 import { InspectMode } from './InspectMode'
 import type { CompileError, RuntimeError } from '@/types/preview'
+import {
+  createSandboxConsoleMessage,
+  type SandboxConsolePayload,
+} from '@/services/previewDiagnostics'
 import './PreviewPane.css'
 
 export const PreviewPane = () => {
   const context = useContext(AppContext)
   if (!context) throw new Error('PreviewPane must be used within AppProvider')
 
-  const { project, updatePreviewState } = context
+  const { project, updatePreviewState, recordSandboxConsoleMessage } = context
   const { theme } = useSettings() // Use centralized theme from Settings
   const [transpiledCode, setTranspiledCode] = useState<string | null>(null)
   const [compileError, setCompileError] = useState<CompileError | null>(null)
@@ -31,6 +35,13 @@ export const PreviewPane = () => {
       clearTimeout(debounceTimerRef.current)
     }
 
+    setRuntimeError(null)
+    updatePreviewState({
+      status: 'transpiling',
+      compileError: null,
+      runtimeError: null,
+    })
+
     // Debounce transpilation by 500ms to avoid showing errors while typing
     debounceTimerRef.current = window.setTimeout(() => {
       transpileCode(project.jsxCode, project.hooksCode)
@@ -40,20 +51,41 @@ export const PreviewPane = () => {
           if (result.success && result.code) {
             setTranspiledCode(result.code)
             setCompileError(null)
+            setRuntimeError(null)
+            updatePreviewState({
+              status: 'rendering',
+              transpiledCode: result.code,
+              compileError: null,
+              runtimeError: null,
+            })
           } else if (result.error) {
             console.error('❌ Compile error:', result.error)
             setCompileError(result.error)
             setTranspiledCode(null)
+            updatePreviewState({
+              status: 'error',
+              transpiledCode: null,
+              compileError: result.error,
+              runtimeError: null,
+            })
           }
         })
         .catch((err) => {
           if (isCancelled) return
           console.error('❌ Transpilation error:', err)
-          setCompileError({
+          const error = {
             message: err.message || 'Unknown transpilation error',
             line: null,
             column: null,
             stack: null,
+          }
+          setCompileError(error)
+          setTranspiledCode(null)
+          updatePreviewState({
+            status: 'error',
+            transpiledCode: null,
+            compileError: error,
+            runtimeError: null,
           })
         })
     }, 500)
@@ -81,6 +113,7 @@ export const PreviewPane = () => {
     updatePreviewState({
       status: 'error',
       compileError: error,
+      runtimeError: null,
     })
   }
 
@@ -88,8 +121,13 @@ export const PreviewPane = () => {
     setRuntimeError(error)
     updatePreviewState({
       status: 'error',
+      compileError: null,
       runtimeError: error,
     })
+  }
+
+  const handleConsoleMessage = (payload: SandboxConsolePayload) => {
+    recordSandboxConsoleMessage(createSandboxConsoleMessage(payload))
   }
 
   const handleInspectToggle = (enabled: boolean) => {
@@ -153,6 +191,7 @@ export const PreviewPane = () => {
           onRenderSuccess={handleRenderSuccess}
           onCompileError={handleCompileError}
           onRuntimeError={handleRuntimeError}
+          onConsoleMessage={handleConsoleMessage}
           viewportWidth={project.viewportSize}
           isInspectMode={isInspectMode}
           theme={theme}

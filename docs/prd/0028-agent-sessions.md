@@ -140,6 +140,23 @@ Fixed after reviewing PR #45:
 
 Verification completed with `npm run typecheck`, `npm run test -- --run`, `npm run build`, and a browser smoke/console check at `http://127.0.0.1:5177/aksel-arcade/`.
 
+### 2026-05-26 - Issue #36 Return diagnostics with bounded sandbox console history
+
+Completed:
+
+- Selected #36 as the highest-priority `ready-for-agent` feature from #36-#38 because #35 is complete, diagnostics are the next PRD feedback-loop capability, and agents need compile/runtime/console visibility before Preview evidence and share/export hardening.
+- Added bounded sandbox console history to preview state so recent sandbox `log`, `warn`, and `error` output is retained as sanitized strings with capped message count, argument count, and argument length.
+- Added the active bridge read command `getDiagnostics()`, returning only Arcade-scoped preview diagnostics: preview status, compile error, runtime error, and bounded sandbox console messages.
+- Updated copied Agent instructions and command discovery so external agents know to use `getDiagnostics()` after accepted changes.
+- Marked accepted source changes as `transpiling` immediately in diagnostics while the debounced preview pipeline reprocesses, avoiding stale pre-change diagnostics in the post-apply gap.
+- Preserved apply-then-review behavior: schema-valid Agent changes that later fail compilation or rendering still apply, and diagnostics reports the normal preview errors afterward.
+- Added unit coverage for diagnostics normalization/bounding/cloning and integration coverage for command shape, diagnostics read activity, revoked-session errors, runtime error diagnostics, bounded console history, and compile error diagnostics after accepted invalid source.
+
+Next:
+
+- #37 can add the permission-gated Preview evidence command using the same active-session/read-activity bridge pattern.
+- #38 should keep share/export regression coverage focused on excluding Agent session state, permissions, activity, bridge metadata, and Checkpoints.
+
 ## Testing Decisions
 
 - Good tests should assert external behavior and user-visible outcomes, not internal implementation details. Tests should prove that agents can only do what the human authorized, that invalid bridge calls fail safely, that accepted changes update the Arcade project atomically, and that rollback restores the prior state.

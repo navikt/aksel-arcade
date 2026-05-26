@@ -16,6 +16,15 @@ export interface RuntimeError {
   stack: string
 }
 
+export type SandboxConsoleLevel = 'log' | 'warn' | 'error'
+
+export interface SandboxConsoleMessage {
+  level: SandboxConsoleLevel
+  message: string
+  args: string[]
+  timestamp: string
+}
+
 export interface PreviewState {
   // Rendering state
   status: PreviewStatus
@@ -24,6 +33,7 @@ export interface PreviewState {
   // Error state
   compileError: CompileError | null
   runtimeError: RuntimeError | null
+  sandboxConsoleMessages: SandboxConsoleMessage[]
 
   // Inspect mode
   inspectEnabled: boolean

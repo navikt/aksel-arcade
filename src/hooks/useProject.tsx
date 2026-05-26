@@ -5,13 +5,14 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from '
 
 import type { Project, ProjectSnapshot, ShareUrlMetadata } from '@/types/project'
 import type { EditorState } from '@/types/editor'
-import type { PreviewState } from '@/types/preview'
+import type { PreviewState, SandboxConsoleMessage } from '@/types/preview'
 import { createDefaultProject, createDefaultEditorState, createDefaultPreviewState, FORM_SUMMARY_JSX_CODE, HOOKS_DEMO_JSX_CODE, HOOKS_DEMO_HOOKS_CODE } from '@/utils/projectDefaults'
 import { loadProject, SNAPSHOT_FILE_IDS } from '@/services/storage'
 import type { ComponentSnippet } from '@/types/snippets'
 import { useSettings } from '@/contexts/SettingsContext'
 import { getViewportWidth } from '@/types/viewports'
 import { decodeShareToken, getShareTokenFromLocation, stripShareQueryParam, type ShareDecodeError } from '@/utils/shareDecoding'
+import { appendSandboxConsoleMessage } from '@/services/previewDiagnostics'
 
 interface ShareHydrationState {
   status: 'idle' | 'decoding' | 'ready' | 'error'
@@ -38,6 +39,7 @@ interface AppState {
   setProject: (project: Project) => void
   updateEditorState: (updates: Partial<EditorState>) => void
   updatePreviewState: (updates: Partial<PreviewState>) => void
+  recordSandboxConsoleMessage: (message: SandboxConsoleMessage) => void
   toggleComponentPalette: () => void
   closeComponentPalette: () => void
   toggleSettings: () => void
@@ -153,6 +155,13 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
   const updatePreviewState = (updates: Partial<PreviewState>) => {
     setPreviewState((prev) => ({ ...prev, ...updates }))
+  }
+
+  const recordSandboxConsoleMessage = (message: SandboxConsoleMessage) => {
+    setPreviewState((prev) => ({
+      ...prev,
+      sandboxConsoleMessages: appendSandboxConsoleMessage(prev.sandboxConsoleMessages, message),
+    }))
   }
 
   const toggleComponentPalette = () => {
@@ -280,6 +289,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     setProject,
     updateEditorState,
     updatePreviewState,
+    recordSandboxConsoleMessage,
     toggleComponentPalette,
     closeComponentPalette,
     toggleSettings,
