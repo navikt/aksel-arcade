@@ -26,7 +26,6 @@ const Harness = ({ includePreview = false }: HarnessProps) => {
     project,
     setProject,
     updateProject,
-    previewState,
     resetToIntro,
     loadFormSummaryTemplate,
     loadHooksDemo,
@@ -39,7 +38,6 @@ const Harness = ({ includePreview = false }: HarnessProps) => {
         projectName={project.name}
         onProjectNameChange={(name) => updateProject({ name })}
         currentProject={project}
-        shareViewport={previewState.currentViewport}
         onProjectImported={setProject}
         saveStatus="idle"
         projectSizeBytes={0}
@@ -397,7 +395,13 @@ describe('ProjectControls layout', () => {
     expect(activeBridge?.getPreviewEvidence).toEqual(expect.any(Function))
     expect(activeBridge?.getSessionState).toEqual(expect.any(Function))
     expect(activeBridge?.applySourceChange).toEqual(expect.any(Function))
+    expect(activeBridge?.commandNames.join(' ')).not.toMatch(/share|export/i)
     expect(activeBridge?.commandNames).not.toContain('restoreCheckpoint')
+    expect(activeBridge as unknown as Record<string, unknown>).not.toHaveProperty(
+      'generateShareUrl'
+    )
+    expect(activeBridge as unknown as Record<string, unknown>).not.toHaveProperty('exportProject')
+    expect(activeBridge as unknown as Record<string, unknown>).not.toHaveProperty('exportJson')
     expect(activeBridge as unknown as Record<string, unknown>).not.toHaveProperty(
       'restoreCheckpoint'
     )
@@ -569,6 +573,9 @@ describe('ProjectControls layout', () => {
       session: sessionResult.ok ? sessionResult.data : null,
     }).join(' ')
     expect(exposedReadKeys).not.toMatch(/share|export|storage|clipboard|cookie/i)
+    expect(sessionResult.ok ? sessionResult.data.commandNames.join(' ') : '').not.toMatch(
+      /share|export/i
+    )
   })
 
   it('returns preview diagnostics, records diagnostics reads, and revokes stale reads', async () => {

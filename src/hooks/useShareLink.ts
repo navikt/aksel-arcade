@@ -96,7 +96,7 @@ export const useShareLink = (options?: UseShareLinkOptions) => {
     strategyId: CompressionStrategyId
   } | null>(null)
   const storageHealthRef = useRef<'unknown' | 'ok' | 'failed'>('unknown')
-  const { project, editorState, previewState } = useProject()
+  const { project, editorState } = useProject()
   const { theme } = useSettings()
   const { adjustPayloadEstimate, recordResult } = useShareLinkExperiments()
 
@@ -114,11 +114,11 @@ export const useShareLink = (options?: UseShareLinkOptions) => {
     return createShareSnapshot(project, {
       activeFileId: editorState.activeTab === 'Hooks' ? SNAPSHOT_FILE_IDS.hooks : SNAPSHOT_FILE_IDS.jsx,
       preview: {
-        viewport: previewState.currentViewport,
+        viewport: project.viewportSize,
         theme,
       },
     })
-  }, [editorState.activeTab, previewState.currentViewport, project, theme])
+  }, [editorState.activeTab, project, theme])
 
   useEffect(() => {
     if (!isProgressStatus(state.status)) {
@@ -167,7 +167,7 @@ export const useShareLink = (options?: UseShareLinkOptions) => {
 
   const snapshotBuilder = options?.snapshotBuilder ?? derivedSnapshotBuilder
 
-  const generateShareLink = useCallback(async () => {
+  const generateShareLink = useCallback(async (forceRegeneration = false) => {
     if (pendingGenerationRef.current) {
       const { startedAt } = pendingGenerationRef.current
       const elapsed = Date.now() - startedAt
@@ -271,7 +271,11 @@ export const useShareLink = (options?: UseShareLinkOptions) => {
       const serialized = serializeSnapshot(snapshot)
       const contentSignature = await computeChecksum(serialized)
 
-      if (lastResultRef.current && lastResultRef.current.contentSignature === contentSignature) {
+      if (
+        !forceRegeneration &&
+        lastResultRef.current &&
+        lastResultRef.current.contentSignature === contentSignature
+      ) {
         emitGenerationTelemetry({
           outcome: 'success',
           approxChars: lastResultRef.current?.approxChars,

@@ -18,7 +18,6 @@ function App() {
 
   const {
     project,
-    previewState,
     updateProject,
     setProject,
     resetToIntro,
@@ -97,7 +96,6 @@ function App() {
           projectName={project.name}
           onProjectNameChange={handleProjectNameChange}
           currentProject={project}
-          shareViewport={previewState.currentViewport}
           onProjectImported={handleProjectImported}
           saveStatus={saveStatus}
           projectSizeBytes={projectSizeBytes}

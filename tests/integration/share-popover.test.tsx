@@ -6,6 +6,8 @@ import { AppProvider, useProject } from '@/hooks/useProject'
 import { SettingsProvider } from '@/contexts/SettingsContext'
 import { AppHeader } from '@/components/Header/AppHeader'
 import type { UseShareLinkOptions } from '@/hooks/useShareLink'
+import type { AgentBridgeCommandResult } from '@/services/agentBridge'
+import type { ProjectSnapshot } from '@/types/project'
 import * as shareEncoding from '@/utils/shareEncoding'
 import * as storage from '@/services/storage'
 import type { CompressionStrategy } from '@/services/compressionStrategies'
@@ -40,7 +42,6 @@ const Harness = ({ shareOptions }: { shareOptions?: UseShareLinkOptions }) => {
     project,
     setProject,
     updateProject,
-    previewState,
     resetToIntro,
     loadFormSummaryTemplate,
     loadHooksDemo,
@@ -64,7 +65,6 @@ const Harness = ({ shareOptions }: { shareOptions?: UseShareLinkOptions }) => {
         projectName={project.name}
         onProjectNameChange={name => updateProject({ name })}
         currentProject={project}
-        shareViewport={previewState.currentViewport}
         onProjectImported={setProject}
         saveStatus="idle"
         projectSizeBytes={0}
@@ -97,6 +97,73 @@ const renderHeader = (shareOptions?: UseShareLinkOptions) => {
 }
 
 const normalizeWhitespace = (value: string): string => value.replace(/\s+/g, ' ').trim()
+const AGENT_CHECKPOINT_SUMMARY = 'Confidential checkpoint summary'
+const AGENT_ARTIFACT_KEY_PATTERN =
+  /agent|session|permission|activity|bridge|checkpoint|rollback|evidence|diagnostic/i
+
+const callBridgeCommand = <TResult,>(command: () => TResult): TResult => {
+  let result: TResult | undefined
+
+  act(() => {
+    result = command()
+  })
+
+  if (result === undefined) {
+    throw new Error('Expected bridge command to return a result.')
+  }
+
+  return result
+}
+
+const expectBridgeSuccess = <TData,>(result: AgentBridgeCommandResult<TData>): TData => {
+  expect(result.ok).toBe(true)
+
+  if (!result.ok) {
+    throw new Error(result.error.message)
+  }
+
+  return result.data
+}
+
+const collectObjectKeys = (value: unknown): string[] => {
+  if (!value || typeof value !== 'object') {
+    return []
+  }
+
+  if (Array.isArray(value)) {
+    return value.flatMap(collectObjectKeys)
+  }
+
+  return Object.entries(value).flatMap(([key, nestedValue]) => [
+    key,
+    ...collectObjectKeys(nestedValue),
+  ])
+}
+
+const readBlobText = (blob: Blob): Promise<string> =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(String(reader.result))
+    reader.onerror = () => reject(reader.error)
+    reader.readAsText(blob)
+  })
+
+const startAgentAccess = async () => {
+  fireEvent.click(screen.getByRole('button', { name: /agent access/i }))
+  expect(await screen.findByText(/Agent session/i)).toBeTruthy()
+  fireEvent.click(
+    screen.getByRole('menuitemcheckbox', { name: /allow project metadata changes/i })
+  )
+  fireEvent.click(screen.getByRole('menuitemcheckbox', { name: /start temporary agent access/i }))
+
+  const bridge = window.__AKSEL_ARCADE_AGENT_BRIDGE__
+  expect(bridge).toBeDefined()
+  if (!bridge) {
+    throw new Error('Expected Agent bridge to be published after access starts.')
+  }
+
+  return bridge
+}
 
 const computeShareLinkChars = (payloadLength: number): number => {
   let workingEnvelope = {
@@ -205,6 +272,117 @@ describe('Share popover integration', () => {
     await waitFor(() => expect(writeText).toHaveBeenCalled())
     expect(writeText.mock.calls[0][0]).toContain('?share=')
     expect(screen.queryByText(/Copied!/i)).toBeNull()
+  })
+
+  it('keeps Agent session artifacts out of share and export fallback payloads', async () => {
+    const nextJsx = 'export default function App() { return <Heading>Fallback source</Heading> }'
+    const nextHooks = 'export const useFallbackFixture = () => "current hooks"'
+    let capturedExportBlob: Blob | null = null
+    const originalCreateObjectURL = global.URL.createObjectURL
+    const originalRevokeObjectURL = global.URL.revokeObjectURL
+
+    global.URL.createObjectURL = ((blob: Blob | MediaSource) => {
+      if (blob instanceof Blob) {
+        capturedExportBlob = blob
+      }
+      return 'blob:agent-fallback-export'
+    }) as typeof URL.createObjectURL
+    global.URL.revokeObjectURL = (() => {}) as typeof URL.revokeObjectURL
+
+    try {
+      renderHeader()
+      const bridge = await startAgentAccess()
+      const changeData = expectBridgeSuccess(
+        callBridgeCommand(() =>
+          bridge.applySourceChange({
+            summary: AGENT_CHECKPOINT_SUMMARY,
+            jsxCode: nextJsx,
+            hooksCode: nextHooks,
+            viewportSize: 'XS',
+            theme: 'light',
+            name: 'Fallback Export Project',
+          })
+        )
+      )
+
+      await waitFor(() => {
+        expect(expectBridgeSuccess(callBridgeCommand(() => bridge.getProject()))).toMatchObject({
+          name: 'Fallback Export Project',
+          jsxCode: nextJsx,
+          hooksCode: nextHooks,
+        })
+        expect(expectBridgeSuccess(callBridgeCommand(() => bridge.getPreviewContext()))).toEqual({
+          theme: 'light',
+          viewportSize: 'XS',
+        })
+      })
+
+      fireEvent.click(screen.getByLabelText(/share project/i))
+      await waitFor(() => expect(encodeSpy).toHaveBeenCalled())
+
+      const shareSnapshot = encodeSpy.mock.calls.at(-1)?.[0] as ProjectSnapshot | undefined
+      expect(shareSnapshot).toBeDefined()
+      if (!shareSnapshot) {
+        throw new Error('Expected share generation to encode a snapshot.')
+      }
+
+      expect(
+        shareSnapshot.files.find(file => file.id === storage.SNAPSHOT_FILE_IDS.jsx)
+      ).toMatchObject({
+        content: nextJsx,
+      })
+      expect(
+        shareSnapshot.files.find(file => file.id === storage.SNAPSHOT_FILE_IDS.hooks)
+      ).toMatchObject({
+        content: nextHooks,
+      })
+      expect(shareSnapshot.preview).toMatchObject({
+        viewport: 'XS',
+        theme: 'light',
+      })
+
+      const serializedShare = JSON.stringify(shareSnapshot)
+      expect(serializedShare).not.toContain(changeData.checkpointId)
+      expect(serializedShare).not.toContain(AGENT_CHECKPOINT_SUMMARY)
+      expect(serializedShare).not.toContain('__AKSEL_ARCADE_AGENT_BRIDGE__')
+      expect(collectObjectKeys(shareSnapshot).join(' ')).not.toMatch(AGENT_ARTIFACT_KEY_PATTERN)
+
+      fireEvent.click(screen.getByRole('button', { name: /^Export$/i }))
+      expect(capturedExportBlob).toBeInstanceOf(Blob)
+      if (!capturedExportBlob) {
+        throw new Error('Expected exportProject to create a JSON blob.')
+      }
+
+      const exportedText = await readBlobText(capturedExportBlob)
+      const exported = JSON.parse(exportedText) as {
+        name: string
+        code: {
+          jsxCode: string
+          hooksCode: string
+        }
+        ui: {
+          viewportSize: string
+        }
+      }
+
+      expect(exported).toMatchObject({
+        name: 'Fallback Export Project',
+        code: {
+          jsxCode: nextJsx,
+          hooksCode: nextHooks,
+        },
+        ui: {
+          viewportSize: 'XS',
+        },
+      })
+      expect(exportedText).not.toContain(changeData.checkpointId)
+      expect(exportedText).not.toContain(AGENT_CHECKPOINT_SUMMARY)
+      expect(exportedText).not.toContain('__AKSEL_ARCADE_AGENT_BRIDGE__')
+      expect(collectObjectKeys(exported).join(' ')).not.toMatch(AGENT_ARTIFACT_KEY_PATTERN)
+    } finally {
+      global.URL.createObjectURL = originalCreateObjectURL
+      global.URL.revokeObjectURL = originalRevokeObjectURL
+    }
   })
 
   it('surfaces offline errors with retry guidance', async () => {

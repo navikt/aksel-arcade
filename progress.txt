@@ -515,3 +515,18 @@ Completed in this branch:
 Verification completed with `npm run typecheck`, `npm run test -- --run`, targeted `npm run test -- --run tests/integration/project-controls-layout.test.tsx`, `git diff --check`, and a headless browser smoke check of the active `getPreviewEvidence()` bridge command at the local Vite URL.
 
 Follow-up note: #38 should verify share/export artifacts still exclude Agent session state, permissions, activity, bridge metadata, Preview evidence, and Checkpoints. Keep Preview evidence as a live, permission-gated bridge read rather than adding it to share/export payloads.
+
+### 2026-05-26 - #38 Keep Agent artifacts out of share/export fallback flows
+
+Selected #38 as the only feature for this branch because #37 is complete and #38 is the PRD follow-up that protects fallback handoff artifacts after Agent changes and Checkpoints.
+
+Completed in this branch:
+
+- Kept Share URL generation and Export JSON as UI fallback flows only; the active Agent bridge command list still exposes no share/export commands or properties.
+- Changed Share URL snapshot generation and the header share refresh fingerprint to use the current project viewport, so accepted Agent preview-size changes are packaged instead of the stale `previewState.currentViewport` default.
+- Added regression coverage that starts an Agent session, accepts source, Hooks, viewport, theme, and name changes that create a Checkpoint, then verifies Share URL snapshot and Export JSON output include the current project/preview state while excluding the Checkpoint id, Checkpoint summary, bridge global, Agent session state, permissions, activity, rollback history, diagnostics, and Preview evidence.
+- Preserved existing share fallback behavior, including oversize/export fallback coverage and explicit regeneration when the share button is clicked while the popover is already open.
+
+Verification completed with `npm run typecheck`, `CI=1 npm run test`, targeted share/Agent integration coverage, and a headless browser smoke check of Agent change -> preview render -> Share URL copy -> Export JSON download.
+
+Follow-up note: keep share/export as human-triggered fallback flows. If future Agent artifacts move into project-level state, extend the share/export exclusion regression checks before exposing those artifacts anywhere near fallback payloads.
