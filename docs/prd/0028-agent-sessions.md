@@ -172,6 +172,17 @@ Next:
 
 - #38 should keep share/export regression coverage focused on excluding Agent session state, permissions, activity, bridge metadata, Preview evidence, and Checkpoints.
 
+### 2026-05-26 - Issue #38 share/export fallback and PR #49 build follow-up
+
+Completed:
+
+- Kept Share URL generation and Export JSON as human-triggered fallback flows only; the active Agent bridge still exposes no share/export commands or properties.
+- Changed Share URL snapshot generation and share refresh fingerprinting to use the current Arcade project viewport, so accepted Agent preview-size changes are packaged instead of stale preview state.
+- Added regression coverage proving Share URL and Export JSON payloads include current project/source/preview state while excluding Agent session state, permissions, activity, bridge metadata, Checkpoints, rollback history, diagnostics, and Preview evidence.
+- Fixed the post-merge PR #49 build regression where the retry button passed `generateShareLink` directly as a React click handler after the hook gained an optional `forceRegeneration` boolean parameter.
+
+Verification completed with `npm run build`, which covers sandbox bundling, `tsc -b`, and Vite production bundling.
+
 ## Testing Decisions
 
 - Good tests should assert external behavior and user-visible outcomes, not internal implementation details. Tests should prove that agents can only do what the human authorized, that invalid bridge calls fail safely, that accepted changes update the Arcade project atomically, and that rollback restores the prior state.
