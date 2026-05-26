@@ -113,6 +113,23 @@ Next:
 
 - #33 can build source replacement, automatic Checkpoints, and human rollback on top of the read command/session primitives.
 
+### 2026-05-26 - Issue #35 Allow permitted preview and metadata replacements
+
+Completed:
+
+- Selected #35 as the highest-priority `ready-for-agent` feature from #35-#38 because #34 is closed, #35 is the next guarded mutation capability in the PRD chain, and it unlocks the later Preview evidence work in #37.
+- Extended the existing guarded `applySourceChange({ summary, ... })` path to accept full-field replacements for `viewportSize`, `theme`, and `name` in addition to `jsxCode` and `hooksCode`.
+- Kept Agent permissions atomic by requiring `sourceChanges` for source fields, `previewSettings` for viewport/theme fields, and `projectMetadata` for project name replacement. Metadata remains disabled by default.
+- Validated unsupported fields, invalid viewport/theme values, invalid names, malformed source fields, missing summaries, empty changes, and oversized project updates before mutation.
+- Created a Checkpoint before every accepted Agent change, including preview-only and metadata-only changes, and extended human rollback to restore only the changed source/name/viewport/theme fields.
+- Updated copied Agent instructions and menu coverage so active sessions can toggle source, preview setting, Preview evidence, and metadata permissions.
+- Added integration coverage for permission defaults/toggles, preview setting replacement, metadata default denial and opt-in apply, combined source/preview/metadata apply, whole-change rejection, invalid enum/name handling, Checkpoint capping, and rollback of combined changes.
+
+Next:
+
+- #36 can expose diagnostics from compile/runtime/console preview state without changing the mutation contract.
+- #37 can build sanitized Preview evidence on top of the now-permitted preview-setting workflow.
+
 ## Testing Decisions
 
 - Good tests should assert external behavior and user-visible outcomes, not internal implementation details. Tests should prove that agents can only do what the human authorized, that invalid bridge calls fail safely, that accepted changes update the Arcade project atomically, and that rollback restores the prior state.

@@ -268,6 +268,22 @@ describe('ProjectControls layout', () => {
       'restoreCheckpoint'
     )
 
+    fireEvent.click(screen.getByRole('menuitemcheckbox', { name: /allow source changes/i }))
+    fireEvent.click(screen.getByRole('menuitemcheckbox', { name: /allow preview setting changes/i }))
+    fireEvent.click(screen.getByRole('menuitemcheckbox', { name: /allow preview evidence reads/i }))
+    fireEvent.click(
+      screen.getByRole('menuitemcheckbox', { name: /allow project metadata changes/i })
+    )
+
+    await waitFor(() => {
+      expect(activeBridge?.permissions).toMatchObject({
+        sourceChanges: false,
+        previewSettings: false,
+        previewEvidence: false,
+        projectMetadata: true,
+      })
+    })
+
     fireEvent.click(screen.getByRole('menuitemcheckbox', { name: /stop temporary agent access/i }))
 
     expect(screen.getByRole('status').textContent).toMatch(/access revoked/i)
@@ -327,6 +343,9 @@ describe('ProjectControls layout', () => {
     expect(instructions).toContain('getPreviewContext()')
     expect(instructions).toContain('getSessionState()')
     expect(instructions).toContain('applySourceChange()')
+    expect(instructions).toContain('viewportSize?')
+    expect(instructions).toContain('theme?')
+    expect(instructions).toContain('name?')
     expect(instructions).toContain('sourceChanges: true')
     expect(instructions).toContain('previewSettings: true')
     expect(instructions).toContain('previewEvidence: true')
@@ -507,6 +526,142 @@ describe('ProjectControls layout', () => {
     })
   })
 
+  it('applies preview setting replacements when the preview permission is enabled', async () => {
+    renderHeader()
+
+    const bridge = await startAgentAccess()
+
+    const result = callBridgeCommand(() =>
+      bridge.applySourceChange({
+        summary: 'Switch preview context',
+        viewportSize: 'XS',
+        theme: 'light',
+      })
+    )
+
+    const changeData = expectBridgeSuccess(result)
+    expect(changeData).toEqual({
+      checkpointId: expect.any(String),
+      changedFields: ['viewportSize', 'theme'],
+    })
+
+    await waitFor(() => {
+      expect(callBridgeCommand(() => bridge.getPreviewContext())).toMatchObject({
+        ok: true,
+        data: {
+          theme: 'light',
+          viewportSize: 'XS',
+        },
+      })
+    })
+    expect(
+      screen.getByRole('menuitem', {
+        name: /restore switch preview context \(viewport \+ theme\)/i,
+      })
+    ).toBeTruthy()
+  })
+
+  it('keeps project metadata denied by default and applies names after opt-in', async () => {
+    renderHeader()
+
+    const bridge = await startAgentAccess()
+    const originalProject = expectBridgeSuccess(callBridgeCommand(() => bridge.getProject()))
+
+    const deniedResult = callBridgeCommand(() =>
+      bridge.applySourceChange({
+        summary: 'Rename project by default',
+        name: 'Denied Agent Project',
+      })
+    )
+
+    expectBridgeFailure(deniedResult, 'permission-denied')
+    expect(expectBridgeSuccess(callBridgeCommand(() => bridge.getProject()))).toEqual(
+      originalProject
+    )
+    expect(screen.queryByRole('menuitem', { name: /restore rename project by default/i })).toBeNull()
+
+    fireEvent.click(
+      screen.getByRole('menuitemcheckbox', { name: /allow project metadata changes/i })
+    )
+
+    const acceptedResult = callBridgeCommand(() =>
+      bridge.applySourceChange({
+        summary: 'Rename project after opt-in',
+        name: 'Agent Named Project',
+      })
+    )
+
+    const changeData = expectBridgeSuccess(acceptedResult)
+    expect(changeData).toEqual({
+      checkpointId: expect.any(String),
+      changedFields: ['name'],
+    })
+    await waitFor(() => {
+      expect(expectBridgeSuccess(callBridgeCommand(() => bridge.getProject())).name).toBe(
+        'Agent Named Project'
+      )
+    })
+  })
+
+  it('applies combined source, preview, and metadata replacements atomically with rollback', async () => {
+    renderHeader()
+
+    const bridge = await startAgentAccess()
+    const original = captureAgentState(bridge)
+    const nextJsx = 'export default function App() { return <Heading>Combined</Heading> }'
+    const nextHooks = 'export const useAgentFixture = () => "combined"'
+
+    fireEvent.click(
+      screen.getByRole('menuitemcheckbox', { name: /allow project metadata changes/i })
+    )
+
+    const result = callBridgeCommand(() =>
+      bridge.applySourceChange({
+        summary: 'Combined Agent update',
+        jsxCode: nextJsx,
+        hooksCode: nextHooks,
+        viewportSize: 'LG',
+        theme: 'light',
+        name: 'Combined Agent Project',
+      })
+    )
+
+    const changeData = expectBridgeSuccess(result)
+    expect(changeData).toEqual({
+      checkpointId: expect.any(String),
+      changedFields: ['jsxCode', 'hooksCode', 'viewportSize', 'theme', 'name'],
+    })
+
+    await waitFor(() => {
+      const updatedProject = expectBridgeSuccess(callBridgeCommand(() => bridge.getProject()))
+      const updatedPreview = expectBridgeSuccess(callBridgeCommand(() => bridge.getPreviewContext()))
+
+      expect(updatedProject).toMatchObject({
+        name: 'Combined Agent Project',
+        jsxCode: nextJsx,
+        hooksCode: nextHooks,
+      })
+      expect(updatedPreview).toMatchObject({
+        theme: 'light',
+        viewportSize: 'LG',
+      })
+    })
+
+    fireEvent.click(
+      await screen.findByRole('menuitem', {
+        name: /restore combined agent update \(JSX \+ Hooks \+ Viewport \+ Theme \+ Name\)/i,
+      })
+    )
+
+    await waitFor(() => {
+      const restoredProject = expectBridgeSuccess(callBridgeCommand(() => bridge.getProject()))
+      const restoredPreview = expectBridgeSuccess(callBridgeCommand(() => bridge.getPreviewContext()))
+
+      expect(restoredProject).toEqual(original.project)
+      expect(restoredPreview).toEqual(original.preview)
+    })
+  })
+
   it('caps automatic source Checkpoints at ten recent entries', async () => {
     renderHeader()
 
@@ -557,7 +712,7 @@ describe('ProjectControls layout', () => {
     expect(screen.queryByRole('menuitem', { name: /restore denied source update/i })).toBeNull()
   })
 
-  it('rejects malformed and unsupported source change requests without mutating Agent state', async () => {
+  it('rejects malformed and unsupported Agent change requests without mutating Agent state', async () => {
     renderHeader()
 
     const bridge = await startAgentAccess()
@@ -594,7 +749,7 @@ describe('ProjectControls layout', () => {
       {
         request: { summary: 'No fields' },
         code: 'invalid-request',
-        message: /jsxCode and\/or hooksCode/i,
+        message: /jsxCode, hooksCode, viewportSize, theme, and\/or name/i,
       },
       {
         request: {
@@ -623,28 +778,44 @@ describe('ProjectControls layout', () => {
         request: {
           summary: 'Unknown field',
           jsxCode: 'export default function App() { return <Heading>Changed</Heading> }',
-          name: 'Renamed by agent',
+          notes: 'Not part of the Agent change contract',
         },
         code: 'unsupported-field',
-        message: /Unsupported Agent source change field: name/i,
+        message: /Unsupported Agent change field: notes/i,
       },
       {
         request: {
-          summary: 'Unsupported viewport',
+          summary: 'Invalid viewport',
           jsxCode: 'export default function App() { return <Heading>Changed</Heading> }',
           viewportSize: 'XXL',
         },
-        code: 'unsupported-field',
+        code: 'invalid-request',
         message: /viewportSize/i,
       },
       {
         request: {
-          summary: 'Unsupported theme',
+          summary: 'Invalid theme',
           hooksCode: 'export const useAgentFixture = () => "theme"',
           theme: 'system',
         },
-        code: 'unsupported-field',
+        code: 'invalid-request',
         message: /theme/i,
+      },
+      {
+        request: {
+          summary: 'Invalid name type',
+          name: 123,
+        },
+        code: 'invalid-request',
+        message: /name must be a full-field string/i,
+      },
+      {
+        request: {
+          summary: 'Invalid blank name',
+          name: '   ',
+        },
+        code: 'invalid-request',
+        message: /name must be 1-100 characters/i,
       },
     ]
 
@@ -655,6 +826,36 @@ describe('ProjectControls layout', () => {
       expect(screen.getByRole('status').textContent).toBe(before.statusText)
       expect(captureAgentState(bridge)).toEqual(before)
     }
+  })
+
+  it('rejects mixed Agent changes atomically when any requested permission is disabled', async () => {
+    renderHeader()
+
+    const bridge = await startAgentAccess()
+    const before = captureAgentState(bridge)
+
+    fireEvent.click(screen.getByRole('menuitemcheckbox', { name: /allow preview setting changes/i }))
+    expect(bridge.permissions.previewSettings).toBe(false)
+
+    const result = callBridgeCommand(() =>
+      bridge.applySourceChange({
+        summary: 'Source plus denied preview',
+        jsxCode: 'export default function App() { return <Heading>Changed</Heading> }',
+        viewportSize: 'SM',
+      })
+    )
+
+    const error = expectBridgeFailure(result, 'permission-denied')
+    expect(error.message).toMatch(/preview setting changes/i)
+    expect(screen.getByRole('status').textContent).toMatch(/permissions changed/i)
+    expect(captureAgentState(bridge)).toEqual({
+      ...before,
+      permissions: {
+        ...before.permissions,
+        previewSettings: false,
+      },
+      statusText: screen.getByRole('status').textContent,
+    })
   })
 
   it('rejects oversized source changes before mutation or Checkpoint creation', async () => {
