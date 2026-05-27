@@ -738,6 +738,112 @@ describe('ProjectControls layout', () => {
     })
   })
 
+  it('restores Desktop transport Checkpoints only from the human Agent menu', async () => {
+    const desktopTransport = setupDesktopTransportPreload()
+    renderHeader()
+
+    const bridge = await startAgentAccess()
+    await waitFor(() =>
+      expect(desktopTransport.api.setAgentTransportRequestHandler).toHaveBeenCalledWith(
+        expect.any(Function)
+      )
+    )
+
+    const original = captureAgentState(bridge)
+    const nextJsx =
+      'export default function App() { return <Heading>Human rollback transport update</Heading> }'
+    const nextHooks = 'export const useAgentFixture = () => "desktop-rollback"'
+    const acceptedResponse = await desktopTransport.route({
+      id: 'rollback-change-1',
+      method: 'applySourceChange',
+      params: {
+        summary: 'Desktop rollback update',
+        jsxCode: nextJsx,
+        hooksCode: nextHooks,
+        viewportSize: 'XS',
+        theme: 'light',
+        name: 'Desktop Rollback Project',
+      },
+    })
+
+    expect(acceptedResponse).toMatchObject({
+      jsonrpc: '2.0',
+      id: 'rollback-change-1',
+      result: {
+        ok: true,
+        command: 'applySourceChange',
+        data: {
+          checkpointId: expect.any(String),
+          changedFields: ['jsxCode', 'hooksCode', 'viewportSize', 'theme', 'name'],
+        },
+      },
+    })
+
+    await waitFor(() => {
+      const updatedProject = expectBridgeSuccess(callBridgeCommand(() => bridge.getProject()))
+      const updatedPreview = expectBridgeSuccess(
+        callBridgeCommand(() => bridge.getPreviewContext())
+      )
+
+      expect(updatedProject).toMatchObject({
+        name: 'Desktop Rollback Project',
+        jsxCode: nextJsx,
+        hooksCode: nextHooks,
+      })
+      expect(updatedPreview).toEqual({
+        theme: 'light',
+        viewportSize: 'XS',
+      })
+    })
+
+    const restoreItem = await screen.findByRole('menuitem', {
+      name: /restore desktop rollback update \(JSX \+ Hooks \+ Viewport \+ Theme \+ Name\)/i,
+    })
+    const changed = captureAgentState(bridge)
+
+    for (const method of ['restoreCheckpoint', 'deleteCheckpoint']) {
+      await expect(
+        desktopTransport.route({
+          id: `${method}-1`,
+          method,
+          params: {
+            checkpointId: 'checkpoint-id-reported-to-agent',
+          },
+        })
+      ).resolves.toMatchObject({
+        error: {
+          code: -32601,
+          data: {
+            code: 'unsupported-method',
+          },
+        },
+      })
+    }
+    expect(captureAgentState(bridge)).toEqual(changed)
+
+    fireEvent.click(restoreItem)
+
+    await waitFor(() => {
+      const restoredProject = expectBridgeSuccess(callBridgeCommand(() => bridge.getProject()))
+      const restoredPreview = expectBridgeSuccess(
+        callBridgeCommand(() => bridge.getPreviewContext())
+      )
+
+      expect(restoredProject).toEqual(original.project)
+      expect(restoredPreview).toEqual(original.preview)
+    })
+
+    fireEvent.click(await findAgentAccessButton())
+    fireEvent.click(screen.getByRole('menuitemcheckbox', { name: /agent-tilgang/i }))
+
+    expect(screen.getByRole('status').textContent).toBe('Status: inaktiv')
+    expect(
+      screen.queryByRole('menuitem', {
+        name: /restore desktop rollback update/i,
+      })
+    ).toBeNull()
+  })
+
   it('shows copy failure feedback and lets the user retry without revealing secrets', async () => {
     const writeText = vi
       .fn()

@@ -779,3 +779,18 @@ Verification completed with `npm run typecheck`, `CI=1 npm run test`, targeted s
 PR #80 review follow-up: tightened package-envelope detection from partial-field matching to requiring the full `format` + `formatVersion` + `project` envelope, so legacy nested JSON with unrelated `project` metadata still imports normally. Added storage coverage for that legacy metadata case and updated the PRD history in #53.
 
 Next note: #66 can proceed with human-controlled Checkpoints now that #65 is closed. Keep rollback human-only and do not let the Agent transport restore or delete Checkpoints. #67 should wait until #66 lands so package cleanliness after Agent sessions can cover read, change, stop, and human rollback cases.
+
+### 2026-05-27 - #66 Restore human Checkpoints after transport changes
+
+Selected #66 as the highest-priority `ready-for-agent` feature from #66 and #67 because #65 is closed, #66 is the next unblocked Desktop transport rollback feature, and #67 remains blocked by #66. Worked only on #66.
+
+Completed in this branch:
+
+- Added Desktop transport integration coverage proving an authenticated `applySourceChange` creates a visible Agent menu Checkpoint and that the human menu restore action rolls back source, Hooks, preview settings, and project metadata.
+- Added coverage that `restoreCheckpoint` and `deleteCheckpoint` stay unsupported JSON-RPC methods, so External agents can receive Checkpoint identifiers in change results but cannot trigger rollback or delete rollback history.
+- Added coverage that stopping Agent access clears the local Checkpoint entries from the Agent menu.
+- Updated the Desktop Agent transport PRD implementation progress with the #66 human-controlled rollback work.
+
+Verification note: attempted `npm run typecheck` and `CI=1 npm run test -- --run`, but this environment does not have `npm` on PATH (`bash: npm: command not found`). The next person should run those two commands in a Node-enabled checkout before merging.
+
+Next note: #67 is now the next Desktop Agent transport follow-up. It should prove `.akselarcade` packages remain clean after Agent transport reads, Agent changes, stop, and human rollback; do not include Agent session identifiers, pairing credentials, endpoints, permissions, Checkpoints, diagnostics, Preview evidence, or transport metadata in package exports/imports.
