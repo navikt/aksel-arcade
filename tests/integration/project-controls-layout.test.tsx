@@ -630,6 +630,11 @@ describe('ProjectControls layout', () => {
     expect(instructions).toContain('applySourceChange()')
     expect(instructions).toMatch(/preview status, compile errors, runtime errors/i)
     expect(instructions).toMatch(/sanitized layout evidence/i)
+    expect(instructions).toMatch(
+      /poll getDiagnostics\(\) until status is no longer "transpiling" or "rendering"/i
+    )
+    expect(instructions).toMatch(/diagnostics settle to "idle".*getPreviewEvidence\(\)/i)
+    expect(instructions).toMatch(/status is "error".*diagnostics again/i)
     expect(instructions).toContain('viewportSize?')
     expect(instructions).toContain('theme?')
     expect(instructions).toContain('name?')
@@ -679,6 +684,10 @@ describe('ProjectControls layout', () => {
       'Supported JSON-RPC methods: getProject, getPreviewContext, getDiagnostics, getPreviewEvidence, getSessionState, applySourceChange.'
     )
     expect(instructions).toContain('"method":"applySourceChange"')
+    expect(instructions).toMatch(
+      /poll getDiagnostics\(\) until status is no longer "transpiling" or "rendering"/i
+    )
+    expect(instructions).toMatch(/diagnostics settle to "idle".*getPreviewEvidence\(\)/i)
     expect(instructions).toMatch(/GitHub Copilot app/i)
     expect(instructions).toMatch(/Copilot CLI/i)
     expect(instructions).toMatch(/Copilot in VS Code/i)

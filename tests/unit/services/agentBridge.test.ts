@@ -334,6 +334,15 @@ describe('agent instructions', () => {
       'Full Agent bridge command names: getProject, getPreviewContext, getDiagnostics, getPreviewEvidence, getSessionState, applySourceChange.'
     )
     expect(instructions).toContain('"method":"applySourceChange"')
+    expect(instructions).toContain(
+      'poll getDiagnostics() until status is no longer "transpiling" or "rendering" before final visual validation'
+    )
+    expect(instructions).toContain(
+      'When diagnostics settle to "idle", read getPreviewEvidence() to validate the visible result.'
+    )
+    expect(instructions).toContain(
+      'When status is "error", read diagnostics again for compile/runtime details instead.'
+    )
     expect(instructions).toMatch(/GitHub Copilot app/i)
     expect(instructions).toMatch(/Copilot CLI/i)
     expect(instructions).toMatch(/Copilot in VS Code/i)
