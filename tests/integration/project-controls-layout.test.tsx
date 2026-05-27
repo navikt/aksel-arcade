@@ -13,6 +13,11 @@ import type {
   AgentBridgeCommandResult,
   AgentBridgeErrorCode,
 } from '@/services/agentBridge'
+import type {
+  DesktopAgentTransportRequestHandler,
+  DesktopAgentTransportRouteRequest,
+  DesktopAgentTransportRouteResponse,
+} from '@/services/desktopAgentTransportProtocol'
 import type { PreviewEvidenceElement } from '@/services/previewEvidence'
 import {
   DESKTOP_ARCADE_CAPABILITIES,
@@ -178,6 +183,58 @@ const startAgentAccess = async () => {
   }
 
   return bridge
+}
+
+const setupDesktopTransportPreload = (
+  sessionId = '11111111-1111-4111-8111-111111111111'
+) => {
+  let transportRequestHandler: DesktopAgentTransportRequestHandler | null = null
+  const endpoint = {
+    endpoint: 'http://127.0.0.1:48123',
+    sessionId,
+    authorizationHeader: 'Bearer copied-agent-secret',
+  }
+  const api = {
+    getShellCapabilities: vi.fn().mockResolvedValue(DESKTOP_ARCADE_CAPABILITIES),
+    startAgentTransportSession: vi.fn().mockResolvedValue(endpoint),
+    stopAgentTransportSession: vi.fn().mockResolvedValue(true),
+    setAgentTransportRequestHandler: vi.fn(
+      (handler: DesktopAgentTransportRequestHandler | null) => {
+        transportRequestHandler = handler
+      }
+    ),
+  }
+
+  window.__AKSEL_ARCADE_DESKTOP__ = api
+  vi.spyOn(globalThis.crypto, 'randomUUID').mockReturnValue(sessionId)
+
+  return {
+    api,
+    endpoint,
+    route: async (
+      request: Omit<DesktopAgentTransportRouteRequest, 'sessionId'> & {
+        sessionId?: string
+      }
+    ): Promise<DesktopAgentTransportRouteResponse> => {
+      if (!transportRequestHandler) {
+        throw new Error('Expected Desktop transport request handler to be registered.')
+      }
+
+      let response: DesktopAgentTransportRouteResponse | undefined
+      await act(async () => {
+        response = await transportRequestHandler({
+          ...request,
+          sessionId: request.sessionId ?? sessionId,
+        })
+      })
+
+      if (!response) {
+        throw new Error('Expected Desktop transport request handler to return a response.')
+      }
+
+      return response
+    },
+  }
 }
 
 const dispatchSandboxMessage = (data: unknown) => {
@@ -544,7 +601,10 @@ describe('ProjectControls layout', () => {
     expect(instructions).toContain(`Endpoint: ${endpoint.endpoint}`)
     expect(instructions).toContain(`Authorization: ${endpoint.authorizationHeader}`)
     expect(instructions).toMatch(/Authorization header/i)
-    expect(instructions).toContain('getProject, getPreviewContext, getDiagnostics')
+    expect(instructions).toContain(
+      'Supported JSON-RPC methods: getProject, getPreviewContext, getDiagnostics, getPreviewEvidence, getSessionState, applySourceChange.'
+    )
+    expect(instructions).toContain('"method":"applySourceChange"')
     expect(instructions).toMatch(/GitHub Copilot app/i)
     expect(instructions).toMatch(/Copilot CLI/i)
     expect(instructions).toMatch(/Copilot in VS Code/i)
@@ -554,6 +614,124 @@ describe('ProjectControls layout', () => {
     expect(instructions).not.toMatch(/[?&](token|credential|authorization)=/i)
     expect(screen.queryByText(endpoint.endpoint)).toBeNull()
     expect(screen.queryByText(endpoint.authorizationHeader)).toBeNull()
+  })
+
+  it('routes Desktop transport Agent changes through normal project and preview flows', async () => {
+    const desktopTransport = setupDesktopTransportPreload()
+    renderHeader()
+
+    const bridge = await startAgentAccess()
+    await waitFor(() =>
+      expect(desktopTransport.api.setAgentTransportRequestHandler).toHaveBeenCalledWith(
+        expect.any(Function)
+      )
+    )
+
+    const nextJsx = 'export default function App() { return <Heading>Transport update</Heading> }'
+    const acceptedResponse = await desktopTransport.route({
+      id: 'change-1',
+      method: 'applySourceChange',
+      params: {
+        summary: 'Desktop transport update',
+        jsxCode: nextJsx,
+        viewportSize: 'LG',
+        theme: 'light',
+        name: 'Transport Agent Project',
+      },
+    })
+
+    expect(acceptedResponse).toMatchObject({
+      jsonrpc: '2.0',
+      id: 'change-1',
+      result: {
+        ok: true,
+        command: 'applySourceChange',
+        data: {
+          checkpointId: expect.any(String),
+          changedFields: ['jsxCode', 'viewportSize', 'theme', 'name'],
+        },
+      },
+    })
+
+    await waitFor(() => {
+      const updatedProject = expectBridgeSuccess(callBridgeCommand(() => bridge.getProject()))
+      const updatedPreview = expectBridgeSuccess(
+        callBridgeCommand(() => bridge.getPreviewContext())
+      )
+
+      expect(updatedProject).toMatchObject({
+        name: 'Transport Agent Project',
+        jsxCode: nextJsx,
+      })
+      expect(updatedPreview).toMatchObject({
+        theme: 'light',
+        viewportSize: 'LG',
+      })
+    })
+    expect(
+      screen.getByRole('menuitem', {
+        name: /restore desktop transport update \(JSX \+ Viewport \+ Theme \+ Name\)/i,
+      })
+    ).toBeTruthy()
+
+    const beforeInvalid = captureAgentState(bridge)
+    const invalidResponse = await desktopTransport.route({
+      id: 'invalid-1',
+      method: 'applySourceChange',
+      params: {
+        summary: 'Invalid viewport',
+        viewportSize: 'XXL',
+      },
+    })
+
+    expect(invalidResponse).toMatchObject({
+      jsonrpc: '2.0',
+      id: 'invalid-1',
+      error: {
+        code: -32002,
+        data: {
+          code: 'invalid-request',
+          command: 'applySourceChange',
+          bridgeError: {
+            code: 'invalid-request',
+          },
+        },
+      },
+    })
+    expect(captureAgentState(bridge)).toEqual(beforeInvalid)
+
+    await expect(
+      desktopTransport.route({
+        id: 'shell-1',
+        method: 'openShell',
+      })
+    ).resolves.toMatchObject({
+      error: {
+        code: -32601,
+        data: {
+          code: 'unsupported-method',
+        },
+      },
+    })
+
+    await expect(
+      desktopTransport.route({
+        id: 'stale-1',
+        method: 'applySourceChange',
+        params: {
+          summary: 'Stale session',
+          jsxCode: 'export default function App() { return <Heading>Stale</Heading> }',
+        },
+        sessionId: 'stale-session',
+      })
+    ).resolves.toMatchObject({
+      error: {
+        code: -32001,
+        data: {
+          code: 'session-mismatch',
+        },
+      },
+    })
   })
 
   it('shows copy failure feedback and lets the user retry without revealing secrets', async () => {

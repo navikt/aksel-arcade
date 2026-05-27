@@ -724,3 +724,20 @@ Completed in this branch:
 Verification completed with `npm run typecheck`, `CI=1 npm run test`, and a desktop-surface browser smoke check for Agent menu render, start access, copy success feedback, hidden instruction copying, visible secret non-disclosure, and clean console output.
 
 Next note: #65 should extend the same Desktop Agent transport protocol path for authenticated `applySourceChange` instead of adding a second command contract. Keep filesystem, shell, Share URL, export/import/package, rollback, and window-management methods rejected, and keep copied instructions/provider examples provider-neutral.
+
+### 2026-05-27 - #65 Apply Agent changes through Desktop transport
+
+Selected #65 as the highest-priority `ready-for-agent` feature from #57-#58 and #65-#67 because #63/#64 are complete, #65 is the next unblocked Desktop Agent transport step, and it unlocks the human Checkpoint restoration work in #66 and package-cleanliness follow-up in #67. Worked only on #65.
+
+Completed in this branch:
+
+- Widened the renderer Desktop Agent transport protocol route from read-only bridge methods to all supported Agent bridge command names.
+- Routed authenticated JSON-RPC `applySourceChange` requests through `createAgentBridgeCommandRouter` with the request `params`, reusing the existing mutation validator, project update flow, preview setting update flow, size checks, structured bridge errors, pending diagnostics behavior, and Checkpoint creation.
+- Kept filesystem, shell, Share URL, export/import/package, rollback, window-management, and other non-bridge methods rejected with structured `unsupported-method` JSON-RPC errors.
+- Updated hidden copied transport instructions to list all supported JSON-RPC methods and include an authenticated `applySourceChange` example without exposing endpoint or credential details in the visible Agent menu.
+- Added unit coverage for transport `applySourceChange` success, bridge validation failure mapping, unsupported methods, stale renderer sessions, and revoked sessions.
+- Added integration coverage that simulates the Desktop preload route handler applying source, preview, and metadata changes through the transport, verifies invalid transport changes leave state unchanged, and keeps unsupported/stale-session failures structured.
+
+Verification completed with `npm run typecheck`, targeted Agent transport Vitest coverage, and the full `CI=1 npm run test -- --run` suite.
+
+Next note: #66 can build directly on the Checkpoint id returned by transport `applySourceChange`, but the transport must remain human-rollback-only. Do not add an agent-triggered restore/delete Checkpoint command when exposing Checkpoints in the menu.

@@ -183,6 +183,11 @@ Web Arcade keeps Share URL as a web-only feature. Desktop Arcade does not offer 
 - `desktop/preload.cjs` exposes only `window.__AKSEL_ARCADE_DESKTOP__.getShellCapabilities()` over the `aksel-arcade:get-shell-capabilities` IPC channel. The renderer now resolves initial shell capabilities from that narrow preload bridge when present and otherwise falls back to `VITE_AKSEL_ARCADE_SURFACE`, preserving Web Arcade defaults.
 - Added preload-capability unit coverage to prove Desktop Arcade capabilities come from the IPC bridge, missing preload falls back to Web Arcade, and malformed preload payloads are rejected instead of giving React arbitrary desktop state.
 
+- 2026-05-27 - Issue #65 exposed `applySourceChange` through the authenticated Desktop Agent transport by widening the renderer transport protocol route from read-only bridge methods to all supported Agent bridge command names.
+- JSON-RPC `params` for `applySourceChange` now flow through the existing Agent bridge mutation validator, so source, preview setting, and project metadata replacements use the same apply-then-review path, size checks, structured errors, diagnostics flow, and Checkpoint creation as the browser bridge compatibility wrapper.
+- Non-bridge desktop automation methods such as filesystem, shell, Share URL, export/import/package, rollback, and window-management requests remain rejected as unsupported transport methods. Copied hidden instructions now list all supported JSON-RPC methods and include an authenticated change example.
+- Added protocol and menu integration coverage for accepted transport changes, validation rejection before mutation, unsupported methods, stale renderer-session mismatch, and normal preview/project state updates after a transport Agent change.
+
 ## Out of Scope
 
 - Editing the historical browser-only Agent sessions PRD.

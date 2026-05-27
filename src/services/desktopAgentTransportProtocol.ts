@@ -1,5 +1,5 @@
 import {
-  isAgentBridgeReadCommandName,
+  isAgentBridgeCommandName,
   type AgentBridgeCommandRouter,
   type AgentBridgeErrorCode,
   type AgentBridgeRoutedCommandResult,
@@ -74,7 +74,7 @@ export const createDesktopAgentTransportSuccessResponse = (
   result,
 })
 
-export const routeDesktopAgentTransportReadRequest = (
+export const routeDesktopAgentTransportRequest = (
   request: DesktopAgentTransportRouteRequest,
   {
     router,
@@ -93,18 +93,22 @@ export const routeDesktopAgentTransportReadRequest = (
     )
   }
 
-  if (!isAgentBridgeReadCommandName(request.method)) {
+  const method = request.method
+  if (!isAgentBridgeCommandName(method)) {
     return createDesktopAgentTransportErrorResponse(
       request.id,
       -32601,
       'unsupported-method',
-      `Unsupported Agent transport method "${request.method}". Supported read methods: ${router.commandNames
-        .filter(isAgentBridgeReadCommandName)
-        .join(', ')}.`
+      `Unsupported Agent transport method "${method}". Supported methods: ${router.commandNames.join(
+        ', '
+      )}.`
     )
   }
 
-  const result = router.routeCommand(request.method)
+  const result =
+    method === 'applySourceChange'
+      ? router.routeCommand(method, request.params)
+      : router.routeCommand(method)
   if (!result.ok) {
     return createDesktopAgentTransportErrorResponse(
       request.id,
