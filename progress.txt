@@ -794,3 +794,18 @@ Completed in this branch:
 Verification note: attempted `npm run typecheck` and `CI=1 npm run test -- --run`, but this environment does not have `npm` on PATH (`bash: npm: command not found`). The next person should run those two commands in a Node-enabled checkout before merging.
 
 Next note: #67 is now the next Desktop Agent transport follow-up. It should prove `.akselarcade` packages remain clean after Agent transport reads, Agent changes, stop, and human rollback; do not include Agent session identifiers, pairing credentials, endpoints, permissions, Checkpoints, diagnostics, Preview evidence, or transport metadata in package exports/imports.
+
+### 2026-05-27 - #67 Keep packages clean after Agent sessions
+
+Selected #67 as the only feature for this branch because #57, #58, #65, and #66 are complete, making package cleanliness after Desktop Agent transport activity fully unblocked. Worked only on #67.
+
+Completed in this branch:
+
+- Added Desktop transport integration coverage that starts Agent access, performs an authenticated transport read, applies source/Hooks/preview/theme/name changes through `applySourceChange`, exports a `.akselarcade` package while Agent access is active, restores the human Checkpoint, stops Agent access, exports again, and imports the active-session package into a fresh Desktop surface.
+- Compared the active and stopped package envelope shape with a normal package export, while verifying package payloads include only portable Arcade project content plus normal Aksel metadata.
+- Proved package exports exclude Agent session ids, pairing credentials, loopback endpoints, permissions, Checkpoints, diagnostics, Preview evidence, transport metadata, rollback/activity/bridge keys, the bridge global, and confidential Checkpoint summaries.
+- Proved importing a package exported after Agent access recreates only the portable project content and does not recreate Agent access or stale Checkpoints. Desktop capability coverage still keeps Export/Import package controls present and Share URL absent.
+
+Verification completed with `npm run typecheck`, `CI=1 npm run test -- --run tests/integration/project-controls-layout.test.tsx tests/unit/services/storage.test.ts`, and the required full `CI=1 npm run test -- --run` suite after installing dependencies with `npm ci` because this worktree initially had no local `node_modules`.
+
+Next note: package cleanliness is now covered at the Desktop transport integration boundary. If future Agent artifacts move into project state or export metadata, extend `tests/integration/project-controls-layout.test.tsx` and `tests/unit/services/storage.test.ts` before exposing those artifacts anywhere near `.akselarcade` import/export.

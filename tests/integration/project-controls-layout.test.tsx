@@ -24,7 +24,13 @@ import {
   WEB_ARCADE_CAPABILITIES,
   type ShellCapabilities,
 } from '@/services/shellCapabilities'
-import { ARCADE_PROJECT_IMPORT_ACCEPT } from '@/services/storage'
+import {
+  ARCADE_PROJECT_IMPORT_ACCEPT,
+  ARCADE_PROJECT_PACKAGE_EXTENSION,
+  ARCADE_PROJECT_PACKAGE_FORMAT,
+  ARCADE_PROJECT_PACKAGE_MIME_TYPE,
+  type ArcadeProjectPackage,
+} from '@/services/storage'
 
 const noop = () => {}
 
@@ -106,6 +112,70 @@ const collectObjectKeys = (value: unknown): string[] => {
     key,
     ...collectObjectKeys(nestedValue),
   ])
+}
+
+const AGENT_PACKAGE_ARTIFACT_KEY_PATTERN =
+  /agent|session|credential|endpoint|permission|checkpoint|diagnostic|evidence|transport|activity|bridge|rollback/i
+
+const readBlobText = (blob: Blob): Promise<string> =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(String(reader.result))
+    reader.onerror = () => reject(reader.error)
+    reader.readAsText(blob)
+  })
+
+const exportCurrentProjectPackage = async (
+  capturedBlobs: Blob[]
+): Promise<{ packageData: ArcadeProjectPackage; text: string }> => {
+  const blobCountBeforeExport = capturedBlobs.length
+
+  fireEvent.click(screen.getByRole('button', { name: /^Export$/i }))
+
+  const capturedBlob = capturedBlobs[blobCountBeforeExport]
+  if (!capturedBlob) {
+    throw new Error('Expected Export to create an Arcade project package blob.')
+  }
+  expect(capturedBlob.type).toBe(ARCADE_PROJECT_PACKAGE_MIME_TYPE)
+
+  const text = await readBlobText(capturedBlob)
+  return {
+    packageData: JSON.parse(text) as ArcadeProjectPackage,
+    text,
+  }
+}
+
+const getPackagePortableShape = (packageData: ArcadeProjectPackage) => ({
+  root: Object.keys(packageData).sort(),
+  project: Object.keys(packageData.project).sort(),
+  code: Object.keys(packageData.project.code).sort(),
+  ui: Object.keys(packageData.project.ui).sort(),
+  meta: packageData.meta ? Object.keys(packageData.meta).sort() : [],
+})
+
+const expectCleanPackage = (
+  packageData: ArcadeProjectPackage,
+  text: string,
+  forbiddenValues: string[]
+) => {
+  expect(packageData.format).toBe(ARCADE_PROJECT_PACKAGE_FORMAT)
+  expect(collectObjectKeys(packageData).join(' ')).not.toMatch(
+    AGENT_PACKAGE_ARTIFACT_KEY_PATTERN
+  )
+
+  for (const forbiddenValue of forbiddenValues) {
+    expect(text).not.toContain(forbiddenValue)
+  }
+}
+
+const createProjectPackageFile = (text: string): File => {
+  const file = new File([text], `agent-clean-package${ARCADE_PROJECT_PACKAGE_EXTENSION}`, {
+    type: ARCADE_PROJECT_PACKAGE_MIME_TYPE,
+  })
+  Object.defineProperty(file, 'text', {
+    value: async () => text,
+  })
+  return file
 }
 
 const callBridgeCommand = <TResult,>(command: () => TResult): TResult => {
@@ -842,6 +912,184 @@ describe('ProjectControls layout', () => {
         name: /restore desktop rollback update/i,
       })
     ).toBeNull()
+  })
+
+  it('keeps Desktop packages clean after transport reads, changes, rollback, stop, and import', async () => {
+    const desktopTransport = setupDesktopTransportPreload()
+    vi.mocked(globalThis.crypto.randomUUID).mockReturnValueOnce(
+      '22222222-2222-4222-8222-222222222222'
+    )
+    const capturedBlobs: Blob[] = []
+    const originalCreateObjectURL = global.URL.createObjectURL
+    const originalRevokeObjectURL = global.URL.revokeObjectURL
+    global.URL.createObjectURL = ((blob: Blob | MediaSource) => {
+      if (blob instanceof Blob) {
+        capturedBlobs.push(blob)
+      }
+      return `blob:desktop-package-${capturedBlobs.length}`
+    }) as typeof URL.createObjectURL
+    global.URL.revokeObjectURL = (() => {}) as typeof URL.revokeObjectURL
+
+    try {
+      const { unmount } = renderHeader()
+      const importInput = screen.getByLabelText(/import project file/i) as HTMLInputElement
+
+      expect(screen.queryByLabelText(/share project/i)).toBeNull()
+      expect(screen.getByRole('button', { name: /^Export$/i })).toBeTruthy()
+      expect(screen.getByRole('button', { name: /^Import$/i })).toBeTruthy()
+      expect(importInput.accept).toBe(ARCADE_PROJECT_IMPORT_ACCEPT)
+
+      const normalPackage = await exportCurrentProjectPackage(capturedBlobs)
+      const normalPackageShape = getPackagePortableShape(normalPackage.packageData)
+      const bridge = await startAgentAccess()
+      await waitFor(() =>
+        expect(desktopTransport.api.setAgentTransportRequestHandler).toHaveBeenCalledWith(
+          expect.any(Function)
+        )
+      )
+
+      const original = captureAgentState(bridge)
+      await expect(
+        desktopTransport.route({
+          id: 'read-before-package-export',
+          method: 'getProject',
+        })
+      ).resolves.toMatchObject({
+        jsonrpc: '2.0',
+        id: 'read-before-package-export',
+        result: {
+          ok: true,
+          command: 'getProject',
+          data: {
+            name: original.project.name,
+            jsxCode: original.project.jsxCode,
+            hooksCode: original.project.hooksCode,
+          },
+        },
+      })
+
+      const checkpointSummary = 'Confidential package checkpoint summary'
+      const nextJsx =
+        'export default function App() { return <Heading>Desktop package export</Heading> }'
+      const nextHooks = 'export const useAgentFixture = () => "package-export"'
+      const acceptedResponse = await desktopTransport.route({
+        id: 'package-change-1',
+        method: 'applySourceChange',
+        params: {
+          summary: checkpointSummary,
+          jsxCode: nextJsx,
+          hooksCode: nextHooks,
+          viewportSize: 'XS',
+          theme: 'light',
+          name: 'Transport Package Project',
+        },
+      })
+
+      expect(acceptedResponse).toMatchObject({
+        jsonrpc: '2.0',
+        id: 'package-change-1',
+        result: {
+          ok: true,
+          command: 'applySourceChange',
+          data: {
+            checkpointId: desktopTransport.endpoint.sessionId,
+            changedFields: ['jsxCode', 'hooksCode', 'viewportSize', 'theme', 'name'],
+          },
+        },
+      })
+      await waitFor(() => {
+        expect(expectBridgeSuccess(callBridgeCommand(() => bridge.getProject()))).toMatchObject({
+          name: 'Transport Package Project',
+          jsxCode: nextJsx,
+          hooksCode: nextHooks,
+        })
+        expect(expectBridgeSuccess(callBridgeCommand(() => bridge.getPreviewContext()))).toEqual({
+          theme: 'light',
+          viewportSize: 'XS',
+        })
+      })
+
+      const forbiddenPackageValues = [
+        desktopTransport.endpoint.sessionId,
+        desktopTransport.endpoint.endpoint,
+        desktopTransport.endpoint.authorizationHeader,
+        checkpointSummary,
+        '__AKSEL_ARCADE_AGENT_BRIDGE__',
+      ]
+      const activePackage = await exportCurrentProjectPackage(capturedBlobs)
+
+      expect(getPackagePortableShape(activePackage.packageData)).toEqual(normalPackageShape)
+      expect(activePackage.packageData.project).toMatchObject({
+        name: 'Transport Package Project',
+        code: {
+          jsxCode: nextJsx,
+          hooksCode: nextHooks,
+        },
+        ui: {
+          viewportSize: 'XS',
+        },
+      })
+      expectCleanPackage(activePackage.packageData, activePackage.text, forbiddenPackageValues)
+
+      fireEvent.click(
+        await screen.findByRole('menuitem', {
+          name: /restore confidential package checkpoint summary \(JSX \+ Hooks \+ Viewport \+ Theme \+ Name\)/i,
+        })
+      )
+      await waitFor(() => {
+        expect(expectBridgeSuccess(callBridgeCommand(() => bridge.getProject()))).toEqual(
+          original.project
+        )
+        expect(expectBridgeSuccess(callBridgeCommand(() => bridge.getPreviewContext()))).toEqual(
+          original.preview
+        )
+      })
+
+      fireEvent.click(await findAgentAccessButton())
+      fireEvent.click(screen.getByRole('menuitemcheckbox', { name: /agent-tilgang/i }))
+      expect(screen.getByRole('status').textContent).toBe('Status: inaktiv')
+      expect(window.__AKSEL_ARCADE_AGENT_BRIDGE__).toBeUndefined()
+
+      const stoppedPackage = await exportCurrentProjectPackage(capturedBlobs)
+
+      expect(getPackagePortableShape(stoppedPackage.packageData)).toEqual(normalPackageShape)
+      expect(stoppedPackage.packageData.project).toMatchObject({
+        name: original.project.name,
+        code: {
+          jsxCode: original.project.jsxCode,
+          hooksCode: original.project.hooksCode,
+        },
+        ui: {
+          viewportSize: original.preview.viewportSize,
+        },
+      })
+      expectCleanPackage(stoppedPackage.packageData, stoppedPackage.text, forbiddenPackageValues)
+
+      unmount()
+      expect(window.__AKSEL_ARCADE_AGENT_BRIDGE__).toBeUndefined()
+      renderHeader()
+
+      fireEvent.change(screen.getByLabelText(/import project file/i), {
+        target: {
+          files: [createProjectPackageFile(activePackage.text)],
+        },
+      })
+
+      await waitFor(() => expect(screen.getByText('Transport Package Project')).toBeTruthy())
+      expect(window.__AKSEL_ARCADE_AGENT_BRIDGE__).toBeUndefined()
+
+      fireEvent.click(await findAgentAccessButton())
+      expect(await screen.findByText(/Gi agenter tilgang/i)).toBeTruthy()
+      expect(screen.getByRole('status').textContent).toBe('Status: inaktiv')
+      expect(
+        screen.queryByRole('menuitem', {
+          name: /restore confidential package checkpoint summary/i,
+        })
+      ).toBeNull()
+    } finally {
+      global.URL.createObjectURL = originalCreateObjectURL
+      global.URL.revokeObjectURL = originalRevokeObjectURL
+    }
   })
 
   it('shows copy failure feedback and lets the user retry without revealing secrets', async () => {
