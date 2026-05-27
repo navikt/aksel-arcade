@@ -42,14 +42,14 @@ describe('desktopAgentSessionCoordinator', () => {
     vi.restoreAllMocks()
   })
 
-  it('starts inactive and creates one all-on Agent session with a hidden pairing credential', () => {
+  it('starts inactive and creates one all-on Agent session with a hidden pairing credential', async () => {
     const { coordinator, startedSessions } = createDeterministicCoordinator()
 
     expect(coordinator.getStatus()).toBe('inactive')
     expect(coordinator.getActiveSession()).toBeNull()
     expect(coordinator.getActiveTransportSession()).toBeNull()
 
-    const session = coordinator.startSession()
+    const session = await coordinator.startSession()
 
     expect(session).toEqual({
       id: 'agent-session-1',
@@ -69,11 +69,11 @@ describe('desktopAgentSessionCoordinator', () => {
     ])
   })
 
-  it('keeps start idempotent while a session is active', () => {
+  it('keeps start idempotent while a session is active', async () => {
     const { coordinator, startedSessions } = createDeterministicCoordinator()
 
-    const firstSession = coordinator.startSession()
-    const secondSession = coordinator.startSession()
+    const firstSession = await coordinator.startSession()
+    const secondSession = await coordinator.startSession()
 
     expect(secondSession).toEqual(firstSession)
     expect(coordinator.getActiveTransportSession()).toMatchObject({
@@ -83,10 +83,10 @@ describe('desktopAgentSessionCoordinator', () => {
     expect(startedSessions).toHaveLength(1)
   })
 
-  it('invalidates session state and credentials on stop before allowing a new session', () => {
+  it('invalidates session state and credentials on stop before allowing a new session', async () => {
     const { coordinator, stoppedSessions } = createDeterministicCoordinator()
 
-    const firstSession = coordinator.startSession()
+    const firstSession = await coordinator.startSession()
     const firstTransportSession = coordinator.getActiveTransportSession()
 
     coordinator.stopSession('stop')
@@ -102,7 +102,7 @@ describe('desktopAgentSessionCoordinator', () => {
       },
     ])
 
-    const secondSession = coordinator.startSession()
+    const secondSession = await coordinator.startSession()
 
     expect(secondSession.id).toBe('agent-session-2')
     expect(coordinator.getActiveTransportSession()).toMatchObject({
@@ -111,19 +111,19 @@ describe('desktopAgentSessionCoordinator', () => {
     })
   })
 
-  it('uses cleanup reasons for reload and quit invalidation', () => {
+  it('uses cleanup reasons for reload and quit invalidation', async () => {
     const { coordinator, stoppedSessions } = createDeterministicCoordinator()
 
-    coordinator.startSession()
+    await coordinator.startSession()
     coordinator.stopSession('reload')
-    coordinator.startSession()
+    await coordinator.startSession()
     coordinator.stopSession('quit')
 
     expect(stoppedSessions.map(({ reason }) => reason)).toEqual(['reload', 'quit'])
     expect(coordinator.getStatus()).toBe('inactive')
   })
 
-  it('rolls back active state if the transport adapter rejects session startup', () => {
+  it('rolls back active state if the transport adapter rejects session startup', async () => {
     const coordinator = createDesktopAgentSessionCoordinator({
       createSessionId: () => 'agent-session-1',
       createPairingCredential: () => 'credential-1',
@@ -135,12 +135,12 @@ describe('desktopAgentSessionCoordinator', () => {
       },
     })
 
-    expect(() => coordinator.startSession()).toThrow(/adapter failed/)
+    await expect(coordinator.startSession()).rejects.toThrow(/adapter failed/)
     expect(coordinator.getStatus()).toBe('inactive')
     expect(coordinator.getActiveTransportSession()).toBeNull()
   })
 
-  it('creates unguessable default pairing credentials from Web Crypto bytes', () => {
+  it('creates unguessable default pairing credentials from Web Crypto bytes', async () => {
     const getRandomValues = vi.spyOn(globalThis.crypto, 'getRandomValues')
     getRandomValues.mockImplementation((array) => {
       const bytes = array as Uint8Array
@@ -152,7 +152,7 @@ describe('desktopAgentSessionCoordinator', () => {
       createTimestamp: () => '2026-05-27T08:00:00.000Z',
     })
 
-    coordinator.startSession()
+    await coordinator.startSession()
 
     expect(coordinator.getActiveTransportSession()?.pairingCredential).toBe('0f'.repeat(32))
   })

@@ -171,8 +171,8 @@ const startAgentAccess = async () => {
   expect(await screen.findByText(/Gi agenter tilgang/i)).toBeTruthy()
   fireEvent.click(screen.getByRole('menuitemcheckbox', { name: /agent-tilgang/i }))
 
+  await waitFor(() => expect(window.__AKSEL_ARCADE_AGENT_BRIDGE__).toBeDefined())
   const bridge = window.__AKSEL_ARCADE_AGENT_BRIDGE__
-  expect(bridge).toBeDefined()
   if (!bridge) {
     throw new Error('Expected Agent bridge to be published after access starts.')
   }
@@ -390,7 +390,7 @@ describe('ProjectControls layout', () => {
 
     fireEvent.click(accessItem)
 
-    expect((await screen.findByRole('status')).textContent).toBe('Status: aktiv')
+    await waitFor(() => expect(screen.getByRole('status').textContent).toBe('Status: aktiv'))
     const activeBridge = window.__AKSEL_ARCADE_AGENT_BRIDGE__
     expect(activeBridge).toMatchObject({
       sessionId: '11111111-1111-4111-8111-111111111111',
@@ -451,7 +451,7 @@ describe('ProjectControls layout', () => {
     })
 
     fireEvent.click(screen.getByRole('menuitemcheckbox', { name: /agent-tilgang/i }))
-    expect(window.__AKSEL_ARCADE_AGENT_BRIDGE__).toBeDefined()
+    await waitFor(() => expect(window.__AKSEL_ARCADE_AGENT_BRIDGE__).toBeDefined())
 
     unmount()
     expect(window.__AKSEL_ARCADE_AGENT_BRIDGE__).toBeUndefined()
@@ -519,8 +519,8 @@ describe('ProjectControls layout', () => {
       })
     )
 
+    await waitFor(() => expect(window.__AKSEL_ARCADE_AGENT_BRIDGE__).toBeDefined())
     const bridge = window.__AKSEL_ARCADE_AGENT_BRIDGE__
-    expect(bridge).toBeDefined()
     if (!bridge) {
       throw new Error('Expected Agent bridge to be published after access starts.')
     }
@@ -801,15 +801,7 @@ describe('ProjectControls layout', () => {
   it('returns current project, preview, and permission state through captured bridge references', async () => {
     renderHeader()
 
-    fireEvent.click(await findAgentAccessButton())
-    expect(await screen.findByText(/Gi agenter tilgang/i)).toBeTruthy()
-    fireEvent.click(screen.getByRole('menuitemcheckbox', { name: /agent-tilgang/i }))
-
-    const bridge = window.__AKSEL_ARCADE_AGENT_BRIDGE__
-    expect(bridge).toBeDefined()
-    if (!bridge) {
-      throw new Error('Expected Agent bridge to be published after access starts.')
-    }
+    const bridge = await startAgentAccess()
 
     fireEvent.click(screen.getByRole('button', { name: /update agent read fixture/i }))
 

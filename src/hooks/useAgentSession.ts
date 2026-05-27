@@ -18,6 +18,7 @@ import {
   type DesktopAgentSessionCoordinator,
   type DesktopAgentSessionEndReason,
 } from '@/services/desktopAgentSessionCoordinator'
+import { createDesktopPreloadAgentTransportAdapter } from '@/services/desktopAgentTransportAdapter'
 import type { ThemeMode } from '@/contexts/SettingsContext'
 import type { Project, ViewportSize } from '@/types/project'
 import type { PreviewState } from '@/types/preview'
@@ -85,7 +86,9 @@ export const useAgentSession = ({
   })
 
   if (!coordinatorRef.current) {
-    coordinatorRef.current = createDesktopAgentSessionCoordinator()
+    coordinatorRef.current = createDesktopAgentSessionCoordinator({
+      transportAdapter: createDesktopPreloadAgentTransportAdapter(),
+    })
   }
 
   const readContext = useMemo<AgentBridgeReadContext>(
@@ -257,14 +260,14 @@ export const useAgentSession = ({
     session,
   ])
 
-  const startAgentSession = useCallback(() => {
+  const startAgentSession = useCallback(async () => {
     const coordinator = coordinatorRef.current
     if (!coordinator) {
       throw new Error('Desktop Agent session coordinator was not initialized.')
     }
 
     const wasActive = coordinator.isSessionActive()
-    const nextSession = coordinator.startSession()
+    const nextSession = await coordinator.startSession()
     activeSessionIdRef.current = nextSession.id
     setPermissions(nextSession.permissions)
     if (!wasActive) {

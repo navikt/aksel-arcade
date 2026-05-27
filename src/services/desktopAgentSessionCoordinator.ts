@@ -19,11 +19,11 @@ export interface DesktopAgentTransportSession extends DesktopAgentSessionSnapsho
 }
 
 export interface DesktopAgentTransportAdapter {
-  startSession?: (session: DesktopAgentTransportSession) => void
+  startSession?: (session: DesktopAgentTransportSession) => void | Promise<void>
   stopSession?: (
     session: DesktopAgentTransportSession,
     reason: DesktopAgentSessionEndReason
-  ) => void
+  ) => void | Promise<void>
 }
 
 export interface DesktopAgentSessionCoordinatorOptions {
@@ -39,7 +39,7 @@ export interface DesktopAgentSessionCoordinator {
   getActiveTransportSession: () => DesktopAgentTransportSession | null
   getPermissions: () => AgentPermissions
   isSessionActive: (sessionId?: string) => boolean
-  startSession: () => DesktopAgentSessionSnapshot
+  startSession: () => Promise<DesktopAgentSessionSnapshot>
   stopSession: (reason?: DesktopAgentSessionEndReason) => void
 }
 
@@ -84,7 +84,12 @@ export const createDesktopAgentSessionCoordinator = ({
 
     const sessionToStop = activeSession
     activeSession = null
-    transportAdapter?.stopSession?.(cloneTransportSession(sessionToStop), reason)
+    const stopResult = transportAdapter?.stopSession?.(cloneTransportSession(sessionToStop), reason)
+    if (isPromiseLike(stopResult)) {
+      void stopResult.catch((error) => {
+        console.error('Desktop Agent transport stop failed.', error)
+      })
+    }
   }
 
   return {
@@ -97,7 +102,7 @@ export const createDesktopAgentSessionCoordinator = ({
         : clonePermissions(DEFAULT_AGENT_PERMISSIONS),
     isSessionActive: (sessionId?: string) =>
       Boolean(activeSession && (sessionId === undefined || activeSession.id === sessionId)),
-    startSession: () => {
+    startSession: async () => {
       if (activeSession) {
         return toSessionSnapshot(activeSession)
       }
@@ -106,7 +111,7 @@ export const createDesktopAgentSessionCoordinator = ({
       activeSession = nextSession
 
       try {
-        transportAdapter?.startSession?.(cloneTransportSession(nextSession))
+        await transportAdapter?.startSession?.(cloneTransportSession(nextSession))
       } catch (error) {
         activeSession = null
         throw error
@@ -119,6 +124,12 @@ export const createDesktopAgentSessionCoordinator = ({
 }
 
 const clonePermissions = (permissions: AgentPermissions): AgentPermissions => ({ ...permissions })
+
+const isPromiseLike = (value: unknown): value is Promise<unknown> =>
+  typeof value === 'object' &&
+  value !== null &&
+  'then' in value &&
+  typeof value.then === 'function'
 
 const toSessionSnapshot = ({
   id,

@@ -171,8 +171,8 @@ const startAgentAccess = async () => {
   expect(await screen.findByText(/Gi agenter tilgang/i)).toBeTruthy()
   fireEvent.click(screen.getByRole('menuitemcheckbox', { name: /agent-tilgang/i }))
 
+  await waitFor(() => expect(window.__AKSEL_ARCADE_AGENT_BRIDGE__).toBeDefined())
   const bridge = window.__AKSEL_ARCADE_AGENT_BRIDGE__
-  expect(bridge).toBeDefined()
   if (!bridge) {
     throw new Error('Expected Agent bridge to be published after access starts.')
   }
