@@ -677,3 +677,17 @@ Fixed after manual Desktop Agent testing showed copied instructions still contai
 Verification completed with `npm run typecheck`, `CI=1 npm run test`, `npm run build`, `npm run lint` (existing warnings only), and a Desktop Arcade dev smoke test. The desktop smoke test copied instructions from the running app, sent a JSON-RPC request with the copied Authorization header and got a structured `unsupported-method` response, verified missing/wrong auth failures, rejected query-token usage, rejected a non-loopback interface request, and confirmed the endpoint shut down after stopping Agent access.
 
 Next note: #63 should now be able to reuse the copied endpoint/Auth instructions and focus only on routing supported read methods through `createAgentBridgeCommandRouter`.
+
+### 2026-05-27 - PR #75 review follow-up: transport lifecycle races
+
+Fixed scoped issues found during PR #75 review before merge:
+
+- Serialized loopback transport `startSession` calls so concurrent starts cannot orphan an earlier random-port HTTP server.
+- Marked the pending loopback session active before the server finishes listening and made server shutdown force-close idle/active HTTP connections where Node supports it.
+- Made coordinator startup cancellable: stopping/reloading while preload IPC is still starting no longer resurrects the Agent session, and any endpoint returned after cancellation is stopped again with the original cleanup reason.
+- Rejected preload IPC endpoints with an empty `Bearer ` Authorization value instead of accepting endpoint metadata that can only fail later.
+- Added regression coverage for concurrent loopback starts, cancelled coordinator startup, and empty Bearer endpoint validation.
+
+Verification completed with `npm run typecheck`, `CI=1 npm run test`, `npm run lint` (existing warnings only), `npm run build`, desktop script syntax checks, and the Desktop Arcade dev smoke path.
+
+Next note: #63 can still focus on routing authenticated JSON-RPC read methods through `createAgentBridgeCommandRouter`; the #75 review fixes only harden #62 lifecycle/auth behavior.

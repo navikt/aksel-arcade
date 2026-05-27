@@ -1,7 +1,4 @@
-import {
-  getDesktopPreloadApi,
-  type DesktopArcadePreloadApi,
-} from './shellCapabilities'
+import { getDesktopPreloadApi, type DesktopArcadePreloadApi } from './shellCapabilities'
 import type {
   DesktopAgentTransportAdapter,
   DesktopAgentTransportEndpoint,
@@ -58,7 +55,8 @@ const isValidTransportEndpoint = (
       url.protocol === 'http:' &&
       (url.hostname === '127.0.0.1' || url.hostname === 'localhost') &&
       Number(url.port) > 0 &&
-      endpoint.authorizationHeader.startsWith('Bearer ')
+      endpoint.authorizationHeader.startsWith('Bearer ') &&
+      endpoint.authorizationHeader.slice('Bearer '.length).trim().length > 0
     )
   } catch {
     return false

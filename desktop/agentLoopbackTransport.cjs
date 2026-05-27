@@ -6,6 +6,7 @@ const MAX_JSON_RPC_BODY_BYTES = 1024 * 1024
 
 const createAgentLoopbackJsonRpcTransport = ({ host = LOOPBACK_HOST, routeRequest } = {}) => {
   let activeSession = null
+  let startQueue = Promise.resolve()
 
   const stopSession = async (sessionId) => {
     if (!activeSession || (sessionId && activeSession.session.id !== sessionId)) {
@@ -18,9 +19,16 @@ const createAgentLoopbackJsonRpcTransport = ({ host = LOOPBACK_HOST, routeReques
     return true
   }
 
-  const startSession = async (session) => {
+  const startSession = (session) => {
     assertTransportSession(session)
 
+    const startOperation = startQueue.then(() => startSessionExclusive(session))
+    startQueue = startOperation.catch(() => undefined)
+
+    return startOperation
+  }
+
+  const startSessionExclusive = async (session) => {
     if (activeSession?.session.id === session.id) {
       return toTransportEndpoint(activeSession)
     }
@@ -35,21 +43,32 @@ const createAgentLoopbackJsonRpcTransport = ({ host = LOOPBACK_HOST, routeReques
         routeRequest,
       })
     })
-    await listenOnRandomLoopbackPort(server, host)
-
-    const address = server.address()
-    if (!address || typeof address === 'string') {
-      await closeServer(server)
-      throw new Error('Agent loopback transport did not receive a TCP address.')
-    }
-
-    activeSession = {
-      endpoint: `http://${host}:${address.port}`,
+    const nextSession = {
+      endpoint: '',
       server,
       session: cloneTransportSession(session),
     }
 
-    return toTransportEndpoint(activeSession)
+    activeSession = nextSession
+
+    try {
+      await listenOnRandomLoopbackPort(server, host)
+
+      const address = server.address()
+      if (!address || typeof address === 'string') {
+        throw new Error('Agent loopback transport did not receive a TCP address.')
+      }
+
+      nextSession.endpoint = `http://${host}:${address.port}`
+    } catch (error) {
+      if (activeSession === nextSession) {
+        activeSession = null
+      }
+      await closeServer(server)
+      throw error
+    }
+
+    return toTransportEndpoint(nextSession)
   }
 
   return {
@@ -148,8 +167,7 @@ const handleJsonRpcRequest = async (request, response, { getSession, routeReques
       id: requestId,
       jsonRpcCode: -32600,
       code: 'invalid-request',
-      message:
-        'Agent JSON-RPC requests must be single JSON-RPC 2.0 objects with a string method.',
+      message: 'Agent JSON-RPC requests must be single JSON-RPC 2.0 objects with a string method.',
     })
     return
   }
@@ -272,14 +290,24 @@ const listenOnRandomLoopbackPort = (server, host) =>
 
 const closeServer = (server) =>
   new Promise((resolve, reject) => {
+    const closeActiveConnections = () => {
+      if (typeof server.closeIdleConnections === 'function') {
+        server.closeIdleConnections()
+      }
+      if (typeof server.closeAllConnections === 'function') {
+        server.closeAllConnections()
+      }
+    }
+
     server.close((error) => {
-      if (error) {
+      if (error && error.code !== 'ERR_SERVER_NOT_RUNNING') {
         reject(error)
         return
       }
 
       resolve()
     })
+    closeActiveConnections()
   })
 
 const assertTransportSession = (session) => {

@@ -3,6 +3,7 @@ import { DEFAULT_AGENT_PERMISSIONS } from '@/services/agentBridge'
 import {
   createDesktopAgentSessionCoordinator,
   type DesktopAgentSessionEndReason,
+  type DesktopAgentTransportEndpoint,
   type DesktopAgentTransportSession,
 } from '@/services/desktopAgentSessionCoordinator'
 
@@ -173,6 +174,70 @@ describe('desktopAgentSessionCoordinator', () => {
     await expect(coordinator.startSession()).rejects.toThrow(/adapter failed/)
     expect(coordinator.getStatus()).toBe('inactive')
     expect(coordinator.getActiveTransportSession()).toBeNull()
+  })
+
+  it('does not resurrect a session stopped before transport startup completes', async () => {
+    let resolveStart!: (endpoint: DesktopAgentTransportEndpoint) => void
+    const stoppedSessions: Array<{
+      session: DesktopAgentTransportSession
+      reason: DesktopAgentSessionEndReason
+    }> = []
+    const coordinator = createDesktopAgentSessionCoordinator({
+      createSessionId: () => 'agent-session-1',
+      createPairingCredential: () => 'credential-1',
+      createTimestamp: () => '2026-05-27T08:00:00.000Z',
+      transportAdapter: {
+        startSession: () =>
+          new Promise<DesktopAgentTransportEndpoint>((resolve) => {
+            resolveStart = resolve
+          }),
+        stopSession: (session, reason) => {
+          stoppedSessions.push({ session, reason })
+        },
+      },
+    })
+
+    const startPromise = coordinator.startSession()
+    expect(coordinator.getStatus()).toBe('active')
+
+    coordinator.stopSession('reload')
+    resolveStart({
+      endpoint: 'http://127.0.0.1:48123',
+      sessionId: 'agent-session-1',
+      authorizationHeader: 'Bearer credential-1',
+    })
+
+    await expect(startPromise).rejects.toThrow(/startup was cancelled/)
+    expect(coordinator.getStatus()).toBe('inactive')
+    expect(coordinator.getActiveSession()).toBeNull()
+    expect(coordinator.getActiveTransportSession()).toBeNull()
+    expect(stoppedSessions).toEqual([
+      {
+        session: {
+          id: 'agent-session-1',
+          startedAt: '2026-05-27T08:00:00.000Z',
+          status: 'active',
+          permissions: DEFAULT_AGENT_PERMISSIONS,
+          pairingCredential: 'credential-1',
+        },
+        reason: 'reload',
+      },
+      {
+        session: {
+          id: 'agent-session-1',
+          startedAt: '2026-05-27T08:00:00.000Z',
+          status: 'active',
+          permissions: DEFAULT_AGENT_PERMISSIONS,
+          pairingCredential: 'credential-1',
+          transportEndpoint: {
+            endpoint: 'http://127.0.0.1:48123',
+            sessionId: 'agent-session-1',
+            authorizationHeader: 'Bearer credential-1',
+          },
+        },
+        reason: 'reload',
+      },
+    ])
   })
 
   it('creates unguessable default pairing credentials from Web Crypto bytes', async () => {

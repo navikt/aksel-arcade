@@ -79,17 +79,18 @@ describe('desktop Agent loopback JSON-RPC transport', () => {
       authorizationHeader: 'Bearer agent-secret-1',
     })
 
-    await expect(postJsonRpc(endpoint.endpoint, { jsonrpc: '2.0', id: 1, method: 'getProject' }))
-      .resolves.toMatchObject({
-        status: 401,
-        body: {
-          error: {
-            data: {
-              code: 'missing-authorization',
-            },
+    await expect(
+      postJsonRpc(endpoint.endpoint, { jsonrpc: '2.0', id: 1, method: 'getProject' })
+    ).resolves.toMatchObject({
+      status: 401,
+      body: {
+        error: {
+          data: {
+            code: 'missing-authorization',
           },
         },
-      })
+      },
+    })
 
     await expect(
       postJsonRpc(
@@ -131,22 +132,22 @@ describe('desktop Agent loopback JSON-RPC transport', () => {
     const transport = createTransport()
     const endpoint = await transport.startSession(createSession())
 
-    await expect(postJsonRpc(endpoint.endpoint, '{', endpoint.authorizationHeader)).resolves.toEqual(
-      {
-        status: 400,
-        body: {
-          jsonrpc: '2.0',
-          id: null,
-          error: {
-            code: -32700,
-            message: 'Agent JSON-RPC request body must be valid JSON.',
-            data: {
-              code: 'parse-error',
-            },
+    await expect(
+      postJsonRpc(endpoint.endpoint, '{', endpoint.authorizationHeader)
+    ).resolves.toEqual({
+      status: 400,
+      body: {
+        jsonrpc: '2.0',
+        id: null,
+        error: {
+          code: -32700,
+          message: 'Agent JSON-RPC request body must be valid JSON.',
+          data: {
+            code: 'parse-error',
           },
         },
-      }
-    )
+      },
+    })
 
     await expect(
       postJsonRpc(endpoint.endpoint, { jsonrpc: '2.0', id: 2 }, endpoint.authorizationHeader)
@@ -198,5 +199,58 @@ describe('desktop Agent loopback JSON-RPC transport', () => {
         endpoint.authorizationHeader
       )
     ).rejects.toThrow()
+  })
+
+  it('serializes concurrent starts so the latest session owns the active endpoint', async () => {
+    const transport = createTransport()
+
+    const [firstEndpoint, secondEndpoint] = await Promise.all([
+      transport.startSession(
+        createSession({
+          id: 'agent-session-1',
+          pairingCredential: 'agent-secret-1',
+        })
+      ),
+      transport.startSession(
+        createSession({
+          id: 'agent-session-2',
+          pairingCredential: 'agent-secret-2',
+        })
+      ),
+    ])
+
+    expect(firstEndpoint).toMatchObject({
+      sessionId: 'agent-session-1',
+      authorizationHeader: 'Bearer agent-secret-1',
+    })
+    expect(secondEndpoint).toMatchObject({
+      sessionId: 'agent-session-2',
+      authorizationHeader: 'Bearer agent-secret-2',
+    })
+
+    await expect(
+      postJsonRpc(
+        firstEndpoint.endpoint,
+        { jsonrpc: '2.0', id: 1, method: 'getProject' },
+        firstEndpoint.authorizationHeader
+      )
+    ).rejects.toThrow()
+    await expect(
+      postJsonRpc(
+        secondEndpoint.endpoint,
+        { jsonrpc: '2.0', id: 2, method: 'getProject' },
+        secondEndpoint.authorizationHeader
+      )
+    ).resolves.toMatchObject({
+      status: 200,
+      body: {
+        id: 2,
+        error: {
+          data: {
+            code: 'unsupported-method',
+          },
+        },
+      },
+    })
   })
 })
