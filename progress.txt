@@ -776,4 +776,6 @@ Completed in this branch:
 
 Verification completed with `npm run typecheck`, `CI=1 npm run test`, targeted storage/header Vitest coverage, and a browser smoke check that exported a `.akselarcade` package and imported a `.akselarcade` package back into the workspace with no console errors.
 
+PR #80 review follow-up: tightened package-envelope detection from partial-field matching to requiring the full `format` + `formatVersion` + `project` envelope, so legacy nested JSON with unrelated `project` metadata still imports normally. Added storage coverage for that legacy metadata case and updated the PRD history in #53.
+
 Next note: #66 can proceed with human-controlled Checkpoints now that #65 is closed. Keep rollback human-only and do not let the Agent transport restore or delete Checkpoints. #67 should wait until #66 lands so package cleanliness after Agent sessions can cover read, change, stop, and human rollback cases.

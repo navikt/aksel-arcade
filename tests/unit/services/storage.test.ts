@@ -590,6 +590,7 @@ describe('Storage Service', () => {
       const legacyNestedJson = {
         ...createArcadeProjectPackage(sourceProject, { includeAIMeta: false }).project,
         meta: { agentSession: 'nested-meta-secret' },
+        project: { owner: 'legacy-project-metadata' },
         transport: { endpoint: 'http://127.0.0.1:9999' },
       }
 
@@ -606,7 +607,9 @@ describe('Storage Service', () => {
         viewportSize: 'XS',
         panelLayout: 'editor-left',
       })
-      expect(JSON.stringify(result.project)).not.toMatch(/nested-meta-secret|127\.0\.0\.1/)
+      expect(JSON.stringify(result.project)).not.toMatch(
+        /nested-meta-secret|legacy-project-metadata|127\.0\.0\.1/
+      )
     })
 
     it('should reject invalid JSON', async () => {

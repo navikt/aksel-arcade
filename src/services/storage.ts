@@ -395,7 +395,7 @@ const extractImportedProject = (payload: unknown): Project => {
 }
 
 const extractArcadeProjectPackage = (payload: Record<string, unknown>): Project | null => {
-  const hasPackageShape = 'format' in payload || 'formatVersion' in payload || 'project' in payload
+  const hasPackageShape = 'format' in payload && 'formatVersion' in payload && 'project' in payload
   if (!hasPackageShape) {
     return null
   }
