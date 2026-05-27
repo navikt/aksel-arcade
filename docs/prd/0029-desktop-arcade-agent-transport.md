@@ -198,6 +198,10 @@ Web Arcade keeps Share URL as a web-only feature. Desktop Arcade does not offer 
 - Web Arcade Share URL remains a separate web-only sharing path. Share URL oversize copy now points users to package export rather than JSON export.
 - Added unit and integration coverage for package filename/MIME/shape, current project content, optional Aksel metadata, Desktop export fallback behavior, and Agent artifact exclusion.
 
+- 2026-05-27 - Issue #68 completed the human-in-the-loop validation pass for the copied Desktop Agent instructions with GitHub Copilot app on macOS, Copilot CLI, and Copilot in VS Code.
+- Each validated surface used Desktop Arcade Agent access to copy the hidden instructions, read Arcade project state, read diagnostics or Preview evidence, apply a small visible Agent change, review the live preview, and stop Agent access.
+- Validation kept the instructions provider-neutral and did not add Copilot-specific protocol behavior. Follow-up issues #83 and #84 record the post-change preview settling guidance gap and sandbox render diagnostics gap instead of changing the PRD requirements.
+
 ## Out of Scope
 
 - Editing the historical browser-only Agent sessions PRD.

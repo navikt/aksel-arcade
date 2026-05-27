@@ -818,3 +818,20 @@ Reviewed PR #82 before merge and found one scoped clarity issue in the new packa
 - Kept that behavior and named the override `deterministicProjectId` so the test makes the project-id/session-id separation explicit while still verifying the active Desktop transport session id from the preload fixture is excluded from exported package JSON.
 
 Verification completed with `npm run typecheck`, `CI=1 npm run test -- --run tests/integration/project-controls-layout.test.tsx tests/unit/services/storage.test.ts`, and the full `CI=1 npm run test -- --run` suite.
+
+### 2026-05-27 - #68 Validate copied instructions with Copilot surfaces
+
+Selected #68 as the only feature for this branch because #64 and #66 are closed, making the copied Desktop Agent instructions and human rollback flow ready for human-in-the-loop validation. Worked only on #68.
+
+Completed in this branch:
+
+- Ran a human-in-the-loop validation pass for the copied Desktop Agent instructions with GitHub Copilot app on macOS, Copilot CLI, and Copilot in VS Code.
+- For each surface, Desktop Arcade Agent access was started, hidden instructions were copied from the Agent menu, the surface read Arcade project state, read diagnostics or Preview evidence, applied a small visible Agent change, the human reviewed the live preview, and Agent access was stopped.
+- Kept the protocol provider-neutral; no Copilot-specific integration behavior was added.
+- Filed follow-up issue #83 for the post-change preview settling guidance gap observed during CLI/VS Code validation: agents should wait for diagnostics to settle after `applySourceChange` before treating Preview evidence as final.
+- Filed follow-up issue #84 for the sandbox render diagnostics gap observed during CLI validation: a React render failure could leave Preview evidence empty while `getDiagnostics` still reported no structured runtime error.
+- Updated the Desktop Agent transport PRD implementation progress with the #68 validation result.
+
+Verification completed with `npm run typecheck` and `CI=1 npm run test`.
+
+Next note: #68 is validation-only. Follow-up #83 should clarify copied instructions around waiting for post-change diagnostics/evidence after `applySourceChange`, and #84 should investigate structured diagnostics for React render failures that currently only show up in sandbox console output. Both follow-ups should avoid changing the provider-neutral protocol or adding Copilot-specific behavior.
