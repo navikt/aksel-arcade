@@ -179,6 +179,10 @@ Web Arcade keeps Share URL as a web-only feature. Desktop Arcade does not offer 
 - `App` now resolves the active capability set from `VITE_AKSEL_ARCADE_SURFACE`, defaulting to Web Arcade. `AppHeader` consumes capabilities instead of checking Electron, browser globals, or URL state, so the normal web surface shows Share URL without Agent access while Desktop capability mode shows Agent access without Share URL.
 - Added unit coverage for the Web/Desktop capability matrix and integration coverage for the header behavior in both capability modes. Existing Desktop Agent bridge coverage now runs against the Desktop capability set.
 
+- 2026-05-27 - Issue #59 added a macOS-first Electron development shell around the shared renderer. `npm run desktop:dev` starts Vite on `127.0.0.1:5173` and launches `desktop/main.cjs`, which loads the existing workspace with `nodeIntegration: false`, `contextIsolation: true`, `sandbox: true`, and a locked-down navigation policy.
+- `desktop/preload.cjs` exposes only `window.__AKSEL_ARCADE_DESKTOP__.getShellCapabilities()` over the `aksel-arcade:get-shell-capabilities` IPC channel. The renderer now resolves initial shell capabilities from that narrow preload bridge when present and otherwise falls back to `VITE_AKSEL_ARCADE_SURFACE`, preserving Web Arcade defaults.
+- Added preload-capability unit coverage to prove Desktop Arcade capabilities come from the IPC bridge, missing preload falls back to Web Arcade, and malformed preload payloads are rejected instead of giving React arbitrary desktop state.
+
 ## Out of Scope
 
 - Editing the historical browser-only Agent sessions PRD.

@@ -612,3 +612,20 @@ Fixed after the merged PR #71 broke the GitHub Pages build:
 Verification completed with `npm run build`, `npm run typecheck`, and `CI=1 npm run test -- --run`.
 
 Follow-up note: Agent bridge router changes should run `npm run build`, not only `npm run typecheck`, because the build-mode referenced TypeScript config catches stricter routed-result inference.
+
+### 2026-05-27 - #59 Boot Desktop Arcade with narrow preload capabilities
+
+Selected #59 as the highest-priority `ready-for-agent` feature from #57-#59 and #61-#68 because #55 and #60 are complete, while #59 is the remaining foundation before the Desktop Agent session coordinator and transport chain (#61-#66). Worked only on #59.
+
+Completed in this branch:
+
+- Added a macOS-first Electron development shell (`desktop/main.cjs` and `desktop/preload.cjs`) around the shared renderer.
+- Added `npm run desktop:dev`, which starts the Vite renderer on `127.0.0.1:5173` and launches Desktop Arcade against it.
+- Kept the renderer browser-like by disabling Node integration, enabling context isolation and sandboxing, and exposing only `getShellCapabilities()` through preload IPC.
+- Updated renderer bootstrap so Desktop Arcade capabilities come from the narrow preload bridge when present, while Web Arcade keeps the existing default capability path.
+- Added unit coverage for preload capability resolution, fallback behavior, and malformed preload payload rejection.
+- Documented local Desktop Arcade development in the README and updated the Desktop Agent transport PRD progress.
+
+Verification completed with `npm run typecheck`, `CI=1 npm run test`, `npm run build`, `npm run lint` (existing hook dependency warnings only), syntax checks for the desktop scripts, and a Desktop Arcade smoke launch through `npm run desktop:dev`.
+
+Next note: #61 can build the Desktop Agent session coordinator on top of this shell. Keep future desktop-only capabilities behind preload/main-process IPC and do not import Electron, Node, socket, process, or filesystem APIs into React components.

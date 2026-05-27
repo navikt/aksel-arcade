@@ -1,7 +1,9 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import {
   DESKTOP_ARCADE_CAPABILITIES,
   WEB_ARCADE_CAPABILITIES,
+  resolveInitialShellCapabilities,
+  resolvePreloadedShellCapabilities,
   resolveShellCapabilities,
   resolveShellSurface,
 } from '@/services/shellCapabilities'
@@ -42,5 +44,30 @@ describe('shellCapabilities', () => {
 
   it('rejects unsupported shell surfaces instead of guessing a capability set', () => {
     expect(() => resolveShellCapabilities('electron')).toThrow(/Unsupported Aksel Arcade shell/)
+  })
+
+  it('resolves Desktop Arcade capabilities from the narrow preload IPC bridge', async () => {
+    const getShellCapabilities = vi.fn().mockResolvedValue(DESKTOP_ARCADE_CAPABILITIES)
+
+    await expect(resolvePreloadedShellCapabilities({ getShellCapabilities })).resolves.toBe(
+      DESKTOP_ARCADE_CAPABILITIES
+    )
+    expect(getShellCapabilities).toHaveBeenCalledTimes(1)
+  })
+
+  it('falls back to configured capabilities when no desktop preload bridge is present', async () => {
+    await expect(resolvePreloadedShellCapabilities(undefined)).resolves.toBeNull()
+    await expect(resolveInitialShellCapabilities(undefined)).resolves.toBe(WEB_ARCADE_CAPABILITIES)
+  })
+
+  it('rejects malformed preload capabilities instead of accepting arbitrary desktop state', async () => {
+    const getShellCapabilities = vi.fn().mockResolvedValue({
+      ...DESKTOP_ARCADE_CAPABILITIES,
+      shareUrl: { enabled: true },
+    })
+
+    await expect(resolvePreloadedShellCapabilities({ getShellCapabilities })).rejects.toThrow(
+      /Invalid Desktop Arcade preload capabilities/
+    )
   })
 })

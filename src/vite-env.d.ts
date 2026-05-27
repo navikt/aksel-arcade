@@ -2,6 +2,7 @@
 
 import type { TelemetryEvent } from './services/telemetry'
 import type { AgentBridge } from './services/agentBridge'
+import type { DesktopArcadePreloadApi } from './services/shellCapabilities'
 
 declare global {
   interface Window {
@@ -9,6 +10,7 @@ declare global {
     __AKSEL_TELEMETRY_HOOK__?: (event: TelemetryEvent) => void
     __COPIED_SHARE_URL__?: string
     __AKSEL_ARCADE_AGENT_BRIDGE__?: AgentBridge
+    __AKSEL_ARCADE_DESKTOP__?: DesktopArcadePreloadApi
   }
 }
 
