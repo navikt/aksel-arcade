@@ -186,7 +186,7 @@ const startAgentAccess = async () => {
 }
 
 const setupDesktopTransportPreload = (
-  sessionId = '11111111-1111-4111-8111-111111111111'
+  sessionId: ReturnType<Crypto['randomUUID']> = '11111111-1111-4111-8111-111111111111'
 ) => {
   let transportRequestHandler: DesktopAgentTransportRequestHandler | null = null
   const endpoint = {
@@ -219,10 +219,11 @@ const setupDesktopTransportPreload = (
       if (!transportRequestHandler) {
         throw new Error('Expected Desktop transport request handler to be registered.')
       }
+      const handler = transportRequestHandler
 
       let response: DesktopAgentTransportRouteResponse | undefined
       await act(async () => {
-        response = await transportRequestHandler({
+        response = await handler({
           ...request,
           sessionId: request.sessionId ?? sessionId,
         })

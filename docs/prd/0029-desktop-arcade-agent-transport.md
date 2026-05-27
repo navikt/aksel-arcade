@@ -188,6 +188,11 @@ Web Arcade keeps Share URL as a web-only feature. Desktop Arcade does not offer 
 - Non-bridge desktop automation methods such as filesystem, shell, Share URL, export/import/package, rollback, and window-management requests remain rejected as unsupported transport methods. Copied hidden instructions now list all supported JSON-RPC methods and include an authenticated change example.
 - Added protocol and menu integration coverage for accepted transport changes, validation rejection before mutation, unsupported methods, stale renderer-session mismatch, and normal preview/project state updates after a transport Agent change.
 
+- 2026-05-27 - Issue #57 changed the default project export into an Arcade project package. Downloads now use the `.akselarcade` extension and a package envelope with `aksel-arcade/project-package` format metadata.
+- Package contents are built by enumerating the portable Arcade project fields: project identity, editable source, viewport, panel layout, timestamps, and optional AI enrichment metadata. Local Agent session state, pairing credentials, endpoints, permissions, Checkpoints, diagnostics, Preview evidence, and transport state are not copied into the package envelope.
+- Web Arcade Share URL remains a separate web-only sharing path. Share URL oversize copy now points users to package export rather than JSON export.
+- Added unit and integration coverage for package filename/MIME/shape, current project content, optional Aksel metadata, Desktop export fallback behavior, and Agent artifact exclusion.
+
 ## Out of Scope
 
 - Editing the historical browser-only Agent sessions PRD.

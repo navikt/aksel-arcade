@@ -343,17 +343,21 @@ describe('Share popover integration', () => {
 
       const exportedText = await readBlobText(capturedExportBlob)
       const exported = JSON.parse(exportedText) as {
-        name: string
-        code: {
-          jsxCode: string
-          hooksCode: string
-        }
-        ui: {
-          viewportSize: string
+        format: string
+        project: {
+          name: string
+          code: {
+            jsxCode: string
+            hooksCode: string
+          }
+          ui: {
+            viewportSize: string
+          }
         }
       }
 
-      expect(exported).toMatchObject({
+      expect(exported.format).toBe('aksel-arcade/project-package')
+      expect(exported.project).toMatchObject({
         name: 'Fallback Export Project',
         code: {
           jsxCode: nextJsx,
