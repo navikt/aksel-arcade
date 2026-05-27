@@ -916,9 +916,8 @@ describe('ProjectControls layout', () => {
 
   it('keeps Desktop packages clean after transport reads, changes, rollback, stop, and import', async () => {
     const desktopTransport = setupDesktopTransportPreload()
-    vi.mocked(globalThis.crypto.randomUUID).mockReturnValueOnce(
-      '22222222-2222-4222-8222-222222222222'
-    )
+    const deterministicProjectId = '22222222-2222-4222-8222-222222222222'
+    vi.mocked(globalThis.crypto.randomUUID).mockReturnValueOnce(deterministicProjectId)
     const capturedBlobs: Blob[] = []
     const originalCreateObjectURL = global.URL.createObjectURL
     const originalRevokeObjectURL = global.URL.revokeObjectURL

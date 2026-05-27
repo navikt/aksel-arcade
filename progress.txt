@@ -809,3 +809,12 @@ Completed in this branch:
 Verification completed with `npm run typecheck`, `CI=1 npm run test -- --run tests/integration/project-controls-layout.test.tsx tests/unit/services/storage.test.ts`, and the required full `CI=1 npm run test -- --run` suite after installing dependencies with `npm ci` because this worktree initially had no local `node_modules`.
 
 Next note: package cleanliness is now covered at the Desktop transport integration boundary. If future Agent artifacts move into project state or export metadata, extend `tests/integration/project-controls-layout.test.tsx` and `tests/unit/services/storage.test.ts` before exposing those artifacts anywhere near `.akselarcade` import/export.
+
+### 2026-05-27 - PR #82 review follow-up
+
+Reviewed PR #82 before merge and found one scoped clarity issue in the new package-cleanliness integration test:
+
+- Investigated whether the extra `crypto.randomUUID().mockReturnValueOnce(...)` was dead code; targeted validation showed it intentionally keeps the default project id distinct from the deterministic Desktop transport session id, so package-leak assertions do not fail on fixture UUID reuse.
+- Kept that behavior and named the override `deterministicProjectId` so the test makes the project-id/session-id separation explicit while still verifying the active Desktop transport session id from the preload fixture is excluded from exported package JSON.
+
+Verification completed with `npm run typecheck`, `CI=1 npm run test -- --run tests/integration/project-controls-layout.test.tsx tests/unit/services/storage.test.ts`, and the full `CI=1 npm run test -- --run` suite.
