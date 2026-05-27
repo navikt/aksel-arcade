@@ -408,6 +408,8 @@
     
     // Theme state - matches main app default (dark)
     let currentTheme = 'dark';
+    let currentRenderId = 0;
+    let failedRenderId = null;
 
     // Listen for messages from parent window
     window.addEventListener('message', (event) => {
@@ -934,15 +936,12 @@
         console.log('🎨 Rendering component...');
         renderComponent(Component);
 
-        // Send success message
-        sendMessage('RENDER_SUCCESS', {});
-        console.log('✅ Render success');
       } catch (error) {
         console.error('❌ Execution error:', error);
         sendError('RUNTIME_ERROR', {
-          message: error.message,
+          message: getErrorMessage(error),
           componentStack: extractComponentStack(error),
-          stack: error.stack || ''
+          stack: getErrorStack(error)
         });
       }
     }
@@ -953,6 +952,10 @@
       if (!rootElement) {
         throw new Error('Root element not found');
       }
+
+      const renderId = currentRenderId + 1;
+      currentRenderId = renderId;
+      failedRenderId = null;
 
       try {
         // Clear previous root if it exists
@@ -977,10 +980,18 @@
         console.log(`🔍 DEBUG: Theme value being passed to Theme component: "${themeValue}"`);
         console.log(`🔍 DEBUG: Theme component props:`, { theme: themeValue });
         
+        const RenderErrorBoundary = createRenderErrorBoundary(renderId);
+        const RenderSuccessReporter = createRenderSuccessReporter(renderId);
+        const guardedComponent = React.createElement(
+          RenderErrorBoundary,
+          null,
+          React.createElement(Component),
+          React.createElement(RenderSuccessReporter)
+        );
         const wrappedComponent = React.createElement(
           ThemeComponent,
           { theme: themeValue },
-          React.createElement(Component)
+          guardedComponent
         );
         
         console.log(`🔍 DEBUG: Created Theme element:`, wrappedComponent);
@@ -1014,12 +1025,52 @@
         }, 100);
       } catch (error) {
         sendError('RUNTIME_ERROR', {
-          message: error.message,
+          message: getErrorMessage(error),
           componentStack: extractComponentStack(error),
-          stack: error.stack || ''
+          stack: getErrorStack(error)
         });
         throw error;
       }
+    }
+
+    function createRenderErrorBoundary(renderId) {
+      return class RenderErrorBoundary extends React.Component {
+        constructor(props) {
+          super(props);
+          this.state = { hasError: false };
+        }
+
+        static getDerivedStateFromError() {
+          return { hasError: true };
+        }
+
+        componentDidCatch(error, errorInfo) {
+          failedRenderId = renderId;
+          console.error('❌ React render error:', error);
+          sendError('RUNTIME_ERROR', {
+            message: getErrorMessage(error),
+            componentStack: errorInfo?.componentStack || extractComponentStack(error),
+            stack: getErrorStack(error)
+          });
+        }
+
+        render() {
+          return this.state.hasError ? null : this.props.children;
+        }
+      };
+    }
+
+    function createRenderSuccessReporter(renderId) {
+      return function RenderSuccessReporter() {
+        React.useEffect(() => {
+          if (renderId === currentRenderId && failedRenderId !== renderId) {
+            sendMessage('RENDER_SUCCESS', {});
+            console.log('✅ Render success');
+          }
+        }, []);
+
+        return null;
+      };
     }
 
     function clearRoot() {
@@ -1053,6 +1104,14 @@
         return error.componentStack;
       }
       return null;
+    }
+
+    function getErrorMessage(error) {
+      return error && typeof error.message === 'string' ? error.message : String(error);
+    }
+
+    function getErrorStack(error) {
+      return error && typeof error.stack === 'string' ? error.stack : '';
     }
 
     // Proxy console methods to send to parent
