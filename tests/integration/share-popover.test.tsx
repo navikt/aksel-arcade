@@ -7,11 +7,15 @@ import { SettingsProvider } from '@/contexts/SettingsContext'
 import { AppHeader } from '@/components/Header/AppHeader'
 import type { UseShareLinkOptions } from '@/hooks/useShareLink'
 import type { AgentBridgeCommandResult } from '@/services/agentBridge'
-import type { ProjectSnapshot } from '@/types/project'
 import * as shareEncoding from '@/utils/shareEncoding'
 import * as storage from '@/services/storage'
 import type { CompressionStrategy } from '@/services/compressionStrategies'
 import * as compressionStrategies from '@/services/compressionStrategies'
+import {
+  DESKTOP_ARCADE_CAPABILITIES,
+  WEB_ARCADE_CAPABILITIES,
+  type ShellCapabilities,
+} from '@/services/shellCapabilities'
 
 const TEST_ALERT_SNIPPET = Array.from({ length: 30 })
   .map((_, index) => `
@@ -37,7 +41,15 @@ const createMockStrategy = (overrides?: Partial<CompressionStrategy>): Compressi
 
 const noop = () => {}
 
-const Harness = ({ shareOptions }: { shareOptions?: UseShareLinkOptions }) => {
+interface HarnessProps {
+  shareOptions?: UseShareLinkOptions
+  shellCapabilities?: ShellCapabilities
+}
+
+const Harness = ({
+  shareOptions,
+  shellCapabilities = WEB_ARCADE_CAPABILITIES,
+}: HarnessProps) => {
   const {
     project,
     setProject,
@@ -73,6 +85,7 @@ const Harness = ({ shareOptions }: { shareOptions?: UseShareLinkOptions }) => {
         onLoadFormSummaryTemplate={loadFormSummaryTemplate}
         onLoadHooksDemo={loadHooksDemo}
         shareOptions={shareOptions}
+        shellCapabilities={shellCapabilities}
       />
       <button
         type="button"
@@ -86,11 +99,14 @@ const Harness = ({ shareOptions }: { shareOptions?: UseShareLinkOptions }) => {
   )
 }
 
-const renderHeader = (shareOptions?: UseShareLinkOptions) => {
+const renderHeader = (
+  shareOptions?: UseShareLinkOptions,
+  shellCapabilities: ShellCapabilities = WEB_ARCADE_CAPABILITIES
+) => {
   return render(
     <SettingsProvider>
       <AppProvider>
-        <Harness shareOptions={shareOptions} />
+        <Harness shareOptions={shareOptions} shellCapabilities={shellCapabilities} />
       </AppProvider>
     </SettingsProvider>
   )
@@ -271,7 +287,7 @@ describe('Share popover integration', () => {
     expect(screen.queryByText(/Copied!/i)).toBeNull()
   })
 
-  it('keeps Agent session artifacts out of share and export fallback payloads', async () => {
+  it('keeps Agent session artifacts out of Desktop export fallback payloads', async () => {
     const nextJsx = 'export default function App() { return <Heading>Fallback source</Heading> }'
     const nextHooks = 'export const useFallbackFixture = () => "current hooks"'
     let capturedExportBlob: Blob | null = null
@@ -287,7 +303,9 @@ describe('Share popover integration', () => {
     global.URL.revokeObjectURL = (() => {}) as typeof URL.revokeObjectURL
 
     try {
-      renderHeader()
+      renderHeader(undefined, DESKTOP_ARCADE_CAPABILITIES)
+      expect(screen.queryByLabelText(/share project/i)).toBeNull()
+
       const bridge = await startAgentAccess()
       const changeData = expectBridgeSuccess(
         callBridgeCommand(() =>
@@ -313,36 +331,7 @@ describe('Share popover integration', () => {
           viewportSize: 'XS',
         })
       })
-
-      fireEvent.click(screen.getByLabelText(/share project/i))
-      await waitFor(() => expect(encodeSpy).toHaveBeenCalled())
-
-      const shareSnapshot = encodeSpy.mock.calls.at(-1)?.[0] as ProjectSnapshot | undefined
-      expect(shareSnapshot).toBeDefined()
-      if (!shareSnapshot) {
-        throw new Error('Expected share generation to encode a snapshot.')
-      }
-
-      expect(
-        shareSnapshot.files.find(file => file.id === storage.SNAPSHOT_FILE_IDS.jsx)
-      ).toMatchObject({
-        content: nextJsx,
-      })
-      expect(
-        shareSnapshot.files.find(file => file.id === storage.SNAPSHOT_FILE_IDS.hooks)
-      ).toMatchObject({
-        content: nextHooks,
-      })
-      expect(shareSnapshot.preview).toMatchObject({
-        viewport: 'XS',
-        theme: 'light',
-      })
-
-      const serializedShare = JSON.stringify(shareSnapshot)
-      expect(serializedShare).not.toContain(changeData.checkpointId)
-      expect(serializedShare).not.toContain(AGENT_CHECKPOINT_SUMMARY)
-      expect(serializedShare).not.toContain('__AKSEL_ARCADE_AGENT_BRIDGE__')
-      expect(collectObjectKeys(shareSnapshot).join(' ')).not.toMatch(AGENT_ARTIFACT_KEY_PATTERN)
+      expect(encodeSpy).not.toHaveBeenCalled()
 
       fireEvent.click(screen.getByRole('button', { name: /^Export$/i }))
       expect(capturedExportBlob).toBeInstanceOf(Blob)

@@ -158,6 +158,16 @@ npm run lint             # Run ESLint
 npm run format           # Format code with Prettier
 ```
 
+### Shell capability modes
+
+Web Arcade is the default dev mode: Share URL is available and Agent access is hidden. To preview the Desktop Arcade capability surface while the desktop shell is still being built, run:
+
+```bash
+VITE_AKSEL_ARCADE_SURFACE=desktop npm run dev
+```
+
+Desktop capability mode shows Agent access and hides Share URL while preserving the shared editor and preview workspace.
+
 ### Tech Stack
 
 - **React 19** - UI framework

@@ -14,14 +14,23 @@ import type {
   AgentBridgeErrorCode,
 } from '@/services/agentBridge'
 import type { PreviewEvidenceElement } from '@/services/previewEvidence'
+import {
+  DESKTOP_ARCADE_CAPABILITIES,
+  WEB_ARCADE_CAPABILITIES,
+  type ShellCapabilities,
+} from '@/services/shellCapabilities'
 
 const noop = () => {}
 
 interface HarnessProps {
   includePreview?: boolean
+  shellCapabilities?: ShellCapabilities
 }
 
-const Harness = ({ includePreview = false }: HarnessProps) => {
+const Harness = ({
+  includePreview = false,
+  shellCapabilities = DESKTOP_ARCADE_CAPABILITIES,
+}: HarnessProps) => {
   const {
     project,
     setProject,
@@ -45,6 +54,7 @@ const Harness = ({ includePreview = false }: HarnessProps) => {
         onClearStorage={noop}
         onLoadFormSummaryTemplate={loadFormSummaryTemplate}
         onLoadHooksDemo={loadHooksDemo}
+        shellCapabilities={shellCapabilities}
       />
       <button
         type="button"
@@ -300,28 +310,42 @@ describe('ProjectControls layout', () => {
     delete window.__AKSEL_ARCADE_AGENT_BRIDGE__
   })
 
-  it('keeps Import → Share → Agent → Settings order and surfaces share metrics', async () => {
-    renderHeader()
+  it('keeps Web Arcade Share URL available and Agent access absent', async () => {
+    renderHeader({ shellCapabilities: WEB_ARCADE_CAPABILITIES })
 
     const importButton = screen.getByRole('button', { name: /^import$/i })
     const shareButton = screen.getByLabelText(/share project/i)
-    const agentButton = screen.getByRole('button', { name: /agent access/i })
     const settingsButton = screen.getByRole('button', { name: /settings/i })
 
+    expect(screen.queryByRole('button', { name: /agent access/i })).toBeNull()
+    expect(window.__AKSEL_ARCADE_AGENT_BRIDGE__).toBeUndefined()
     expect(
       importButton.compareDocumentPosition(shareButton) & Node.DOCUMENT_POSITION_FOLLOWING
     ).toBeTruthy()
     expect(
-      shareButton.compareDocumentPosition(agentButton) & Node.DOCUMENT_POSITION_FOLLOWING
-    ).toBeTruthy()
-    expect(
-      agentButton.compareDocumentPosition(settingsButton) & Node.DOCUMENT_POSITION_FOLLOWING
+      shareButton.compareDocumentPosition(settingsButton) & Node.DOCUMENT_POSITION_FOLLOWING
     ).toBeTruthy()
 
     fireEvent.click(shareButton)
 
     expect(await screen.findByText(/Share URL length/i)).toBeTruthy()
     expect(screen.getByText(/Strategy:/i)).toBeTruthy()
+  })
+
+  it('keeps Desktop Arcade Agent access available and Share URL absent', async () => {
+    renderHeader()
+
+    const importButton = screen.getByRole('button', { name: /^import$/i })
+    const agentButton = screen.getByRole('button', { name: /agent access/i })
+    const settingsButton = screen.getByRole('button', { name: /settings/i })
+
+    expect(screen.queryByLabelText(/share project/i)).toBeNull()
+    expect(
+      importButton.compareDocumentPosition(agentButton) & Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy()
+    expect(
+      agentButton.compareDocumentPosition(settingsButton) & Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy()
 
     fireEvent.click(settingsButton)
     expect(await screen.findByText(/Switch to light theme/i)).toBeTruthy()
