@@ -1,4 +1,4 @@
-import { useCallback } from 'react'
+import { useCallback, useState } from 'react'
 import { ActionMenu, Box, Button, Detail, VStack } from '@navikt/ds-react'
 import { FilesIcon, RobotIcon } from '@navikt/aksel-icons'
 import { useAgentSession } from '@/hooks/useAgentSession'
@@ -10,6 +10,7 @@ import { useProject } from '@/hooks/useProject'
 export const AgentSessionMenu = () => {
   const { project, previewIframeRef, previewState, updateProject } = useProject()
   const { theme, setTheme } = useSettings()
+  const [copyStatus, setCopyStatus] = useState<'idle' | 'success' | 'error'>('idle')
   const getPreviewEvidence = useCallback(
     () => collectPreviewEvidenceFromFrame(previewIframeRef.current),
     [previewIframeRef]
@@ -32,6 +33,7 @@ export const AgentSessionMenu = () => {
   })
 
   const handleAccessChange = (checked: boolean) => {
+    setCopyStatus('idle')
     if (checked) {
       void startAgentSession().catch((error) => {
         console.error('Agent access could not be started.', error)
@@ -41,18 +43,29 @@ export const AgentSessionMenu = () => {
     }
   }
 
-  const handleCopyInstructions = async () => {
+  const copyAgentInstructions = async () => {
+    setCopyStatus('idle')
     if (!navigator.clipboard?.writeText) {
       console.error('Agent instructions could not be copied: clipboard API is unavailable.')
+      setCopyStatus('error')
       return
     }
 
     try {
       await navigator.clipboard.writeText(agentInstructions)
+      setCopyStatus('success')
     } catch (error) {
       console.error('Agent instructions could not be copied.', error)
+      setCopyStatus('error')
     }
   }
+
+  const copyFeedbackText =
+    copyStatus === 'success'
+      ? 'Instruksjoner kopiert.'
+      : copyStatus === 'error'
+        ? 'Kunne ikke kopiere instruksjoner. Prøv igjen.'
+        : null
 
   return (
     <ActionMenu>
@@ -84,10 +97,25 @@ export const AgentSessionMenu = () => {
               Klikk på knappen nedenfor for å kopiere instrukser du kan gi til agenten, slik at den
               får tilgang til denne filen.
             </Detail>
+            {copyFeedbackText && (
+              <Detail
+                aria-live="polite"
+                className="agent-menu__context"
+                role={copyStatus === 'error' ? 'alert' : undefined}
+              >
+                {copyFeedbackText}
+              </Detail>
+            )}
           </VStack>
         </Box>
-        <ActionMenu.Item icon={<FilesIcon aria-hidden />} onSelect={handleCopyInstructions}>
-          Kopier instruksjoner
+        <ActionMenu.Item
+          icon={<FilesIcon aria-hidden />}
+          onSelect={(event) => {
+            event.preventDefault()
+            void copyAgentInstructions()
+          }}
+        >
+          {copyStatus === 'error' ? 'Prøv igjen' : 'Kopier instruksjoner'}
         </ActionMenu.Item>
         {checkpoints.length > 0 && (
           <>

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   AGENT_BRIDGE_COMMAND_NAMES,
   DEFAULT_AGENT_PERMISSIONS,
+  createAgentInstructions,
   createAgentBridge,
   createAgentBridgeCommandRouter,
   isAgentBridgeCommandName,
@@ -311,5 +312,39 @@ describe('agent bridge command router', () => {
     expect(expectBridgeSuccess(bridge.getProject())).toEqual(createReadContext().project)
     expect(bridge.applySourceChange(request)).toEqual(createApplySuccess())
     expect(recordedCommands).toEqual(['getProject', 'applySourceChange'])
+  })
+})
+
+describe('agent instructions', () => {
+  it('includes provider-neutral Desktop transport instructions without URL credentials', () => {
+    const instructions = createAgentInstructions(DEFAULT_AGENT_PERMISSIONS, {
+      endpoint: 'http://127.0.0.1:48123',
+      sessionId: 'agent-session-1',
+      authorizationHeader: 'Bearer copied-agent-secret',
+    })
+
+    expect(instructions).toContain('Desktop loopback JSON-RPC transport')
+    expect(instructions).toContain('Endpoint: http://127.0.0.1:48123')
+    expect(instructions).toContain('Authorization: Bearer copied-agent-secret')
+    expect(instructions).toMatch(/Content-Type: application\/json and the Authorization header/i)
+    expect(instructions).toContain(
+      'Supported read methods: getProject, getPreviewContext, getDiagnostics, getPreviewEvidence, getSessionState.'
+    )
+    expect(instructions).toContain(
+      'Full Agent bridge command names: getProject, getPreviewContext, getDiagnostics, getPreviewEvidence, getSessionState, applySourceChange.'
+    )
+    expect(instructions).toMatch(/GitHub Copilot app/i)
+    expect(instructions).toMatch(/Copilot CLI/i)
+    expect(instructions).toMatch(/Copilot in VS Code/i)
+    expect(instructions).toMatch(/Other same-device External agents/i)
+    expect(instructions).not.toMatch(/[?&](token|credential|authorization)=/i)
+  })
+
+  it('keeps inactive copied instructions free of transport secrets', () => {
+    const instructions = createAgentInstructions(DEFAULT_AGENT_PERMISSIONS)
+
+    expect(instructions).toContain('window.__AKSEL_ARCADE_AGENT_BRIDGE__')
+    expect(instructions).not.toMatch(/Endpoint:|Authorization: Bearer|copied-agent-secret/i)
+    expect(instructions).not.toMatch(/[?&](token|credential|authorization)=/i)
   })
 })

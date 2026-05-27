@@ -402,14 +402,21 @@ export const createAgentInstructions = (
         'Desktop loopback JSON-RPC transport:',
         `Endpoint: ${transportEndpoint.endpoint}`,
         `Authorization: ${transportEndpoint.authorizationHeader}`,
-        'Send JSON-RPC 2.0 POST requests with Content-Type: application/json.',
+        'Send JSON-RPC 2.0 POST requests with Content-Type: application/json and the Authorization header above.',
         `Supported read methods: ${AGENT_BRIDGE_READ_COMMAND_NAMES.join(', ')}.`,
+        `Full Agent bridge command names: ${AGENT_BRIDGE_COMMAND_NAMES.join(', ')}.`,
         'Example request:',
         `curl -sS -X POST '${transportEndpoint.endpoint}' \\`,
         `  -H 'Authorization: ${transportEndpoint.authorizationHeader}' \\`,
         `  -H 'Content-Type: application/json' \\`,
         `  --data '{"jsonrpc":"2.0","id":"agent-request-1","method":"getProject","params":{}}'`,
         'Do not put the credential in the URL or query parameters; those requests are rejected.',
+        '',
+        'Provider-neutral usage examples:',
+        '- GitHub Copilot app: paste these instructions into the agent conversation after Agent access is active, then ask it to call the JSON-RPC endpoint with the Authorization header.',
+        '- Copilot CLI: paste these instructions into a local CLI session so it can read Arcade-scoped state through the endpoint and report proposed changes back to you.',
+        '- Copilot in VS Code: paste these instructions into chat for the current workspace and ask it to use the same JSON-RPC method names and Authorization header.',
+        '- Other same-device External agents: use the endpoint, Authorization header, and method names above without any provider-specific SDK.',
       ]
     : []
 
