@@ -64,6 +64,7 @@ export type AgentBridgeErrorCode =
   | 'permission-denied'
   | 'invalid-request'
   | 'unsupported-field'
+  | 'unsupported-command'
   | 'payload-too-large'
   | 'preview-unavailable'
 
@@ -87,15 +88,15 @@ export interface AgentSessionReadState {
   commandNames: readonly AgentBridgeCommandName[]
 }
 
-interface AgentBridgeCommandSuccess<TData> {
+interface AgentBridgeCommandSuccess<TData, TCommand extends string = AgentBridgeCommandName> {
   ok: true
-  command: AgentBridgeCommandName
+  command: TCommand
   data: TData
 }
 
-interface AgentBridgeCommandFailure {
+interface AgentBridgeCommandFailure<TCommand extends string = AgentBridgeCommandName> {
   ok: false
-  command: AgentBridgeCommandName
+  command: TCommand
   error: {
     code: AgentBridgeErrorCode
     message: string
@@ -106,6 +107,15 @@ export type AgentBridgeCommandResult<TData> =
   | AgentBridgeCommandSuccess<TData>
   | AgentBridgeCommandFailure
 
+export type AgentBridgeRoutedCommandResult =
+  | AgentBridgeCommandResult<AgentProjectReadState>
+  | AgentBridgeCommandResult<AgentPreviewReadState>
+  | AgentBridgeCommandResult<PreviewDiagnostics>
+  | AgentBridgeCommandResult<PreviewEvidence>
+  | AgentBridgeCommandResult<AgentSessionReadState>
+  | AgentBridgeCommandResult<AgentSourceChangeResult>
+  | AgentBridgeCommandFailure<string>
+
 export interface AgentBridgeController {
   getReadContext: () => AgentBridgeReadContext
   getPermissions: () => AgentPermissions
@@ -113,6 +123,26 @@ export interface AgentBridgeController {
   recordActivity: (command: AgentBridgeCommandName) => void
   applySourceChange: (request: unknown) => AgentBridgeCommandResult<AgentSourceChangeResult>
   getPreviewEvidence: () => PreviewEvidenceCaptureResult
+}
+
+export interface AgentBridgeCommandRouter {
+  version: 1
+  sessionId: string
+  status: 'active'
+  startedAt: string
+  permissions: AgentPermissions
+  readScope: 'arcade-session'
+  commandNames: readonly AgentBridgeCommandName[]
+  routeCommand(command: 'getProject'): AgentBridgeCommandResult<AgentProjectReadState>
+  routeCommand(command: 'getPreviewContext'): AgentBridgeCommandResult<AgentPreviewReadState>
+  routeCommand(command: 'getDiagnostics'): AgentBridgeCommandResult<PreviewDiagnostics>
+  routeCommand(command: 'getPreviewEvidence'): AgentBridgeCommandResult<PreviewEvidence>
+  routeCommand(command: 'getSessionState'): AgentBridgeCommandResult<AgentSessionReadState>
+  routeCommand(
+    command: 'applySourceChange',
+    request: unknown
+  ): AgentBridgeCommandResult<AgentSourceChangeResult>
+  routeCommand(command: string, request?: unknown): AgentBridgeRoutedCommandResult
 }
 
 export interface AgentBridge {
@@ -138,42 +168,143 @@ export const DEFAULT_AGENT_PERMISSIONS: AgentPermissions = {
   projectMetadata: true,
 }
 
-export const createAgentBridge = (
+export const isAgentBridgeCommandName = (command: string): command is AgentBridgeCommandName =>
+  AGENT_BRIDGE_COMMAND_NAMES.some((supportedCommand) => supportedCommand === command)
+
+const createCommandFailure = <TCommand extends string>(
+  command: TCommand,
+  code: AgentBridgeErrorCode,
+  message: string
+): AgentBridgeCommandFailure<TCommand> => ({
+  ok: false,
+  command,
+  error: {
+    code,
+    message,
+  },
+})
+
+const createSessionRevokedFailure = (
+  command: AgentBridgeCommandName
+): AgentBridgeCommandFailure => {
+  return createCommandFailure(
+    command,
+    'session-revoked',
+    'Agent access has been revoked. Ask the human to start a new Agent session.'
+  )
+}
+
+const createUnsupportedCommandFailure = (command: string): AgentBridgeCommandFailure<string> => {
+  return createCommandFailure(
+    command,
+    'unsupported-command',
+    `Unsupported Agent bridge command "${command}". Supported commands: ${AGENT_BRIDGE_COMMAND_NAMES.join(
+      ', '
+    )}.`
+  )
+}
+
+const createCommandSuccess = <TData>(
+  command: AgentBridgeCommandName,
+  data: TData
+): AgentBridgeCommandSuccess<TData> => ({
+  ok: true,
+  command,
+  data,
+})
+
+export const createAgentBridgeCommandRouter = (
   session: AgentBridgeSession,
   controller: AgentBridgeController
-): AgentBridge => {
-  const createFailure = (
-    command: AgentBridgeCommandName,
-    code: AgentBridgeErrorCode,
-    message: string
-  ): AgentBridgeCommandResult<never> => ({
-    ok: false,
-    command,
-    error: {
-      code,
-      message,
-    },
-  })
-
+): AgentBridgeCommandRouter => {
   const readCommand = <TData>(
     command: AgentBridgeCommandName,
     read: () => TData
   ): AgentBridgeCommandResult<TData> => {
     if (!controller.isSessionActive()) {
-      return createFailure(
-        command,
-        'session-revoked',
-        'Agent access has been revoked. Ask the human to start a new Agent session.'
-      )
+      return createSessionRevokedFailure(command)
     }
 
     const data = read()
     controller.recordActivity(command)
 
-    return {
-      ok: true,
-      command,
-      data,
+    return createCommandSuccess(command, data)
+  }
+
+  function routeCommand(command: 'getProject'): AgentBridgeCommandResult<AgentProjectReadState>
+  function routeCommand(
+    command: 'getPreviewContext'
+  ): AgentBridgeCommandResult<AgentPreviewReadState>
+  function routeCommand(command: 'getDiagnostics'): AgentBridgeCommandResult<PreviewDiagnostics>
+  function routeCommand(command: 'getPreviewEvidence'): AgentBridgeCommandResult<PreviewEvidence>
+  function routeCommand(command: 'getSessionState'): AgentBridgeCommandResult<AgentSessionReadState>
+  function routeCommand(
+    command: 'applySourceChange',
+    request: unknown
+  ): AgentBridgeCommandResult<AgentSourceChangeResult>
+  function routeCommand(command: string, request?: unknown): AgentBridgeRoutedCommandResult {
+    if (!isAgentBridgeCommandName(command)) {
+      return createUnsupportedCommandFailure(command)
+    }
+
+    switch (command) {
+      case 'getProject':
+        return readCommand('getProject', () => ({
+          ...controller.getReadContext().project,
+        }))
+      case 'getPreviewContext':
+        return readCommand('getPreviewContext', () => ({
+          ...controller.getReadContext().preview,
+        }))
+      case 'getDiagnostics':
+        return readCommand('getDiagnostics', () =>
+          clonePreviewDiagnostics(controller.getReadContext().diagnostics)
+        )
+      case 'getPreviewEvidence':
+        if (!controller.isSessionActive()) {
+          return createSessionRevokedFailure(command)
+        }
+
+        if (!controller.getPermissions().previewEvidence) {
+          return createCommandFailure(
+            command,
+            'permission-denied',
+            'Preview evidence reads require the Preview evidence permission.'
+          )
+        }
+
+        {
+          const result = controller.getPreviewEvidence()
+          if (!result.ok) {
+            return createCommandFailure(command, result.error.code, result.error.message)
+          }
+
+          controller.recordActivity(command)
+
+          return createCommandSuccess(command, result.evidence)
+        }
+      case 'getSessionState':
+        return readCommand('getSessionState', () => ({
+          sessionId: session.id,
+          status: 'active',
+          startedAt: session.startedAt,
+          permissions: { ...controller.getPermissions() },
+          readScope: 'arcade-session',
+          commandNames: [...AGENT_BRIDGE_COMMAND_NAMES],
+        }))
+      case 'applySourceChange':
+        if (!controller.isSessionActive()) {
+          return createSessionRevokedFailure(command)
+        }
+
+        {
+          const result = controller.applySourceChange(request)
+          if (result.ok) {
+            controller.recordActivity(command)
+          }
+
+          return result
+        }
     }
   }
 
@@ -187,77 +318,32 @@ export const createAgentBridge = (
     },
     readScope: 'arcade-session',
     commandNames: [...AGENT_BRIDGE_COMMAND_NAMES],
-    getProject: () =>
-      readCommand('getProject', () => ({
-        ...controller.getReadContext().project,
-      })),
-    getPreviewContext: () =>
-      readCommand('getPreviewContext', () => ({
-        ...controller.getReadContext().preview,
-      })),
-    getDiagnostics: () =>
-      readCommand('getDiagnostics', () =>
-        clonePreviewDiagnostics(controller.getReadContext().diagnostics)
-      ),
-    getPreviewEvidence: () => {
-      const command: AgentBridgeCommandName = 'getPreviewEvidence'
+    routeCommand,
+  }
+}
 
-      if (!controller.isSessionActive()) {
-        return createFailure(
-          command,
-          'session-revoked',
-          'Agent access has been revoked. Ask the human to start a new Agent session.'
-        )
-      }
+export const createAgentBridge = (
+  session: AgentBridgeSession,
+  controller: AgentBridgeController
+): AgentBridge => {
+  const router = createAgentBridgeCommandRouter(session, controller)
 
-      if (!controller.getPermissions().previewEvidence) {
-        return createFailure(
-          command,
-          'permission-denied',
-          'Preview evidence reads require the Preview evidence permission.'
-        )
-      }
-
-      const result = controller.getPreviewEvidence()
-      if (!result.ok) {
-        return createFailure(command, result.error.code, result.error.message)
-      }
-
-      controller.recordActivity(command)
-
-      return {
-        ok: true,
-        command,
-        data: result.evidence,
-      }
+  return {
+    version: router.version,
+    sessionId: router.sessionId,
+    status: router.status,
+    startedAt: router.startedAt,
+    get permissions() {
+      return router.permissions
     },
-    getSessionState: () =>
-      readCommand('getSessionState', () => ({
-        sessionId: session.id,
-        status: 'active',
-        startedAt: session.startedAt,
-        permissions: { ...controller.getPermissions() },
-        readScope: 'arcade-session',
-        commandNames: [...AGENT_BRIDGE_COMMAND_NAMES],
-      })),
-    applySourceChange: (request) => {
-      const command: AgentBridgeCommandName = 'applySourceChange'
-
-      if (!controller.isSessionActive()) {
-        return createFailure(
-          command,
-          'session-revoked',
-          'Agent access has been revoked. Ask the human to start a new Agent session.'
-        )
-      }
-
-      const result = controller.applySourceChange(request)
-      if (result.ok) {
-        controller.recordActivity(command)
-      }
-
-      return result
-    },
+    readScope: router.readScope,
+    commandNames: [...router.commandNames],
+    getProject: () => router.routeCommand('getProject'),
+    getPreviewContext: () => router.routeCommand('getPreviewContext'),
+    getDiagnostics: () => router.routeCommand('getDiagnostics'),
+    getPreviewEvidence: () => router.routeCommand('getPreviewEvidence'),
+    getSessionState: () => router.routeCommand('getSessionState'),
+    applySourceChange: (request) => router.routeCommand('applySourceChange', request),
   }
 }
 export const publishAgentBridge = (

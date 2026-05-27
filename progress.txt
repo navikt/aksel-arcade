@@ -584,3 +584,19 @@ Completed in this branch:
 Verification completed with `npm run typecheck` and `npm run test`.
 
 Next note: #60 can now extract the bridge command router without needing to preserve a Web Arcade browser-global Agent surface. Keep the lazy/Desktop-only Agent menu boundary unless a later PRD explicitly reintroduces Web Agent access.
+
+### 2026-05-27 - #60 Extract the Agent bridge command router
+
+Selected #60 as the highest-priority `ready-for-agent` feature from #57-#68 because #56 is complete, #60 is now unblocked, and the router seam unlocks the Desktop Agent transport work without taking on package export/import or the desktop shell. Worked only on #60.
+
+Completed in this branch:
+
+- Extracted `createAgentBridgeCommandRouter` from the browser-global Agent bridge publishing path, keeping the command contract reusable without `window.__AKSEL_ARCADE_AGENT_BRIDGE__`.
+- Preserved the supported command names and response shapes for `getProject`, `getPreviewContext`, `getDiagnostics`, `getPreviewEvidence`, `getSessionState`, and `applySourceChange`.
+- Added a structured `unsupported-command` error for non-bridge command routing while preserving existing session-revoked, permission-denied, preview-unavailable, validation, and apply-source result semantics.
+- Kept `createAgentBridge` as a compatibility wrapper over the router so Desktop capability tests and existing browser-global bridge behavior do not regress.
+- Added unit coverage for router read commands, diagnostics cloning, Preview evidence permission/unavailable failures, apply-source routing, unsupported commands, revoked sessions, and wrapper compatibility.
+
+Verification completed with `npm run typecheck` and `CI=1 npm run test -- --run`.
+
+Next note: #61 can build the Desktop Agent session coordinator on top of this router. Transport adapters should call `routeCommand(commandName, payload)` rather than reaching through the browser-global bridge wrapper, and should continue rejecting file-system, shell, Share URL, export/import, package, and window-management commands as unsupported.
