@@ -14,6 +14,11 @@ const STORAGE_KEY = 'aksel-arcade:project'
 const MAX_PROJECT_SIZE_BYTES = 5 * 1024 * 1024 // 5MB
 const WARN_PROJECT_SIZE_BYTES = 4 * 1024 * 1024 // 4MB
 const CURRENT_VERSION = '1.0.0'
+export const ARCADE_PROJECT_PACKAGE_FORMAT = 'aksel-arcade/project-package' as const
+export const ARCADE_PROJECT_PACKAGE_FORMAT_VERSION = 1
+export const ARCADE_PROJECT_PACKAGE_EXTENSION = '.akselarcade' as const
+export const ARCADE_PROJECT_PACKAGE_MIME_TYPE =
+  'application/vnd.nav.aksel-arcade.project-package+json'
 
 export interface SaveResult {
   success: boolean
@@ -33,6 +38,40 @@ export interface ImportResult {
   project: Project | null
   success: boolean
   error?: string
+}
+
+export interface ExportProjectOptions {
+  includeAIMeta?: boolean
+  exportedAt?: string
+}
+
+export interface PortableArcadeProject {
+  version: string
+  id: string
+  name: string
+  createdAt: string
+  lastModified: string
+  code: {
+    jsxCode: string
+    hooksCode: string
+  }
+  ui: {
+    viewportSize: Project['viewportSize']
+    panelLayout: Project['panelLayout']
+  }
+}
+
+type ArcadeProjectPackageMeta = typeof AKSEL_METADATA & {
+  usedComponents: ReturnType<typeof extractUsedComponents>
+  aiInstructions: string
+}
+
+export interface ArcadeProjectPackage {
+  format: typeof ARCADE_PROJECT_PACKAGE_FORMAT
+  formatVersion: typeof ARCADE_PROJECT_PACKAGE_FORMAT_VERSION
+  exportedAt: string
+  project: PortableArcadeProject
+  meta?: ArcadeProjectPackageMeta
 }
 
 export interface ShareSnapshotOverrides {
@@ -200,23 +239,29 @@ export const loadProject = (): LoadResult => {
   }
 }
 
-export const exportProject = (project: Project, includeAIMeta = true): void => {
-  // Build export data with AI metadata
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const exportData: any = {
-    // Core project data (always included)
-    version: project.version,
-    id: project.id,
-    name: project.name,
-    createdAt: project.createdAt,
-    lastModified: project.lastModified,
-    code: {
-      jsxCode: project.jsxCode,
-      hooksCode: project.hooksCode,
-    },
-    ui: {
-      viewportSize: project.viewportSize,
-      panelLayout: project.panelLayout,
+export const createArcadeProjectPackage = (
+  project: Project,
+  options: ExportProjectOptions = {}
+): ArcadeProjectPackage => {
+  const includeAIMeta = options.includeAIMeta ?? true
+  const packageData: ArcadeProjectPackage = {
+    format: ARCADE_PROJECT_PACKAGE_FORMAT,
+    formatVersion: ARCADE_PROJECT_PACKAGE_FORMAT_VERSION,
+    exportedAt: options.exportedAt ?? new Date().toISOString(),
+    project: {
+      version: project.version,
+      id: project.id,
+      name: project.name,
+      createdAt: project.createdAt,
+      lastModified: project.lastModified,
+      code: {
+        jsxCode: project.jsxCode,
+        hooksCode: project.hooksCode,
+      },
+      ui: {
+        viewportSize: project.viewportSize,
+        panelLayout: project.panelLayout,
+      },
     },
   }
 
@@ -224,7 +269,7 @@ export const exportProject = (project: Project, includeAIMeta = true): void => {
   if (includeAIMeta) {
     const usedComponents = extractUsedComponents(project.jsxCode)
 
-    exportData.meta = {
+    packageData.meta = {
       designSystem: AKSEL_METADATA.designSystem,
       designSystemVersion: AKSEL_METADATA.designSystemVersion,
       framework: AKSEL_METADATA.framework,
@@ -241,12 +286,22 @@ export const exportProject = (project: Project, includeAIMeta = true): void => {
     }
   }
 
-  const json = JSON.stringify(exportData, null, 2)
-  const blob = new Blob([json], { type: 'application/json' })
+  return packageData
+}
+
+export const exportProject = (
+  project: Project,
+  optionsOrIncludeAIMeta: ExportProjectOptions | boolean = {}
+): void => {
+  const options = normalizeExportProjectOptions(optionsOrIncludeAIMeta)
+  const exportedAt = options.exportedAt ?? new Date().toISOString()
+  const packageData = createArcadeProjectPackage(project, { ...options, exportedAt })
+  const json = JSON.stringify(packageData, null, 2)
+  const blob = new Blob([json], { type: ARCADE_PROJECT_PACKAGE_MIME_TYPE })
   const url = URL.createObjectURL(blob)
 
-  const timestamp = new Date().toISOString().split('T')[0] // YYYY-MM-DD
-  const filename = `${sanitizeFilename(project.name)}-${timestamp}.json`
+  const timestamp = exportedAt.split('T')[0] // YYYY-MM-DD
+  const filename = `${sanitizeFilename(project.name)}-${timestamp}${ARCADE_PROJECT_PACKAGE_EXTENSION}`
 
   const a = document.createElement('a')
   a.href = url
@@ -255,6 +310,13 @@ export const exportProject = (project: Project, includeAIMeta = true): void => {
 
   URL.revokeObjectURL(url)
 }
+
+const normalizeExportProjectOptions = (
+  optionsOrIncludeAIMeta: ExportProjectOptions | boolean
+): ExportProjectOptions =>
+  typeof optionsOrIncludeAIMeta === 'boolean'
+    ? { includeAIMeta: optionsOrIncludeAIMeta }
+    : optionsOrIncludeAIMeta
 
 export const importProject = async (file: File): Promise<ImportResult> => {
   try {

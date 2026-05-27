@@ -3,12 +3,45 @@ import {
   saveProject,
   loadProject,
   exportProject,
+  createArcadeProjectPackage,
   importProject,
   validateProjectSize,
   clearStorage,
+  ARCADE_PROJECT_PACKAGE_EXTENSION,
+  ARCADE_PROJECT_PACKAGE_FORMAT,
+  ARCADE_PROJECT_PACKAGE_FORMAT_VERSION,
+  ARCADE_PROJECT_PACKAGE_MIME_TYPE,
 } from '@/services/storage'
 import type { Project } from '@/types/project'
 import { setupLocalStorageMock, resetLocalStorageMock } from '../../helpers/mockLocalStorage'
+
+const createTestProject = (overrides: Partial<Project> = {}): Project => ({
+  id: crypto.randomUUID(),
+  name: 'Test Project',
+  jsxCode: '<Button>Test</Button>',
+  hooksCode: '',
+  viewportSize: 'MD',
+  panelLayout: 'editor-left',
+  version: '1.0.0',
+  createdAt: new Date().toISOString(),
+  lastModified: new Date().toISOString(),
+  ...overrides,
+})
+
+const collectObjectKeys = (value: unknown): string[] => {
+  if (!value || typeof value !== 'object') {
+    return []
+  }
+
+  if (Array.isArray(value)) {
+    return value.flatMap(collectObjectKeys)
+  }
+
+  return Object.entries(value).flatMap(([key, nestedValue]) => [
+    key,
+    ...collectObjectKeys(nestedValue),
+  ])
+}
 
 describe('Storage Service', () => {
   beforeEach(() => {
@@ -240,10 +273,16 @@ describe('Storage Service', () => {
   })
 
   describe('exportProject', () => {
-    it('should create a downloadable JSON blob', () => {
+    it('should create a downloadable Arcade project package blob', () => {
       // Mock URL.createObjectURL
       const mockUrl = 'blob:mock-url'
-      global.URL.createObjectURL = () => mockUrl
+      const capturedBlobs: Blob[] = []
+      global.URL.createObjectURL = ((blob: Blob | MediaSource) => {
+        if (blob instanceof Blob) {
+          capturedBlobs.push(blob)
+        }
+        return mockUrl
+      }) as typeof URL.createObjectURL
       global.URL.revokeObjectURL = () => {}
 
       // Mock document.createElement to capture download
@@ -276,29 +315,88 @@ describe('Storage Service', () => {
       }) as typeof document.createElement
 
       const project: Project = {
-        id: crypto.randomUUID(),
+        ...createTestProject(),
         name: 'Export Test',
         jsxCode: '<Button>Click</Button>',
-        hooksCode: '',
-        viewportSize: 'MD',
-        panelLayout: 'editor-left',
-        version: '1.0.0',
-        createdAt: new Date().toISOString(),
-        lastModified: new Date().toISOString(),
       }
 
       exportProject(project)
 
       expect(capturedHref).toBe(mockUrl)
       expect(capturedDownload).toContain('export-test')
-      expect(capturedDownload).toContain('.json')
+      expect(capturedDownload).toContain(ARCADE_PROJECT_PACKAGE_EXTENSION)
+      const capturedBlob = capturedBlobs[0]
+      if (!capturedBlob) {
+        throw new Error('Expected exportProject to create a package blob')
+      }
+      expect(capturedBlob.type).toBe(ARCADE_PROJECT_PACKAGE_MIME_TYPE)
       expect(clickCalled).toBe(true)
 
       // Cleanup
       document.createElement = originalCreateElement
     })
 
-    it('includes current Aksel v8 metadata in exported JSON', async () => {
+    it('creates portable package data with current project content only', () => {
+      const project = {
+        ...createTestProject({
+          name: 'Portable Package Test',
+          jsxCode: '<HStack><Button>Click</Button></HStack>',
+          hooksCode: 'export const useCounter = () => 1',
+          viewportSize: 'LG',
+          panelLayout: 'editor-right',
+        }),
+        agentSession: {
+          id: 'agent-session-secret',
+          credential: 'credential-secret',
+          endpoint: 'http://127.0.0.1:1234',
+        },
+        agentPermissions: ['read', 'write'],
+        checkpoints: [{ id: 'checkpoint-secret', summary: 'rollback-secret' }],
+        diagnostics: [{ message: 'diagnostic-secret' }],
+        previewEvidence: { dom: 'evidence-secret' },
+        transport: { token: 'transport-secret' },
+      } as Project & Record<string, unknown>
+
+      const packageData = createArcadeProjectPackage(project, {
+        includeAIMeta: false,
+        exportedAt: '2026-05-27T00:00:00.000Z',
+      })
+      const serialized = JSON.stringify(packageData)
+
+      expect(packageData).toEqual({
+        format: ARCADE_PROJECT_PACKAGE_FORMAT,
+        formatVersion: ARCADE_PROJECT_PACKAGE_FORMAT_VERSION,
+        exportedAt: '2026-05-27T00:00:00.000Z',
+        project: {
+          version: project.version,
+          id: project.id,
+          name: 'Portable Package Test',
+          createdAt: project.createdAt,
+          lastModified: project.lastModified,
+          code: {
+            jsxCode: '<HStack><Button>Click</Button></HStack>',
+            hooksCode: 'export const useCounter = () => 1',
+          },
+          ui: {
+            viewportSize: 'LG',
+            panelLayout: 'editor-right',
+          },
+        },
+      })
+      expect(serialized).not.toContain('agent-session-secret')
+      expect(serialized).not.toContain('credential-secret')
+      expect(serialized).not.toContain('http://127.0.0.1:1234')
+      expect(serialized).not.toContain('checkpoint-secret')
+      expect(serialized).not.toContain('rollback-secret')
+      expect(serialized).not.toContain('diagnostic-secret')
+      expect(serialized).not.toContain('evidence-secret')
+      expect(serialized).not.toContain('transport-secret')
+      expect(collectObjectKeys(packageData).join(' ')).not.toMatch(
+        /agent|session|credential|endpoint|permission|checkpoint|diagnostic|evidence|transport/i
+      )
+    })
+
+    it('includes current Aksel v8 metadata in exported packages', async () => {
       const mockUrl = 'blob:mock-url'
       let capturedBlob: Blob | null = null
       const originalCreateObjectURL = global.URL.createObjectURL
@@ -313,15 +411,9 @@ describe('Storage Service', () => {
       global.URL.revokeObjectURL = () => {}
 
       const project: Project = {
-        id: crypto.randomUUID(),
+        ...createTestProject(),
         name: 'Export Metadata Test',
         jsxCode: '<HStack><Button>Click</Button></HStack>',
-        hooksCode: '',
-        viewportSize: 'MD',
-        panelLayout: 'editor-left',
-        version: '1.0.0',
-        createdAt: new Date().toISOString(),
-        lastModified: new Date().toISOString(),
       }
 
       try {
@@ -333,6 +425,8 @@ describe('Storage Service', () => {
 
         const exportedText = await readBlobText(capturedBlob)
         const exported = JSON.parse(exportedText) as {
+          format: string
+          formatVersion: number
           meta: {
             designSystem: string
             packageVersions: Record<string, string>
@@ -342,6 +436,8 @@ describe('Storage Service', () => {
           }
         }
 
+        expect(exported.format).toBe(ARCADE_PROJECT_PACKAGE_FORMAT)
+        expect(exported.formatVersion).toBe(ARCADE_PROJECT_PACKAGE_FORMAT_VERSION)
         expect(exported.meta.designSystem).toBe('Aksel v8')
         expect(exported.meta.packageVersions['@navikt/ds-react']).toBe('8.11.0')
         expect(exported.meta.packageVersions['@navikt/ds-css']).toBe('8.11.0')

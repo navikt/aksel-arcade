@@ -741,3 +741,22 @@ Completed in this branch:
 Verification completed with `npm run typecheck`, targeted Agent transport Vitest coverage, and the full `CI=1 npm run test -- --run` suite.
 
 Next note: #66 can build directly on the Checkpoint id returned by transport `applySourceChange`, but the transport must remain human-rollback-only. Do not add an agent-triggered restore/delete Checkpoint command when exposing Checkpoints in the menu.
+
+### 2026-05-27 - #57 Export Arcade project packages
+
+Selected #57 as the highest-priority `ready-for-agent` feature from #57-#58 and #66-#67 because #55 is closed, #57 is now unblocked, and it gates both package import compatibility (#58) and package-cleanliness-after-Agent-session work (#67). Worked only on #57.
+
+Completed in this branch:
+
+- Changed the default project export from a loose JSON artifact to an Arcade project package download with the `.akselarcade` extension.
+- Added a typed package envelope with `aksel-arcade/project-package` format metadata, export timestamp, portable project content, and optional AI enrichment metadata.
+- Kept package contents scoped to portable Arcade project state by explicitly copying only identity, editable source, viewport, panel layout, timestamps, and Aksel metadata; Agent sessions, pairing credentials, endpoints, permissions, Checkpoints, diagnostics, Preview evidence, and transport metadata are excluded.
+- Kept Web Arcade Share URL as a separate web-only sharing path and updated oversized Share URL copy to point users to package export instead of JSON export.
+- Added storage unit coverage for filename/MIME/shape, portable content, Aksel metadata, and Agent artifact exclusion.
+- Updated Desktop export fallback integration coverage to assert the new package envelope still carries current Agent-applied project content without local Agent artifacts.
+- Updated the Desktop Agent transport PRD implementation progress with the #57 package export work.
+- Tightened build-mode test type assertions encountered during validation so `npm run build` type-checks the package export test and existing Desktop transport test harness cleanly.
+
+Verification completed with `npm run typecheck`, `CI=1 npm run test`, `npm run lint` (existing warnings only), `npm run build`, targeted package/export Vitest coverage, and a browser smoke check that rendered the default preview and downloaded an `.akselarcade` package.
+
+Next note: #58 should add import support for this package envelope while preserving legacy `.json` import compatibility. Reuse `createArcadeProjectPackage`/the package constants from `src/services/storage.ts` instead of inventing a second package shape, and keep Agent session/transport fields ignored on import.

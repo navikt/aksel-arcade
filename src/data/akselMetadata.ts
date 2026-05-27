@@ -1,7 +1,7 @@
 /**
  * Aksel v8 Metadata Template
  *
- * This metadata is included in JSON exports to provide AI assistants
+ * This metadata is included in Arcade project package exports to provide AI assistants
  * with complete context for building production apps outside our editor.
  *
  * Update this file when:
@@ -59,7 +59,7 @@ export interface AkselMetadata {
 
 /**
  * Current Aksel v8 metadata
- * Used when generating AI-enriched JSON exports
+ * Used when generating AI-enriched Arcade project package exports
  */
 export const AKSEL_METADATA: AkselMetadata = {
   designSystem: 'Aksel v8',

@@ -415,7 +415,7 @@ export const AppHeader = ({
                       <>
                         <BodyLong size="small">
                           Generate a secure link so teammates can load this project without
-                          exporting JSON files.
+                          downloading a package file.
                         </BodyLong>
                         <VStack gap="space-12">
                           {shareState.status === 'error' && shareState.error && (
@@ -442,7 +442,7 @@ export const AppHeader = ({
                               <VStack gap="space-12">
                                 <VStack gap="space-4">
                                   <BodyLong size="small">
-                                    This project is too large for a share link. Use Export JSON
+                                    This project is too large for a share link. Use Export package
                                     instead.
                                   </BodyLong>
                                   {shareLengthDetailText && (
@@ -582,7 +582,7 @@ const getShareErrorMessage = (code: ShareLinkErrorCode): string => {
     case 'storage-unavailable':
       return 'Browser storage is blocked, so we cannot package your project. Enable storage access and retry.'
     case 'oversize':
-      return 'This project is too large for a share link. Use Export JSON instead.'
+      return 'This project is too large for a share link. Use Export package instead.'
     default:
       return 'Something went wrong while generating the share link. Please try again.'
   }
