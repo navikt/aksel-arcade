@@ -284,7 +284,7 @@ export const createAgentBridgeCommandRouter = (
           return createCommandSuccess(command, result.evidence)
         }
       case 'getSessionState':
-        return readCommand('getSessionState', () => ({
+        return readCommand('getSessionState', (): AgentSessionReadState => ({
           sessionId: session.id,
           status: 'active',
           startedAt: session.startedAt,
