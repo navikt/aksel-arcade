@@ -427,6 +427,9 @@ describe('ProjectControls layout', () => {
     expect(activeBridge as unknown as Record<string, unknown>).not.toHaveProperty(
       'restoreCheckpoint'
     )
+    expect(activeBridge as unknown as Record<string, unknown>).not.toHaveProperty(
+      'pairingCredential'
+    )
 
     expect(activeBridge?.permissions).toMatchObject({
       sourceChanges: true,

@@ -13,6 +13,11 @@ import {
   type AgentSourceField,
   type AgentSourceChangeResult,
 } from '@/services/agentBridge'
+import {
+  createDesktopAgentSessionCoordinator,
+  type DesktopAgentSessionCoordinator,
+  type DesktopAgentSessionEndReason,
+} from '@/services/desktopAgentSessionCoordinator'
 import type { ThemeMode } from '@/contexts/SettingsContext'
 import type { Project, ViewportSize } from '@/types/project'
 import type { PreviewState } from '@/types/preview'
@@ -62,6 +67,7 @@ export const useAgentSession = ({
   const [session, setSession] = useState<AgentBridgeSession | null>(null)
   const [permissions, setPermissions] = useState<AgentPermissions>({ ...DEFAULT_AGENT_PERMISSIONS })
   const [checkpoints, setCheckpoints] = useState<AgentCheckpoint[]>([])
+  const coordinatorRef = useRef<DesktopAgentSessionCoordinator | null>(null)
   const activeSessionIdRef = useRef<string | null>(null)
   const permissionsRef = useRef<AgentPermissions>(permissions)
   const projectRef = useRef(project)
@@ -77,6 +83,10 @@ export const useAgentSession = ({
     },
     diagnostics: collectPreviewDiagnostics(previewState),
   })
+
+  if (!coordinatorRef.current) {
+    coordinatorRef.current = createDesktopAgentSessionCoordinator()
+  }
 
   const readContext = useMemo<AgentBridgeReadContext>(
     () => ({
@@ -120,6 +130,13 @@ export const useAgentSession = ({
     },
     []
   )
+
+  const cleanupAgentSession = useCallback((reason: DesktopAgentSessionEndReason) => {
+    const sessionId = activeSessionIdRef.current
+    coordinatorRef.current?.stopSession(reason)
+    activeSessionIdRef.current = null
+    removeAgentBridge(sessionId ?? undefined)
+  }, [])
 
   const applyAgentChange = useCallback(
     (request: unknown): AgentBridgeCommandResult<AgentSourceChangeResult> => {
@@ -195,6 +212,24 @@ export const useAgentSession = ({
   )
 
   useEffect(() => {
+    const cleanupForReload = () => {
+      cleanupAgentSession('reload')
+      setCheckpoints([])
+      setPermissions({ ...DEFAULT_AGENT_PERMISSIONS })
+      setSession(null)
+    }
+
+    window.addEventListener('pagehide', cleanupForReload)
+    window.addEventListener('beforeunload', cleanupForReload)
+
+    return () => {
+      window.removeEventListener('pagehide', cleanupForReload)
+      window.removeEventListener('beforeunload', cleanupForReload)
+      cleanupAgentSession('renderer-unmount')
+    }
+  }, [cleanupAgentSession])
+
+  useEffect(() => {
     if (!session) {
       removeAgentBridge()
       return
@@ -223,25 +258,30 @@ export const useAgentSession = ({
   ])
 
   const startAgentSession = useCallback(() => {
-    const startedAt = createTimestamp()
-    const nextSession = {
-      id: generateSecureUUID(),
-      startedAt,
+    const coordinator = coordinatorRef.current
+    if (!coordinator) {
+      throw new Error('Desktop Agent session coordinator was not initialized.')
     }
 
+    const wasActive = coordinator.isSessionActive()
+    const nextSession = coordinator.startSession()
     activeSessionIdRef.current = nextSession.id
-    setPermissions({ ...DEFAULT_AGENT_PERMISSIONS })
-    setCheckpoints([])
-    setSession(nextSession)
+    setPermissions(nextSession.permissions)
+    if (!wasActive) {
+      setCheckpoints([])
+    }
+    setSession({
+      id: nextSession.id,
+      startedAt: nextSession.startedAt,
+    })
   }, [activeSessionIdRef])
 
   const stopAgentSession = useCallback(() => {
-    const sessionId = activeSessionIdRef.current ?? session?.id
-    activeSessionIdRef.current = null
-    removeAgentBridge(sessionId)
+    cleanupAgentSession('stop')
     setCheckpoints([])
+    setPermissions({ ...DEFAULT_AGENT_PERMISSIONS })
     setSession(null)
-  }, [activeSessionIdRef, session?.id])
+  }, [cleanupAgentSession])
 
   const restoreCheckpoint = useCallback(
     (checkpointId: string) => {
