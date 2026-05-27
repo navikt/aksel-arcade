@@ -12,6 +12,13 @@ export type DesktopAgentSessionEndReason = 'stop' | 'reload' | 'quit' | 'rendere
 export interface DesktopAgentSessionSnapshot extends AgentBridgeSession {
   status: 'active'
   permissions: AgentPermissions
+  transportEndpoint?: DesktopAgentTransportEndpoint
+}
+
+export interface DesktopAgentTransportEndpoint {
+  endpoint: string
+  sessionId: string
+  authorizationHeader: string
 }
 
 export interface DesktopAgentTransportSession extends DesktopAgentSessionSnapshot {
@@ -19,11 +26,13 @@ export interface DesktopAgentTransportSession extends DesktopAgentSessionSnapsho
 }
 
 export interface DesktopAgentTransportAdapter {
-  startSession?: (session: DesktopAgentTransportSession) => void
+  startSession?: (
+    session: DesktopAgentTransportSession
+  ) => DesktopAgentTransportEndpoint | void | Promise<DesktopAgentTransportEndpoint | void>
   stopSession?: (
     session: DesktopAgentTransportSession,
     reason: DesktopAgentSessionEndReason
-  ) => void
+  ) => void | Promise<void>
 }
 
 export interface DesktopAgentSessionCoordinatorOptions {
@@ -39,7 +48,7 @@ export interface DesktopAgentSessionCoordinator {
   getActiveTransportSession: () => DesktopAgentTransportSession | null
   getPermissions: () => AgentPermissions
   isSessionActive: (sessionId?: string) => boolean
-  startSession: () => DesktopAgentSessionSnapshot
+  startSession: () => Promise<DesktopAgentSessionSnapshot>
   stopSession: (reason?: DesktopAgentSessionEndReason) => void
 }
 
@@ -65,6 +74,12 @@ export const createDesktopAgentSessionCoordinator = ({
   transportAdapter,
 }: DesktopAgentSessionCoordinatorOptions = {}): DesktopAgentSessionCoordinator => {
   let activeSession: DesktopAgentTransportSession | null = null
+  let lifecycleVersion = 0
+  let startOperation: Promise<DesktopAgentSessionSnapshot> | null = null
+  let pendingStartCancellation: {
+    sessionId: string
+    reason: DesktopAgentSessionEndReason
+  } | null = null
 
   const createSession = (): DesktopAgentTransportSession => ({
     id: createSessionId(),
@@ -84,7 +99,20 @@ export const createDesktopAgentSessionCoordinator = ({
 
     const sessionToStop = activeSession
     activeSession = null
-    transportAdapter?.stopSession?.(cloneTransportSession(sessionToStop), reason)
+    lifecycleVersion += 1
+    if (startOperation) {
+      pendingStartCancellation = {
+        sessionId: sessionToStop.id,
+        reason,
+      }
+    }
+
+    const stopResult = stopTransportSession(sessionToStop, reason)
+    if (isPromiseLike(stopResult)) {
+      void stopResult.catch((error) => {
+        console.error('Desktop Agent transport stop failed.', error)
+      })
+    }
   }
 
   return {
@@ -97,39 +125,119 @@ export const createDesktopAgentSessionCoordinator = ({
         : clonePermissions(DEFAULT_AGENT_PERMISSIONS),
     isSessionActive: (sessionId?: string) =>
       Boolean(activeSession && (sessionId === undefined || activeSession.id === sessionId)),
-    startSession: () => {
+    startSession: async () => {
+      if (startOperation) {
+        return startOperation
+      }
+
       if (activeSession) {
         return toSessionSnapshot(activeSession)
       }
 
-      const nextSession = createSession()
-      activeSession = nextSession
+      const nextStartOperation = startNewSession()
+      startOperation = nextStartOperation
 
       try {
-        transportAdapter?.startSession?.(cloneTransportSession(nextSession))
-      } catch (error) {
-        activeSession = null
-        throw error
+        return await nextStartOperation
+      } finally {
+        if (startOperation === nextStartOperation) {
+          startOperation = null
+        }
       }
-
-      return toSessionSnapshot(nextSession)
     },
     stopSession,
+  }
+
+  async function startNewSession(): Promise<DesktopAgentSessionSnapshot> {
+    const nextSession = createSession()
+    activeSession = nextSession
+    const sessionVersion = (lifecycleVersion += 1)
+
+    try {
+      const transportEndpoint = await transportAdapter?.startSession?.(
+        cloneTransportSession(nextSession)
+      )
+
+      if (!isCurrentSession(nextSession.id, sessionVersion)) {
+        const cancellationReason =
+          pendingStartCancellation?.sessionId === nextSession.id
+            ? pendingStartCancellation.reason
+            : 'stop'
+        pendingStartCancellation = null
+
+        if (transportEndpoint) {
+          await stopTransportSession(
+            {
+              ...nextSession,
+              transportEndpoint: cloneTransportEndpoint(transportEndpoint),
+            },
+            cancellationReason
+          )
+        }
+
+        throw new Error(
+          'Desktop Agent session startup was cancelled before the transport was ready.'
+        )
+      }
+
+      if (transportEndpoint) {
+        activeSession = {
+          ...nextSession,
+          transportEndpoint: cloneTransportEndpoint(transportEndpoint),
+        }
+      }
+
+      return toSessionSnapshot(activeSession)
+    } catch (error) {
+      if (isCurrentSession(nextSession.id, sessionVersion)) {
+        activeSession = null
+        lifecycleVersion += 1
+      }
+      throw error
+    } finally {
+      if (pendingStartCancellation?.sessionId === nextSession.id) {
+        pendingStartCancellation = null
+      }
+    }
+  }
+
+  function stopTransportSession(
+    session: DesktopAgentTransportSession,
+    reason: DesktopAgentSessionEndReason
+  ) {
+    return transportAdapter?.stopSession?.(cloneTransportSession(session), reason)
+  }
+
+  function isCurrentSession(sessionId: string, version: number): boolean {
+    return activeSession?.id === sessionId && lifecycleVersion === version
   }
 }
 
 const clonePermissions = (permissions: AgentPermissions): AgentPermissions => ({ ...permissions })
+
+const cloneTransportEndpoint = (
+  endpoint: DesktopAgentTransportEndpoint
+): DesktopAgentTransportEndpoint => ({
+  endpoint: endpoint.endpoint,
+  sessionId: endpoint.sessionId,
+  authorizationHeader: endpoint.authorizationHeader,
+})
+
+const isPromiseLike = (value: unknown): value is Promise<unknown> =>
+  typeof value === 'object' && value !== null && 'then' in value && typeof value.then === 'function'
 
 const toSessionSnapshot = ({
   id,
   startedAt,
   status,
   permissions,
+  transportEndpoint,
 }: DesktopAgentTransportSession): DesktopAgentSessionSnapshot => ({
   id,
   startedAt,
   status,
   permissions: clonePermissions(permissions),
+  ...(transportEndpoint ? { transportEndpoint: cloneTransportEndpoint(transportEndpoint) } : {}),
 })
 
 const cloneTransportSession = (

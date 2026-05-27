@@ -1,10 +1,14 @@
 const { app, BrowserWindow, ipcMain } = require('electron')
 const path = require('node:path')
 const { fileURLToPath } = require('node:url')
+const { createAgentLoopbackJsonRpcTransport } = require('./agentLoopbackTransport.cjs')
 
 const SHELL_CAPABILITIES_CHANNEL = 'aksel-arcade:get-shell-capabilities'
+const START_AGENT_TRANSPORT_CHANNEL = 'aksel-arcade:start-agent-transport-session'
+const STOP_AGENT_TRANSPORT_CHANNEL = 'aksel-arcade:stop-agent-transport-session'
 const DEFAULT_RENDERER_URL = 'http://127.0.0.1:5173/aksel-arcade/'
 const DIST_DIR = path.resolve(__dirname, '..', 'dist')
+const agentLoopbackTransport = createAgentLoopbackJsonRpcTransport()
 const DESKTOP_ARCADE_CAPABILITIES = Object.freeze({
   surface: 'desktop',
   shareUrl: Object.freeze({ enabled: false }),
@@ -27,7 +31,58 @@ const cloneDesktopCapabilities = () => ({
 
 const registerDesktopIpc = () => {
   ipcMain.handle(SHELL_CAPABILITIES_CHANNEL, () => cloneDesktopCapabilities())
+  ipcMain.handle(START_AGENT_TRANSPORT_CHANNEL, (_event, payload) =>
+    agentLoopbackTransport.startSession(parseTransportSessionPayload(payload))
+  )
+  ipcMain.handle(STOP_AGENT_TRANSPORT_CHANNEL, (_event, payload) => {
+    const sessionId = parseStopTransportPayload(payload)
+    return agentLoopbackTransport.stopSession(sessionId)
+  })
 }
+
+const removeDesktopIpc = () => {
+  ipcMain.removeHandler(SHELL_CAPABILITIES_CHANNEL)
+  ipcMain.removeHandler(START_AGENT_TRANSPORT_CHANNEL)
+  ipcMain.removeHandler(STOP_AGENT_TRANSPORT_CHANNEL)
+}
+
+const parseTransportSessionPayload = (payload) => {
+  if (
+    !isRecord(payload) ||
+    typeof payload.id !== 'string' ||
+    typeof payload.startedAt !== 'string' ||
+    payload.status !== 'active' ||
+    typeof payload.pairingCredential !== 'string' ||
+    !isAgentPermissions(payload.permissions)
+  ) {
+    throw new Error('Invalid Agent transport session payload.')
+  }
+
+  return {
+    id: payload.id,
+    startedAt: payload.startedAt,
+    status: payload.status,
+    permissions: { ...payload.permissions },
+    pairingCredential: payload.pairingCredential,
+  }
+}
+
+const parseStopTransportPayload = (payload) => {
+  if (!isRecord(payload) || typeof payload.sessionId !== 'string') {
+    throw new Error('Invalid Agent transport stop payload.')
+  }
+
+  return payload.sessionId
+}
+
+const isRecord = (value) => typeof value === 'object' && value !== null && !Array.isArray(value)
+
+const isAgentPermissions = (value) =>
+  isRecord(value) &&
+  typeof value.sourceChanges === 'boolean' &&
+  typeof value.previewSettings === 'boolean' &&
+  typeof value.previewEvidence === 'boolean' &&
+  typeof value.projectMetadata === 'boolean'
 
 const isAllowedNavigation = (targetUrl) => {
   if (app.isPackaged) {
@@ -105,5 +160,6 @@ app.on('window-all-closed', () => {
 })
 
 app.on('will-quit', () => {
-  ipcMain.removeHandler(SHELL_CAPABILITIES_CHANNEL)
+  void agentLoopbackTransport.stopSession()
+  removeDesktopIpc()
 })

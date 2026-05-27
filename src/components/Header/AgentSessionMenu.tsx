@@ -33,7 +33,9 @@ export const AgentSessionMenu = () => {
 
   const handleAccessChange = (checked: boolean) => {
     if (checked) {
-      startAgentSession()
+      void startAgentSession().catch((error) => {
+        console.error('Agent access could not be started.', error)
+      })
     } else {
       stopAgentSession()
     }

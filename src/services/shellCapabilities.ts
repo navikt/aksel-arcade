@@ -1,3 +1,9 @@
+import type {
+  DesktopAgentSessionEndReason,
+  DesktopAgentTransportEndpoint,
+  DesktopAgentTransportSession,
+} from './desktopAgentSessionCoordinator'
+
 export type ArcadeShellSurface = 'web' | 'desktop'
 
 export interface ShellCapabilityToggle {
@@ -18,6 +24,13 @@ export interface ShellCapabilities {
 
 export interface DesktopArcadePreloadApi {
   getShellCapabilities: () => Promise<unknown>
+  startAgentTransportSession?: (
+    session: DesktopAgentTransportSession
+  ) => Promise<DesktopAgentTransportEndpoint>
+  stopAgentTransportSession?: (
+    sessionId: string,
+    reason: DesktopAgentSessionEndReason
+  ) => Promise<unknown>
 }
 
 export const WEB_ARCADE_CAPABILITIES: ShellCapabilities = Object.freeze({
@@ -64,9 +77,14 @@ export const getDesktopPreloadApi = (): DesktopArcadePreloadApi | undefined => {
     return undefined
   }
 
-  if (!isRecord(api) || typeof api.getShellCapabilities !== 'function') {
+  if (
+    !isRecord(api) ||
+    typeof api.getShellCapabilities !== 'function' ||
+    !hasOptionalFunction(api, 'startAgentTransportSession') ||
+    !hasOptionalFunction(api, 'stopAgentTransportSession')
+  ) {
     throw new Error(
-      'Invalid Desktop Arcade preload API. Expected a narrow getShellCapabilities IPC bridge.'
+      'Invalid Desktop Arcade preload API. Expected narrow shell capability and Agent transport IPC bridges.'
     )
   }
 
@@ -111,6 +129,9 @@ export const resolveShellSurface = (surface: unknown = 'web'): ArcadeShellSurfac
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null
+
+const hasOptionalFunction = (value: Record<string, unknown>, key: string): boolean =>
+  value[key] === undefined || typeof value[key] === 'function'
 
 const hasCapabilityToggle = (value: unknown, expectedEnabled: boolean): boolean =>
   isRecord(value) && value.enabled === expectedEnabled

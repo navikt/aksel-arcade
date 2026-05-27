@@ -2,6 +2,7 @@ import type { ThemeMode } from '@/contexts/SettingsContext'
 import type { ViewportSize } from '@/types/project'
 import { clonePreviewDiagnostics, type PreviewDiagnostics } from '@/services/previewDiagnostics'
 import type { PreviewEvidence, PreviewEvidenceCaptureResult } from '@/services/previewEvidence'
+import type { DesktopAgentTransportEndpoint } from '@/services/desktopAgentSessionCoordinator'
 
 export const AGENT_BRIDGE_GLOBAL = '__AKSEL_ARCADE_AGENT_BRIDGE__'
 
@@ -370,10 +371,28 @@ export const removeAgentBridge = (sessionId?: string): void => {
   delete window[AGENT_BRIDGE_GLOBAL]
 }
 
-export const createAgentInstructions = (permissions: AgentPermissions): string => {
+export const createAgentInstructions = (
+  permissions: AgentPermissions,
+  transportEndpoint?: DesktopAgentTransportEndpoint
+): string => {
   const permissionLines = Object.entries(permissions).map(
     ([key, value]) => `- ${key}: ${value ? 'true' : 'false'}`
   )
+  const transportLines = transportEndpoint
+    ? [
+        '',
+        'Desktop loopback JSON-RPC transport:',
+        `Endpoint: ${transportEndpoint.endpoint}`,
+        `Authorization: ${transportEndpoint.authorizationHeader}`,
+        'Send JSON-RPC 2.0 POST requests with Content-Type: application/json.',
+        'Example request:',
+        `curl -sS -X POST '${transportEndpoint.endpoint}' \\`,
+        `  -H 'Authorization: ${transportEndpoint.authorizationHeader}' \\`,
+        `  -H 'Content-Type: application/json' \\`,
+        `  --data '{"jsonrpc":"2.0","id":"agent-request-1","method":"getProject","params":{}}'`,
+        'Do not put the credential in the URL or query parameters; those requests are rejected.',
+      ]
+    : []
 
   return [
     'Aksel Arcade external-agent instructions',
@@ -385,6 +404,7 @@ export const createAgentInstructions = (permissions: AgentPermissions): string =
     'Use getDiagnostics() to read preview status, compile errors, runtime errors, and bounded sandbox console messages after changes.',
     'Use getPreviewEvidence() to read permission-gated, sanitized layout evidence from only the sandboxed Preview frame.',
     'To replace allowed fields, call applySourceChange({ summary, jsxCode?, hooksCode?, viewportSize?, theme?, name? }). A non-empty human-readable summary is required, and the human controls rollback from the Agent menu.',
+    ...transportLines,
     '',
     'Active permission state:',
     ...permissionLines,

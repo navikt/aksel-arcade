@@ -645,3 +645,49 @@ Completed in this branch:
 Verification completed with `npm run typecheck` and `CI=1 npm run test`.
 
 Next note: #62 can attach the loopback JSON-RPC lifecycle/auth adapter to `DesktopAgentTransportAdapter` and should use `getActiveTransportSession()` only inside the transport boundary. Keep the renderer-facing bridge command contract routed through `createAgentBridgeCommandRouter`; do not expose filesystem, shell, Share URL, export/import, package, rollback, or window-management commands.
+
+### 2026-05-27 - #62 Implement loopback JSON-RPC lifecycle and authentication
+
+Selected #62 as the highest-priority `ready-for-agent` feature from #57-#58 and #62-#68 because #61 is complete and #62 is the first concrete Desktop Agent transport, unblocking the read-command, copy-instructions, mutation, Checkpoint, and validation chain. Worked only on #62.
+
+Completed in this branch:
+
+- Added `desktop/agentLoopbackTransport.cjs`, a short-lived main-process HTTP JSON-RPC transport bound to `127.0.0.1` on a random available port for the active Desktop Agent session.
+- Wired Desktop preload IPC and the renderer `DesktopAgentTransportAdapter` so starting Agent access starts the loopback endpoint with the hidden pairing credential, and stopping/reload/quit tears it down.
+- Required the pairing credential as a `Bearer` Authorization header; query-string credentials, missing/unsupported/invalid Authorization headers, malformed JSON, invalid JSON-RPC envelopes, unsupported methods, and inactive sessions return structured JSON-RPC errors when a request reaches the transport.
+- Preserved the existing renderer Agent bridge/router command contract for #63 by leaving transport methods unsupported until the read-only routing feature is implemented.
+- Updated async coordinator and integration coverage so bridge publication waits for transport startup and rolls back active session state if transport startup fails.
+- Added loopback transport unit coverage for localhost endpoint metadata, Authorization-header auth, query credential rejection, malformed JSON-RPC, unsupported methods, and shutdown behavior.
+- Updated PRD #53 implementation progress with the #62 transport lifecycle/auth work.
+
+Verification completed with `npm run typecheck`, `CI=1 npm run test`, `npm run build`, `npm run lint` (existing warnings only), desktop script syntax checks, and a browser smoke/console check at the local Vite URL.
+
+Next note: #63 should route authenticated JSON-RPC method names through `createAgentBridgeCommandRouter` rather than adding a second command contract. Keep the main-process transport as lifecycle/auth only, continue rejecting filesystem, shell, Share URL, export/import, package, rollback, and window-management methods, and keep credentials in the Authorization header only.
+
+### 2026-05-27 - #62 follow-up: expose copied loopback auth details
+
+Fixed after manual Desktop Agent testing showed copied instructions still contained only the older browser-global bridge text:
+
+- Carried the active `DesktopAgentTransportEndpoint` returned by preload IPC through the coordinator and `useAgentSession`.
+- Added a minimal hidden transport section to copied Agent instructions with the loopback endpoint, `Authorization: Bearer ...` header, JSON-RPC POST guidance, and an example request.
+- Kept the visible Agent menu from rendering the endpoint or credential; these details are only in the copied instructions while Agent access is active.
+- Left actual JSON-RPC command routing for #63 and copied-instruction product polish for #64.
+- Added regression coverage for active Desktop copied instructions containing endpoint/Auth details without visible UI leakage.
+
+Verification completed with `npm run typecheck`, `CI=1 npm run test`, `npm run build`, `npm run lint` (existing warnings only), and a Desktop Arcade dev smoke test. The desktop smoke test copied instructions from the running app, sent a JSON-RPC request with the copied Authorization header and got a structured `unsupported-method` response, verified missing/wrong auth failures, rejected query-token usage, rejected a non-loopback interface request, and confirmed the endpoint shut down after stopping Agent access.
+
+Next note: #63 should now be able to reuse the copied endpoint/Auth instructions and focus only on routing supported read methods through `createAgentBridgeCommandRouter`.
+
+### 2026-05-27 - PR #75 review follow-up: transport lifecycle races
+
+Fixed scoped issues found during PR #75 review before merge:
+
+- Serialized loopback transport `startSession` calls so concurrent starts cannot orphan an earlier random-port HTTP server.
+- Marked the pending loopback session active before the server finishes listening and made server shutdown force-close idle/active HTTP connections where Node supports it.
+- Made coordinator startup cancellable: stopping/reloading while preload IPC is still starting no longer resurrects the Agent session, and any endpoint returned after cancellation is stopped again with the original cleanup reason.
+- Rejected preload IPC endpoints with an empty `Bearer ` Authorization value instead of accepting endpoint metadata that can only fail later.
+- Added regression coverage for concurrent loopback starts, cancelled coordinator startup, and empty Bearer endpoint validation.
+
+Verification completed with `npm run typecheck`, `CI=1 npm run test`, `npm run lint` (existing warnings only), `npm run build`, desktop script syntax checks, and the Desktop Arcade dev smoke path.
+
+Next note: #63 can still focus on routing authenticated JSON-RPC read methods through `createAgentBridgeCommandRouter`; the #75 review fixes only harden #62 lifecycle/auth behavior.

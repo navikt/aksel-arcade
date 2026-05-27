@@ -8,7 +8,6 @@ import {
   type AgentBridgeErrorCode,
   type AgentBridgeReadContext,
   type AgentChangeField,
-  type AgentBridgeSession,
   type AgentPermissions,
   type AgentSourceField,
   type AgentSourceChangeResult,
@@ -17,7 +16,9 @@ import {
   createDesktopAgentSessionCoordinator,
   type DesktopAgentSessionCoordinator,
   type DesktopAgentSessionEndReason,
+  type DesktopAgentSessionSnapshot,
 } from '@/services/desktopAgentSessionCoordinator'
+import { createDesktopPreloadAgentTransportAdapter } from '@/services/desktopAgentTransportAdapter'
 import type { ThemeMode } from '@/contexts/SettingsContext'
 import type { Project, ViewportSize } from '@/types/project'
 import type { PreviewState } from '@/types/preview'
@@ -64,7 +65,7 @@ export const useAgentSession = ({
   onThemeChange,
   getPreviewEvidence,
 }: UseAgentSessionOptions) => {
-  const [session, setSession] = useState<AgentBridgeSession | null>(null)
+  const [session, setSession] = useState<DesktopAgentSessionSnapshot | null>(null)
   const [permissions, setPermissions] = useState<AgentPermissions>({ ...DEFAULT_AGENT_PERMISSIONS })
   const [checkpoints, setCheckpoints] = useState<AgentCheckpoint[]>([])
   const coordinatorRef = useRef<DesktopAgentSessionCoordinator | null>(null)
@@ -85,7 +86,9 @@ export const useAgentSession = ({
   })
 
   if (!coordinatorRef.current) {
-    coordinatorRef.current = createDesktopAgentSessionCoordinator()
+    coordinatorRef.current = createDesktopAgentSessionCoordinator({
+      transportAdapter: createDesktopPreloadAgentTransportAdapter(),
+    })
   }
 
   const readContext = useMemo<AgentBridgeReadContext>(
@@ -257,23 +260,20 @@ export const useAgentSession = ({
     session,
   ])
 
-  const startAgentSession = useCallback(() => {
+  const startAgentSession = useCallback(async () => {
     const coordinator = coordinatorRef.current
     if (!coordinator) {
       throw new Error('Desktop Agent session coordinator was not initialized.')
     }
 
     const wasActive = coordinator.isSessionActive()
-    const nextSession = coordinator.startSession()
+    const nextSession = await coordinator.startSession()
     activeSessionIdRef.current = nextSession.id
     setPermissions(nextSession.permissions)
     if (!wasActive) {
       setCheckpoints([])
     }
-    setSession({
-      id: nextSession.id,
-      startedAt: nextSession.startedAt,
-    })
+    setSession(nextSession)
   }, [activeSessionIdRef])
 
   const stopAgentSession = useCallback(() => {
@@ -348,7 +348,10 @@ export const useAgentSession = ({
 
   const statusText = session ? 'Status: aktiv' : 'Status: inaktiv'
 
-  const agentInstructions = useMemo(() => createAgentInstructions(permissions), [permissions])
+  const agentInstructions = useMemo(
+    () => createAgentInstructions(permissions, session?.transportEndpoint),
+    [permissions, session?.transportEndpoint]
+  )
 
   return {
     agentInstructions,
