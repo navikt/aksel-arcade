@@ -9,7 +9,9 @@ const {
   createAgentLoopbackJsonRpcTransport,
 }: {
   LOOPBACK_HOST: string
-  createAgentLoopbackJsonRpcTransport: () => AgentLoopbackJsonRpcTransport
+  createAgentLoopbackJsonRpcTransport: (
+    options?: AgentLoopbackJsonRpcTransportOptions
+  ) => AgentLoopbackJsonRpcTransport
 } = require('../../../desktop/agentLoopbackTransport.cjs')
 
 interface AgentLoopbackJsonRpcTransport {
@@ -21,10 +23,21 @@ interface AgentLoopbackJsonRpcTransport {
   stopSession: (sessionId?: string) => Promise<boolean>
 }
 
+interface AgentLoopbackJsonRpcRouteRequest {
+  id: string | number | null
+  method: string
+  params?: unknown
+  session: Omit<DesktopAgentTransportSession, 'pairingCredential'>
+}
+
+interface AgentLoopbackJsonRpcTransportOptions {
+  routeRequest?: (request: AgentLoopbackJsonRpcRouteRequest) => unknown | Promise<unknown>
+}
+
 const activeTransports: AgentLoopbackJsonRpcTransport[] = []
 
-const createTransport = () => {
-  const transport = createAgentLoopbackJsonRpcTransport()
+const createTransport = (options?: AgentLoopbackJsonRpcTransportOptions) => {
+  const transport = createAgentLoopbackJsonRpcTransport(options)
   activeTransports.push(transport)
   return transport
 }
@@ -184,6 +197,67 @@ describe('desktop Agent loopback JSON-RPC transport', () => {
         },
       },
     })
+  })
+
+  it('routes authenticated JSON-RPC calls without exposing pairing credentials to the route boundary', async () => {
+    const routedRequests: AgentLoopbackJsonRpcRouteRequest[] = []
+    const transport = createTransport({
+      routeRequest: (request) => {
+        routedRequests.push(request)
+        return {
+          jsonrpc: '2.0',
+          id: request.id,
+          result: {
+            ok: true,
+            command: request.method,
+            data: {
+              name: 'Routed project',
+              jsxCode: '<Button>Routed</Button>',
+              hooksCode: '',
+            },
+          },
+        }
+      },
+    })
+    const endpoint = await transport.startSession(createSession())
+
+    await expect(
+      postJsonRpc(
+        endpoint.endpoint,
+        { jsonrpc: '2.0', id: 'read-1', method: 'getProject', params: {} },
+        endpoint.authorizationHeader
+      )
+    ).resolves.toEqual({
+      status: 200,
+      body: {
+        jsonrpc: '2.0',
+        id: 'read-1',
+        result: {
+          ok: true,
+          command: 'getProject',
+          data: {
+            name: 'Routed project',
+            jsxCode: '<Button>Routed</Button>',
+            hooksCode: '',
+          },
+        },
+      },
+    })
+
+    expect(routedRequests).toEqual([
+      {
+        id: 'read-1',
+        method: 'getProject',
+        params: {},
+        session: {
+          id: 'agent-session-1',
+          startedAt: '2026-05-27T08:00:00.000Z',
+          status: 'active',
+          permissions: DEFAULT_AGENT_PERMISSIONS,
+        },
+      },
+    ])
+    expect(JSON.stringify(routedRequests)).not.toContain('agent-secret-1')
   })
 
   it('shuts down the endpoint when Agent access ends', async () => {
