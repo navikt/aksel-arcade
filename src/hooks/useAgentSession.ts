@@ -24,7 +24,7 @@ import {
   createDesktopPreloadAgentTransportAdapter,
   registerDesktopPreloadAgentTransportRequestHandler,
 } from '@/services/desktopAgentTransportAdapter'
-import { routeDesktopAgentTransportReadRequest } from '@/services/desktopAgentTransportProtocol'
+import { routeDesktopAgentTransportRequest } from '@/services/desktopAgentTransportProtocol'
 import type { ThemeMode } from '@/contexts/SettingsContext'
 import type { Project, ViewportSize } from '@/types/project'
 import type { PreviewState } from '@/types/preview'
@@ -270,7 +270,7 @@ export const useAgentSession = ({
     }
 
     return registerDesktopPreloadAgentTransportRequestHandler((request) =>
-      routeDesktopAgentTransportReadRequest(request, {
+      routeDesktopAgentTransportRequest(request, {
         session,
         router: createAgentBridgeCommandRouter(session, createBridgeController()),
       })

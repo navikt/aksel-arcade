@@ -328,11 +328,12 @@ describe('agent instructions', () => {
     expect(instructions).toContain('Authorization: Bearer copied-agent-secret')
     expect(instructions).toMatch(/Content-Type: application\/json and the Authorization header/i)
     expect(instructions).toContain(
-      'Supported read methods: getProject, getPreviewContext, getDiagnostics, getPreviewEvidence, getSessionState.'
+      'Supported JSON-RPC methods: getProject, getPreviewContext, getDiagnostics, getPreviewEvidence, getSessionState, applySourceChange.'
     )
     expect(instructions).toContain(
       'Full Agent bridge command names: getProject, getPreviewContext, getDiagnostics, getPreviewEvidence, getSessionState, applySourceChange.'
     )
+    expect(instructions).toContain('"method":"applySourceChange"')
     expect(instructions).toMatch(/GitHub Copilot app/i)
     expect(instructions).toMatch(/Copilot CLI/i)
     expect(instructions).toMatch(/Copilot in VS Code/i)
