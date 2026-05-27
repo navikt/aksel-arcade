@@ -3,6 +3,7 @@ import type {
   DesktopAgentTransportEndpoint,
   DesktopAgentTransportSession,
 } from './desktopAgentSessionCoordinator'
+import type { DesktopAgentTransportRequestHandler } from './desktopAgentTransportProtocol'
 
 export type ArcadeShellSurface = 'web' | 'desktop'
 
@@ -31,6 +32,7 @@ export interface DesktopArcadePreloadApi {
     sessionId: string,
     reason: DesktopAgentSessionEndReason
   ) => Promise<unknown>
+  setAgentTransportRequestHandler?: (handler: DesktopAgentTransportRequestHandler | null) => void
 }
 
 export const WEB_ARCADE_CAPABILITIES: ShellCapabilities = Object.freeze({
@@ -81,7 +83,8 @@ export const getDesktopPreloadApi = (): DesktopArcadePreloadApi | undefined => {
     !isRecord(api) ||
     typeof api.getShellCapabilities !== 'function' ||
     !hasOptionalFunction(api, 'startAgentTransportSession') ||
-    !hasOptionalFunction(api, 'stopAgentTransportSession')
+    !hasOptionalFunction(api, 'stopAgentTransportSession') ||
+    !hasOptionalFunction(api, 'setAgentTransportRequestHandler')
   ) {
     throw new Error(
       'Invalid Desktop Arcade preload API. Expected narrow shell capability and Agent transport IPC bridges.'

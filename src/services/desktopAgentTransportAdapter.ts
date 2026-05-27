@@ -4,6 +4,7 @@ import type {
   DesktopAgentTransportEndpoint,
   DesktopAgentTransportSession,
 } from './desktopAgentSessionCoordinator'
+import type { DesktopAgentTransportRequestHandler } from './desktopAgentTransportProtocol'
 
 export const createDesktopPreloadAgentTransportAdapter = (
   api: DesktopArcadePreloadApi | undefined = getDesktopPreloadApi()
@@ -25,6 +26,18 @@ export const createDesktopPreloadAgentTransportAdapter = (
       await stopAgentTransportSession(session.id, reason)
     },
   }
+}
+
+export const registerDesktopPreloadAgentTransportRequestHandler = (
+  handler: DesktopAgentTransportRequestHandler,
+  api: DesktopArcadePreloadApi | undefined = getDesktopPreloadApi()
+): (() => void) | undefined => {
+  if (!api?.setAgentTransportRequestHandler) {
+    return undefined
+  }
+
+  api.setAgentTransportRequestHandler(handler)
+  return () => api.setAgentTransportRequestHandler?.(null)
 }
 
 const cloneTransportSession = (

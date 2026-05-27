@@ -691,3 +691,20 @@ Fixed scoped issues found during PR #75 review before merge:
 Verification completed with `npm run typecheck`, `CI=1 npm run test`, `npm run lint` (existing warnings only), `npm run build`, desktop script syntax checks, and the Desktop Arcade dev smoke path.
 
 Next note: #63 can still focus on routing authenticated JSON-RPC read methods through `createAgentBridgeCommandRouter`; the #75 review fixes only harden #62 lifecycle/auth behavior.
+
+### 2026-05-27 - #63 Expose read-only Agent bridge commands over transport
+
+Selected #63 as the highest-priority `ready-for-agent` feature from #57-#58 and #63-#68 because #62 is complete, #63 is the next unblocked Desktop Agent transport step, and it unlocks the copied-instruction, mutation, and checkpoint follow-ups. Worked only on #63.
+
+Completed in this branch:
+
+- Routed authenticated loopback JSON-RPC requests from the main-process transport to the active renderer through narrow preload IPC.
+- Added a Desktop Agent transport protocol helper that maps read-only method names one-to-one to `createAgentBridgeCommandRouter` for `getProject`, `getPreviewContext`, `getDiagnostics`, `getPreviewEvidence`, and `getSessionState`.
+- Kept the transport read-only for this feature: `applySourceChange`, rollback, filesystem, shell, Share URL, export/import/package, window-management, and other unsupported methods return structured JSON-RPC `unsupported-method` errors.
+- Kept the hidden pairing credential out of the renderer route boundary; the main-process loopback still authenticates with the Bearer header before forwarding sanitized requests.
+- Updated copied transport instructions to name the supported read methods while keeping endpoint and credential details hidden from the visible Agent menu.
+- Added unit coverage for protocol routing, stale/revoked session errors, loopback route forwarding without credential leakage, and preload route-handler registration.
+
+Verification completed with `npm run typecheck`, `CI=1 npm run test`, `npm run build`, desktop script syntax checks, and a headless browser smoke check against the local Vite app.
+
+Next note: #64 should now polish the copied provider-neutral instructions around the working read transport. #65 should extend the same protocol path for `applySourceChange` instead of adding a second command contract, and should keep the non-project desktop methods rejected.

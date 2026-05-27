@@ -80,6 +80,16 @@ export const AGENT_BRIDGE_COMMAND_NAMES = [
 
 export type AgentBridgeCommandName = (typeof AGENT_BRIDGE_COMMAND_NAMES)[number]
 
+export const AGENT_BRIDGE_READ_COMMAND_NAMES = [
+  'getProject',
+  'getPreviewContext',
+  'getDiagnostics',
+  'getPreviewEvidence',
+  'getSessionState',
+] as const
+
+export type AgentBridgeReadCommandName = (typeof AGENT_BRIDGE_READ_COMMAND_NAMES)[number]
+
 export interface AgentSessionReadState {
   sessionId: string
   status: 'active'
@@ -171,6 +181,11 @@ export const DEFAULT_AGENT_PERMISSIONS: AgentPermissions = {
 
 export const isAgentBridgeCommandName = (command: string): command is AgentBridgeCommandName =>
   AGENT_BRIDGE_COMMAND_NAMES.some((supportedCommand) => supportedCommand === command)
+
+export const isAgentBridgeReadCommandName = (
+  command: string
+): command is AgentBridgeReadCommandName =>
+  AGENT_BRIDGE_READ_COMMAND_NAMES.some((supportedCommand) => supportedCommand === command)
 
 const createCommandFailure = <TCommand extends string>(
   command: TCommand,
@@ -285,14 +300,17 @@ export const createAgentBridgeCommandRouter = (
           return createCommandSuccess(command, result.evidence)
         }
       case 'getSessionState':
-        return readCommand('getSessionState', (): AgentSessionReadState => ({
-          sessionId: session.id,
-          status: 'active',
-          startedAt: session.startedAt,
-          permissions: { ...controller.getPermissions() },
-          readScope: 'arcade-session',
-          commandNames: [...AGENT_BRIDGE_COMMAND_NAMES],
-        }))
+        return readCommand(
+          'getSessionState',
+          (): AgentSessionReadState => ({
+            sessionId: session.id,
+            status: 'active',
+            startedAt: session.startedAt,
+            permissions: { ...controller.getPermissions() },
+            readScope: 'arcade-session',
+            commandNames: [...AGENT_BRIDGE_COMMAND_NAMES],
+          })
+        )
       case 'applySourceChange':
         if (!controller.isSessionActive()) {
           return createSessionRevokedFailure(command)
@@ -385,6 +403,7 @@ export const createAgentInstructions = (
         `Endpoint: ${transportEndpoint.endpoint}`,
         `Authorization: ${transportEndpoint.authorizationHeader}`,
         'Send JSON-RPC 2.0 POST requests with Content-Type: application/json.',
+        `Supported read methods: ${AGENT_BRIDGE_READ_COMMAND_NAMES.join(', ')}.`,
         'Example request:',
         `curl -sS -X POST '${transportEndpoint.endpoint}' \\`,
         `  -H 'Authorization: ${transportEndpoint.authorizationHeader}' \\`,

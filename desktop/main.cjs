@@ -6,9 +6,17 @@ const { createAgentLoopbackJsonRpcTransport } = require('./agentLoopbackTranspor
 const SHELL_CAPABILITIES_CHANNEL = 'aksel-arcade:get-shell-capabilities'
 const START_AGENT_TRANSPORT_CHANNEL = 'aksel-arcade:start-agent-transport-session'
 const STOP_AGENT_TRANSPORT_CHANNEL = 'aksel-arcade:stop-agent-transport-session'
+const ROUTE_AGENT_TRANSPORT_REQUEST_CHANNEL = 'aksel-arcade:route-agent-transport-request'
+const ROUTE_AGENT_TRANSPORT_RESPONSE_CHANNEL = 'aksel-arcade:route-agent-transport-response'
 const DEFAULT_RENDERER_URL = 'http://127.0.0.1:5173/aksel-arcade/'
 const DIST_DIR = path.resolve(__dirname, '..', 'dist')
-const agentLoopbackTransport = createAgentLoopbackJsonRpcTransport()
+const AGENT_TRANSPORT_ROUTE_TIMEOUT_MS = 5000
+const agentLoopbackTransport = createAgentLoopbackJsonRpcTransport({
+  routeRequest: routeAgentTransportRequest,
+})
+let activeMainWindow = null
+let nextAgentTransportRouteRequestId = 0
+const pendingAgentTransportRouteRequests = new Map()
 const DESKTOP_ARCADE_CAPABILITIES = Object.freeze({
   surface: 'desktop',
   shareUrl: Object.freeze({ enabled: false }),
@@ -38,13 +46,128 @@ const registerDesktopIpc = () => {
     const sessionId = parseStopTransportPayload(payload)
     return agentLoopbackTransport.stopSession(sessionId)
   })
+  ipcMain.on(ROUTE_AGENT_TRANSPORT_RESPONSE_CHANNEL, handleAgentTransportRouteResponse)
 }
 
 const removeDesktopIpc = () => {
   ipcMain.removeHandler(SHELL_CAPABILITIES_CHANNEL)
   ipcMain.removeHandler(START_AGENT_TRANSPORT_CHANNEL)
   ipcMain.removeHandler(STOP_AGENT_TRANSPORT_CHANNEL)
+  ipcMain.off(ROUTE_AGENT_TRANSPORT_RESPONSE_CHANNEL, handleAgentTransportRouteResponse)
 }
+
+function routeAgentTransportRequest({ id, method, params, session }) {
+  const targetWindow = getAgentTransportWindow()
+  if (!targetWindow) {
+    return createAgentTransportRouteErrorResponse(
+      id,
+      -32003,
+      'renderer-unavailable',
+      'Desktop Agent transport cannot route requests because the renderer window is unavailable.'
+    )
+  }
+
+  const requestId = `agent-transport-route-${++nextAgentTransportRouteRequestId}`
+  const routePayload = {
+    requestId,
+    id,
+    method,
+    ...(params !== undefined ? { params } : {}),
+    sessionId: session.id,
+  }
+
+  return new Promise((resolve) => {
+    const timeout = setTimeout(() => {
+      pendingAgentTransportRouteRequests.delete(requestId)
+      resolve(
+        createAgentTransportRouteErrorResponse(
+          id,
+          -32003,
+          'route-timeout',
+          'Desktop Agent transport request routing timed out before the renderer responded.'
+        )
+      )
+    }, AGENT_TRANSPORT_ROUTE_TIMEOUT_MS)
+
+    pendingAgentTransportRouteRequests.set(requestId, {
+      id,
+      resolve,
+      timeout,
+      webContentsId: targetWindow.webContents.id,
+    })
+
+    try {
+      targetWindow.webContents.send(ROUTE_AGENT_TRANSPORT_REQUEST_CHANNEL, routePayload)
+    } catch {
+      pendingAgentTransportRouteRequests.delete(requestId)
+      clearTimeout(timeout)
+      resolve(
+        createAgentTransportRouteErrorResponse(
+          id,
+          -32003,
+          'renderer-unavailable',
+          'Desktop Agent transport renderer became unavailable before the request could be routed.'
+        )
+      )
+    }
+  })
+}
+
+function handleAgentTransportRouteResponse(event, payload) {
+  if (!isRecord(payload) || typeof payload.requestId !== 'string') {
+    return
+  }
+
+  const pendingRequest = pendingAgentTransportRouteRequests.get(payload.requestId)
+  if (!pendingRequest || pendingRequest.webContentsId !== event.sender.id) {
+    return
+  }
+
+  pendingAgentTransportRouteRequests.delete(payload.requestId)
+  clearTimeout(pendingRequest.timeout)
+
+  if (!isAgentTransportRouteResponse(payload.response, pendingRequest.id)) {
+    pendingRequest.resolve(
+      createAgentTransportRouteErrorResponse(
+        pendingRequest.id,
+        -32603,
+        'invalid-route-response',
+        'Desktop Agent transport renderer returned an invalid JSON-RPC response.'
+      )
+    )
+    return
+  }
+
+  pendingRequest.resolve(payload.response)
+}
+
+const getAgentTransportWindow = () => {
+  if (activeMainWindow && !activeMainWindow.isDestroyed()) {
+    return activeMainWindow
+  }
+
+  return BrowserWindow.getAllWindows().find((browserWindow) => !browserWindow.isDestroyed()) ?? null
+}
+
+const resolvePendingAgentTransportRouteRequests = (responseFactory) => {
+  for (const [requestId, pendingRequest] of pendingAgentTransportRouteRequests) {
+    pendingAgentTransportRouteRequests.delete(requestId)
+    clearTimeout(pendingRequest.timeout)
+    pendingRequest.resolve(responseFactory(pendingRequest.id))
+  }
+}
+
+const createAgentTransportRouteErrorResponse = (id, jsonRpcCode, code, message) => ({
+  jsonrpc: '2.0',
+  id: isJsonRpcId(id) ? id : null,
+  error: {
+    code: jsonRpcCode,
+    message,
+    data: {
+      code,
+    },
+  },
+})
 
 const parseTransportSessionPayload = (payload) => {
   if (
@@ -120,6 +243,20 @@ const createWindow = async () => {
       webSecurity: true,
     },
   })
+  activeMainWindow = mainWindow
+  mainWindow.on('closed', () => {
+    if (activeMainWindow === mainWindow) {
+      activeMainWindow = null
+    }
+    resolvePendingAgentTransportRouteRequests((id) =>
+      createAgentTransportRouteErrorResponse(
+        id,
+        -32003,
+        'renderer-unavailable',
+        'Desktop Agent transport renderer closed before it returned a response.'
+      )
+    )
+  })
 
   mainWindow.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
   mainWindow.webContents.on('will-navigate', (event, targetUrl) => {
@@ -161,5 +298,35 @@ app.on('window-all-closed', () => {
 
 app.on('will-quit', () => {
   void agentLoopbackTransport.stopSession()
+  resolvePendingAgentTransportRouteRequests((id) =>
+    createAgentTransportRouteErrorResponse(
+      id,
+      -32003,
+      'renderer-unavailable',
+      'Desktop Agent transport renderer is shutting down.'
+    )
+  )
   removeDesktopIpc()
 })
+
+const isAgentTransportRouteResponse = (value, expectedId) => {
+  if (!isRecord(value) || value.jsonrpc !== '2.0' || value.id !== expectedId) {
+    return false
+  }
+
+  if ('result' in value && !('error' in value)) {
+    return true
+  }
+
+  return (
+    !('result' in value) &&
+    isRecord(value.error) &&
+    typeof value.error.code === 'number' &&
+    typeof value.error.message === 'string' &&
+    isRecord(value.error.data) &&
+    typeof value.error.data.code === 'string'
+  )
+}
+
+const isJsonRpcId = (value) =>
+  value === null || value === undefined || typeof value === 'string' || typeof value === 'number'

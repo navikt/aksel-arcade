@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   DEFAULT_AGENT_PERMISSIONS,
+  createAgentBridgeCommandRouter,
   createAgentInstructions,
   publishAgentBridge,
   removeAgentBridge,
+  type AgentBridgeController,
   type AgentBridgeCommandResult,
   type AgentBridgeErrorCode,
   type AgentBridgeReadContext,
@@ -18,7 +20,11 @@ import {
   type DesktopAgentSessionEndReason,
   type DesktopAgentSessionSnapshot,
 } from '@/services/desktopAgentSessionCoordinator'
-import { createDesktopPreloadAgentTransportAdapter } from '@/services/desktopAgentTransportAdapter'
+import {
+  createDesktopPreloadAgentTransportAdapter,
+  registerDesktopPreloadAgentTransportRequestHandler,
+} from '@/services/desktopAgentTransportAdapter'
+import { routeDesktopAgentTransportReadRequest } from '@/services/desktopAgentTransportProtocol'
 import type { ThemeMode } from '@/contexts/SettingsContext'
 import type { Project, ViewportSize } from '@/types/project'
 import type { PreviewState } from '@/types/preview'
@@ -214,6 +220,18 @@ export const useAgentSession = ({
     [onProjectChange, onThemeChange, syncCurrentContext]
   )
 
+  const createBridgeController = useCallback(
+    (): AgentBridgeController => ({
+      getReadContext: () => readContextRef.current,
+      getPermissions: () => permissionsRef.current,
+      isSessionActive: () => activeSessionIdRef.current === session?.id,
+      recordActivity: () => undefined,
+      applySourceChange: applyAgentChange,
+      getPreviewEvidence,
+    }),
+    [applyAgentChange, getPreviewEvidence, session?.id]
+  )
+
   useEffect(() => {
     const cleanupForReload = () => {
       cleanupAgentSession('reload')
@@ -239,26 +257,25 @@ export const useAgentSession = ({
     }
 
     activeSessionIdRef.current = session.id
-    publishAgentBridge(session, {
-      getReadContext: () => readContextRef.current,
-      getPermissions: () => permissionsRef.current,
-      isSessionActive: () => activeSessionIdRef.current === session.id,
-      recordActivity: () => undefined,
-      applySourceChange: applyAgentChange,
-      getPreviewEvidence,
-    })
+    publishAgentBridge(session, createBridgeController())
 
     return () => {
       removeAgentBridge(session.id)
     }
-  }, [
-    activeSessionIdRef,
-    applyAgentChange,
-    getPreviewEvidence,
-    permissionsRef,
-    readContextRef,
-    session,
-  ])
+  }, [activeSessionIdRef, createBridgeController, session])
+
+  useEffect(() => {
+    if (!session) {
+      return
+    }
+
+    return registerDesktopPreloadAgentTransportRequestHandler((request) =>
+      routeDesktopAgentTransportReadRequest(request, {
+        session,
+        router: createAgentBridgeCommandRouter(session, createBridgeController()),
+      })
+    )
+  }, [createBridgeController, session])
 
   const startAgentSession = useCallback(async () => {
     const coordinator = coordinatorRef.current

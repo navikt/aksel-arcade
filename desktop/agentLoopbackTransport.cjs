@@ -173,13 +173,26 @@ const handleJsonRpcRequest = async (request, response, { getSession, routeReques
   }
 
   if (routeRequest) {
-    const routedResponse = await routeRequest({
-      id: payload.id ?? null,
-      method: payload.method,
-      params: payload.params,
-      session: cloneTransportSession(session),
-    })
-    sendJson(response, 200, routedResponse)
+    try {
+      const routedResponse = await routeRequest({
+        id: payload.id ?? null,
+        method: payload.method,
+        params: payload.params,
+        session: toTransportRouteSession(session),
+      })
+      sendJson(response, 200, routedResponse)
+    } catch (error) {
+      sendJsonRpcError(response, {
+        httpStatus: 500,
+        id: payload.id ?? null,
+        jsonRpcCode: -32603,
+        code: 'route-request-failed',
+        message:
+          error instanceof Error
+            ? error.message
+            : 'Agent transport request routing failed unexpectedly.',
+      })
+    }
     return
   }
 
@@ -338,6 +351,13 @@ const toTransportEndpoint = ({ endpoint, session }) => ({
   endpoint,
   sessionId: session.id,
   authorizationHeader: `Bearer ${session.pairingCredential}`,
+})
+
+const toTransportRouteSession = (session) => ({
+  id: session.id,
+  startedAt: session.startedAt,
+  status: session.status,
+  permissions: { ...session.permissions },
 })
 
 const isJsonRpcRequest = (value) =>
