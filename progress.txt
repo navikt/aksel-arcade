@@ -629,3 +629,19 @@ Completed in this branch:
 Verification completed with `npm run typecheck`, `CI=1 npm run test`, `npm run build`, `npm run lint` (existing hook dependency warnings only), syntax checks for the desktop scripts, and a Desktop Arcade smoke launch through `npm run desktop:dev`.
 
 Next note: #61 can build the Desktop Agent session coordinator on top of this shell. Keep future desktop-only capabilities behind preload/main-process IPC and do not import Electron, Node, socket, process, or filesystem APIs into React components.
+
+### 2026-05-27 - #61 Add Desktop Agent session coordinator
+
+Selected #61 as the highest-priority `ready-for-agent` feature from #57-#58 and #61-#68 because #59 and #60 are complete, #61 is now unblocked, and it is the next foundation for the Desktop transport chain (#62-#66). Worked only on #61.
+
+Completed in this branch:
+
+- Added `src/services/desktopAgentSessionCoordinator.ts` as the Desktop Agent session coordinator boundary. It owns active/inactive state, one active session, all-on v1 permissions, session identifiers, hidden short-lived pairing credentials, and start/stop hooks for the later transport adapter.
+- Wired `useAgentSession` to start and stop through the coordinator while preserving the existing Desktop Agent menu status text and browser bridge compatibility wrapper.
+- Added cleanup on explicit stop, reload/pagehide, beforeunload, and renderer unmount so stale session state, permissions, Checkpoints, credentials, and bridge publication are invalidated.
+- Added coordinator unit coverage for lifecycle, one-session behavior, stop/reload/quit cleanup reasons, credential invalidation, Web Crypto credential generation, all-on permissions, and adapter startup rollback.
+- Strengthened Desktop Agent menu integration coverage to prove the published bridge still excludes the pairing credential.
+
+Verification completed with `npm run typecheck` and `CI=1 npm run test`.
+
+Next note: #62 can attach the loopback JSON-RPC lifecycle/auth adapter to `DesktopAgentTransportAdapter` and should use `getActiveTransportSession()` only inside the transport boundary. Keep the renderer-facing bridge command contract routed through `createAgentBridgeCommandRouter`; do not expose filesystem, shell, Share URL, export/import, package, rollback, or window-management commands.
