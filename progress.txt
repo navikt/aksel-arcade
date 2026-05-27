@@ -708,3 +708,19 @@ Completed in this branch:
 Verification completed with `npm run typecheck`, `CI=1 npm run test`, `npm run build`, desktop script syntax checks, and a headless browser smoke check against the local Vite app.
 
 Next note: #64 should now polish the copied provider-neutral instructions around the working read transport. #65 should extend the same protocol path for `applySourceChange` instead of adding a second command contract, and should keep the non-project desktop methods rejected.
+
+### 2026-05-27 - #64 Copy hidden provider-neutral Agent instructions
+
+Selected #64 as the highest-priority `ready-for-agent` feature from #57-#58 and #64-#68 because #63 is complete, #64 is the next unblocked Desktop Agent transport step, and it sharpens the active-session instructions needed before mutation and human validation work. Worked only on #64.
+
+Completed in this branch:
+
+- Polished the hidden copied Desktop Agent instructions with endpoint and `Authorization` header guidance, supported read method names, the full Agent bridge command list, JSON-RPC request shape, query-credential rejection guidance, and provider-neutral examples for GitHub Copilot app, Copilot CLI, Copilot in VS Code, and other same-device External agents.
+- Kept endpoint, credential, local server, and transport details out of the visible Desktop Agent menu while adding visible copy success feedback, copy failure feedback, and a retry affordance.
+- Added prompt unit coverage for provider-neutral contents and inactive secret exclusion.
+- Added Agent menu integration coverage for success feedback, hidden active endpoint/Auth details, provider-neutral examples, failure feedback, retry, and visible UI secret non-disclosure.
+- Updated PRD #53 implementation progress with the #64 copied-instruction work.
+
+Verification completed with `npm run typecheck`, `CI=1 npm run test`, and a desktop-surface browser smoke check for Agent menu render, start access, copy success feedback, hidden instruction copying, visible secret non-disclosure, and clean console output.
+
+Next note: #65 should extend the same Desktop Agent transport protocol path for authenticated `applySourceChange` instead of adding a second command contract. Keep filesystem, shell, Share URL, export/import/package, rollback, and window-management methods rejected, and keep copied instructions/provider examples provider-neutral.

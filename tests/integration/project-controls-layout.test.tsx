@@ -487,6 +487,7 @@ describe('ProjectControls layout', () => {
     fireEvent.click(screen.getByRole('menuitem', { name: /kopier instruksjoner/i }))
 
     await waitFor(() => expect(writeText).toHaveBeenCalledTimes(1))
+    expect(await screen.findByText(/instruksjoner kopiert/i)).toBeTruthy()
 
     const instructions = writeText.mock.calls[0]?.[0] ?? ''
     expect(instructions).toContain('window.__AKSEL_ARCADE_AGENT_BRIDGE__')
@@ -542,12 +543,58 @@ describe('ProjectControls layout', () => {
     expect(instructions).toContain('Desktop loopback JSON-RPC transport')
     expect(instructions).toContain(`Endpoint: ${endpoint.endpoint}`)
     expect(instructions).toContain(`Authorization: ${endpoint.authorizationHeader}`)
+    expect(instructions).toMatch(/Authorization header/i)
+    expect(instructions).toContain('getProject, getPreviewContext, getDiagnostics')
+    expect(instructions).toMatch(/GitHub Copilot app/i)
+    expect(instructions).toMatch(/Copilot CLI/i)
+    expect(instructions).toMatch(/Copilot in VS Code/i)
+    expect(instructions).toMatch(/Other same-device External agents/i)
     expect(instructions).toContain('"jsonrpc":"2.0"')
     expect(instructions).toMatch(/query parameters/i)
     expect(instructions).not.toMatch(/[?&](token|credential|authorization)=/i)
     expect(screen.queryByText(endpoint.endpoint)).toBeNull()
     expect(screen.queryByText(endpoint.authorizationHeader)).toBeNull()
+  })
 
+  it('shows copy failure feedback and lets the user retry without revealing secrets', async () => {
+    const writeText = vi
+      .fn()
+      .mockRejectedValueOnce(new Error('clipboard blocked'))
+      .mockResolvedValueOnce(undefined)
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText },
+    })
+    const sessionId = '11111111-1111-4111-8111-111111111111'
+    const endpoint = {
+      endpoint: 'http://127.0.0.1:48123',
+      sessionId,
+      authorizationHeader: 'Bearer copied-agent-secret',
+    }
+    window.__AKSEL_ARCADE_DESKTOP__ = {
+      getShellCapabilities: vi.fn().mockResolvedValue(DESKTOP_ARCADE_CAPABILITIES),
+      startAgentTransportSession: vi.fn().mockResolvedValue(endpoint),
+      stopAgentTransportSession: vi.fn().mockResolvedValue(true),
+    }
+    vi.spyOn(globalThis.crypto, 'randomUUID').mockReturnValue(sessionId)
+
+    renderHeader()
+
+    await startAgentAccess()
+    fireEvent.click(screen.getByRole('menuitem', { name: /kopier instruksjoner/i }))
+
+    expect((await screen.findByRole('alert')).textContent).toMatch(/kunne ikke kopiere/i)
+    expect(screen.queryByText(endpoint.endpoint)).toBeNull()
+    expect(screen.queryByText(endpoint.authorizationHeader)).toBeNull()
+    expect(screen.queryByText(/transport/i)).toBeNull()
+    expect(screen.queryByText(/local server/i)).toBeNull()
+
+    fireEvent.click(screen.getByRole('menuitem', { name: /prøv igjen/i }))
+
+    await waitFor(() => expect(writeText).toHaveBeenCalledTimes(2))
+    expect(await screen.findByText(/instruksjoner kopiert/i)).toBeTruthy()
+    expect(screen.queryByText(endpoint.endpoint)).toBeNull()
+    expect(screen.queryByText(endpoint.authorizationHeader)).toBeNull()
   })
 
   it('returns Arcade-scoped read state with simplified Agent status', async () => {
