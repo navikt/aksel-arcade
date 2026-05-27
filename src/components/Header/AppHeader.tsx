@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import {
   Heading,
   Detail,
@@ -28,7 +28,6 @@ import {
 } from '@navikt/aksel-icons'
 import { SaveStatusIndicator } from './SaveStatusIndicator'
 import { ProjectSizeIndicator } from './ProjectSizeIndicator'
-import { AgentSessionMenu } from './AgentSessionMenu'
 import { useSettings } from '@/contexts/SettingsContext'
 import type { Project } from '@/types/project'
 import type { SaveStatus } from '@/hooks/useAutoSave'
@@ -44,6 +43,10 @@ import {
   type ShellCapabilities,
 } from '@/services/shellCapabilities'
 import './AppHeader.css'
+
+const AgentSessionMenu = lazy(() =>
+  import('./AgentSessionMenu').then((module) => ({ default: module.AgentSessionMenu }))
+)
 
 // Aksel Logo Mark SVG - 24x24px with brand-blue color
 const AkselLogoMark = () => (
@@ -505,7 +508,11 @@ export const AppHeader = ({
               </Popover>
             </>
           )}
-          {canUseAgentSessions && <AgentSessionMenu />}
+          {canUseAgentSessions && (
+            <Suspense fallback={null}>
+              <AgentSessionMenu />
+            </Suspense>
+          )}
           <ActionMenu>
             <ActionMenu.Trigger>
               <Button

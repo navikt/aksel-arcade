@@ -570,3 +570,17 @@ Completed in this branch:
 Verification completed with `npm run typecheck`, `npm run test -- --run`, `npm run type-check`, `npm run lint` (existing hook dependency warnings only), and browser smoke checks for Web default capabilities plus `VITE_AKSEL_ARCADE_SURFACE=desktop` Desktop capabilities.
 
 Next note: #56 should continue from the capability model instead of adding platform checks. Start with `src/services/shellCapabilities.ts` and `AppHeader` when proving Web Arcade has no Agent runtime, then keep Desktop transport work separate from Share URL behavior.
+
+### 2026-05-27 - #56 Gate Web Arcade Agent and Share surfaces
+
+Selected #56 as the highest-priority `ready-for-agent` feature from #56-#68 because #55 is closed, #56 is the earliest unblocked feature in the Desktop Agent transport dependency chain, and it unlocks the shared Agent bridge router work in #60. Worked only on #56.
+
+Completed in this branch:
+
+- Kept Web Arcade free of Agent controls and the browser-global Agent bridge while preserving the Web Share URL path.
+- Moved `AgentSessionMenu` behind a Desktop-capability-only lazy boundary in `AppHeader`, so Web Arcade does not mount or load the Agent session runtime path during normal rendering.
+- Strengthened integration coverage to prove Web Arcade can open the Share URL popover without publishing `window.__AKSEL_ARCADE_AGENT_BRIDGE__`, while Desktop capability tests still cover Agent access with Share URL absent.
+
+Verification completed with `npm run typecheck` and `npm run test`.
+
+Next note: #60 can now extract the bridge command router without needing to preserve a Web Arcade browser-global Agent surface. Keep the lazy/Desktop-only Agent menu boundary unless a later PRD explicitly reintroduces Web Agent access.

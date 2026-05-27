@@ -85,6 +85,8 @@ const renderHeader = (options?: HarnessProps) => {
   )
 }
 
+const findAgentAccessButton = () => screen.findByRole('button', { name: /agent access/i })
+
 const collectObjectKeys = (value: unknown): string[] => {
   if (!value || typeof value !== 'object') {
     return []
@@ -165,7 +167,7 @@ const captureAgentState = (bridge: AgentBridge) => {
 }
 
 const startAgentAccess = async () => {
-  fireEvent.click(screen.getByRole('button', { name: /agent access/i }))
+  fireEvent.click(await findAgentAccessButton())
   expect(await screen.findByText(/Gi agenter tilgang/i)).toBeTruthy()
   fireEvent.click(screen.getByRole('menuitemcheckbox', { name: /agent-tilgang/i }))
 
@@ -330,13 +332,14 @@ describe('ProjectControls layout', () => {
 
     expect(await screen.findByText(/Share URL length/i)).toBeTruthy()
     expect(screen.getByText(/Strategy:/i)).toBeTruthy()
+    expect(window.__AKSEL_ARCADE_AGENT_BRIDGE__).toBeUndefined()
   })
 
   it('keeps Desktop Arcade Agent access available and Share URL absent', async () => {
     renderHeader()
 
     const importButton = screen.getByRole('button', { name: /^import$/i })
-    const agentButton = screen.getByRole('button', { name: /agent access/i })
+    const agentButton = await findAgentAccessButton()
     const settingsButton = screen.getByRole('button', { name: /settings/i })
 
     expect(screen.queryByLabelText(/share project/i)).toBeNull()
@@ -360,7 +363,7 @@ describe('ProjectControls layout', () => {
 
     expect(window.__AKSEL_ARCADE_AGENT_BRIDGE__).toBeUndefined()
 
-    fireEvent.click(screen.getByRole('button', { name: /agent access/i }))
+    fireEvent.click(await findAgentAccessButton())
 
     expect(await screen.findByText(/Gi agenter tilgang/i)).toBeTruthy()
     expect(screen.getByText(/Klikk på knappen nedenfor/i)).toBeTruthy()
@@ -453,7 +456,7 @@ describe('ProjectControls layout', () => {
     renderHeader()
     expect(window.__AKSEL_ARCADE_AGENT_BRIDGE__).toBeUndefined()
 
-    fireEvent.click(screen.getByRole('button', { name: /agent access/i }))
+    fireEvent.click(await findAgentAccessButton())
     expect(
       (
         await screen.findByRole('menuitemcheckbox', {
@@ -473,7 +476,7 @@ describe('ProjectControls layout', () => {
 
     renderHeader()
 
-    fireEvent.click(screen.getByRole('button', { name: /agent access/i }))
+    fireEvent.click(await findAgentAccessButton())
     expect(await screen.findByText(/Gi agenter tilgang/i)).toBeTruthy()
 
     fireEvent.click(screen.getByRole('menuitem', { name: /kopier instruksjoner/i }))
@@ -505,7 +508,7 @@ describe('ProjectControls layout', () => {
   it('returns Arcade-scoped read state with simplified Agent status', async () => {
     renderHeader()
 
-    fireEvent.click(screen.getByRole('button', { name: /agent access/i }))
+    fireEvent.click(await findAgentAccessButton())
     expect(await screen.findByText(/Gi agenter tilgang/i)).toBeTruthy()
     fireEvent.click(
       screen.getByRole('menuitemcheckbox', {
@@ -795,7 +798,7 @@ describe('ProjectControls layout', () => {
   it('returns current project, preview, and permission state through captured bridge references', async () => {
     renderHeader()
 
-    fireEvent.click(screen.getByRole('button', { name: /agent access/i }))
+    fireEvent.click(await findAgentAccessButton())
     expect(await screen.findByText(/Gi agenter tilgang/i)).toBeTruthy()
     fireEvent.click(screen.getByRole('menuitemcheckbox', { name: /agent-tilgang/i }))
 
@@ -932,7 +935,7 @@ describe('ProjectControls layout', () => {
       )
     })
 
-    fireEvent.click(screen.getByRole('button', { name: /agent access/i }))
+    fireEvent.click(await findAgentAccessButton())
     fireEvent.click(
       await screen.findByRole('menuitem', {
         name: /restore first rapid change \(JSX\)/i,

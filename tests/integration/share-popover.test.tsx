@@ -112,6 +112,8 @@ const renderHeader = (
   )
 }
 
+const findAgentAccessButton = () => screen.findByRole('button', { name: /agent access/i })
+
 const normalizeWhitespace = (value: string): string => value.replace(/\s+/g, ' ').trim()
 const AGENT_CHECKPOINT_SUMMARY = 'Confidential checkpoint summary'
 const AGENT_ARTIFACT_KEY_PATTERN =
@@ -165,7 +167,7 @@ const readBlobText = (blob: Blob): Promise<string> =>
   })
 
 const startAgentAccess = async () => {
-  fireEvent.click(screen.getByRole('button', { name: /agent access/i }))
+  fireEvent.click(await findAgentAccessButton())
   expect(await screen.findByText(/Gi agenter tilgang/i)).toBeTruthy()
   fireEvent.click(screen.getByRole('menuitemcheckbox', { name: /agent-tilgang/i }))
 
