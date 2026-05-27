@@ -149,6 +149,7 @@ Inspect mode helps you understand your UI structure:
 
 ```bash
 npm run dev              # Start development server
+npm run desktop:dev      # Start macOS-first Desktop Arcade dev shell
 npm run build            # Build for production
 npm run preview          # Preview production build
 npm test                 # Run unit tests
@@ -160,19 +161,26 @@ npm run format           # Format code with Prettier
 
 ### Shell capability modes
 
-Web Arcade is the default dev mode: Share URL is available and Agent access is hidden. To preview the Desktop Arcade capability surface while the desktop shell is still being built, run:
+Web Arcade is the default dev mode: Share URL is available and Agent access is hidden. To launch the Desktop Arcade development shell, run:
+
+```bash
+npm run desktop:dev
+```
+
+The desktop script starts Vite on `127.0.0.1:5173` and opens an Electron shell around the same renderer. Desktop capabilities are supplied through a narrow preload IPC bridge, so React components stay browser-like: they receive the Desktop Arcade capability set without direct Node, socket, process, or filesystem access.
+
+To preview the same Desktop Arcade capability surface in a browser without Electron, run:
 
 ```bash
 VITE_AKSEL_ARCADE_SURFACE=desktop npm run dev
 ```
-
-Desktop capability mode shows Agent access and hides Share URL while preserving the shared editor and preview workspace.
 
 ### Tech Stack
 
 - **React 19** - UI framework
 - **TypeScript 5** - Type safety
 - **Vite** - Build tool and dev server
+- **Electron** - macOS-first Desktop Arcade development shell with narrow preload IPC
 - **CodeMirror 6** - Code editor
 - **Babel Standalone** - In-browser JSX transpilation
 - **@navikt/ds-react** - Aksel v8 React components
