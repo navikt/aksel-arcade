@@ -219,6 +219,29 @@ describe('desktop Agent transport protocol', () => {
     })
   })
 
+  it('does not expose Agent-triggered Checkpoint rollback methods', () => {
+    for (const method of ['restoreCheckpoint', 'deleteCheckpoint']) {
+      expect(
+        routeRequest({
+          id: `${method}-1`,
+          method,
+          params: {
+            checkpointId: 'checkpoint-1',
+          },
+          sessionId: session.id,
+        }).response
+      ).toMatchObject({
+        error: {
+          code: -32601,
+          message: expect.stringContaining(`Unsupported Agent transport method "${method}"`),
+          data: {
+            code: 'unsupported-method',
+          },
+        },
+      })
+    }
+  })
+
   it('returns structured errors for stale renderer sessions and revoked bridge sessions', () => {
     expect(
       routeRequest({
