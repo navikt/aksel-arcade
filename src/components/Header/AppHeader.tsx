@@ -39,6 +39,10 @@ import {
   type UseShareLinkOptions,
 } from '@/hooks/useShareLink'
 import { SHARE_URL_CHAR_LIMIT } from '@/utils/shareEncoding'
+import {
+  WEB_ARCADE_CAPABILITIES,
+  type ShellCapabilities,
+} from '@/services/shellCapabilities'
 import './AppHeader.css'
 
 // Aksel Logo Mark SVG - 24x24px with brand-blue color
@@ -70,6 +74,7 @@ interface AppHeaderProps {
   onLoadFormSummaryTemplate: () => void
   onLoadHooksDemo: () => void
   shareOptions?: UseShareLinkOptions
+  shellCapabilities?: ShellCapabilities
 }
 
 export const AppHeader = ({
@@ -84,6 +89,7 @@ export const AppHeader = ({
   onLoadFormSummaryTemplate,
   onLoadHooksDemo,
   shareOptions,
+  shellCapabilities = WEB_ARCADE_CAPABILITIES,
 }: AppHeaderProps) => {
   const MAX_PROJECT_SIZE = 5 * 1024 * 1024 // 5MB
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -102,6 +108,8 @@ export const AppHeader = ({
     markCopySuccess,
     markCopyFailure,
   } = useShareLink(shareOptions)
+  const canUseShareUrl = shellCapabilities.shareUrl.enabled
+  const canUseAgentSessions = shellCapabilities.agentSessions.enabled
 
   const handleExport = () => {
     exportProject(currentProject)
@@ -137,6 +145,10 @@ export const AppHeader = ({
   }
 
   const handleShareButtonClick = () => {
+    if (!canUseShareUrl) {
+      return
+    }
+
     if (shareOpen) {
       generateShareLink(true)
       return
@@ -150,10 +162,14 @@ export const AppHeader = ({
   }, [])
 
   useEffect(() => {
+    if (!canUseShareUrl) {
+      return
+    }
+
     return () => {
       resetShareState()
     }
-  }, [resetShareState])
+  }, [canUseShareUrl, resetShareState])
 
   const handleCopyClick = async (event: React.MouseEvent<HTMLButtonElement>) => {
     if (!shareState.link) {
@@ -244,7 +260,7 @@ export const AppHeader = ({
     ) : null
 
   useEffect(() => {
-    if (!shareOpen) {
+    if (!canUseShareUrl || !shareOpen) {
       lastGeneratedShareFingerprintRef.current = null
       return
     }
@@ -259,7 +275,13 @@ export const AppHeader = ({
 
     lastGeneratedShareFingerprintRef.current = shareDependenciesFingerprint
     generateShareLink()
-  }, [shareOpen, shareDependenciesFingerprint, isGeneratingShare, generateShareLink])
+  }, [
+    canUseShareUrl,
+    shareOpen,
+    shareDependenciesFingerprint,
+    isGeneratingShare,
+    generateShareLink,
+  ])
 
   return (
     <Box
@@ -339,143 +361,151 @@ export const AppHeader = ({
           >
             Import
           </Button>
-          <Button
-            variant="tertiary"
-            data-color="neutral"
-            size="small"
-            icon={<LinkIcon aria-hidden />}
-            onClick={handleShareButtonClick}
-            aria-label="Share project"
-            ref={shareButtonRef}
-            aria-expanded={shareOpen}
-          />
-          <Popover
-            open={shareOpen}
-            onClose={handleShareClose}
-            anchorEl={shareButtonRef.current}
-            placement="bottom-end"
-          >
-            <Popover.Content className="share-popover" data-testid="share-popover">
-              <VStack gap="space-12">
-                <Heading size="small" level="2">
-                  Share this prototype
-                </Heading>
-                {isGeneratingShare ? (
-                  <HStack gap="space-8" align="center" role="status" aria-live="polite">
-                    <Loader size="xsmall" title="Generating share link" />
-                    <VStack gap="space-4">
-                      <BodyLong size="small" id={loadingDescriptionId}>
-                        Link is being generated…
-                      </BodyLong>
-                      {shareState.showSlowGenerationNotice && (
-                        <Detail
-                          size="small"
-                          id={slowDescriptionId}
-                          className="share-popover__loader-apology"
-                        >
-                          This is taking longer than usual. Sorry for the wait!
-                        </Detail>
-                      )}
-                      {shareState.warningThresholdHit && (
-                        <Detail size="small" className="share-popover__loader-warning">
-                          Estimated size {formatCharCount(shareState.estimatedChars)} /{' '}
-                          {SHARE_URL_CHAR_LIMIT.toLocaleString()} characters.
-                        </Detail>
-                      )}
-                    </VStack>
-                  </HStack>
-                ) : (
-                  <>
-                    <BodyLong size="small">
-                      Generate a secure link so teammates can load this project without exporting
-                      JSON files.
-                    </BodyLong>
-                    <VStack gap="space-12">
-                      {shareState.status === 'error' && shareState.error && (
-                        <Alert variant="warning" size="small">
-                          <VStack gap="space-8">
-                            <BodyLong size="small">
-                              {getShareErrorMessage(shareState.error.code)}
-                            </BodyLong>
-                            <Button
-                              size="xsmall"
-                              variant="tertiary"
-                              onClick={() => {
-                                void generateShareLink()
-                              }}
-                              className="share-popover__retry"
+          {canUseShareUrl && (
+            <>
+              <Button
+                variant="tertiary"
+                data-color="neutral"
+                size="small"
+                icon={<LinkIcon aria-hidden />}
+                onClick={handleShareButtonClick}
+                aria-label="Share project"
+                ref={shareButtonRef}
+                aria-expanded={shareOpen}
+              />
+              <Popover
+                open={shareOpen}
+                onClose={handleShareClose}
+                anchorEl={shareButtonRef.current}
+                placement="bottom-end"
+              >
+                <Popover.Content className="share-popover" data-testid="share-popover">
+                  <VStack gap="space-12">
+                    <Heading size="small" level="2">
+                      Share this prototype
+                    </Heading>
+                    {isGeneratingShare ? (
+                      <HStack gap="space-8" align="center" role="status" aria-live="polite">
+                        <Loader size="xsmall" title="Generating share link" />
+                        <VStack gap="space-4">
+                          <BodyLong size="small" id={loadingDescriptionId}>
+                            Link is being generated…
+                          </BodyLong>
+                          {shareState.showSlowGenerationNotice && (
+                            <Detail
+                              size="small"
+                              id={slowDescriptionId}
+                              className="share-popover__loader-apology"
                             >
-                              Retry generation
-                            </Button>
-                          </VStack>
-                        </Alert>
-                      )}
-                      {showOversizeMessage ? (
-                        <Alert variant="warning" size="small" role="status">
-                          <VStack gap="space-12">
-                            <VStack gap="space-4">
-                              <BodyLong size="small">
-                                This project is too large for a share link. Use Export JSON instead.
-                              </BodyLong>
-                              {shareLengthDetailText && (
-                                <Detail size="small" className="share-popover__oversize-details">
-                                  {shareLengthDetailText}
-                                </Detail>
-                              )}
-                            </VStack>
-                            <Button
-                              size="xsmall"
-                              variant="primary"
-                              className="share-popover__oversize-cta"
-                              onClick={handleExport}
-                            >
-                              Use Export instead
-                            </Button>
-                          </VStack>
-                        </Alert>
-                      ) : (
-                        <CopyButton
-                          copyText={shareState.link ?? ''}
-                          text="Copy share link"
-                          activeText="Link copied"
-                          size="small"
-                          variant="neutral"
-                          disabled={shareState.status !== 'ready'}
-                          onClick={handleCopyClick}
-                        />
-                      )}
-                      {statusMessage && (
-                        <Detail
-                          size="small"
-                          className="share-popover__status"
-                          role="status"
-                          aria-live="polite"
-                        >
-                          {statusMessage}
-                        </Detail>
-                      )}
-                      {shareState.clipboardStatus === 'error' && (
-                        <BodyLong size="small" className="share-popover__error">
-                          {shareState.clipboardError ||
-                            'Clipboard permissions prevented automatic copy.'}
+                              This is taking longer than usual. Sorry for the wait!
+                            </Detail>
+                          )}
+                          {shareState.warningThresholdHit && (
+                            <Detail size="small" className="share-popover__loader-warning">
+                              Estimated size {formatCharCount(shareState.estimatedChars)} /{' '}
+                              {SHARE_URL_CHAR_LIMIT.toLocaleString()} characters.
+                            </Detail>
+                          )}
+                        </VStack>
+                      </HStack>
+                    ) : (
+                      <>
+                        <BodyLong size="small">
+                          Generate a secure link so teammates can load this project without
+                          exporting JSON files.
                         </BodyLong>
-                      )}
-                    </VStack>
-                    {shareMeta}
-                    <textarea
-                      ref={clipboardBufferRef}
-                      className="share-popover__clipboard-buffer"
-                      aria-hidden="true"
-                      tabIndex={-1}
-                      readOnly
-                      value={shareState.link ?? ''}
-                    />
-                  </>
-                )}
-              </VStack>
-            </Popover.Content>
-          </Popover>
-          <AgentSessionMenu />
+                        <VStack gap="space-12">
+                          {shareState.status === 'error' && shareState.error && (
+                            <Alert variant="warning" size="small">
+                              <VStack gap="space-8">
+                                <BodyLong size="small">
+                                  {getShareErrorMessage(shareState.error.code)}
+                                </BodyLong>
+                                <Button
+                                  size="xsmall"
+                                  variant="tertiary"
+                                  onClick={() => {
+                                    void generateShareLink()
+                                  }}
+                                  className="share-popover__retry"
+                                >
+                                  Retry generation
+                                </Button>
+                              </VStack>
+                            </Alert>
+                          )}
+                          {showOversizeMessage ? (
+                            <Alert variant="warning" size="small" role="status">
+                              <VStack gap="space-12">
+                                <VStack gap="space-4">
+                                  <BodyLong size="small">
+                                    This project is too large for a share link. Use Export JSON
+                                    instead.
+                                  </BodyLong>
+                                  {shareLengthDetailText && (
+                                    <Detail
+                                      size="small"
+                                      className="share-popover__oversize-details"
+                                    >
+                                      {shareLengthDetailText}
+                                    </Detail>
+                                  )}
+                                </VStack>
+                                <Button
+                                  size="xsmall"
+                                  variant="primary"
+                                  className="share-popover__oversize-cta"
+                                  onClick={handleExport}
+                                >
+                                  Use Export instead
+                                </Button>
+                              </VStack>
+                            </Alert>
+                          ) : (
+                            <CopyButton
+                              copyText={shareState.link ?? ''}
+                              text="Copy share link"
+                              activeText="Link copied"
+                              size="small"
+                              variant="neutral"
+                              disabled={shareState.status !== 'ready'}
+                              onClick={handleCopyClick}
+                            />
+                          )}
+                          {statusMessage && (
+                            <Detail
+                              size="small"
+                              className="share-popover__status"
+                              role="status"
+                              aria-live="polite"
+                            >
+                              {statusMessage}
+                            </Detail>
+                          )}
+                          {shareState.clipboardStatus === 'error' && (
+                            <BodyLong size="small" className="share-popover__error">
+                              {shareState.clipboardError ||
+                                'Clipboard permissions prevented automatic copy.'}
+                            </BodyLong>
+                          )}
+                        </VStack>
+                        {shareMeta}
+                        <textarea
+                          ref={clipboardBufferRef}
+                          className="share-popover__clipboard-buffer"
+                          aria-hidden="true"
+                          tabIndex={-1}
+                          readOnly
+                          value={shareState.link ?? ''}
+                        />
+                      </>
+                    )}
+                  </VStack>
+                </Popover.Content>
+              </Popover>
+            </>
+          )}
+          {canUseAgentSessions && <AgentSessionMenu />}
           <ActionMenu>
             <ActionMenu.Trigger>
               <Button

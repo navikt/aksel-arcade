@@ -554,3 +554,19 @@ Completed in this branch:
 - Updated integration coverage for the simplified menu, static checkbox label, all-on permission state, ActionMenu copy item, simplified status, metadata replacement default, and share/export fallback helper.
 
 Next note: #51 intentionally changes the earlier Agent session PRD assumption that project metadata is opt-in and permission toggles are user-visible. Future Agent ActionMenu work should treat the menu as a simple access/context surface unless a new issue reintroduces granular controls.
+
+### 2026-05-27 - #55 Capability-gate Web and Desktop Arcade
+
+Selected #55 as the highest-priority `ready-for-agent` feature from #55-#68 because it is unblocked and establishes the capability foundation that #56-#67 depend on. Worked only on #55.
+
+Completed in this branch:
+
+- Added `src/services/shellCapabilities.ts` with reusable Web Arcade and Desktop Arcade capability sets for Share URL, Agent sessions, and Arcade project package affordances.
+- Wired `App` and `AppHeader` to consume the capability model, defaulting to Web Arcade and supporting Desktop capability preview through `VITE_AKSEL_ARCADE_SURFACE=desktop`.
+- Kept Web Arcade Share URL available while hiding Agent access and avoiding a published browser-global Agent bridge.
+- Kept Desktop capability mode Agent access available while hiding the Share URL surface.
+- Added unit coverage for the capability matrix and integration coverage for Web-vs-Desktop header behavior; moved existing Agent bridge integration coverage onto Desktop capabilities.
+
+Verification completed with `npm run typecheck`, `npm run test -- --run`, `npm run type-check`, `npm run lint` (existing hook dependency warnings only), and browser smoke checks for Web default capabilities plus `VITE_AKSEL_ARCADE_SURFACE=desktop` Desktop capabilities.
+
+Next note: #56 should continue from the capability model instead of adding platform checks. Start with `src/services/shellCapabilities.ts` and `AppHeader` when proving Web Arcade has no Agent runtime, then keep Desktop transport work separate from Share URL behavior.

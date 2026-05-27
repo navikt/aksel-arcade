@@ -10,9 +10,17 @@ import { WarningNotification } from './components/Header/WarningNotification'
 import { SplitPane } from './components/Layout/SplitPane'
 import { validateProjectSize, clearStorage } from './services/storage'
 import type { Project } from './types/project'
+import {
+  getConfiguredShellCapabilities,
+  type ShellCapabilities,
+} from './services/shellCapabilities'
 import './App.css'
 
-function App() {
+interface AppProps {
+  shellCapabilities?: ShellCapabilities
+}
+
+function App({ shellCapabilities = getConfiguredShellCapabilities() }: AppProps) {
   const context = useContext(AppContext)
   if (!context) throw new Error('App must be used within AppProvider')
 
@@ -103,6 +111,7 @@ function App() {
           onClearStorage={clearStorage}
           onLoadFormSummaryTemplate={loadFormSummaryTemplate}
           onLoadHooksDemo={loadHooksDemo}
+          shellCapabilities={shellCapabilities}
         />
 
         <Box as="main" className="app-shell__workspace">

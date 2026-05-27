@@ -173,6 +173,12 @@ Web Arcade keeps Share URL as a web-only feature. Desktop Arcade does not offer 
 - E2E-test Web Arcade for regression safety: normal editing, preview, import/export, and Share URL behavior still work with Agent features disabled.
 - Prior art in the codebase includes unit tests for storage, share encoding/decoding, compression strategies, security message validation, snapshot packing, diagnostics, and Preview evidence; integration tests for header controls, share popovers, settings, sandbox behavior, Agent menu behavior, and inspection popovers; and Playwright E2E coverage for share links, themes, autocomplete, component palette behavior, inspect overlays, and sandboxed Aksel rendering.
 
+## Implementation Progress
+
+- 2026-05-27 - Issue #55 added `src/services/shellCapabilities.ts` as the reusable shell capability boundary for Web Arcade and Desktop Arcade. Web Arcade enables Share URL and disables Agent sessions; Desktop Arcade enables Agent sessions, disables Share URL, and keeps Arcade project package affordances explicit for the later package issues.
+- `App` now resolves the active capability set from `VITE_AKSEL_ARCADE_SURFACE`, defaulting to Web Arcade. `AppHeader` consumes capabilities instead of checking Electron, browser globals, or URL state, so the normal web surface shows Share URL without Agent access while Desktop capability mode shows Agent access without Share URL.
+- Added unit coverage for the Web/Desktop capability matrix and integration coverage for the header behavior in both capability modes. Existing Desktop Agent bridge coverage now runs against the Desktop capability set.
+
 ## Out of Scope
 
 - Editing the historical browser-only Agent sessions PRD.
