@@ -31,17 +31,14 @@ import { ProjectSizeIndicator } from './ProjectSizeIndicator'
 import { useSettings } from '@/contexts/SettingsContext'
 import type { Project } from '@/types/project'
 import type { SaveStatus } from '@/hooks/useAutoSave'
-import { exportProject, importProject } from '@/services/storage'
+import { ARCADE_PROJECT_IMPORT_ACCEPT, exportProject, importProject } from '@/services/storage'
 import {
   useShareLink,
   type ShareLinkErrorCode,
   type UseShareLinkOptions,
 } from '@/hooks/useShareLink'
 import { SHARE_URL_CHAR_LIMIT } from '@/utils/shareEncoding'
-import {
-  WEB_ARCADE_CAPABILITIES,
-  type ShellCapabilities,
-} from '@/services/shellCapabilities'
+import { WEB_ARCADE_CAPABILITIES, type ShellCapabilities } from '@/services/shellCapabilities'
 import './AppHeader.css'
 
 const AgentSessionMenu = lazy(() =>
@@ -565,7 +562,7 @@ export const AppHeader = ({
         <input
           ref={fileInputRef}
           type="file"
-          accept=".json,application/json"
+          accept={ARCADE_PROJECT_IMPORT_ACCEPT}
           onChange={handleFileChange}
           style={{ display: 'none' }}
           aria-label="Import project file"

@@ -760,3 +760,22 @@ Completed in this branch:
 Verification completed with `npm run typecheck`, `CI=1 npm run test`, `npm run lint` (existing warnings only), `npm run build`, targeted package/export Vitest coverage, and a browser smoke check that rendered the default preview and downloaded an `.akselarcade` package.
 
 Next note: #58 should add import support for this package envelope while preserving legacy `.json` import compatibility. Reuse `createArcadeProjectPackage`/the package constants from `src/services/storage.ts` instead of inventing a second package shape, and keep Agent session/transport fields ignored on import.
+
+### 2026-05-27 - #58 Import Arcade project packages and legacy JSON
+
+Selected #58 as the highest-priority `ready-for-agent` feature from #58, #66, and #67 because #57 is closed and #58 is the next unblocked package-sharing step. #66 remains the next Desktop transport Checkpoint feature, and #67 is blocked by both package import and Checkpoint rollback cleanliness. Worked only on #58.
+
+Completed in this branch:
+
+- Added `.akselarcade` package import support for the `aksel-arcade/project-package` envelope created by package export.
+- Kept legacy flat `.json` imports and pre-package nested JSON imports compatible with the same validation path.
+- Normalized imported projects to portable Arcade project fields only, assigning a fresh local id and timestamp on import.
+- Explicitly ignored Agent session, pairing credential, endpoint, permissions, Checkpoint, diagnostics, Preview evidence, and transport fields from package and legacy JSON payloads.
+- Updated the shared Import file picker to accept `.akselarcade`, the package MIME type, `.json`, and `application/json`.
+- Updated the Desktop Agent transport PRD implementation progress with the #58 package import work.
+
+Verification completed with `npm run typecheck`, `CI=1 npm run test`, targeted storage/header Vitest coverage, and a browser smoke check that exported a `.akselarcade` package and imported a `.akselarcade` package back into the workspace with no console errors.
+
+PR #80 review follow-up: tightened package-envelope detection from partial-field matching to requiring the full `format` + `formatVersion` + `project` envelope, so legacy nested JSON with unrelated `project` metadata still imports normally. Added storage coverage for that legacy metadata case and updated the PRD history in #53.
+
+Next note: #66 can proceed with human-controlled Checkpoints now that #65 is closed. Keep rollback human-only and do not let the Agent transport restore or delete Checkpoints. #67 should wait until #66 lands so package cleanliness after Agent sessions can cover read, change, stop, and human rollback cases.

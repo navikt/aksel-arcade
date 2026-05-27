@@ -19,6 +19,12 @@ export const ARCADE_PROJECT_PACKAGE_FORMAT_VERSION = 1
 export const ARCADE_PROJECT_PACKAGE_EXTENSION = '.akselarcade' as const
 export const ARCADE_PROJECT_PACKAGE_MIME_TYPE =
   'application/vnd.nav.aksel-arcade.project-package+json'
+export const ARCADE_PROJECT_IMPORT_ACCEPT = [
+  ARCADE_PROJECT_PACKAGE_EXTENSION,
+  ARCADE_PROJECT_PACKAGE_MIME_TYPE,
+  '.json',
+  'application/json',
+].join(',')
 
 export interface SaveResult {
   success: boolean
@@ -335,43 +341,10 @@ export const importProject = async (file: File): Promise<ImportResult> => {
       }
     }
 
-    // Extract project data from new or old format
+    // Extract portable project data from package or legacy JSON formats.
     let project: Project
     try {
-      if (imported && typeof imported === 'object') {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const obj = imported as Record<string, any>
-
-        // New format with nested structure
-        if ('code' in obj && 'ui' in obj) {
-          project = {
-            version: obj.version || CURRENT_VERSION,
-            id: obj.id,
-            name: obj.name,
-            jsxCode: obj.code.jsxCode,
-            hooksCode: obj.code.hooksCode,
-            viewportSize: obj.ui.viewportSize,
-            panelLayout: obj.ui.panelLayout,
-            createdAt: obj.createdAt,
-            lastModified: obj.lastModified,
-          }
-          // Note: obj.meta is completely ignored ✅
-        }
-        // Old flat format (backward compatibility)
-        else if ('jsxCode' in obj && 'hooksCode' in obj) {
-          if (obj.version !== CURRENT_VERSION) {
-            project = migrateProject(obj)
-          } else {
-            project = obj as Project
-          }
-        } else {
-          throw new Error('Unrecognized project format')
-        }
-
-        validateProjectSchema(project)
-      } else {
-        throw new Error('Invalid project data')
-      }
+      project = extractImportedProject(imported)
     } catch (error) {
       return {
         project: null,
@@ -381,8 +354,11 @@ export const importProject = async (file: File): Promise<ImportResult> => {
     }
 
     // Assign new ID and timestamp (treat as new project)
-    project.id = generateSecureUUID()
-    project.lastModified = new Date().toISOString()
+    project = {
+      ...project,
+      id: generateSecureUUID(),
+      lastModified: new Date().toISOString(),
+    }
 
     return {
       project,
@@ -396,6 +372,96 @@ export const importProject = async (file: File): Promise<ImportResult> => {
     }
   }
 }
+
+const extractImportedProject = (payload: unknown): Project => {
+  if (!isRecord(payload)) {
+    throw new Error('Invalid project data')
+  }
+
+  const packagedProject = extractArcadeProjectPackage(payload)
+  if (packagedProject) {
+    return packagedProject
+  }
+
+  if (isPortableProjectPayload(payload)) {
+    return buildProjectFromPortable(payload)
+  }
+
+  if ('jsxCode' in payload && 'hooksCode' in payload) {
+    return buildProjectFromLegacyJson(payload)
+  }
+
+  throw new Error('Unrecognized project format')
+}
+
+const extractArcadeProjectPackage = (payload: Record<string, unknown>): Project | null => {
+  const hasPackageShape = 'format' in payload && 'formatVersion' in payload && 'project' in payload
+  if (!hasPackageShape) {
+    return null
+  }
+
+  if (payload.format !== ARCADE_PROJECT_PACKAGE_FORMAT) {
+    throw new Error('Unsupported Arcade project package format')
+  }
+
+  if (payload.formatVersion !== ARCADE_PROJECT_PACKAGE_FORMAT_VERSION) {
+    throw new Error('Unsupported Arcade project package version')
+  }
+
+  return buildProjectFromPortable(payload.project)
+}
+
+const buildProjectFromPortable = (portable: unknown): Project => {
+  if (!isPortableProjectPayload(portable)) {
+    throw new Error('Project package is missing portable project content')
+  }
+
+  return normalizeImportedProject({
+    version:
+      typeof portable.version === 'string' && portable.version.trim()
+        ? portable.version
+        : CURRENT_VERSION,
+    id: portable.id,
+    name: portable.name,
+    createdAt: portable.createdAt,
+    lastModified: portable.lastModified,
+    jsxCode: portable.code.jsxCode,
+    hooksCode: portable.code.hooksCode,
+    viewportSize: portable.ui.viewportSize,
+    panelLayout: portable.ui.panelLayout,
+  })
+}
+
+const buildProjectFromLegacyJson = (legacyProject: Record<string, unknown>): Project => {
+  const project =
+    legacyProject.version === CURRENT_VERSION ? legacyProject : migrateProject(legacyProject)
+
+  return normalizeImportedProject(project)
+}
+
+const normalizeImportedProject = (project: unknown): Project => {
+  validateProjectSchema(project)
+  return copyProjectFields(project)
+}
+
+const copyProjectFields = (project: Project): Project => ({
+  version: project.version,
+  id: project.id,
+  name: project.name,
+  jsxCode: project.jsxCode,
+  hooksCode: project.hooksCode,
+  viewportSize: project.viewportSize,
+  panelLayout: project.panelLayout,
+  createdAt: project.createdAt,
+  lastModified: project.lastModified,
+})
+
+const isPortableProjectPayload = (
+  payload: unknown
+): payload is Record<string, unknown> & {
+  code: Record<string, unknown>
+  ui: Record<string, unknown>
+} => isRecord(payload) && isRecord(payload.code) && isRecord(payload.ui)
 
 export const clearStorage = (): void => {
   localStorage.removeItem(STORAGE_KEY)
@@ -434,6 +500,9 @@ export const createShareSnapshot = (
 }
 
 // Helper functions
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null
 
 const buildDefaultSnapshotFiles = (project: Project): ProjectFileSnapshot[] => {
   return [

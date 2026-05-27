@@ -24,6 +24,7 @@ import {
   WEB_ARCADE_CAPABILITIES,
   type ShellCapabilities,
 } from '@/services/shellCapabilities'
+import { ARCADE_PROJECT_IMPORT_ACCEPT } from '@/services/storage'
 
 const noop = () => {}
 
@@ -376,9 +377,11 @@ describe('ProjectControls layout', () => {
     renderHeader({ shellCapabilities: WEB_ARCADE_CAPABILITIES })
 
     const importButton = screen.getByRole('button', { name: /^import$/i })
+    const importInput = screen.getByLabelText(/import project file/i) as HTMLInputElement
     const shareButton = screen.getByLabelText(/share project/i)
     const settingsButton = screen.getByRole('button', { name: /settings/i })
 
+    expect(importInput.accept).toBe(ARCADE_PROJECT_IMPORT_ACCEPT)
     expect(screen.queryByRole('button', { name: /agent access/i })).toBeNull()
     expect(window.__AKSEL_ARCADE_AGENT_BRIDGE__).toBeUndefined()
     expect(

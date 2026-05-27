@@ -7,6 +7,7 @@ import {
   importProject,
   validateProjectSize,
   clearStorage,
+  ARCADE_PROJECT_IMPORT_ACCEPT,
   ARCADE_PROJECT_PACKAGE_EXTENSION,
   ARCADE_PROJECT_PACKAGE_FORMAT,
   ARCADE_PROJECT_PACKAGE_FORMAT_VERSION,
@@ -464,9 +465,9 @@ describe('Storage Service', () => {
 
   describe('importProject', () => {
     // Helper to create a mock File with working .text() method
-    const createMockFile = (content: string, filename: string): File => {
-      const blob = new Blob([content], { type: 'application/json' })
-      const file = new File([blob], filename, { type: 'application/json' })
+    const createMockFile = (content: string, filename: string, type = 'application/json'): File => {
+      const blob = new Blob([content], { type })
+      const file = new File([blob], filename, { type })
       // Add text() method for jsdom compatibility
       Object.defineProperty(file, 'text', {
         value: async () => content,
@@ -475,7 +476,7 @@ describe('Storage Service', () => {
     }
 
     it('should validate and load JSON file', async () => {
-      const project: Project = {
+      const project = {
         id: crypto.randomUUID(),
         name: 'Import Test',
         jsxCode: '<Box>Imported</Box>',
@@ -485,7 +486,10 @@ describe('Storage Service', () => {
         version: '1.0.0',
         createdAt: new Date().toISOString(),
         lastModified: new Date().toISOString(),
-      }
+        agentSession: { credential: 'legacy-credential-secret' },
+        diagnostics: [{ message: 'legacy-diagnostic-secret' }],
+        transport: { endpoint: 'http://127.0.0.1:4321' },
+      } satisfies Project & Record<string, unknown>
 
       const json = JSON.stringify(project)
       const file = createMockFile(json, 'test.json')
@@ -493,6 +497,7 @@ describe('Storage Service', () => {
       const result = await importProject(file)
 
       expect(result.success).toBe(true)
+      expect(result.error).toBeUndefined()
       expect(result.project).toBeTruthy()
       expect(result.project!.name).toBe('Import Test')
       expect(result.project!.jsxCode).toBe('<Box>Imported</Box>')
@@ -504,6 +509,106 @@ describe('Storage Service', () => {
       const lastModified = new Date(result.project!.lastModified)
       expect(lastModified.getTime()).toBeGreaterThanOrEqual(
         new Date(project.lastModified).getTime()
+      )
+      expect(JSON.stringify(result.project)).not.toContain('legacy-credential-secret')
+      expect(JSON.stringify(result.project)).not.toContain('legacy-diagnostic-secret')
+      expect(JSON.stringify(result.project)).not.toContain('http://127.0.0.1:4321')
+      expect(collectObjectKeys(result.project).join(' ')).not.toMatch(
+        /agent|session|credential|endpoint|permission|checkpoint|diagnostic|evidence|transport/i
+      )
+    })
+
+    it('should import Arcade project packages from .akselarcade files', async () => {
+      const sourceProject = createTestProject({
+        name: 'Package Import Test',
+        jsxCode: '<VStack><Heading>Packaged</Heading></VStack>',
+        hooksCode: 'export const usePackaged = () => "ok"',
+        viewportSize: 'XL',
+        panelLayout: 'editor-right',
+        createdAt: '2026-05-20T00:00:00.000Z',
+        lastModified: '2026-05-21T00:00:00.000Z',
+      })
+      const packageData = createArcadeProjectPackage(sourceProject, {
+        includeAIMeta: false,
+        exportedAt: '2026-05-22T00:00:00.000Z',
+      })
+      const packageWithLocalState = {
+        ...packageData,
+        agentSession: {
+          id: 'agent-session-secret',
+          credential: 'credential-secret',
+          endpoint: 'http://127.0.0.1:1234',
+        },
+        project: {
+          ...packageData.project,
+          checkpoints: [{ id: 'checkpoint-secret' }],
+          diagnostics: [{ message: 'diagnostic-secret' }],
+          previewEvidence: { dom: 'evidence-secret' },
+          transport: { token: 'transport-secret' },
+        },
+      }
+
+      const file = createMockFile(
+        JSON.stringify(packageWithLocalState),
+        'package-import.akselarcade',
+        ARCADE_PROJECT_PACKAGE_MIME_TYPE
+      )
+
+      const result = await importProject(file)
+
+      expect(result.success).toBe(true)
+      expect(result.error).toBeUndefined()
+      expect(result.project).toMatchObject({
+        name: 'Package Import Test',
+        jsxCode: '<VStack><Heading>Packaged</Heading></VStack>',
+        hooksCode: 'export const usePackaged = () => "ok"',
+        viewportSize: 'XL',
+        panelLayout: 'editor-right',
+        version: '1.0.0',
+        createdAt: '2026-05-20T00:00:00.000Z',
+      })
+      expect(result.project!.id).not.toBe(sourceProject.id)
+      expect(new Date(result.project!.lastModified).getTime()).toBeGreaterThanOrEqual(
+        new Date(sourceProject.lastModified).getTime()
+      )
+      expect(JSON.stringify(result.project)).not.toMatch(
+        /agent-session-secret|credential-secret|127\.0\.0\.1|checkpoint-secret|diagnostic-secret|evidence-secret|transport-secret/
+      )
+      expect(collectObjectKeys(result.project).join(' ')).not.toMatch(
+        /agent|session|credential|endpoint|permission|checkpoint|diagnostic|evidence|transport/i
+      )
+    })
+
+    it('should keep importing pre-package nested JSON exports', async () => {
+      const sourceProject = createTestProject({
+        name: 'Nested JSON Import Test',
+        jsxCode: '<Box>Nested JSON</Box>',
+        hooksCode: 'export const useNested = () => true',
+        viewportSize: 'XS',
+        panelLayout: 'editor-left',
+      })
+      const legacyNestedJson = {
+        ...createArcadeProjectPackage(sourceProject, { includeAIMeta: false }).project,
+        meta: { agentSession: 'nested-meta-secret' },
+        project: { owner: 'legacy-project-metadata' },
+        transport: { endpoint: 'http://127.0.0.1:9999' },
+      }
+
+      const file = createMockFile(JSON.stringify(legacyNestedJson), 'legacy-nested.json')
+
+      const result = await importProject(file)
+
+      expect(result.success).toBe(true)
+      expect(result.error).toBeUndefined()
+      expect(result.project).toMatchObject({
+        name: 'Nested JSON Import Test',
+        jsxCode: '<Box>Nested JSON</Box>',
+        hooksCode: 'export const useNested = () => true',
+        viewportSize: 'XS',
+        panelLayout: 'editor-left',
+      })
+      expect(JSON.stringify(result.project)).not.toMatch(
+        /nested-meta-secret|legacy-project-metadata|127\.0\.0\.1/
       )
     })
 
@@ -525,6 +630,13 @@ describe('Storage Service', () => {
 
       expect(result.success).toBe(false)
       expect(result.error).toContain('Validation failed')
+    })
+
+    it('should expose package and legacy JSON import file types', () => {
+      expect(ARCADE_PROJECT_IMPORT_ACCEPT).toContain(ARCADE_PROJECT_PACKAGE_EXTENSION)
+      expect(ARCADE_PROJECT_IMPORT_ACCEPT).toContain(ARCADE_PROJECT_PACKAGE_MIME_TYPE)
+      expect(ARCADE_PROJECT_IMPORT_ACCEPT).toContain('.json')
+      expect(ARCADE_PROJECT_IMPORT_ACCEPT).toContain('application/json')
     })
   })
 
