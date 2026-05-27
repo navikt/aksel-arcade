@@ -1,5 +1,6 @@
 import type {
   DesktopAgentSessionEndReason,
+  DesktopAgentTransportEndpoint,
   DesktopAgentTransportSession,
 } from './desktopAgentSessionCoordinator'
 
@@ -30,12 +31,6 @@ export interface DesktopArcadePreloadApi {
     sessionId: string,
     reason: DesktopAgentSessionEndReason
   ) => Promise<unknown>
-}
-
-export interface DesktopAgentTransportEndpoint {
-  endpoint: string
-  sessionId: string
-  authorizationHeader: string
 }
 
 export const WEB_ARCADE_CAPABILITIES: ShellCapabilities = Object.freeze({

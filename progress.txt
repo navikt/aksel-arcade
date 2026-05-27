@@ -663,3 +663,17 @@ Completed in this branch:
 Verification completed with `npm run typecheck`, `CI=1 npm run test`, `npm run build`, `npm run lint` (existing warnings only), desktop script syntax checks, and a browser smoke/console check at the local Vite URL.
 
 Next note: #63 should route authenticated JSON-RPC method names through `createAgentBridgeCommandRouter` rather than adding a second command contract. Keep the main-process transport as lifecycle/auth only, continue rejecting filesystem, shell, Share URL, export/import, package, rollback, and window-management methods, and keep credentials in the Authorization header only.
+
+### 2026-05-27 - #62 follow-up: expose copied loopback auth details
+
+Fixed after manual Desktop Agent testing showed copied instructions still contained only the older browser-global bridge text:
+
+- Carried the active `DesktopAgentTransportEndpoint` returned by preload IPC through the coordinator and `useAgentSession`.
+- Added a minimal hidden transport section to copied Agent instructions with the loopback endpoint, `Authorization: Bearer ...` header, JSON-RPC POST guidance, and an example request.
+- Kept the visible Agent menu from rendering the endpoint or credential; these details are only in the copied instructions while Agent access is active.
+- Left actual JSON-RPC command routing for #63 and copied-instruction product polish for #64.
+- Added regression coverage for active Desktop copied instructions containing endpoint/Auth details without visible UI leakage.
+
+Verification completed with `npm run typecheck`, `CI=1 npm run test`, `npm run build`, `npm run lint` (existing warnings only), and a Desktop Arcade dev smoke test. The desktop smoke test copied instructions from the running app, sent a JSON-RPC request with the copied Authorization header and got a structured `unsupported-method` response, verified missing/wrong auth failures, rejected query-token usage, rejected a non-loopback interface request, and confirmed the endpoint shut down after stopping Agent access.
+
+Next note: #63 should now be able to reuse the copied endpoint/Auth instructions and focus only on routing supported read methods through `createAgentBridgeCommandRouter`.

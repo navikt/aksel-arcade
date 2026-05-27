@@ -12,6 +12,13 @@ export type DesktopAgentSessionEndReason = 'stop' | 'reload' | 'quit' | 'rendere
 export interface DesktopAgentSessionSnapshot extends AgentBridgeSession {
   status: 'active'
   permissions: AgentPermissions
+  transportEndpoint?: DesktopAgentTransportEndpoint
+}
+
+export interface DesktopAgentTransportEndpoint {
+  endpoint: string
+  sessionId: string
+  authorizationHeader: string
 }
 
 export interface DesktopAgentTransportSession extends DesktopAgentSessionSnapshot {
@@ -19,7 +26,9 @@ export interface DesktopAgentTransportSession extends DesktopAgentSessionSnapsho
 }
 
 export interface DesktopAgentTransportAdapter {
-  startSession?: (session: DesktopAgentTransportSession) => void | Promise<void>
+  startSession?: (
+    session: DesktopAgentTransportSession
+  ) => DesktopAgentTransportEndpoint | void | Promise<DesktopAgentTransportEndpoint | void>
   stopSession?: (
     session: DesktopAgentTransportSession,
     reason: DesktopAgentSessionEndReason
@@ -111,19 +120,35 @@ export const createDesktopAgentSessionCoordinator = ({
       activeSession = nextSession
 
       try {
-        await transportAdapter?.startSession?.(cloneTransportSession(nextSession))
+        const transportEndpoint = await transportAdapter?.startSession?.(
+          cloneTransportSession(nextSession)
+        )
+        if (transportEndpoint) {
+          activeSession = {
+            ...nextSession,
+            transportEndpoint: cloneTransportEndpoint(transportEndpoint),
+          }
+        }
       } catch (error) {
         activeSession = null
         throw error
       }
 
-      return toSessionSnapshot(nextSession)
+      return toSessionSnapshot(activeSession)
     },
     stopSession,
   }
 }
 
 const clonePermissions = (permissions: AgentPermissions): AgentPermissions => ({ ...permissions })
+
+const cloneTransportEndpoint = (
+  endpoint: DesktopAgentTransportEndpoint
+): DesktopAgentTransportEndpoint => ({
+  endpoint: endpoint.endpoint,
+  sessionId: endpoint.sessionId,
+  authorizationHeader: endpoint.authorizationHeader,
+})
 
 const isPromiseLike = (value: unknown): value is Promise<unknown> =>
   typeof value === 'object' &&
@@ -136,11 +161,13 @@ const toSessionSnapshot = ({
   startedAt,
   status,
   permissions,
+  transportEndpoint,
 }: DesktopAgentTransportSession): DesktopAgentSessionSnapshot => ({
   id,
   startedAt,
   status,
   permissions: clonePermissions(permissions),
+  ...(transportEndpoint ? { transportEndpoint: cloneTransportEndpoint(transportEndpoint) } : {}),
 })
 
 const cloneTransportSession = (

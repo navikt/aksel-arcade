@@ -305,11 +305,13 @@ describe('ProjectControls layout', () => {
     vi.clearAllMocks()
     window.localStorage.clear()
     delete window.__AKSEL_ARCADE_AGENT_BRIDGE__
+    delete window.__AKSEL_ARCADE_DESKTOP__
   })
 
   afterEach(() => {
     vi.restoreAllMocks()
     delete window.__AKSEL_ARCADE_AGENT_BRIDGE__
+    delete window.__AKSEL_ARCADE_DESKTOP__
   })
 
   it('keeps Web Arcade Share URL available and Agent access absent', async () => {
@@ -506,6 +508,46 @@ describe('ProjectControls layout', () => {
     expect(instructions).toMatch(/human must start temporary Agent access/i)
     expect(instructions).toMatch(/Arcade authoring contract/i)
     expect(instructions).toMatch(/import-free Arcade JSX and Hooks code/i)
+    expect(instructions).not.toMatch(/Desktop loopback JSON-RPC transport/i)
+  })
+
+  it('copies active Desktop loopback endpoint and Authorization header in hidden instructions', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined)
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText },
+    })
+    const sessionId = '11111111-1111-4111-8111-111111111111'
+    const endpoint = {
+      endpoint: 'http://127.0.0.1:48123',
+      sessionId,
+      authorizationHeader: 'Bearer copied-agent-secret',
+    }
+    window.__AKSEL_ARCADE_DESKTOP__ = {
+      getShellCapabilities: vi.fn().mockResolvedValue(DESKTOP_ARCADE_CAPABILITIES),
+      startAgentTransportSession: vi.fn().mockResolvedValue(endpoint),
+      stopAgentTransportSession: vi.fn().mockResolvedValue(true),
+    }
+    vi.spyOn(globalThis.crypto, 'randomUUID').mockReturnValue(sessionId)
+
+    renderHeader()
+
+    await startAgentAccess()
+    fireEvent.click(screen.getByRole('menuitem', { name: /kopier instruksjoner/i }))
+
+    await waitFor(() => expect(writeText).toHaveBeenCalledTimes(1))
+
+    const instructions = writeText.mock.calls[0]?.[0] ?? ''
+    expect(window.__AKSEL_ARCADE_DESKTOP__.startAgentTransportSession).toHaveBeenCalledTimes(1)
+    expect(instructions).toContain('Desktop loopback JSON-RPC transport')
+    expect(instructions).toContain(`Endpoint: ${endpoint.endpoint}`)
+    expect(instructions).toContain(`Authorization: ${endpoint.authorizationHeader}`)
+    expect(instructions).toContain('"jsonrpc":"2.0"')
+    expect(instructions).toMatch(/query parameters/i)
+    expect(instructions).not.toMatch(/[?&](token|credential|authorization)=/i)
+    expect(screen.queryByText(endpoint.endpoint)).toBeNull()
+    expect(screen.queryByText(endpoint.authorizationHeader)).toBeNull()
+
   })
 
   it('returns Arcade-scoped read state with simplified Agent status', async () => {

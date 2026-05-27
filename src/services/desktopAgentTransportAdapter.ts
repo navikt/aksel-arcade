@@ -1,10 +1,10 @@
 import {
   getDesktopPreloadApi,
-  type DesktopAgentTransportEndpoint,
   type DesktopArcadePreloadApi,
 } from './shellCapabilities'
 import type {
   DesktopAgentTransportAdapter,
+  DesktopAgentTransportEndpoint,
   DesktopAgentTransportSession,
 } from './desktopAgentSessionCoordinator'
 
@@ -22,6 +22,7 @@ export const createDesktopPreloadAgentTransportAdapter = (
       if (!isValidTransportEndpoint(endpoint, session.id)) {
         throw new Error('Invalid Desktop Agent transport endpoint returned from preload IPC.')
       }
+      return endpoint
     },
     stopSession: async (session, reason) => {
       await stopAgentTransportSession(session.id, reason)

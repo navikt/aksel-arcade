@@ -83,6 +83,41 @@ describe('desktopAgentSessionCoordinator', () => {
     expect(startedSessions).toHaveLength(1)
   })
 
+  it('returns hidden transport endpoint details without exposing the pairing credential', async () => {
+    const coordinator = createDesktopAgentSessionCoordinator({
+      createSessionId: () => 'agent-session-1',
+      createPairingCredential: () => 'credential-1',
+      createTimestamp: () => '2026-05-27T08:00:00.000Z',
+      transportAdapter: {
+        startSession: (session) => ({
+          endpoint: 'http://127.0.0.1:48123',
+          sessionId: session.id,
+          authorizationHeader: `Bearer ${session.pairingCredential}`,
+        }),
+      },
+    })
+
+    const session = await coordinator.startSession()
+
+    expect(session).toEqual({
+      id: 'agent-session-1',
+      startedAt: '2026-05-27T08:00:00.000Z',
+      status: 'active',
+      permissions: DEFAULT_AGENT_PERMISSIONS,
+      transportEndpoint: {
+        endpoint: 'http://127.0.0.1:48123',
+        sessionId: 'agent-session-1',
+        authorizationHeader: 'Bearer credential-1',
+      },
+    })
+    expect(session).not.toHaveProperty('pairingCredential')
+    expect(coordinator.getActiveTransportSession()).toMatchObject({
+      id: 'agent-session-1',
+      pairingCredential: 'credential-1',
+      transportEndpoint: session.transportEndpoint,
+    })
+  })
+
   it('invalidates session state and credentials on stop before allowing a new session', async () => {
     const { coordinator, stoppedSessions } = createDeterministicCoordinator()
 
