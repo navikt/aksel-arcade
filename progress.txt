@@ -835,3 +835,19 @@ Completed in this branch:
 Verification completed with `npm run typecheck` and `CI=1 npm run test`.
 
 Next note: #68 is validation-only. Follow-up #83 should clarify copied instructions around waiting for post-change diagnostics/evidence after `applySourceChange`, and #84 should investigate structured diagnostics for React render failures that currently only show up in sandbox console output. Both follow-ups should avoid changing the provider-neutral protocol or adding Copilot-specific behavior.
+
+### 2026-05-28 - #88 Add getAgentInstructions Agent bridge command
+
+Selected #88 as the highest-priority `ready-for-agent` feature from #88-#91 because #89, #90, and #91 are all blocked by #88. Worked only on #88.
+
+Completed in this branch:
+
+- Added read-only `getAgentInstructions` to the Agent bridge command names, read command names, browser bridge wrapper, Desktop transport protocol routing, and `getSessionState` command metadata.
+- Added a versioned `getAgentInstructions` payload with English instruction markdown plus machine-readable session id, endpoint, Authorization header, permissions, read scope, supported command names, JSON-RPC protocol metadata, and an Arcade authoring contract summary.
+- Kept the payload scoped to active-session guidance only: no Arcade project name/source, diagnostics, Preview evidence, Checkpoints, package data, storage data, or Aksel Design System tutorial content.
+- Preserved existing inactive, revoked, stale-session, and unauthenticated transport failure paths, with explicit coverage for endpoint-less bridge calls and revoked instruction reads.
+- Added unit and integration coverage for command-list exposure, successful Desktop transport routing, excluded project content, and existing stale/revoked behavior.
+
+Verification completed with `npm run typecheck` and `CI=1 npm run test -- --run` after installing dependencies with `npm ci` and using `/opt/homebrew/bin` for the local Node/npm toolchain.
+
+Next note: #89 is now unblocked. It should replace the long copied instructions with a one-line `curl` bootstrap command that calls `getAgentInstructions`, keeps credentials in the Authorization header only, and relies on the same stop/reload invalidation boundary.

@@ -17,6 +17,11 @@ import type { PreviewDiagnostics } from '@/services/previewDiagnostics'
 const session = {
   id: 'agent-session-1',
   startedAt: '2026-05-27T08:00:00.000Z',
+  transportEndpoint: {
+    endpoint: 'http://127.0.0.1:48123',
+    sessionId: 'agent-session-1',
+    authorizationHeader: 'Bearer agent-secret-1',
+  },
 }
 
 const diagnostics: PreviewDiagnostics = {
@@ -139,6 +144,35 @@ describe('desktop Agent transport protocol', () => {
     })
   })
 
+  it('routes authenticated getAgentInstructions without project content', () => {
+    const response = routeRequest({
+      id: 'instructions-1',
+      method: 'getAgentInstructions',
+      params: {},
+      sessionId: session.id,
+    }).response
+
+    expect(response).toMatchObject({
+      jsonrpc: '2.0',
+      id: 'instructions-1',
+      result: {
+        ok: true,
+        command: 'getAgentInstructions',
+        data: {
+          version: 1,
+          sessionId: session.id,
+          endpoint: session.transportEndpoint.endpoint,
+          authorizationHeader: session.transportEndpoint.authorizationHeader,
+          permissions: DEFAULT_AGENT_PERMISSIONS,
+          readScope: 'arcade-session',
+        },
+      },
+    })
+    expect(JSON.stringify(response)).not.toContain(readContext.project.name)
+    expect(JSON.stringify(response)).not.toContain(readContext.project.jsxCode)
+    expect(JSON.stringify(response)).not.toContain('sandboxConsoleMessages')
+  })
+
   it('routes authenticated applySourceChange params through the Agent bridge router', () => {
     const params = {
       summary: 'Transport update',
@@ -211,7 +245,7 @@ describe('desktop Agent transport protocol', () => {
       error: {
         code: -32601,
         message:
-          'Unsupported Agent transport method "openShell". Supported methods: getProject, getPreviewContext, getDiagnostics, getPreviewEvidence, getSessionState, applySourceChange.',
+          'Unsupported Agent transport method "openShell". Supported methods: getAgentInstructions, getProject, getPreviewContext, getDiagnostics, getPreviewEvidence, getSessionState, applySourceChange.',
         data: {
           code: 'unsupported-method',
         },
@@ -281,5 +315,24 @@ describe('desktop Agent transport protocol', () => {
       },
     })
     expect(appliedRequests).toEqual([])
+
+    expect(
+      routeRequest(
+        {
+          id: 'revoked-instructions-1',
+          method: 'getAgentInstructions',
+          sessionId: session.id,
+        },
+        false
+      ).response
+    ).toMatchObject({
+      error: {
+        code: -32002,
+        data: {
+          code: 'session-revoked',
+          command: 'getAgentInstructions',
+        },
+      },
+    })
   })
 })
