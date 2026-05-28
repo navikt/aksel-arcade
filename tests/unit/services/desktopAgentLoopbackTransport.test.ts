@@ -16,6 +16,11 @@ const {
     options?: AgentLoopbackJsonRpcTransportOptions
   ) => AgentLoopbackJsonRpcTransport
 } = require('../../../desktop/agentLoopbackTransport.cjs')
+const {
+  redactAgentHandoffSecrets: redactDesktopAgentHandoffSecrets,
+}: {
+  redactAgentHandoffSecrets: (value: string) => string
+} = require('../../../desktop/agentHandoffRedaction.cjs')
 
 interface AgentLoopbackJsonRpcTransport {
   startSession: (session: DesktopAgentTransportSession) => Promise<{
@@ -349,6 +354,23 @@ describe('desktop Agent loopback JSON-RPC transport', () => {
     expect(serializedBody).not.toContain(endpoint.endpoint)
     expect(serializedBody).not.toContain(endpoint.authorizationHeader)
     expect(serializedBody).not.toContain('agent-secret-1')
+  })
+
+  it('redacts stringified pairing credentials and fetched instructions in desktop errors', () => {
+    const redacted = redactDesktopAgentHandoffSecrets(
+      JSON.stringify({
+        pairingCredential: 'raw-pairing-secret',
+        instructionsMarkdown:
+          'Aksel Arcade Agent pairing handoff\nEndpoint: http://127.0.0.1:48123\nAuthorization: Bearer copied-agent-secret',
+      })
+    )
+
+    expect(redacted).toContain('[redacted Agent pairing handoff]')
+    expect(redacted).not.toContain('[redacted]]')
+    expect(redacted).not.toContain('raw-pairing-secret')
+    expect(redacted).not.toContain('Aksel Arcade Agent pairing handoff')
+    expect(redacted).not.toContain('http://127.0.0.1:48123')
+    expect(redacted).not.toContain('Bearer copied-agent-secret')
   })
 
   it('shuts down the endpoint when Agent access ends', async () => {

@@ -888,3 +888,12 @@ Completed in this branch:
 - Added regression coverage for redaction helpers, copy failure logging, async transport stop logging, instruction fetch failure responses, and the existing package export / rollback / import flow after an active Agent session.
 
 Verification completed with `npm run typecheck`, `CI=1 npm run test`, and `npm run lint` (passes with the existing React hook dependency warnings in `InspectionPopover` and `PreviewPane`).
+
+### 2026-05-28 - PR #96 review follow-up
+
+Fixed one scoped review finding before merge:
+
+- Brought the Desktop CJS Agent handoff redactor to parity with the renderer redactor for stringified `pairingCredential` and `instructionsMarkdown` fields.
+- Added regression coverage proving Desktop-side redaction marks redacted content and removes stringified pairing credentials, fetched instruction markdown, endpoint, and Authorization header content.
+
+Verification completed with `npm run typecheck`, `CI=1 npm run test`, and `npm run lint` (passes with the existing React hook dependency warnings in `InspectionPopover` and `PreviewPane`).
