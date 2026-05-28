@@ -25,7 +25,7 @@ A Desktop Arcade-only revocable, consent-gated pairing relationship where an aut
 _Avoid_: Chat, bot session, automation session
 
 **Agent access**:
-The user-facing consent state for giving an **External agent** access to the current **Arcade project** through an **Agent session**.
+The human-controlled on/off consent state that makes the current **Arcade project** available for explicit **Agent pairing** during an **Agent session**.
 _Avoid_: Local server, transport, pairing token
 
 **Agent bridge**:
@@ -37,8 +37,12 @@ The Desktop Arcade-only same-device mechanism an **External agent** uses to reac
 _Avoid_: Agent bridge, permission model, browser access
 
 **Agent pairing**:
-The user-approved act of giving an **External agent** access to one active **Agent session** through an **Agent pairing credential**.
-_Avoid_: Installation, login, persistent trust
+The deliberate user-approved link between one **External agent** and one active **Agent session** through an **Agent pairing credential**.
+_Avoid_: Installation, login, persistent trust, implicit local trust
+
+**Agent pairing handoff**:
+The human-mediated transfer that gives an **External agent** what it needs to complete **Agent pairing** for one active **Agent session**.
+_Avoid_: Agent discovery, provider push, persistent setup
 
 **Agent pairing credential**:
 A short-lived secret that authorizes one **External agent** to use the **Agent transport** for one active **Agent session**.
@@ -77,6 +81,10 @@ A human-restorable safety point captured before an **Agent change** during an **
 _Avoid_: Version, revision, commit
 
 ## Example dialogue
+
+Developer: "The human started Agent access and copied an Agent pairing handoff to the external agent."
+
+Domain expert: "Good. That pairs the agent with this active Arcade project only; it is not persistent trust."
 
 Developer: "The agent session applied an agent change to the Arcade project."
 
