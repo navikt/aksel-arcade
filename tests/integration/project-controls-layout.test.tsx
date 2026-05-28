@@ -536,6 +536,7 @@ describe('ProjectControls layout', () => {
         projectMetadata: true,
       },
       commandNames: [
+        'getAgentInstructions',
         'getProject',
         'getPreviewContext',
         'getDiagnostics',
@@ -544,6 +545,7 @@ describe('ProjectControls layout', () => {
         'applySourceChange',
       ],
     })
+    expect(activeBridge?.getAgentInstructions).toEqual(expect.any(Function))
     expect(activeBridge?.getProject).toEqual(expect.any(Function))
     expect(activeBridge?.getPreviewContext).toEqual(expect.any(Function))
     expect(activeBridge?.getDiagnostics).toEqual(expect.any(Function))
@@ -622,6 +624,7 @@ describe('ProjectControls layout', () => {
 
     const instructions = writeText.mock.calls[0]?.[0] ?? ''
     expect(instructions).toContain('window.__AKSEL_ARCADE_AGENT_BRIDGE__')
+    expect(instructions).toContain('getAgentInstructions()')
     expect(instructions).toContain('getProject()')
     expect(instructions).toContain('getPreviewContext()')
     expect(instructions).toContain('getDiagnostics()')
@@ -681,7 +684,7 @@ describe('ProjectControls layout', () => {
     expect(instructions).toContain(`Authorization: ${endpoint.authorizationHeader}`)
     expect(instructions).toMatch(/Authorization header/i)
     expect(instructions).toContain(
-      'Supported JSON-RPC methods: getProject, getPreviewContext, getDiagnostics, getPreviewEvidence, getSessionState, applySourceChange.'
+      'Supported JSON-RPC methods: getAgentInstructions, getProject, getPreviewContext, getDiagnostics, getPreviewEvidence, getSessionState, applySourceChange.'
     )
     expect(instructions).toContain('"method":"applySourceChange"')
     expect(instructions).toMatch(
@@ -709,6 +712,27 @@ describe('ProjectControls layout', () => {
         expect.any(Function)
       )
     )
+
+    await expect(
+      desktopTransport.route({
+        id: 'instructions-1',
+        method: 'getAgentInstructions',
+      })
+    ).resolves.toMatchObject({
+      jsonrpc: '2.0',
+      id: 'instructions-1',
+      result: {
+        ok: true,
+        command: 'getAgentInstructions',
+        data: {
+          version: 1,
+          sessionId: desktopTransport.endpoint.sessionId,
+          endpoint: desktopTransport.endpoint.endpoint,
+          authorizationHeader: desktopTransport.endpoint.authorizationHeader,
+          readScope: 'arcade-session',
+        },
+      },
+    })
 
     const nextJsx = 'export default function App() { return <Heading>Transport update</Heading> }'
     const acceptedResponse = await desktopTransport.route({
@@ -1197,6 +1221,7 @@ describe('ProjectControls layout', () => {
         },
         readScope: 'arcade-session',
         commandNames: [
+          'getAgentInstructions',
           'getProject',
           'getPreviewContext',
           'getDiagnostics',

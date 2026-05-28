@@ -22,6 +22,7 @@ export interface AgentPermissions {
 export interface AgentBridgeSession {
   id: string
   startedAt: string
+  transportEndpoint?: DesktopAgentTransportEndpoint
 }
 
 export interface AgentProjectReadState {
@@ -70,6 +71,7 @@ export type AgentBridgeErrorCode =
   | 'preview-unavailable'
 
 export const AGENT_BRIDGE_COMMAND_NAMES = [
+  'getAgentInstructions',
   'getProject',
   'getPreviewContext',
   'getDiagnostics',
@@ -81,6 +83,7 @@ export const AGENT_BRIDGE_COMMAND_NAMES = [
 export type AgentBridgeCommandName = (typeof AGENT_BRIDGE_COMMAND_NAMES)[number]
 
 export const AGENT_BRIDGE_READ_COMMAND_NAMES = [
+  'getAgentInstructions',
   'getProject',
   'getPreviewContext',
   'getDiagnostics',
@@ -97,6 +100,29 @@ export interface AgentSessionReadState {
   permissions: AgentPermissions
   readScope: 'arcade-session'
   commandNames: readonly AgentBridgeCommandName[]
+}
+
+export interface AgentInstructionsPayload {
+  version: 1
+  instructionsMarkdown: string
+  sessionId: string
+  startedAt: string
+  endpoint: string
+  authorizationHeader: string
+  permissions: AgentPermissions
+  readScope: 'arcade-session'
+  commandNames: readonly AgentBridgeCommandName[]
+  protocol: {
+    transport: 'desktop-loopback-http'
+    format: 'json-rpc-2.0'
+    contentType: 'application/json'
+    authorizationHeaderName: 'Authorization'
+  }
+  arcadeAuthoringContract: {
+    summary: string
+    rules: readonly string[]
+    supportedCopiedOutImports: readonly string[]
+  }
 }
 
 interface AgentBridgeCommandSuccess<TData, TCommand extends string = AgentBridgeCommandName> {
@@ -119,6 +145,7 @@ export type AgentBridgeCommandResult<TData> =
   | AgentBridgeCommandFailure
 
 export type AgentBridgeRoutedCommandResult =
+  | AgentBridgeCommandResult<AgentInstructionsPayload>
   | AgentBridgeCommandResult<AgentProjectReadState>
   | AgentBridgeCommandResult<AgentPreviewReadState>
   | AgentBridgeCommandResult<PreviewDiagnostics>
@@ -144,6 +171,7 @@ export interface AgentBridgeCommandRouter {
   permissions: AgentPermissions
   readScope: 'arcade-session'
   commandNames: readonly AgentBridgeCommandName[]
+  routeCommand(command: 'getAgentInstructions'): AgentBridgeCommandResult<AgentInstructionsPayload>
   routeCommand(command: 'getProject'): AgentBridgeCommandResult<AgentProjectReadState>
   routeCommand(command: 'getPreviewContext'): AgentBridgeCommandResult<AgentPreviewReadState>
   routeCommand(command: 'getDiagnostics'): AgentBridgeCommandResult<PreviewDiagnostics>
@@ -164,6 +192,7 @@ export interface AgentBridge {
   permissions: AgentPermissions
   readScope: 'arcade-session'
   commandNames: readonly AgentBridgeCommandName[]
+  getAgentInstructions: () => AgentBridgeCommandResult<AgentInstructionsPayload>
   getProject: () => AgentBridgeCommandResult<AgentProjectReadState>
   getPreviewContext: () => AgentBridgeCommandResult<AgentPreviewReadState>
   getDiagnostics: () => AgentBridgeCommandResult<PreviewDiagnostics>
@@ -229,6 +258,86 @@ const createCommandSuccess = <TData>(
   data,
 })
 
+const SUPPORTED_COPIED_OUT_IMPORTS = [
+  'react',
+  '@navikt/ds-react',
+  '@navikt/ds-react/Theme',
+  '@navikt/aksel-icons',
+  '@navikt/ds-css',
+  './hooks',
+] as const
+
+const ARCADE_AUTHORING_CONTRACT_RULES = [
+  'Work with import-free Arcade JSX and Hooks code.',
+  'Keep source changes within the active Arcade project.',
+  'Use preview diagnostics and Preview evidence to validate visible results after changes.',
+  'Do not read share payloads, export data, browser storage, clipboard data, cookies, or unrelated page state.',
+] as const
+
+const ARCADE_AUTHORING_CONTRACT_SUMMARY =
+  'Author only the active Arcade project through the Agent bridge: import-free JSX and Hooks source, preview settings, and permitted metadata.'
+
+const createAgentInstructionsMarkdown = (
+  session: AgentBridgeSession,
+  transportEndpoint: DesktopAgentTransportEndpoint,
+  permissions: AgentPermissions
+): string => {
+  const permissionLines = Object.entries(permissions).map(
+    ([key, value]) => `- ${key}: ${value ? 'true' : 'false'}`
+  )
+
+  return [
+    'Aksel Arcade Agent pairing handoff',
+    '',
+    `Session id: ${session.id}`,
+    `Started at: ${session.startedAt}`,
+    '',
+    'Use this active Desktop Arcade Agent session only. Send JSON-RPC 2.0 POST requests to the endpoint with Content-Type: application/json and the Authorization header below.',
+    `Endpoint: ${transportEndpoint.endpoint}`,
+    `Authorization: ${transportEndpoint.authorizationHeader}`,
+    `Supported command names: ${AGENT_BRIDGE_COMMAND_NAMES.join(', ')}`,
+    '',
+    'Read Arcade-scoped state with getProject, getPreviewContext, getDiagnostics, getPreviewEvidence, and getSessionState. Submit allowed changes with applySourceChange({ summary, jsxCode?, hooksCode?, viewportSize?, theme?, name? }).',
+    'After changes, poll getDiagnostics until the preview is idle or reports an error, then use Preview evidence for visual validation when permitted.',
+    '',
+    'Active permission state:',
+    ...permissionLines,
+    '',
+    'Read scope: arcade-session. Do not read project packages, share payloads, browser storage, clipboard data, cookies, unrelated page state, Checkpoints, or host application UI state.',
+    '',
+    'Arcade authoring contract summary:',
+    ARCADE_AUTHORING_CONTRACT_SUMMARY,
+    ...ARCADE_AUTHORING_CONTRACT_RULES.map((rule) => `- ${rule}`),
+  ].join('\n')
+}
+
+const createAgentInstructionsPayload = (
+  session: AgentBridgeSession,
+  transportEndpoint: DesktopAgentTransportEndpoint,
+  permissions: AgentPermissions
+): AgentInstructionsPayload => ({
+  version: 1,
+  instructionsMarkdown: createAgentInstructionsMarkdown(session, transportEndpoint, permissions),
+  sessionId: session.id,
+  startedAt: session.startedAt,
+  endpoint: transportEndpoint.endpoint,
+  authorizationHeader: transportEndpoint.authorizationHeader,
+  permissions: { ...permissions },
+  readScope: 'arcade-session',
+  commandNames: [...AGENT_BRIDGE_COMMAND_NAMES],
+  protocol: {
+    transport: 'desktop-loopback-http',
+    format: 'json-rpc-2.0',
+    contentType: 'application/json',
+    authorizationHeaderName: 'Authorization',
+  },
+  arcadeAuthoringContract: {
+    summary: ARCADE_AUTHORING_CONTRACT_SUMMARY,
+    rules: [...ARCADE_AUTHORING_CONTRACT_RULES],
+    supportedCopiedOutImports: [...SUPPORTED_COPIED_OUT_IMPORTS],
+  },
+})
+
 export const createAgentBridgeCommandRouter = (
   session: AgentBridgeSession,
   controller: AgentBridgeController
@@ -247,6 +356,9 @@ export const createAgentBridgeCommandRouter = (
     return createCommandSuccess(command, data)
   }
 
+  function routeCommand(
+    command: 'getAgentInstructions'
+  ): AgentBridgeCommandResult<AgentInstructionsPayload>
   function routeCommand(command: 'getProject'): AgentBridgeCommandResult<AgentProjectReadState>
   function routeCommand(
     command: 'getPreviewContext'
@@ -264,6 +376,28 @@ export const createAgentBridgeCommandRouter = (
     }
 
     switch (command) {
+      case 'getAgentInstructions':
+        if (!controller.isSessionActive()) {
+          return createSessionRevokedFailure(command)
+        }
+
+        if (!session.transportEndpoint) {
+          return createCommandFailure(
+            command,
+            'invalid-request',
+            'Agent instructions require an active Desktop Agent transport endpoint.'
+          )
+        }
+
+        {
+          const permissions = controller.getPermissions()
+          controller.recordActivity(command)
+
+          return createCommandSuccess(
+            command,
+            createAgentInstructionsPayload(session, session.transportEndpoint, permissions)
+          )
+        }
       case 'getProject':
         return readCommand('getProject', () => ({
           ...controller.getReadContext().project,
@@ -357,6 +491,7 @@ export const createAgentBridge = (
     },
     readScope: router.readScope,
     commandNames: [...router.commandNames],
+    getAgentInstructions: () => router.routeCommand('getAgentInstructions'),
     getProject: () => router.routeCommand('getProject'),
     getPreviewContext: () => router.routeCommand('getPreviewContext'),
     getDiagnostics: () => router.routeCommand('getDiagnostics'),

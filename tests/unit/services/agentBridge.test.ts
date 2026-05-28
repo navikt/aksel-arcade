@@ -1,11 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import {
   AGENT_BRIDGE_COMMAND_NAMES,
+  AGENT_BRIDGE_READ_COMMAND_NAMES,
   DEFAULT_AGENT_PERMISSIONS,
   createAgentInstructions,
   createAgentBridge,
   createAgentBridgeCommandRouter,
   isAgentBridgeCommandName,
+  isAgentBridgeReadCommandName,
   type AgentBridgeCommandName,
   type AgentBridgeCommandResult,
   type AgentBridgeController,
@@ -24,6 +26,15 @@ import type { PreviewDiagnostics } from '@/services/previewDiagnostics'
 const session = {
   id: 'agent-session-1',
   startedAt: '2026-05-27T08:00:00.000Z',
+}
+
+const desktopSession = {
+  ...session,
+  transportEndpoint: {
+    endpoint: 'http://127.0.0.1:48123',
+    sessionId: session.id,
+    authorizationHeader: 'Bearer copied-agent-secret',
+  },
 }
 
 const createDiagnostics = (): PreviewDiagnostics => ({
@@ -155,6 +166,8 @@ describe('agent bridge command router', () => {
     const router = createAgentBridgeCommandRouter(session, controller)
 
     expect(router.commandNames).toEqual(AGENT_BRIDGE_COMMAND_NAMES)
+    expect(AGENT_BRIDGE_READ_COMMAND_NAMES).toContain('getAgentInstructions')
+    expect(isAgentBridgeReadCommandName('getAgentInstructions')).toBe(true)
     expect(expectBridgeSuccess(router.routeCommand('getProject'))).toEqual(context.project)
     expect(expectBridgeSuccess(router.routeCommand('getPreviewContext'))).toEqual(context.preview)
     expect(expectBridgeSuccess(router.routeCommand('getSessionState'))).toEqual({
@@ -166,6 +179,60 @@ describe('agent bridge command router', () => {
       commandNames: AGENT_BRIDGE_COMMAND_NAMES,
     })
     expect(recordedCommands).toEqual(['getProject', 'getPreviewContext', 'getSessionState'])
+  })
+
+  it('returns versioned Agent instructions without Arcade project content', () => {
+    const { context, controller, recordedCommands } = createController()
+    const router = createAgentBridgeCommandRouter(desktopSession, controller)
+
+    const instructions = expectBridgeSuccess(router.routeCommand('getAgentInstructions'))
+
+    expect(instructions).toMatchObject({
+      version: 1,
+      sessionId: desktopSession.id,
+      startedAt: desktopSession.startedAt,
+      endpoint: desktopSession.transportEndpoint.endpoint,
+      authorizationHeader: desktopSession.transportEndpoint.authorizationHeader,
+      permissions: DEFAULT_AGENT_PERMISSIONS,
+      readScope: 'arcade-session',
+      commandNames: AGENT_BRIDGE_COMMAND_NAMES,
+      protocol: {
+        transport: 'desktop-loopback-http',
+        format: 'json-rpc-2.0',
+        contentType: 'application/json',
+        authorizationHeaderName: 'Authorization',
+      },
+    })
+    expect(instructions.instructionsMarkdown).toContain('Aksel Arcade Agent pairing handoff')
+    expect(instructions.instructionsMarkdown).toContain(
+      `Endpoint: ${desktopSession.transportEndpoint.endpoint}`
+    )
+    expect(instructions.instructionsMarkdown).toContain(
+      `Authorization: ${desktopSession.transportEndpoint.authorizationHeader}`
+    )
+    expect(instructions.arcadeAuthoringContract.summary).toMatch(/active Arcade project/i)
+    expect(JSON.stringify(instructions)).not.toContain(context.project.name)
+    expect(JSON.stringify(instructions)).not.toContain(context.project.jsxCode)
+    expect(JSON.stringify(instructions)).not.toContain(context.project.hooksCode)
+    expect(JSON.stringify(instructions)).not.toContain(
+      context.diagnostics.sandboxConsoleMessages[0]!.message
+    )
+    expect(JSON.stringify(instructions)).not.toContain('checkpoint-1')
+    expect(recordedCommands).toEqual(['getAgentInstructions'])
+  })
+
+  it('requires a Desktop transport endpoint before returning Agent instructions', () => {
+    const { controller, recordedCommands } = createController()
+    const router = createAgentBridgeCommandRouter(session, controller)
+
+    expect(router.routeCommand('getAgentInstructions')).toMatchObject({
+      ok: false,
+      command: 'getAgentInstructions',
+      error: {
+        code: 'invalid-request',
+      },
+    })
+    expect(recordedCommands).toEqual([])
   })
 
   it('keeps diagnostics routed through the existing clone semantics', () => {
@@ -272,7 +339,7 @@ describe('agent bridge command router', () => {
       error: {
         code: 'unsupported-command',
         message:
-          'Unsupported Agent bridge command "openShell". Supported commands: getProject, getPreviewContext, getDiagnostics, getPreviewEvidence, getSessionState, applySourceChange.',
+          'Unsupported Agent bridge command "openShell". Supported commands: getAgentInstructions, getProject, getPreviewContext, getDiagnostics, getPreviewEvidence, getSessionState, applySourceChange.',
       },
     })
     expect(recordedCommands).toEqual([])
@@ -296,6 +363,13 @@ describe('agent bridge command router', () => {
         code: 'session-revoked',
       },
     })
+    expect(router.routeCommand('getAgentInstructions')).toMatchObject({
+      ok: false,
+      command: 'getAgentInstructions',
+      error: {
+        code: 'session-revoked',
+      },
+    })
     expect(appliedRequests).toEqual([])
     expect(recordedCommands).toEqual([])
   })
@@ -306,12 +380,16 @@ describe('agent bridge command router', () => {
       jsxCode: '<Button>Updated</Button>',
     }
     const { controller, recordedCommands } = createController()
-    const bridge = createAgentBridge(session, controller)
+    const bridge = createAgentBridge(desktopSession, controller)
 
     expect(bridge.commandNames).toEqual(AGENT_BRIDGE_COMMAND_NAMES)
+    expect(expectBridgeSuccess(bridge.getAgentInstructions())).toMatchObject({
+      version: 1,
+      sessionId: desktopSession.id,
+    })
     expect(expectBridgeSuccess(bridge.getProject())).toEqual(createReadContext().project)
     expect(bridge.applySourceChange(request)).toEqual(createApplySuccess())
-    expect(recordedCommands).toEqual(['getProject', 'applySourceChange'])
+    expect(recordedCommands).toEqual(['getAgentInstructions', 'getProject', 'applySourceChange'])
   })
 })
 
@@ -328,10 +406,10 @@ describe('agent instructions', () => {
     expect(instructions).toContain('Authorization: Bearer copied-agent-secret')
     expect(instructions).toMatch(/Content-Type: application\/json and the Authorization header/i)
     expect(instructions).toContain(
-      'Supported JSON-RPC methods: getProject, getPreviewContext, getDiagnostics, getPreviewEvidence, getSessionState, applySourceChange.'
+      'Supported JSON-RPC methods: getAgentInstructions, getProject, getPreviewContext, getDiagnostics, getPreviewEvidence, getSessionState, applySourceChange.'
     )
     expect(instructions).toContain(
-      'Full Agent bridge command names: getProject, getPreviewContext, getDiagnostics, getPreviewEvidence, getSessionState, applySourceChange.'
+      'Full Agent bridge command names: getAgentInstructions, getProject, getPreviewContext, getDiagnostics, getPreviewEvidence, getSessionState, applySourceChange.'
     )
     expect(instructions).toContain('"method":"applySourceChange"')
     expect(instructions).toContain(
