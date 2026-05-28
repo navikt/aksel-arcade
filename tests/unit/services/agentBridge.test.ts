@@ -413,6 +413,19 @@ describe('agent instructions', () => {
     expect(command).not.toContain('applySourceChange')
   })
 
+  it('shell-quotes endpoint and Authorization header metacharacters', () => {
+    const command = createAgentPairingHandoffCommand({
+      endpoint: "http://127.0.0.1:48123/path'with'quotes;$HOME",
+      sessionId: 'agent-session-1',
+      authorizationHeader: "Bearer token'with'$pecial`chars\\and spaces",
+    })
+
+    expect(command).toBe(
+      `curl -sS -X POST 'http://127.0.0.1:48123/path'\\''with'\\''quotes;$HOME' -H 'Authorization: Bearer token'\\''with'\\''$pecial\`chars\\and spaces' -H 'Content-Type: application/json' --data '{"jsonrpc":"2.0","id":"agent-instructions-1","method":"getAgentInstructions"}'`
+    )
+    expect(command).not.toContain('\n')
+  })
+
   it('includes provider-neutral Desktop transport instructions without URL credentials', () => {
     const instructions = createAgentInstructions(DEFAULT_AGENT_PERMISSIONS, {
       endpoint: 'http://127.0.0.1:48123',

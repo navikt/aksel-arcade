@@ -867,3 +867,11 @@ Completed in this branch:
 Verification completed with `npm run typecheck`, `npm run test -- --run`, and a browser smoke check via `npm run test:e2e -- --project=chromium tests/e2e/agent-diagnostics.spec.ts --reporter=line` after installing dependencies with `npm ci` and using `/opt/homebrew/bin` for the local Node/npm toolchain.
 
 Next note: #90 can now update the Norwegian Agent menu wording and safety cues on top of the short command behavior. #91 should keep focusing on preventing the command, endpoint, Authorization header, pairing credential, and fetched instructions from becoming durable project/package/telemetry/log data.
+
+### 2026-05-28 - PR #95 review follow-up
+
+Reviewed PR #95 before merge and fixed one scoped test gap:
+
+- Added regression coverage proving the copied Agent pairing handoff command POSIX-shell-quotes single quotes and shell metacharacters in the endpoint and Authorization header while remaining one line.
+
+Verification completed with `npm run typecheck` and targeted `npm run test -- --run tests/unit/services/agentBridge.test.ts`; full-suite verification was rerun before merge.
