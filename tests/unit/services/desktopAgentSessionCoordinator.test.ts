@@ -256,4 +256,38 @@ describe('desktopAgentSessionCoordinator', () => {
 
     expect(coordinator.getActiveTransportSession()?.pairingCredential).toBe('0f'.repeat(32))
   })
+
+  it('redacts handoff secrets from async transport stop failure logs', async () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const coordinator = createDesktopAgentSessionCoordinator({
+      createSessionId: () => 'agent-session-1',
+      createPairingCredential: () => 'credential-secret',
+      createTimestamp: () => '2026-05-27T08:00:00.000Z',
+      transportAdapter: {
+        startSession: (session) => ({
+          endpoint: 'http://127.0.0.1:48123',
+          sessionId: session.id,
+          authorizationHeader: `Bearer ${session.pairingCredential}`,
+        }),
+        stopSession: async (session) => {
+          throw new Error(
+            `Stop failed for ${session.transportEndpoint?.endpoint} with ${session.transportEndpoint?.authorizationHeader} and ${session.pairingCredential}.`
+          )
+        },
+      },
+    })
+
+    await coordinator.startSession()
+    coordinator.stopSession('stop')
+    await new Promise((resolve) => setTimeout(resolve, 0))
+
+    const serializedLog = JSON.stringify(consoleError.mock.calls)
+    expect(consoleError).toHaveBeenCalledWith(
+      'Desktop Agent transport stop failed.',
+      expect.any(String)
+    )
+    expect(serializedLog).not.toContain('http://127.0.0.1:48123')
+    expect(serializedLog).not.toContain('Bearer credential-secret')
+    expect(serializedLog).not.toContain('credential-secret')
+  })
 })

@@ -875,3 +875,16 @@ Reviewed PR #95 before merge and fixed one scoped test gap:
 - Added regression coverage proving the copied Agent pairing handoff command POSIX-shell-quotes single quotes and shell metacharacters in the endpoint and Authorization header while remaining one line.
 
 Verification completed with `npm run typecheck` and targeted `npm run test -- --run tests/unit/services/agentBridge.test.ts`; full-suite verification was rerun before merge.
+
+### 2026-05-28 - #91 Prevent Agent pairing handoff secrets from durable artifacts
+
+Selected #91 as the highest-priority `ready-for-agent` feature from #90-#91 because it protects the secret-bearing Agent pairing handoff from durable storage/logging. Worked only on #91.
+
+Completed in this branch:
+
+- Added shared renderer redaction for Agent pairing handoff logs so copied commands, loopback endpoints, Authorization bearer values, pairing credentials, and fetched instruction markdown are replaced before console logging.
+- Applied the redaction to Agent menu copy/start failures and Desktop Agent transport stop failures, avoiding raw Error object logging for these paths.
+- Redacted secret-bearing route failure messages in Desktop loopback/preload transport responses so failed instruction fetches do not echo endpoint, Authorization header, credential, or copied command text.
+- Added regression coverage for redaction helpers, copy failure logging, async transport stop logging, instruction fetch failure responses, and the existing package export / rollback / import flow after an active Agent session.
+
+Verification completed with `npm run typecheck`, `CI=1 npm run test`, and `npm run lint` (passes with the existing React hook dependency warnings in `InspectionPopover` and `PreviewPane`).

@@ -317,6 +317,40 @@ describe('desktop Agent loopback JSON-RPC transport', () => {
     ).rejects.toThrow()
   })
 
+  it('redacts handoff secrets from instruction fetch failure responses', async () => {
+    let endpoint: {
+      endpoint: string
+      sessionId: string
+      authorizationHeader: string
+    } | null = null
+    const transport = createTransport({
+      routeRequest: () => {
+        if (!endpoint) {
+          throw new Error('Endpoint fixture was not initialized.')
+        }
+
+        const command = createAgentPairingHandoffCommand(endpoint)
+        throw new Error(
+          `Instruction fetch failed for ${command} ${endpoint.endpoint} ${endpoint.authorizationHeader}.`
+        )
+      },
+    })
+    endpoint = await transport.startSession(createSession())
+
+    const response = await postJsonRpc(
+      endpoint.endpoint,
+      { jsonrpc: '2.0', id: 'agent-instructions-1', method: 'getAgentInstructions' },
+      endpoint.authorizationHeader
+    )
+    const serializedBody = JSON.stringify(response.body)
+
+    expect(response.status).toBe(500)
+    expect(response.body.error.message).toContain('[redacted Agent pairing handoff]')
+    expect(serializedBody).not.toContain(endpoint.endpoint)
+    expect(serializedBody).not.toContain(endpoint.authorizationHeader)
+    expect(serializedBody).not.toContain('agent-secret-1')
+  })
+
   it('shuts down the endpoint when Agent access ends', async () => {
     const transport = createTransport()
     const endpoint = await transport.startSession(createSession())

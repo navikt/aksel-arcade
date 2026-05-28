@@ -6,6 +6,7 @@ import { type AgentChangeField } from '@/services/agentBridge'
 import { collectPreviewEvidenceFromFrame } from '@/services/previewEvidence'
 import { useSettings } from '@/contexts/SettingsContext'
 import { useProject } from '@/hooks/useProject'
+import { formatAgentErrorForLog } from '@/services/agentHandoffRedaction'
 
 export const AgentSessionMenu = () => {
   const { project, previewIframeRef, previewState, updateProject } = useProject()
@@ -36,7 +37,7 @@ export const AgentSessionMenu = () => {
     setCopyStatus('idle')
     if (checked) {
       void startAgentSession().catch((error) => {
-        console.error('Agent access could not be started.', error)
+        console.error('Agent access could not be started.', formatAgentErrorForLog(error))
       })
     } else {
       stopAgentSession()
@@ -63,7 +64,12 @@ export const AgentSessionMenu = () => {
       await navigator.clipboard.writeText(agentPairingHandoffCommand)
       setCopyStatus('success')
     } catch (error) {
-      console.error('Agent instructions could not be copied.', error)
+      console.error(
+        'Agent instructions could not be copied.',
+        formatAgentErrorForLog(error, {
+          knownSecrets: [agentPairingHandoffCommand],
+        })
+      )
       setCopyStatus('error')
     }
   }
