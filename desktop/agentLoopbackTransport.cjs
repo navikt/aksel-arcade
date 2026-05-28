@@ -1,5 +1,6 @@
 const http = require('node:http')
 const { timingSafeEqual } = require('node:crypto')
+const { getRedactedAgentErrorMessage } = require('./agentHandoffRedaction.cjs')
 
 const LOOPBACK_HOST = '127.0.0.1'
 const MAX_JSON_RPC_BODY_BYTES = 1024 * 1024
@@ -187,10 +188,10 @@ const handleJsonRpcRequest = async (request, response, { getSession, routeReques
         id: payload.id ?? null,
         jsonRpcCode: -32603,
         code: 'route-request-failed',
-        message:
-          error instanceof Error
-            ? error.message
-            : 'Agent transport request routing failed unexpectedly.',
+        message: getRedactedAgentErrorMessage(
+          error,
+          'Agent transport request routing failed unexpectedly.'
+        ),
       })
     }
     return

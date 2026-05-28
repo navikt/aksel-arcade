@@ -16,6 +16,11 @@ const {
     options?: AgentLoopbackJsonRpcTransportOptions
   ) => AgentLoopbackJsonRpcTransport
 } = require('../../../desktop/agentLoopbackTransport.cjs')
+const {
+  redactAgentHandoffSecrets: redactDesktopAgentHandoffSecrets,
+}: {
+  redactAgentHandoffSecrets: (value: string) => string
+} = require('../../../desktop/agentHandoffRedaction.cjs')
 
 interface AgentLoopbackJsonRpcTransport {
   startSession: (session: DesktopAgentTransportSession) => Promise<{
@@ -315,6 +320,57 @@ describe('desktop Agent loopback JSON-RPC transport', () => {
         endpoint.authorizationHeader
       )
     ).rejects.toThrow()
+  })
+
+  it('redacts handoff secrets from instruction fetch failure responses', async () => {
+    let endpoint: {
+      endpoint: string
+      sessionId: string
+      authorizationHeader: string
+    } | null = null
+    const transport = createTransport({
+      routeRequest: () => {
+        if (!endpoint) {
+          throw new Error('Endpoint fixture was not initialized.')
+        }
+
+        const command = createAgentPairingHandoffCommand(endpoint)
+        throw new Error(
+          `Instruction fetch failed for ${command} ${endpoint.endpoint} ${endpoint.authorizationHeader}.`
+        )
+      },
+    })
+    endpoint = await transport.startSession(createSession())
+
+    const response = await postJsonRpc(
+      endpoint.endpoint,
+      { jsonrpc: '2.0', id: 'agent-instructions-1', method: 'getAgentInstructions' },
+      endpoint.authorizationHeader
+    )
+    const serializedBody = JSON.stringify(response.body)
+
+    expect(response.status).toBe(500)
+    expect(response.body.error.message).toContain('[redacted Agent pairing handoff]')
+    expect(serializedBody).not.toContain(endpoint.endpoint)
+    expect(serializedBody).not.toContain(endpoint.authorizationHeader)
+    expect(serializedBody).not.toContain('agent-secret-1')
+  })
+
+  it('redacts stringified pairing credentials and fetched instructions in desktop errors', () => {
+    const redacted = redactDesktopAgentHandoffSecrets(
+      JSON.stringify({
+        pairingCredential: 'raw-pairing-secret',
+        instructionsMarkdown:
+          'Aksel Arcade Agent pairing handoff\nEndpoint: http://127.0.0.1:48123\nAuthorization: Bearer copied-agent-secret',
+      })
+    )
+
+    expect(redacted).toContain('[redacted Agent pairing handoff]')
+    expect(redacted).not.toContain('[redacted]]')
+    expect(redacted).not.toContain('raw-pairing-secret')
+    expect(redacted).not.toContain('Aksel Arcade Agent pairing handoff')
+    expect(redacted).not.toContain('http://127.0.0.1:48123')
+    expect(redacted).not.toContain('Bearer copied-agent-secret')
   })
 
   it('shuts down the endpoint when Agent access ends', async () => {

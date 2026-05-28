@@ -1092,20 +1092,26 @@ describe('ProjectControls layout', () => {
   })
 
   it('shows copy failure feedback and lets the user retry without revealing secrets', async () => {
-    const writeText = vi
-      .fn()
-      .mockRejectedValueOnce(new Error('clipboard blocked'))
-      .mockResolvedValueOnce(undefined)
-    Object.defineProperty(navigator, 'clipboard', {
-      configurable: true,
-      value: { writeText },
-    })
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
     const sessionId = '11111111-1111-4111-8111-111111111111'
     const endpoint = {
       endpoint: 'http://127.0.0.1:48123',
       sessionId,
       authorizationHeader: 'Bearer copied-agent-secret',
     }
+    const command = `curl -sS -X POST '${endpoint.endpoint}' -H 'Authorization: ${endpoint.authorizationHeader}' -H 'Content-Type: application/json' --data '{"jsonrpc":"2.0","id":"agent-instructions-1","method":"getAgentInstructions"}'`
+    const writeText = vi
+      .fn()
+      .mockRejectedValueOnce(
+        new Error(
+          `clipboard blocked while writing ${command} to ${endpoint.endpoint} with ${endpoint.authorizationHeader}`
+        )
+      )
+      .mockResolvedValueOnce(undefined)
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText },
+    })
     window.__AKSEL_ARCADE_DESKTOP__ = {
       getShellCapabilities: vi.fn().mockResolvedValue(DESKTOP_ARCADE_CAPABILITIES),
       startAgentTransportSession: vi.fn().mockResolvedValue(endpoint),
@@ -1119,6 +1125,11 @@ describe('ProjectControls layout', () => {
     fireEvent.click(screen.getByRole('menuitem', { name: /kopier instruksjoner/i }))
 
     expect((await screen.findByRole('alert')).textContent).toMatch(/kunne ikke kopiere/i)
+    const serializedLog = JSON.stringify(consoleError.mock.calls)
+    expect(serializedLog).not.toContain(command)
+    expect(serializedLog).not.toContain(endpoint.endpoint)
+    expect(serializedLog).not.toContain(endpoint.authorizationHeader)
+    expect(serializedLog).not.toContain('copied-agent-secret')
     expect(screen.queryByText(endpoint.endpoint)).toBeNull()
     expect(screen.queryByText(endpoint.authorizationHeader)).toBeNull()
     expect(screen.queryByText(/transport/i)).toBeNull()

@@ -1,4 +1,5 @@
 const { contextBridge, ipcRenderer } = require('electron')
+const { getRedactedAgentErrorMessage } = require('./agentHandoffRedaction.cjs')
 
 const SHELL_CAPABILITIES_CHANNEL = 'aksel-arcade:get-shell-capabilities'
 const START_AGENT_TRANSPORT_CHANNEL = 'aksel-arcade:start-agent-transport-session'
@@ -59,9 +60,10 @@ const routeAgentTransportRequest = async (payload) => {
         request.id,
         -32603,
         'route-handler-failed',
-        error instanceof Error
-          ? error.message
-          : 'Desktop Agent transport route handler failed unexpectedly.'
+        getRedactedAgentErrorMessage(
+          error,
+          'Desktop Agent transport route handler failed unexpectedly.'
+        )
       ),
     })
   }

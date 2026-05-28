@@ -3,6 +3,10 @@ import {
   type AgentBridgeSession,
   type AgentPermissions,
 } from './agentBridge'
+import {
+  collectAgentHandoffLogSecrets,
+  formatAgentErrorForLog,
+} from './agentHandoffRedaction'
 import { generateSecureUUID } from '@/utils/crypto'
 
 export type DesktopAgentSessionStatus = 'inactive' | 'active'
@@ -110,7 +114,12 @@ export const createDesktopAgentSessionCoordinator = ({
     const stopResult = stopTransportSession(sessionToStop, reason)
     if (isPromiseLike(stopResult)) {
       void stopResult.catch((error) => {
-        console.error('Desktop Agent transport stop failed.', error)
+        console.error(
+          'Desktop Agent transport stop failed.',
+          formatAgentErrorForLog(error, {
+            knownSecrets: collectAgentHandoffLogSecrets(sessionToStop),
+          })
+        )
       })
     }
   }
