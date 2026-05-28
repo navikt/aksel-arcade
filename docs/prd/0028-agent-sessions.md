@@ -1,5 +1,7 @@
 # PRD: Agent sessions for Aksel Arcade
 
+> Superseded for current planning: Web Arcade no longer supports Agent access, and Desktop Arcade Agent sessions no longer include Checkpoints or rollback. See `docs/prd/0029-desktop-arcade-agent-transport.md` and `docs/adr/0005-remove-agent-checkpoints.md` for the current direction.
+
 ## Problem Statement
 
 Aksel Arcade is already a high-signal environment for creating Aksel-based React prototypes: it has the active Arcade project, JSX and Hooks source, preview preferences, compile and runtime diagnostics, Aksel metadata, share/export packaging, and a live sandboxed preview. External LLMs and coding agents can use that context to produce useful UI changes, but today they have no intentional way to work in the active browser session.

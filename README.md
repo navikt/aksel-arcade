@@ -161,13 +161,13 @@ npm run format           # Format code with Prettier
 
 ### Shell capability modes
 
-Web Arcade is the default dev mode: Share URL is available and Agent access is hidden. To launch the Desktop Arcade development shell, run:
+Web Arcade is the default dev mode: Share URL is available and Agent access is not available. To launch the Desktop Arcade development shell, run:
 
 ```bash
 npm run desktop:dev
 ```
 
-The desktop script starts Vite on `127.0.0.1:5173` and opens an Electron shell around the same renderer. Desktop capabilities are supplied only through a narrow preload IPC bridge, so React components stay browser-like: the Electron shell receives the Desktop Arcade capability set without direct Node, socket, process, or filesystem access. The same renderer URL opened in a normal browser remains Web Arcade with Share URL available and Agent access hidden.
+The desktop script starts Vite on `127.0.0.1:5173` and opens an Electron shell around the same renderer. Desktop capabilities are supplied only through a narrow preload IPC bridge, so React components stay browser-like: the Electron shell receives the Desktop Arcade capability set without direct Node, socket, process, or filesystem access. The same renderer URL opened in a normal browser remains Web Arcade with Share URL available and no Agent access.
 
 ### Tech Stack
 
