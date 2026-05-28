@@ -963,3 +963,12 @@ Completed in this branch:
 Verification completed with `npm run typecheck`, `CI=1 npm run test`, `npm run lint` (same existing hook dependency warnings), and a real Electron Desktop Arcade smoke test against the current dev renderer on port 5174.
 
 Next note: keep future Agent pairing handoff UI Desktop-scoped and avoid showing the secret-bearing command before the user explicitly enables Agent access.
+
+### 2026-05-28 - Desktop Agent menu width follow-up
+
+Followed up on the Desktop Agent menu gating PR:
+
+- Changed the Agent action menu from `max-width` only to a fixed reserved width capped by the viewport, so the inactive menu keeps the same width as the expanded menu.
+- Verified in real Electron Desktop Arcade that the settled menu width is 360px both before and after `Agent-tilgang` is checked.
+
+Next note: if more content is added to the Agent action menu, adjust the reserved `.agent-menu` width together with the full-content design to avoid reintroducing checkbox-triggered layout shift.
