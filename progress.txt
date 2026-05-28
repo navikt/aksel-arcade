@@ -920,3 +920,12 @@ Completed in this branch:
 Verification completed with `npm run typecheck`, `CI=1 npm run test`, and a Desktop Arcade browser smoke test against the dev server with a preload/clipboard stub.
 
 Next note: future Agent pairing work should keep the secret-bearing command, endpoint, Authorization header, and Agent pairing credential out of visible UI and durable artifacts; treat the copied command as clipboard-only handoff material.
+
+### 2026-05-28 - #90 Desktop dev surface follow-up
+
+Fixed a follow-up bug in the same #90 feature:
+
+- Root cause: `npm run desktop:dev` spawned Vite without `VITE_AKSEL_ARCADE_SURFACE=desktop`, so the dev renderer fell back to Web Arcade if viewed without the Electron preload bridge. That hid the Agent menu button and exposed the Share URL button.
+- Set the desktop dev Vite process to `VITE_AKSEL_ARCADE_SURFACE=desktop`, documented the behavior, and added a regression test for the desktop dev script.
+
+Verification completed with `npm run typecheck`, `CI=1 npm run test`, targeted shell capability/script tests, and a browser smoke test against a Desktop-surface dev server confirming the Agent menu is visible and Share URL is absent.
