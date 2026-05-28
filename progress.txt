@@ -897,3 +897,12 @@ Fixed one scoped review finding before merge:
 - Added regression coverage proving Desktop-side redaction marks redacted content and removes stringified pairing credentials, fetched instruction markdown, endpoint, and Authorization header content.
 
 Verification completed with `npm run typecheck`, `CI=1 npm run test`, and `npm run lint` (passes with the existing React hook dependency warnings in `InspectionPopover` and `PreviewPane`).
+
+### 2026-05-28 - PR #96 build failure follow-up
+
+Fixed the post-merge `npm run build` failure from PR #96:
+
+- Root cause: `tsc -b` selected the generic `Array.reduce` overload from the nullable `knownSecrets` item type in `src/services/agentHandoffRedaction.ts`, so the accumulator was inferred as `string | null | undefined` even though runtime always seeded it with a string.
+- Fixed by making the accumulator type explicit with `reduce<string>`, preserving the redaction behavior while satisfying the build tsconfig.
+
+Verification completed with `npm run build`, `npm run typecheck`, `CI=1 npm run test`, and `npm run lint` (passes with the existing React hook dependency warnings in `InspectionPopover` and `PreviewPane`).

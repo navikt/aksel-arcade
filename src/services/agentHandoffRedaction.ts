@@ -65,7 +65,7 @@ const redactKnownSecrets = (
   value: string,
   knownSecrets: readonly (string | null | undefined)[]
 ): string =>
-  knownSecrets.reduce(
+  knownSecrets.reduce<string>(
     (redacted, secret) =>
       isNonEmptyString(secret) ? redacted.split(secret).join(REDACTED_AGENT_PAIRING_DATA) : redacted,
     value
