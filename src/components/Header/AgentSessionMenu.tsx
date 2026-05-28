@@ -44,18 +44,18 @@ export const AgentSessionMenu = () => {
     }
   }
 
-  const copyAgentInstructions = async () => {
+  const copyAgentCommand = async () => {
     setCopyStatus('idle')
     if (!agentPairingHandoffCommand) {
       console.error(
-        'Agent pairing handoff could not be copied: Agent access is inactive or Desktop transport is unavailable.'
+        'Agent command could not be copied: Agent access is inactive or Desktop transport is unavailable.'
       )
       setCopyStatus('error')
       return
     }
 
     if (!navigator.clipboard?.writeText) {
-      console.error('Agent instructions could not be copied: clipboard API is unavailable.')
+      console.error('Agent command could not be copied: clipboard API is unavailable.')
       setCopyStatus('error')
       return
     }
@@ -65,7 +65,7 @@ export const AgentSessionMenu = () => {
       setCopyStatus('success')
     } catch (error) {
       console.error(
-        'Agent instructions could not be copied.',
+        'Agent command could not be copied.',
         formatAgentErrorForLog(error, {
           knownSecrets: [agentPairingHandoffCommand],
         })
@@ -76,9 +76,9 @@ export const AgentSessionMenu = () => {
 
   const copyFeedbackText =
     copyStatus === 'success'
-      ? 'Instruksjoner kopiert.'
+      ? 'Agentkommando kopiert.'
       : copyStatus === 'error'
-        ? 'Kunne ikke kopiere instruksjoner. Prøv igjen.'
+        ? 'Kunne ikke kopiere agentkommando. Prøv igjen.'
         : null
 
   return (
@@ -89,12 +89,12 @@ export const AgentSessionMenu = () => {
           data-color="neutral"
           size="small"
           icon={<RobotIcon title="Agent" />}
-          aria-label="Agent access"
+          aria-label="Koble til agent"
           data-testid="agent-session-menu"
         />
       </ActionMenu.Trigger>
       <ActionMenu.Content className="agent-menu">
-        <ActionMenu.Label>Gi agenter tilgang</ActionMenu.Label>
+        <ActionMenu.Label>Koble til agent</ActionMenu.Label>
         <ActionMenu.CheckboxItem checked={isActive} onCheckedChange={handleAccessChange}>
           Agent-tilgang
         </ActionMenu.CheckboxItem>
@@ -103,13 +103,15 @@ export const AgentSessionMenu = () => {
             {statusText}
           </Detail>
         </Box>
-        <ActionMenu.Divider />
-        <ActionMenu.Label>Gi agenten kontekst</ActionMenu.Label>
         <Box paddingInline="space-12" paddingBlock="space-8" role="none">
           <VStack gap="space-6">
             <Detail className="agent-menu__context">
-              Klikk på knappen nedenfor for å kopiere instrukser du kan gi til agenten, slik at den
-              får tilgang til denne filen.
+              Start Agent-tilgang, kopier kommandoen og del den med agenten du vil koble til.
+              Kommandoen gir agenten tilgang til dette aktive Arcade-prosjektet mens Agent-tilgang
+              er aktiv.
+            </Detail>
+            <Detail className="agent-menu__warning">
+              Del bare med agenten du vil gi tilgang.
             </Detail>
             {copyFeedbackText && (
               <Detail
@@ -126,21 +128,21 @@ export const AgentSessionMenu = () => {
           icon={<FilesIcon aria-hidden />}
           onSelect={(event) => {
             event.preventDefault()
-            void copyAgentInstructions()
+            void copyAgentCommand()
           }}
         >
-          {copyStatus === 'error' ? 'Prøv igjen' : 'Kopier instruksjoner'}
+          {copyStatus === 'error' ? 'Prøv igjen' : 'Kopier agentkommando'}
         </ActionMenu.Item>
         {checkpoints.length > 0 && (
           <>
             <ActionMenu.Divider />
-            <ActionMenu.Group label="Rollback Checkpoints">
+            <ActionMenu.Group label="Kontrollpunkter">
               {checkpoints.map((checkpoint) => (
                 <ActionMenu.Item
                   key={checkpoint.id}
                   onSelect={() => restoreCheckpoint(checkpoint.id)}
                 >
-                  {`Restore ${checkpoint.summary} (${formatChangedFields(checkpoint.changedFields)})`}
+                  {`Gjenopprett ${checkpoint.summary} (${formatChangedFields(checkpoint.changedFields)})`}
                 </ActionMenu.Item>
               ))}
             </ActionMenu.Group>
@@ -161,10 +163,10 @@ const formatChangedField = (field: AgentChangeField): string => {
     case 'hooksCode':
       return 'Hooks'
     case 'viewportSize':
-      return 'Viewport'
+      return 'Skjermstørrelse'
     case 'theme':
-      return 'Theme'
+      return 'Tema'
     case 'name':
-      return 'Name'
+      return 'Navn'
   }
 }

@@ -906,3 +906,17 @@ Fixed the post-merge `npm run build` failure from PR #96:
 - Fixed by making the accumulator type explicit with `reduce<string>`, preserving the redaction behavior while satisfying the build tsconfig.
 
 Verification completed with `npm run build`, `npm run typecheck`, `CI=1 npm run test`, and `npm run lint` (passes with the existing React hook dependency warnings in `InspectionPopover` and `PreviewPane`).
+
+### 2026-05-28 - #90 Agent pairing handoff menu wording
+
+Worked only on #90.
+
+Completed in this branch:
+
+- Updated the Desktop Arcade Agent menu to use the `Koble til agent` section label, `Kopier agentkommando` copy action, helper text that says the command grants access to the active Arcade project while Agent access is active, and the visible warning `Del bare med agenten du vil gi tilgang.`.
+- Kept endpoint, Authorization header, Agent pairing credential, and copied command text clipboard-only/not visibly rendered in the menu; the fetched agent-facing instruction payload remains English.
+- Localized the same Agent menu checkpoint restore labels and changed integration coverage so copy success, failure, retry, safety copy, and hidden handoff details stay covered.
+
+Verification completed with `npm run typecheck`, `CI=1 npm run test`, and a Desktop Arcade browser smoke test against the dev server with a preload/clipboard stub.
+
+Next note: future Agent pairing work should keep the secret-bearing command, endpoint, Authorization header, and Agent pairing credential out of visible UI and durable artifacts; treat the copied command as clipboard-only handoff material.
