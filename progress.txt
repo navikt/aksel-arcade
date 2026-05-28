@@ -851,3 +851,19 @@ Completed in this branch:
 Verification completed with `npm run typecheck` and `CI=1 npm run test -- --run` after installing dependencies with `npm ci` and using `/opt/homebrew/bin` for the local Node/npm toolchain.
 
 Next note: #89 is now unblocked. It should replace the long copied instructions with a one-line `curl` bootstrap command that calls `getAgentInstructions`, keeps credentials in the Authorization header only, and relies on the same stop/reload invalidation boundary.
+
+### 2026-05-28 - #89 Copy one-line Agent pairing handoff command
+
+Selected #89 as the highest-priority `ready-for-agent` feature from #89-#91 because #90 and #91 are both blocked by #89, while #88 is already closed. Worked only on #89.
+
+Completed in this branch:
+
+- Replaced the Agent menu clipboard payload with a single-line pure `curl` bootstrap command for the active Desktop Agent session.
+- The copied command sends a JSON-RPC `getAgentInstructions` request to the loopback endpoint with `Content-Type: application/json` and the Agent pairing credential only in the Authorization header.
+- Inactive Agent access, or a session without a Desktop transport endpoint, now refuses to copy a handoff command and keeps the existing copy error feedback path.
+- Kept endpoint, Authorization header, and command text hidden in the menu UI while still allowing the short-lived command to be copied after active Desktop Agent access starts.
+- Added regression coverage for exact clipboard output, inactive no-copy behavior, no query credentials, no helper/jq/MCP dependency, active getAgentInstructions routing, and stop invalidation for the copied command path.
+
+Verification completed with `npm run typecheck`, `npm run test -- --run`, and a browser smoke check via `npm run test:e2e -- --project=chromium tests/e2e/agent-diagnostics.spec.ts --reporter=line` after installing dependencies with `npm ci` and using `/opt/homebrew/bin` for the local Node/npm toolchain.
+
+Next note: #90 can now update the Norwegian Agent menu wording and safety cues on top of the short command behavior. #91 should keep focusing on preventing the command, endpoint, Authorization header, pairing credential, and fetched instructions from becoming durable project/package/telemetry/log data.

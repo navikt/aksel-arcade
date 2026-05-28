@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   DEFAULT_AGENT_PERMISSIONS,
   createAgentBridgeCommandRouter,
-  createAgentInstructions,
+  createAgentPairingHandoffCommand,
   publishAgentBridge,
   removeAgentBridge,
   type AgentBridgeController,
@@ -365,13 +365,14 @@ export const useAgentSession = ({
 
   const statusText = session ? 'Status: aktiv' : 'Status: inaktiv'
 
-  const agentInstructions = useMemo(
-    () => createAgentInstructions(permissions, session?.transportEndpoint),
-    [permissions, session?.transportEndpoint]
+  const agentPairingHandoffCommand = useMemo(
+    () =>
+      session?.transportEndpoint ? createAgentPairingHandoffCommand(session.transportEndpoint) : null,
+    [session?.transportEndpoint]
   )
 
   return {
-    agentInstructions,
+    agentPairingHandoffCommand,
     checkpoints: rollbackCheckpoints,
     isActive: Boolean(session),
     restoreCheckpoint,
