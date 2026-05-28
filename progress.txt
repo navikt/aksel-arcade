@@ -929,3 +929,13 @@ Fixed a follow-up bug in the same #90 feature:
 - Set the desktop dev Vite process to `VITE_AKSEL_ARCADE_SURFACE=desktop`, documented the behavior, and added a regression test for the desktop dev script.
 
 Verification completed with `npm run typecheck`, `CI=1 npm run test`, targeted shell capability/script tests, and a browser smoke test against a Desktop-surface dev server confirming the Agent menu is visible and Share URL is absent.
+
+### 2026-05-28 - #90 Desktop Agent command copy follow-up
+
+Fixed another follow-up bug in the same #90 feature:
+
+- Root cause: the sandboxed Electron preload script tried to `require('./agentHandoffRedaction.cjs')`, but Electron's sandboxed preload context cannot load project-local modules. The preload failed before exposing `__AKSEL_ARCADE_DESKTOP__`, so Agent access had no Desktop Agent transport endpoint and `Kopier agentkommando` had no command to copy.
+- Inlined the small preload redaction helper to keep the preload self-contained while leaving the main-process CJS redactor in place for non-preload code.
+- Added a regression test that prevents project-local `require('./...')` imports from returning to `desktop/preload.cjs`.
+
+Verification completed with `npm run typecheck`, `CI=1 npm run test`, targeted preload/script tests, and a Playwright Electron smoke test that starts Agent access and reaches `Agentkommando kopiert.`.
