@@ -4,6 +4,7 @@ import {
   AGENT_BRIDGE_READ_COMMAND_NAMES,
   DEFAULT_AGENT_PERMISSIONS,
   createAgentInstructions,
+  createAgentPairingHandoffCommand,
   createAgentBridge,
   createAgentBridgeCommandRouter,
   isAgentBridgeCommandName,
@@ -394,6 +395,37 @@ describe('agent bridge command router', () => {
 })
 
 describe('agent instructions', () => {
+  it('creates a one-line pure curl bootstrap command for getAgentInstructions', () => {
+    const command = createAgentPairingHandoffCommand({
+      endpoint: 'http://127.0.0.1:48123',
+      sessionId: 'agent-session-1',
+      authorizationHeader: 'Bearer copied-agent-secret',
+    })
+
+    expect(command).toBe(
+      `curl -sS -X POST 'http://127.0.0.1:48123' -H 'Authorization: Bearer copied-agent-secret' -H 'Content-Type: application/json' --data '{"jsonrpc":"2.0","id":"agent-instructions-1","method":"getAgentInstructions"}'`
+    )
+    expect(command).not.toContain('\n')
+    expect(command).toContain('"method":"getAgentInstructions"')
+    expect(command).not.toMatch(/\b(jq|mcp|helper)\b/i)
+    expect(command).not.toMatch(/[?&](token|credential|authorization)=/i)
+    expect(command).not.toContain('getProject')
+    expect(command).not.toContain('applySourceChange')
+  })
+
+  it('shell-quotes endpoint and Authorization header metacharacters', () => {
+    const command = createAgentPairingHandoffCommand({
+      endpoint: "http://127.0.0.1:48123/path'with'quotes;$HOME",
+      sessionId: 'agent-session-1',
+      authorizationHeader: "Bearer token'with'$pecial`chars\\and spaces",
+    })
+
+    expect(command).toBe(
+      `curl -sS -X POST 'http://127.0.0.1:48123/path'\\''with'\\''quotes;$HOME' -H 'Authorization: Bearer token'\\''with'\\''$pecial\`chars\\and spaces' -H 'Content-Type: application/json' --data '{"jsonrpc":"2.0","id":"agent-instructions-1","method":"getAgentInstructions"}'`
+    )
+    expect(command).not.toContain('\n')
+  })
+
   it('includes provider-neutral Desktop transport instructions without URL credentials', () => {
     const instructions = createAgentInstructions(DEFAULT_AGENT_PERMISSIONS, {
       endpoint: 'http://127.0.0.1:48123',

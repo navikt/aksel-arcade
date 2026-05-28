@@ -605,7 +605,7 @@ describe('ProjectControls layout', () => {
     expect(screen.getByRole('status').textContent).toBe('Status: inaktiv')
   })
 
-  it('copies external-agent instructions with commands, all permissions, and the Arcade contract', async () => {
+  it('does not copy an Agent pairing handoff before Agent access is active', async () => {
     const writeText = vi.fn().mockResolvedValue(undefined)
     Object.defineProperty(navigator, 'clipboard', {
       configurable: true,
@@ -619,39 +619,11 @@ describe('ProjectControls layout', () => {
 
     fireEvent.click(screen.getByRole('menuitem', { name: /kopier instruksjoner/i }))
 
-    await waitFor(() => expect(writeText).toHaveBeenCalledTimes(1))
-    expect(await screen.findByText(/instruksjoner kopiert/i)).toBeTruthy()
-
-    const instructions = writeText.mock.calls[0]?.[0] ?? ''
-    expect(instructions).toContain('window.__AKSEL_ARCADE_AGENT_BRIDGE__')
-    expect(instructions).toContain('getAgentInstructions()')
-    expect(instructions).toContain('getProject()')
-    expect(instructions).toContain('getPreviewContext()')
-    expect(instructions).toContain('getDiagnostics()')
-    expect(instructions).toContain('getPreviewEvidence()')
-    expect(instructions).toContain('getSessionState()')
-    expect(instructions).toContain('applySourceChange()')
-    expect(instructions).toMatch(/preview status, compile errors, runtime errors/i)
-    expect(instructions).toMatch(/sanitized layout evidence/i)
-    expect(instructions).toMatch(
-      /poll getDiagnostics\(\) until status is no longer "transpiling" or "rendering"/i
-    )
-    expect(instructions).toMatch(/diagnostics settle to "idle".*getPreviewEvidence\(\)/i)
-    expect(instructions).toMatch(/status is "error".*diagnostics again/i)
-    expect(instructions).toContain('viewportSize?')
-    expect(instructions).toContain('theme?')
-    expect(instructions).toContain('name?')
-    expect(instructions).toContain('sourceChanges: true')
-    expect(instructions).toContain('previewSettings: true')
-    expect(instructions).toContain('previewEvidence: true')
-    expect(instructions).toContain('projectMetadata: true')
-    expect(instructions).toMatch(/human must start temporary Agent access/i)
-    expect(instructions).toMatch(/Arcade authoring contract/i)
-    expect(instructions).toMatch(/import-free Arcade JSX and Hooks code/i)
-    expect(instructions).not.toMatch(/Desktop loopback JSON-RPC transport/i)
+    expect((await screen.findByRole('alert')).textContent).toMatch(/kunne ikke kopiere/i)
+    expect(writeText).not.toHaveBeenCalled()
   })
 
-  it('copies active Desktop loopback endpoint and Authorization header in hidden instructions', async () => {
+  it('copies a one-line Agent pairing handoff command only after Desktop Agent access starts', async () => {
     const writeText = vi.fn().mockResolvedValue(undefined)
     Object.defineProperty(navigator, 'clipboard', {
       configurable: true,
@@ -679,24 +651,19 @@ describe('ProjectControls layout', () => {
 
     const instructions = writeText.mock.calls[0]?.[0] ?? ''
     expect(window.__AKSEL_ARCADE_DESKTOP__.startAgentTransportSession).toHaveBeenCalledTimes(1)
-    expect(instructions).toContain('Desktop loopback JSON-RPC transport')
-    expect(instructions).toContain(`Endpoint: ${endpoint.endpoint}`)
-    expect(instructions).toContain(`Authorization: ${endpoint.authorizationHeader}`)
-    expect(instructions).toMatch(/Authorization header/i)
-    expect(instructions).toContain(
-      'Supported JSON-RPC methods: getAgentInstructions, getProject, getPreviewContext, getDiagnostics, getPreviewEvidence, getSessionState, applySourceChange.'
+    expect(instructions).toBe(
+      `curl -sS -X POST '${endpoint.endpoint}' -H 'Authorization: ${endpoint.authorizationHeader}' -H 'Content-Type: application/json' --data '{"jsonrpc":"2.0","id":"agent-instructions-1","method":"getAgentInstructions"}'`
     )
-    expect(instructions).toContain('"method":"applySourceChange"')
-    expect(instructions).toMatch(
-      /poll getDiagnostics\(\) until status is no longer "transpiling" or "rendering"/i
-    )
-    expect(instructions).toMatch(/diagnostics settle to "idle".*getPreviewEvidence\(\)/i)
-    expect(instructions).toMatch(/GitHub Copilot app/i)
-    expect(instructions).toMatch(/Copilot CLI/i)
-    expect(instructions).toMatch(/Copilot in VS Code/i)
-    expect(instructions).toMatch(/Other same-device External agents/i)
+    expect(instructions).not.toContain('\n')
+    expect(instructions).toContain(`'${endpoint.endpoint}'`)
+    expect(instructions).toContain(`'Authorization: ${endpoint.authorizationHeader}'`)
+    expect(instructions).toContain('"method":"getAgentInstructions"')
+    expect(instructions).not.toContain('window.__AKSEL_ARCADE_AGENT_BRIDGE__')
+    expect(instructions).not.toContain('Desktop loopback JSON-RPC transport')
+    expect(instructions).not.toContain('getProject')
+    expect(instructions).not.toContain('applySourceChange')
+    expect(instructions).not.toMatch(/\b(jq|mcp|helper)\b/i)
     expect(instructions).toContain('"jsonrpc":"2.0"')
-    expect(instructions).toMatch(/query parameters/i)
     expect(instructions).not.toMatch(/[?&](token|credential|authorization)=/i)
     expect(screen.queryByText(endpoint.endpoint)).toBeNull()
     expect(screen.queryByText(endpoint.authorizationHeader)).toBeNull()

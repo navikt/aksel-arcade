@@ -1,6 +1,9 @@
 import { createRequire } from 'node:module'
 import { afterEach, describe, expect, it } from 'vitest'
-import { DEFAULT_AGENT_PERMISSIONS } from '@/services/agentBridge'
+import {
+  DEFAULT_AGENT_PERMISSIONS,
+  createAgentPairingHandoffCommand,
+} from '@/services/agentBridge'
 import type { DesktopAgentTransportSession } from '@/services/desktopAgentSessionCoordinator'
 
 const require = createRequire(import.meta.url)
@@ -258,6 +261,60 @@ describe('desktop Agent loopback JSON-RPC transport', () => {
       },
     ])
     expect(JSON.stringify(routedRequests)).not.toContain('agent-secret-1')
+  })
+
+  it('serves getAgentInstructions through the copied bootstrap request and fails after stop', async () => {
+    const transport = createTransport({
+      routeRequest: (request) => ({
+        jsonrpc: '2.0',
+        id: request.id,
+        result: {
+          ok: true,
+          command: request.method,
+          data: {
+            sessionId: request.session.id,
+            readScope: 'arcade-session',
+          },
+        },
+      }),
+    })
+    const endpoint = await transport.startSession(createSession())
+    const command = createAgentPairingHandoffCommand(endpoint)
+
+    expect(command).toBe(
+      `curl -sS -X POST '${endpoint.endpoint}' -H 'Authorization: ${endpoint.authorizationHeader}' -H 'Content-Type: application/json' --data '{"jsonrpc":"2.0","id":"agent-instructions-1","method":"getAgentInstructions"}'`
+    )
+    await expect(
+      postJsonRpc(
+        endpoint.endpoint,
+        { jsonrpc: '2.0', id: 'agent-instructions-1', method: 'getAgentInstructions' },
+        endpoint.authorizationHeader
+      )
+    ).resolves.toMatchObject({
+      status: 200,
+      body: {
+        jsonrpc: '2.0',
+        id: 'agent-instructions-1',
+        result: {
+          ok: true,
+          command: 'getAgentInstructions',
+          data: {
+            sessionId: 'agent-session-1',
+            readScope: 'arcade-session',
+          },
+        },
+      },
+    })
+
+    await transport.stopSession('agent-session-1')
+
+    await expect(
+      postJsonRpc(
+        endpoint.endpoint,
+        { jsonrpc: '2.0', id: 'agent-instructions-1', method: 'getAgentInstructions' },
+        endpoint.authorizationHeader
+      )
+    ).rejects.toThrow()
   })
 
   it('shuts down the endpoint when Agent access ends', async () => {

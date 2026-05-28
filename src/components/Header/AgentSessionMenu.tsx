@@ -16,7 +16,7 @@ export const AgentSessionMenu = () => {
     [previewIframeRef]
   )
   const {
-    agentInstructions,
+    agentPairingHandoffCommand,
     checkpoints,
     isActive,
     restoreCheckpoint,
@@ -45,6 +45,14 @@ export const AgentSessionMenu = () => {
 
   const copyAgentInstructions = async () => {
     setCopyStatus('idle')
+    if (!agentPairingHandoffCommand) {
+      console.error(
+        'Agent pairing handoff could not be copied: Agent access is inactive or Desktop transport is unavailable.'
+      )
+      setCopyStatus('error')
+      return
+    }
+
     if (!navigator.clipboard?.writeText) {
       console.error('Agent instructions could not be copied: clipboard API is unavailable.')
       setCopyStatus('error')
@@ -52,7 +60,7 @@ export const AgentSessionMenu = () => {
     }
 
     try {
-      await navigator.clipboard.writeText(agentInstructions)
+      await navigator.clipboard.writeText(agentPairingHandoffCommand)
       setCopyStatus('success')
     } catch (error) {
       console.error('Agent instructions could not be copied.', error)

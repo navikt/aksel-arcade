@@ -500,6 +500,29 @@ export const createAgentBridge = (
     applySourceChange: (request) => router.routeCommand('applySourceChange', request),
   }
 }
+
+const GET_AGENT_INSTRUCTIONS_JSON_RPC_REQUEST =
+  '{"jsonrpc":"2.0","id":"agent-instructions-1","method":"getAgentInstructions"}'
+
+const shellQuote = (value: string): string => `'${value.replace(/'/g, `'\\''`)}'`
+
+export const createAgentPairingHandoffCommand = (
+  transportEndpoint: DesktopAgentTransportEndpoint
+): string =>
+  [
+    'curl',
+    '-sS',
+    '-X',
+    'POST',
+    shellQuote(transportEndpoint.endpoint),
+    '-H',
+    shellQuote(`Authorization: ${transportEndpoint.authorizationHeader}`),
+    '-H',
+    shellQuote('Content-Type: application/json'),
+    '--data',
+    shellQuote(GET_AGENT_INSTRUCTIONS_JSON_RPC_REQUEST),
+  ].join(' ')
+
 export const publishAgentBridge = (
   session: AgentBridgeSession,
   controller: AgentBridgeController
