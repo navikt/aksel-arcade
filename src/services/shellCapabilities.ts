@@ -63,11 +63,13 @@ export const SHELL_CAPABILITY_SETS: Readonly<Record<ArcadeShellSurface, ShellCap
     desktop: DESKTOP_ARCADE_CAPABILITIES,
   })
 
+interface ResolveInitialShellCapabilitiesOptions {
+  preloadApi?: DesktopArcadePreloadApi
+  isElectron?: boolean
+}
+
 export const resolveShellCapabilities = (surface: unknown = 'web'): ShellCapabilities =>
   SHELL_CAPABILITY_SETS[resolveShellSurface(surface)]
-
-export const getConfiguredShellCapabilities = (): ShellCapabilities =>
-  resolveShellCapabilities(import.meta.env.VITE_AKSEL_ARCADE_SURFACE)
 
 export const getDesktopPreloadApi = (): DesktopArcadePreloadApi | undefined => {
   if (typeof window === 'undefined') {
@@ -102,19 +104,37 @@ export const resolvePreloadedShellCapabilities = async (
   }
 
   const payload = await api.getShellCapabilities()
-  if (!isShellCapabilitiesPayload(payload)) {
+  if (!isShellCapabilitiesPayload(payload) || payload.surface !== 'desktop') {
     throw new Error(
-      'Invalid Desktop Arcade preload capabilities. Expected a known shell capability set.'
+      'Invalid Desktop Arcade preload capabilities. Expected the Desktop Arcade capability set.'
     )
   }
 
-  return resolveShellCapabilities(payload.surface)
+  return DESKTOP_ARCADE_CAPABILITIES
 }
 
-export const resolveInitialShellCapabilities = async (
-  api: DesktopArcadePreloadApi | undefined = getDesktopPreloadApi()
-): Promise<ShellCapabilities> =>
-  (await resolvePreloadedShellCapabilities(api)) ?? getConfiguredShellCapabilities()
+export const resolveInitialShellCapabilities = async ({
+  preloadApi,
+  isElectron = isElectronRenderer(),
+}: ResolveInitialShellCapabilitiesOptions = {}): Promise<ShellCapabilities> => {
+  if (!isElectron) {
+    return WEB_ARCADE_CAPABILITIES
+  }
+
+  const api = preloadApi ?? getDesktopPreloadApi()
+  if (!api) {
+    throw new Error(
+      'Desktop Arcade preload bridge is unavailable. Refusing to show Web Arcade inside Electron.'
+    )
+  }
+
+  const capabilities = await resolvePreloadedShellCapabilities(api)
+  if (!capabilities) {
+    throw new Error('Desktop Arcade preload bridge did not return capabilities.')
+  }
+
+  return capabilities
+}
 
 export const resolveShellSurface = (surface: unknown = 'web'): ArcadeShellSurface => {
   if (surface === undefined || surface === null || surface === '' || surface === 'web') {
@@ -132,6 +152,9 @@ export const resolveShellSurface = (surface: unknown = 'web'): ArcadeShellSurfac
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null
+
+const isElectronRenderer = (): boolean =>
+  typeof navigator !== 'undefined' && /\bElectron\//.test(navigator.userAgent)
 
 const hasOptionalFunction = (value: Record<string, unknown>, key: string): boolean =>
   value[key] === undefined || typeof value[key] === 'function'

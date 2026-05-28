@@ -71,7 +71,6 @@ const viteProcess = spawnChild(commandName('vite'), ['--host', '127.0.0.1', '--s
   env: {
     ...process.env,
     BROWSER: 'none',
-    VITE_AKSEL_ARCADE_SURFACE: 'desktop',
   },
 })
 

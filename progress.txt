@@ -939,3 +939,13 @@ Fixed another follow-up bug in the same #90 feature:
 - Added a regression test that prevents project-local `require('./...')` imports from returning to `desktop/preload.cjs`.
 
 Verification completed with `npm run typecheck`, `CI=1 npm run test`, targeted preload/script tests, and a Playwright Electron smoke test that starts Agent access and reaches `Agentkommando kopiert.`.
+
+### 2026-05-28 - #90 Web/Desktop surface separation follow-up
+
+Fixed a surface-mixing bug in the same #90 feature:
+
+- Removed the env-based Desktop capability escape hatch. Desktop Arcade is now selected only through the Electron preload bridge; normal browser pages always resolve Web Arcade even if a Desktop-looking global is present.
+- Electron now fails closed if the Desktop preload bridge is missing instead of silently rendering Web Arcade inside the Electron app.
+- Updated tests and docs to encode the separation: browser pages show Share URL without Agent access, while Electron shows Agent access without Share URL.
+
+Verification completed with `npm run typecheck`, `CI=1 npm run test`, targeted shell/script/preload tests, and a shared-renderer smoke test proving the same Vite URL renders Web Arcade in Chromium and Desktop Arcade in Electron.

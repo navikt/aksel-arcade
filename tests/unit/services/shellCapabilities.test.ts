@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   DESKTOP_ARCADE_CAPABILITIES,
   WEB_ARCADE_CAPABILITIES,
@@ -9,6 +9,11 @@ import {
 } from '@/services/shellCapabilities'
 
 describe('shellCapabilities', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+    delete window.__AKSEL_ARCADE_DESKTOP__
+  })
+
   it('defines Web Arcade capabilities with Share URL enabled and Agent sessions disabled', () => {
     expect(WEB_ARCADE_CAPABILITIES).toMatchObject({
       surface: 'web',
@@ -55,9 +60,21 @@ describe('shellCapabilities', () => {
     expect(getShellCapabilities).toHaveBeenCalledTimes(1)
   })
 
-  it('falls back to configured capabilities when no desktop preload bridge is present', async () => {
+  it('uses Web Arcade on webpages even if a Desktop-looking global exists', async () => {
+    window.__AKSEL_ARCADE_DESKTOP__ = {
+      getShellCapabilities: vi.fn().mockResolvedValue(DESKTOP_ARCADE_CAPABILITIES),
+    }
+
+    await expect(resolveInitialShellCapabilities({ isElectron: false })).resolves.toBe(
+      WEB_ARCADE_CAPABILITIES
+    )
+  })
+
+  it('refuses to show Web Arcade inside Electron when no desktop preload bridge is present', async () => {
     await expect(resolvePreloadedShellCapabilities(undefined)).resolves.toBeNull()
-    await expect(resolveInitialShellCapabilities(undefined)).resolves.toBe(WEB_ARCADE_CAPABILITIES)
+    await expect(resolveInitialShellCapabilities({ isElectron: true })).rejects.toThrow(
+      /Refusing to show Web Arcade inside Electron/
+    )
   })
 
   it('rejects malformed preload capabilities instead of accepting arbitrary desktop state', async () => {
@@ -69,5 +86,16 @@ describe('shellCapabilities', () => {
     await expect(resolvePreloadedShellCapabilities({ getShellCapabilities })).rejects.toThrow(
       /Invalid Desktop Arcade preload capabilities/
     )
+  })
+
+  it('rejects Web Arcade capabilities from the Desktop preload bridge', async () => {
+    const getShellCapabilities = vi.fn().mockResolvedValue(WEB_ARCADE_CAPABILITIES)
+
+    await expect(
+      resolveInitialShellCapabilities({
+        preloadApi: { getShellCapabilities },
+        isElectron: true,
+      })
+    ).rejects.toThrow(/Invalid Desktop Arcade preload capabilities/)
   })
 })

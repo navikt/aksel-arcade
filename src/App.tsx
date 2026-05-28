@@ -11,7 +11,7 @@ import { SplitPane } from './components/Layout/SplitPane'
 import { validateProjectSize, clearStorage } from './services/storage'
 import type { Project } from './types/project'
 import {
-  getConfiguredShellCapabilities,
+  WEB_ARCADE_CAPABILITIES,
   type ShellCapabilities,
 } from './services/shellCapabilities'
 import './App.css'
@@ -20,7 +20,7 @@ interface AppProps {
   shellCapabilities?: ShellCapabilities
 }
 
-function App({ shellCapabilities = getConfiguredShellCapabilities() }: AppProps) {
+function App({ shellCapabilities = WEB_ARCADE_CAPABILITIES }: AppProps) {
   const context = useContext(AppContext)
   if (!context) throw new Error('App must be used within AppProvider')
 
