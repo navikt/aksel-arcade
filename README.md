@@ -167,13 +167,7 @@ Web Arcade is the default dev mode: Share URL is available and Agent access is h
 npm run desktop:dev
 ```
 
-The desktop script starts Vite on `127.0.0.1:5173` and opens an Electron shell around the same renderer. Desktop capabilities are supplied through a narrow preload IPC bridge, so React components stay browser-like: they receive the Desktop Arcade capability set without direct Node, socket, process, or filesystem access.
-
-To preview the same Desktop Arcade capability surface in a browser without Electron, run:
-
-```bash
-VITE_AKSEL_ARCADE_SURFACE=desktop npm run dev
-```
+The desktop script starts Vite on `127.0.0.1:5173` and opens an Electron shell around the same renderer. Desktop capabilities are supplied only through a narrow preload IPC bridge, so React components stay browser-like: the Electron shell receives the Desktop Arcade capability set without direct Node, socket, process, or filesystem access. The same renderer URL opened in a normal browser remains Web Arcade with Share URL available and Agent access hidden.
 
 ### Tech Stack
 

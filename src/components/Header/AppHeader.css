@@ -38,6 +38,10 @@
   color: var(--ax-text-neutral-subtle);
 }
 
+.agent-menu__warning {
+  color: var(--ax-text-warning);
+}
+
 .share-popover__estimate-tag {
   text-transform: none;
 }

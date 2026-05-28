@@ -906,3 +906,46 @@ Fixed the post-merge `npm run build` failure from PR #96:
 - Fixed by making the accumulator type explicit with `reduce<string>`, preserving the redaction behavior while satisfying the build tsconfig.
 
 Verification completed with `npm run build`, `npm run typecheck`, `CI=1 npm run test`, and `npm run lint` (passes with the existing React hook dependency warnings in `InspectionPopover` and `PreviewPane`).
+
+### 2026-05-28 - #90 Agent pairing handoff menu wording
+
+Worked only on #90.
+
+Completed in this branch:
+
+- Updated the Desktop Arcade Agent menu to use the `Koble til agent` section label, `Kopier agentkommando` copy action, helper text that says the command grants access to the active Arcade project while Agent access is active, and the visible warning `Del bare med agenten du vil gi tilgang.`.
+- Kept endpoint, Authorization header, Agent pairing credential, and copied command text clipboard-only/not visibly rendered in the menu; the fetched agent-facing instruction payload remains English.
+- Localized the same Agent menu checkpoint restore labels and changed integration coverage so copy success, failure, retry, safety copy, and hidden handoff details stay covered.
+
+Verification completed with `npm run typecheck`, `CI=1 npm run test`, and a Desktop Arcade browser smoke test against the dev server with a preload/clipboard stub.
+
+Next note: future Agent pairing work should keep the secret-bearing command, endpoint, Authorization header, and Agent pairing credential out of visible UI and durable artifacts; treat the copied command as clipboard-only handoff material.
+
+### 2026-05-28 - #90 Desktop dev surface follow-up
+
+Fixed a follow-up bug in the same #90 feature:
+
+- Root cause: `npm run desktop:dev` spawned Vite without `VITE_AKSEL_ARCADE_SURFACE=desktop`, so the dev renderer fell back to Web Arcade if viewed without the Electron preload bridge. That hid the Agent menu button and exposed the Share URL button.
+- Set the desktop dev Vite process to `VITE_AKSEL_ARCADE_SURFACE=desktop`, documented the behavior, and added a regression test for the desktop dev script.
+
+Verification completed with `npm run typecheck`, `CI=1 npm run test`, targeted shell capability/script tests, and a browser smoke test against a Desktop-surface dev server confirming the Agent menu is visible and Share URL is absent.
+
+### 2026-05-28 - #90 Desktop Agent command copy follow-up
+
+Fixed another follow-up bug in the same #90 feature:
+
+- Root cause: the sandboxed Electron preload script tried to `require('./agentHandoffRedaction.cjs')`, but Electron's sandboxed preload context cannot load project-local modules. The preload failed before exposing `__AKSEL_ARCADE_DESKTOP__`, so Agent access had no Desktop Agent transport endpoint and `Kopier agentkommando` had no command to copy.
+- Inlined the small preload redaction helper to keep the preload self-contained while leaving the main-process CJS redactor in place for non-preload code.
+- Added a regression test that prevents project-local `require('./...')` imports from returning to `desktop/preload.cjs`.
+
+Verification completed with `npm run typecheck`, `CI=1 npm run test`, targeted preload/script tests, and a Playwright Electron smoke test that starts Agent access and reaches `Agentkommando kopiert.`.
+
+### 2026-05-28 - #90 Web/Desktop surface separation follow-up
+
+Fixed a surface-mixing bug in the same #90 feature:
+
+- Removed the env-based Desktop capability escape hatch. Desktop Arcade is now selected only through the Electron preload bridge; normal browser pages always resolve Web Arcade even if a Desktop-looking global is present.
+- Electron now fails closed if the Desktop preload bridge is missing instead of silently rendering Web Arcade inside the Electron app.
+- Updated tests and docs to encode the separation: browser pages show Share URL without Agent access, while Electron shows Agent access without Share URL.
+
+Verification completed with `npm run typecheck`, `CI=1 npm run test`, targeted shell/script/preload tests, and a shared-renderer smoke test proving the same Vite URL renders Web Arcade in Chromium and Desktop Arcade in Electron.

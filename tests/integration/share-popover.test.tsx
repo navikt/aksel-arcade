@@ -112,7 +112,7 @@ const renderHeader = (
   )
 }
 
-const findAgentAccessButton = () => screen.findByRole('button', { name: /agent access/i })
+const findAgentAccessButton = () => screen.findByRole('button', { name: /koble til agent/i })
 
 const normalizeWhitespace = (value: string): string => value.replace(/\s+/g, ' ').trim()
 const AGENT_CHECKPOINT_SUMMARY = 'Confidential checkpoint summary'
@@ -168,7 +168,7 @@ const readBlobText = (blob: Blob): Promise<string> =>
 
 const startAgentAccess = async () => {
   fireEvent.click(await findAgentAccessButton())
-  expect(await screen.findByText(/Gi agenter tilgang/i)).toBeTruthy()
+  expect(await screen.findByText(/Koble til agent/i)).toBeTruthy()
   fireEvent.click(screen.getByRole('menuitemcheckbox', { name: /agent-tilgang/i }))
 
   await waitFor(() => expect(window.__AKSEL_ARCADE_AGENT_BRIDGE__).toBeDefined())

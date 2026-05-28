@@ -97,7 +97,7 @@ const renderHeader = (options?: HarnessProps) => {
   )
 }
 
-const findAgentAccessButton = () => screen.findByRole('button', { name: /agent access/i })
+const findAgentAccessButton = () => screen.findByRole('button', { name: /koble til agent/i })
 
 const collectObjectKeys = (value: unknown): string[] => {
   if (!value || typeof value !== 'object') {
@@ -226,7 +226,7 @@ const getRollbackLabels = (): string[] =>
   screen
     .queryAllByRole('menuitem')
     .map((item) => item.textContent ?? '')
-    .filter((label) => label.startsWith('Restore '))
+    .filter((label) => label.startsWith('Gjenopprett '))
 
 const captureAgentState = (bridge: AgentBridge) => {
   const project = expectBridgeSuccess(callBridgeCommand(() => bridge.getProject()))
@@ -244,7 +244,7 @@ const captureAgentState = (bridge: AgentBridge) => {
 
 const startAgentAccess = async () => {
   fireEvent.click(await findAgentAccessButton())
-  expect(await screen.findByText(/Gi agenter tilgang/i)).toBeTruthy()
+  expect(await screen.findByText(/Koble til agent/i)).toBeTruthy()
   fireEvent.click(screen.getByRole('menuitemcheckbox', { name: /agent-tilgang/i }))
 
   await waitFor(() => expect(window.__AKSEL_ARCADE_AGENT_BRIDGE__).toBeDefined())
@@ -452,7 +452,7 @@ describe('ProjectControls layout', () => {
     const settingsButton = screen.getByRole('button', { name: /settings/i })
 
     expect(importInput.accept).toBe(ARCADE_PROJECT_IMPORT_ACCEPT)
-    expect(screen.queryByRole('button', { name: /agent access/i })).toBeNull()
+    expect(screen.queryByRole('button', { name: /koble til agent/i })).toBeNull()
     expect(window.__AKSEL_ARCADE_AGENT_BRIDGE__).toBeUndefined()
     expect(
       importButton.compareDocumentPosition(shareButton) & Node.DOCUMENT_POSITION_FOLLOWING
@@ -498,9 +498,10 @@ describe('ProjectControls layout', () => {
 
     fireEvent.click(await findAgentAccessButton())
 
-    expect(await screen.findByText(/Gi agenter tilgang/i)).toBeTruthy()
-    expect(screen.getByText(/Klikk på knappen nedenfor/i)).toBeTruthy()
-    expect(screen.getByRole('menuitem', { name: /Kopier instruksjoner/i })).toBeTruthy()
+    expect(await screen.findByText(/Koble til agent/i)).toBeTruthy()
+    expect(screen.getByText(/kommandoen gir agenten tilgang/i)).toBeTruthy()
+    expect(screen.getByText('Del bare med agenten du vil gi tilgang.')).toBeTruthy()
+    expect(screen.getByRole('menuitem', { name: /Kopier agentkommando/i })).toBeTruthy()
     const inactiveStatus = screen.getByRole('status').textContent ?? ''
     expect(inactiveStatus).toBe('Status: inaktiv')
     expect(inactiveStatus).not.toMatch(/connected|disconnected/i)
@@ -615,9 +616,9 @@ describe('ProjectControls layout', () => {
     renderHeader()
 
     fireEvent.click(await findAgentAccessButton())
-    expect(await screen.findByText(/Gi agenter tilgang/i)).toBeTruthy()
+    expect(await screen.findByText(/Koble til agent/i)).toBeTruthy()
 
-    fireEvent.click(screen.getByRole('menuitem', { name: /kopier instruksjoner/i }))
+    fireEvent.click(screen.getByRole('menuitem', { name: /kopier agentkommando/i }))
 
     expect((await screen.findByRole('alert')).textContent).toMatch(/kunne ikke kopiere/i)
     expect(writeText).not.toHaveBeenCalled()
@@ -645,7 +646,7 @@ describe('ProjectControls layout', () => {
     renderHeader()
 
     await startAgentAccess()
-    fireEvent.click(screen.getByRole('menuitem', { name: /kopier instruksjoner/i }))
+    fireEvent.click(screen.getByRole('menuitem', { name: /kopier agentkommando/i }))
 
     await waitFor(() => expect(writeText).toHaveBeenCalledTimes(1))
 
@@ -667,6 +668,9 @@ describe('ProjectControls layout', () => {
     expect(instructions).not.toMatch(/[?&](token|credential|authorization)=/i)
     expect(screen.queryByText(endpoint.endpoint)).toBeNull()
     expect(screen.queryByText(endpoint.authorizationHeader)).toBeNull()
+    expect(screen.queryByText('copied-agent-secret')).toBeNull()
+    expect(screen.queryByText(/curl -sS/i)).toBeNull()
+    expect(screen.queryByText(/getAgentInstructions/i)).toBeNull()
   })
 
   it('routes Desktop transport Agent changes through normal project and preview flows', async () => {
@@ -744,7 +748,7 @@ describe('ProjectControls layout', () => {
     })
     expect(
       screen.getByRole('menuitem', {
-        name: /restore desktop transport update \(JSX \+ Viewport \+ Theme \+ Name\)/i,
+        name: /gjenopprett desktop transport update \(JSX \+ Skjermstørrelse \+ Tema \+ Navn\)/i,
       })
     ).toBeTruthy()
 
@@ -867,7 +871,7 @@ describe('ProjectControls layout', () => {
     })
 
     const restoreItem = await screen.findByRole('menuitem', {
-      name: /restore desktop rollback update \(JSX \+ Hooks \+ Viewport \+ Theme \+ Name\)/i,
+      name: /gjenopprett desktop rollback update \(JSX \+ Hooks \+ Skjermstørrelse \+ Tema \+ Navn\)/i,
     })
     const changed = captureAgentState(bridge)
 
@@ -909,7 +913,7 @@ describe('ProjectControls layout', () => {
     expect(screen.getByRole('status').textContent).toBe('Status: inaktiv')
     expect(
       screen.queryByRole('menuitem', {
-        name: /restore desktop rollback update/i,
+        name: /gjenopprett desktop rollback update/i,
       })
     ).toBeNull()
   })
@@ -1032,7 +1036,7 @@ describe('ProjectControls layout', () => {
 
       fireEvent.click(
         await screen.findByRole('menuitem', {
-          name: /restore confidential package checkpoint summary \(JSX \+ Hooks \+ Viewport \+ Theme \+ Name\)/i,
+          name: /gjenopprett confidential package checkpoint summary \(JSX \+ Hooks \+ Skjermstørrelse \+ Tema \+ Navn\)/i,
         })
       )
       await waitFor(() => {
@@ -1078,11 +1082,11 @@ describe('ProjectControls layout', () => {
       expect(window.__AKSEL_ARCADE_AGENT_BRIDGE__).toBeUndefined()
 
       fireEvent.click(await findAgentAccessButton())
-      expect(await screen.findByText(/Gi agenter tilgang/i)).toBeTruthy()
+      expect(await screen.findByText(/Koble til agent/i)).toBeTruthy()
       expect(screen.getByRole('status').textContent).toBe('Status: inaktiv')
       expect(
         screen.queryByRole('menuitem', {
-          name: /restore confidential package checkpoint summary/i,
+          name: /gjenopprett confidential package checkpoint summary/i,
         })
       ).toBeNull()
     } finally {
@@ -1122,7 +1126,7 @@ describe('ProjectControls layout', () => {
     renderHeader()
 
     await startAgentAccess()
-    fireEvent.click(screen.getByRole('menuitem', { name: /kopier instruksjoner/i }))
+    fireEvent.click(screen.getByRole('menuitem', { name: /kopier agentkommando/i }))
 
     expect((await screen.findByRole('alert')).textContent).toMatch(/kunne ikke kopiere/i)
     const serializedLog = JSON.stringify(consoleError.mock.calls)
@@ -1138,7 +1142,7 @@ describe('ProjectControls layout', () => {
     fireEvent.click(screen.getByRole('menuitem', { name: /prøv igjen/i }))
 
     await waitFor(() => expect(writeText).toHaveBeenCalledTimes(2))
-    expect(await screen.findByText(/instruksjoner kopiert/i)).toBeTruthy()
+    expect(await screen.findByText(/agentkommando kopiert/i)).toBeTruthy()
     expect(screen.queryByText(endpoint.endpoint)).toBeNull()
     expect(screen.queryByText(endpoint.authorizationHeader)).toBeNull()
   })
@@ -1147,7 +1151,7 @@ describe('ProjectControls layout', () => {
     renderHeader()
 
     fireEvent.click(await findAgentAccessButton())
-    expect(await screen.findByText(/Gi agenter tilgang/i)).toBeTruthy()
+    expect(await screen.findByText(/Koble til agent/i)).toBeTruthy()
     fireEvent.click(
       screen.getByRole('menuitemcheckbox', {
         name: /agent-tilgang/i,
@@ -1509,7 +1513,7 @@ describe('ProjectControls layout', () => {
 
     fireEvent.click(
       await screen.findByRole('menuitem', {
-        name: /restore replace source for demo \(JSX \+ Hooks\)/i,
+        name: /gjenopprett replace source for demo \(JSX \+ Hooks\)/i,
       })
     )
 
@@ -1556,7 +1560,7 @@ describe('ProjectControls layout', () => {
 
     fireEvent.click(
       await screen.findByRole('menuitem', {
-        name: /restore second rapid change \(JSX\)/i,
+        name: /gjenopprett second rapid change \(JSX\)/i,
       })
     )
 
@@ -1569,7 +1573,7 @@ describe('ProjectControls layout', () => {
     fireEvent.click(await findAgentAccessButton())
     fireEvent.click(
       await screen.findByRole('menuitem', {
-        name: /restore first rapid change \(JSX\)/i,
+        name: /gjenopprett first rapid change \(JSX\)/i,
       })
     )
 
@@ -1610,7 +1614,7 @@ describe('ProjectControls layout', () => {
     })
     expect(
       screen.getByRole('menuitem', {
-        name: /restore switch preview context \(viewport \+ theme\)/i,
+        name: /gjenopprett switch preview context \(skjermstørrelse \+ tema\)/i,
       })
     ).toBeTruthy()
   })
@@ -1684,7 +1688,7 @@ describe('ProjectControls layout', () => {
 
     fireEvent.click(
       await screen.findByRole('menuitem', {
-        name: /restore combined agent update \(JSX \+ Hooks \+ Viewport \+ Theme \+ Name\)/i,
+        name: /gjenopprett combined agent update \(JSX \+ Hooks \+ Skjermstørrelse \+ Tema \+ Navn\)/i,
       })
     )
 
@@ -1717,11 +1721,11 @@ describe('ProjectControls layout', () => {
     await waitFor(() => {
       const rollbackItems = screen
         .getAllByRole('menuitem')
-        .filter((item) => item.textContent?.startsWith('Restore change'))
+        .filter((item) => item.textContent?.startsWith('Gjenopprett change'))
       expect(rollbackItems).toHaveLength(10)
     })
-    expect(screen.queryByRole('menuitem', { name: /^Restore change 1 \(/i })).toBeNull()
-    expect(screen.getByRole('menuitem', { name: /^Restore change 11 \(/i })).toBeTruthy()
+    expect(screen.queryByRole('menuitem', { name: /^Gjenopprett change 1 \(/i })).toBeNull()
+    expect(screen.getByRole('menuitem', { name: /^Gjenopprett change 11 \(/i })).toBeTruthy()
   })
 
   it('rejects malformed and unsupported Agent change requests without mutating Agent state', async () => {
