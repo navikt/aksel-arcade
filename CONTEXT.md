@@ -21,12 +21,12 @@ The desktop product surface for working with the same **Arcade projects** as **W
 _Avoid_: Electron app, native app
 
 **Agent session**:
-A Desktop Arcade-only revocable, consent-gated pairing relationship where an authorized external agent can inspect and change the active **Arcade project** while the human can stop access and roll back changes.
+A Desktop Arcade-only revocable, consent-gated pairing relationship where an authorized external agent can inspect and change one active **Arcade project** while the human can stop access.
 _Avoid_: Chat, bot session, automation session
 
 **Agent access**:
-The human-controlled on/off consent state that makes the current **Arcade project** available for explicit **Agent pairing** during an **Agent session**.
-_Avoid_: Local server, transport, pairing token
+A Desktop Arcade-only human-controlled on/off consent state that makes the current **Arcade project** available for explicit **Agent pairing** during an **Agent session**. It does not include ordinary project sharing, import/export, or normal human preview review.
+_Avoid_: Local server, transport, pairing token, Share URL
 
 **Agent bridge**:
 The Desktop Arcade user-authorized connection point between an external agent and an active **Agent session**; it lets agents read **Arcade-scoped state** and submit **Agent changes**.
@@ -76,10 +76,6 @@ _Avoid_: Agent-only rules, human-only rules
 An agent-authored replacement set applied to one or more parts of the active **Arcade project** during an **Agent session**.
 _Avoid_: Proposed change, patch, command, cursor edit
 
-**Checkpoint**:
-A human-restorable safety point captured before an **Agent change** during an **Agent session**; checkpoints are local session safety, not shared project history.
-_Avoid_: Version, revision, commit
-
 ## Example dialogue
 
 Developer: "The human started Agent access and copied an Agent pairing handoff to the external agent."
@@ -88,4 +84,4 @@ Domain expert: "Good. That pairs the agent with this active Arcade project only;
 
 Developer: "The agent session applied an agent change to the Arcade project."
 
-Domain expert: "Show it in the live preview. If the user does not want it, restore the checkpoint."
+Domain expert: "Show it in the live preview. If the user does not want more agent changes, stop Agent access."
