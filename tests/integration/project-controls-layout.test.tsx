@@ -499,9 +499,9 @@ describe('ProjectControls layout', () => {
     fireEvent.click(await findAgentAccessButton())
 
     expect(await screen.findByText(/Koble til agent/i)).toBeTruthy()
-    expect(screen.getByText(/kommandoen gir agenten tilgang/i)).toBeTruthy()
-    expect(screen.getByText('Del bare med agenten du vil gi tilgang.')).toBeTruthy()
-    expect(screen.getByRole('menuitem', { name: /Kopier agentkommando/i })).toBeTruthy()
+    expect(screen.queryByText(/kommandoen gir agenten tilgang/i)).toBeNull()
+    expect(screen.queryByText('Del bare med agenten du vil gi tilgang.')).toBeNull()
+    expect(screen.queryByRole('menuitem', { name: /Kopier agentkommando/i })).toBeNull()
     const inactiveStatus = screen.getByRole('status').textContent ?? ''
     expect(inactiveStatus).toBe('Status: inaktiv')
     expect(inactiveStatus).not.toMatch(/connected|disconnected/i)
@@ -525,6 +525,9 @@ describe('ProjectControls layout', () => {
     fireEvent.click(accessItem)
 
     await waitFor(() => expect(screen.getByRole('status').textContent).toBe('Status: aktiv'))
+    expect(screen.getByText(/kommandoen gir agenten tilgang/i)).toBeTruthy()
+    expect(screen.getByText('Del bare med agenten du vil gi tilgang.')).toBeTruthy()
+    expect(screen.getByRole('menuitem', { name: /Kopier agentkommando/i })).toBeTruthy()
     const activeBridge = window.__AKSEL_ARCADE_AGENT_BRIDGE__
     expect(activeBridge).toMatchObject({
       sessionId: '11111111-1111-4111-8111-111111111111',
@@ -606,7 +609,7 @@ describe('ProjectControls layout', () => {
     expect(screen.getByRole('status').textContent).toBe('Status: inaktiv')
   })
 
-  it('does not copy an Agent pairing handoff before Agent access is active', async () => {
+  it('hides the Agent pairing handoff before Agent access is active', async () => {
     const writeText = vi.fn().mockResolvedValue(undefined)
     Object.defineProperty(navigator, 'clipboard', {
       configurable: true,
@@ -618,9 +621,10 @@ describe('ProjectControls layout', () => {
     fireEvent.click(await findAgentAccessButton())
     expect(await screen.findByText(/Koble til agent/i)).toBeTruthy()
 
-    fireEvent.click(screen.getByRole('menuitem', { name: /kopier agentkommando/i }))
-
-    expect((await screen.findByRole('alert')).textContent).toMatch(/kunne ikke kopiere/i)
+    expect(screen.queryByText(/kommandoen gir agenten tilgang/i)).toBeNull()
+    expect(screen.queryByText('Del bare med agenten du vil gi tilgang.')).toBeNull()
+    expect(screen.queryByRole('menuitem', { name: /kopier agentkommando/i })).toBeNull()
+    expect(screen.queryByRole('alert')).toBeNull()
     expect(writeText).not.toHaveBeenCalled()
   })
 
