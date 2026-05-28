@@ -31,6 +31,7 @@
 }
 
 .agent-menu {
+  width: min(360px, calc(100vw - 2rem));
   max-width: 360px;
 }
 

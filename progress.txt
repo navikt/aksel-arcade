@@ -949,3 +949,26 @@ Fixed a surface-mixing bug in the same #90 feature:
 - Updated tests and docs to encode the separation: browser pages show Share URL without Agent access, while Electron shows Agent access without Share URL.
 
 Verification completed with `npm run typecheck`, `CI=1 npm run test`, targeted shell/script/preload tests, and a shared-renderer smoke test proving the same Vite URL renders Web Arcade in Chromium and Desktop Arcade in Electron.
+
+### 2026-05-28 - Desktop Agent menu gating
+
+Worked only on the Desktop Arcade Agent action menu.
+
+Completed in this branch:
+
+- Gated the Desktop Agent action menu so the inactive state only shows `Koble til agent`, `Agent-tilgang`, and `Status: inaktiv`.
+- Kept the helper copy, safety warning, copy action, feedback, and checkpoint restore controls hidden until `Agent-tilgang` is checked.
+- Updated the Desktop Agent menu regression coverage to assert the inactive menu is minimal and the active menu restores the handoff content.
+
+Verification completed with `npm run typecheck`, `CI=1 npm run test`, `npm run lint` (same existing hook dependency warnings), and a real Electron Desktop Arcade smoke test against the current dev renderer on port 5174.
+
+Next note: keep future Agent pairing handoff UI Desktop-scoped and avoid showing the secret-bearing command before the user explicitly enables Agent access.
+
+### 2026-05-28 - Desktop Agent menu width follow-up
+
+Followed up on the Desktop Agent menu gating PR:
+
+- Changed the Agent action menu from `max-width` only to a fixed reserved width capped by the viewport, so the inactive menu keeps the same width as the expanded menu.
+- Verified in real Electron Desktop Arcade that the settled menu width is 360px both before and after `Agent-tilgang` is checked.
+
+Next note: if more content is added to the Agent action menu, adjust the reserved `.agent-menu` width together with the full-content design to avoid reintroducing checkbox-triggered layout shift.

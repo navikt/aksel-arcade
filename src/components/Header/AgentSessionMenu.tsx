@@ -103,49 +103,53 @@ export const AgentSessionMenu = () => {
             {statusText}
           </Detail>
         </Box>
-        <Box paddingInline="space-12" paddingBlock="space-8" role="none">
-          <VStack gap="space-6">
-            <Detail className="agent-menu__context">
-              Start Agent-tilgang, kopier kommandoen og del den med agenten du vil koble til.
-              Kommandoen gir agenten tilgang til dette aktive Arcade-prosjektet mens Agent-tilgang
-              er aktiv.
-            </Detail>
-            <Detail className="agent-menu__warning">
-              Del bare med agenten du vil gi tilgang.
-            </Detail>
-            {copyFeedbackText && (
-              <Detail
-                aria-live="polite"
-                className="agent-menu__context"
-                role={copyStatus === 'error' ? 'alert' : undefined}
-              >
-                {copyFeedbackText}
-              </Detail>
-            )}
-          </VStack>
-        </Box>
-        <ActionMenu.Item
-          icon={<FilesIcon aria-hidden />}
-          onSelect={(event) => {
-            event.preventDefault()
-            void copyAgentCommand()
-          }}
-        >
-          {copyStatus === 'error' ? 'Prøv igjen' : 'Kopier agentkommando'}
-        </ActionMenu.Item>
-        {checkpoints.length > 0 && (
+        {isActive && (
           <>
-            <ActionMenu.Divider />
-            <ActionMenu.Group label="Kontrollpunkter">
-              {checkpoints.map((checkpoint) => (
-                <ActionMenu.Item
-                  key={checkpoint.id}
-                  onSelect={() => restoreCheckpoint(checkpoint.id)}
-                >
-                  {`Gjenopprett ${checkpoint.summary} (${formatChangedFields(checkpoint.changedFields)})`}
-                </ActionMenu.Item>
-              ))}
-            </ActionMenu.Group>
+            <Box paddingInline="space-12" paddingBlock="space-8" role="none">
+              <VStack gap="space-6">
+                <Detail className="agent-menu__context">
+                  Start Agent-tilgang, kopier kommandoen og del den med agenten du vil koble til.
+                  Kommandoen gir agenten tilgang til dette aktive Arcade-prosjektet mens
+                  Agent-tilgang er aktiv.
+                </Detail>
+                <Detail className="agent-menu__warning">
+                  Del bare med agenten du vil gi tilgang.
+                </Detail>
+                {copyFeedbackText && (
+                  <Detail
+                    aria-live="polite"
+                    className="agent-menu__context"
+                    role={copyStatus === 'error' ? 'alert' : undefined}
+                  >
+                    {copyFeedbackText}
+                  </Detail>
+                )}
+              </VStack>
+            </Box>
+            <ActionMenu.Item
+              icon={<FilesIcon aria-hidden />}
+              onSelect={(event) => {
+                event.preventDefault()
+                void copyAgentCommand()
+              }}
+            >
+              {copyStatus === 'error' ? 'Prøv igjen' : 'Kopier agentkommando'}
+            </ActionMenu.Item>
+            {checkpoints.length > 0 && (
+              <>
+                <ActionMenu.Divider />
+                <ActionMenu.Group label="Kontrollpunkter">
+                  {checkpoints.map((checkpoint) => (
+                    <ActionMenu.Item
+                      key={checkpoint.id}
+                      onSelect={() => restoreCheckpoint(checkpoint.id)}
+                    >
+                      {`Gjenopprett ${checkpoint.summary} (${formatChangedFields(checkpoint.changedFields)})`}
+                    </ActionMenu.Item>
+                  ))}
+                </ActionMenu.Group>
+              </>
+            )}
           </>
         )}
       </ActionMenu.Content>
