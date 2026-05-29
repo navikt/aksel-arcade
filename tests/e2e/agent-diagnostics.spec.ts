@@ -23,12 +23,7 @@ interface AgentDiagnostics {
 
 interface TestAgentTransport {
   hasHandler: () => boolean
-  route: (request: {
-    id: string
-    method: string
-    params?: unknown
-    sessionId?: string
-  }) =>
+  route: (request: { id: string; method: string; params?: unknown; sessionId?: string }) =>
     | {
         result: AgentBridgeCommandResult<unknown>
       }
@@ -41,12 +36,7 @@ const installDesktopAgentSurface = async (page: Page) => {
   await page.addInitScript(() => {
     const testTransportGlobal = '__AKSEL_ARCADE_TEST_AGENT_TRANSPORT__'
     let transportRequestHandler:
-      | ((request: {
-          id: string
-          method: string
-          params?: unknown
-          sessionId: string
-        }) => unknown)
+      | ((request: { id: string; method: string; params?: unknown; sessionId: string }) => unknown)
       | null = null
     const endpoint = {
       endpoint: 'http://127.0.0.1:48123',
@@ -62,7 +52,7 @@ const installDesktopAgentSurface = async (page: Page) => {
         projectPackages: {
           enabled: true,
           defaultExtension: '.akselarcade',
-          legacyJsonImport: true,
+          legacyJsonImport: false,
         },
       }),
       startAgentTransportSession: async () => endpoint,

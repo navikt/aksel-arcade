@@ -42,7 +42,7 @@ export const WEB_ARCADE_CAPABILITIES: ShellCapabilities = Object.freeze({
   projectPackages: Object.freeze({
     enabled: true,
     defaultExtension: '.akselarcade',
-    legacyJsonImport: true,
+    legacyJsonImport: false,
   }),
 })
 
@@ -53,7 +53,7 @@ export const DESKTOP_ARCADE_CAPABILITIES: ShellCapabilities = Object.freeze({
   projectPackages: Object.freeze({
     enabled: true,
     defaultExtension: '.akselarcade',
-    legacyJsonImport: true,
+    legacyJsonImport: false,
   }),
 })
 
