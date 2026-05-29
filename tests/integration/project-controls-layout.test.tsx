@@ -11,8 +11,12 @@ import {
 } from '@/services/previewDiagnostics'
 import type {
   AgentBridgeCommandResult,
+  AgentBridgeCommandName,
   AgentBridgeErrorCode,
-  AgentBridgeRoutedCommandResult,
+  AgentInstructionsPayload,
+  AgentPreviewReadState,
+  AgentProjectReadState,
+  AgentSourceChangeResult,
   AgentSessionReadState,
 } from '@/services/agentBridge'
 import type {
@@ -20,7 +24,7 @@ import type {
   DesktopAgentTransportRouteRequest,
   DesktopAgentTransportRouteResponse,
 } from '@/services/desktopAgentTransportProtocol'
-import type { PreviewEvidenceElement } from '@/services/previewEvidence'
+import type { PreviewEvidence, PreviewEvidenceElement } from '@/services/previewEvidence'
 import {
   DESKTOP_ARCADE_CAPABILITIES,
   WEB_ARCADE_CAPABILITIES,
@@ -41,11 +45,10 @@ import { createShareToken, encodeSharePayload } from '@/utils/shareEncoding'
 const noop = () => {}
 const LEGACY_AGENT_BRIDGE_GLOBAL = '__AKSEL_ARCADE_AGENT_BRIDGE__'
 
-const getLegacyAgentBridgeGlobal = () =>
-  (window as Window & Record<string, unknown>)[LEGACY_AGENT_BRIDGE_GLOBAL]
+const getLegacyAgentBridgeGlobal = () => Reflect.get(window, LEGACY_AGENT_BRIDGE_GLOBAL)
 
 const clearLegacyAgentBridgeGlobal = () => {
-  delete (window as Window & Record<string, unknown>)[LEGACY_AGENT_BRIDGE_GLOBAL]
+  Reflect.deleteProperty(window, LEGACY_AGENT_BRIDGE_GLOBAL)
 }
 
 const expectLegacyAgentBridgeAbsent = () => {
@@ -279,19 +282,22 @@ type AgentTransportClient = {
   readonly permissions: AgentSessionReadState['permissions']
   readonly readScope: 'arcade-session'
   readonly commandNames: AgentSessionReadState['commandNames']
-  getAgentInstructions: () => AgentBridgeRoutedCommandResult
-  getProject: () => AgentBridgeRoutedCommandResult
-  getPreviewContext: () => AgentBridgeRoutedCommandResult
-  getDiagnostics: () => AgentBridgeRoutedCommandResult
-  getPreviewEvidence: () => AgentBridgeRoutedCommandResult
-  getSessionState: () => AgentBridgeRoutedCommandResult
-  applySourceChange: (request: unknown) => AgentBridgeRoutedCommandResult
+  getAgentInstructions: () => AgentBridgeCommandResult<AgentInstructionsPayload>
+  getProject: () => AgentBridgeCommandResult<AgentProjectReadState>
+  getPreviewContext: () => AgentBridgeCommandResult<AgentPreviewReadState>
+  getDiagnostics: () => AgentBridgeCommandResult<PreviewDiagnostics>
+  getPreviewEvidence: () => AgentBridgeCommandResult<PreviewEvidence>
+  getSessionState: () => AgentBridgeCommandResult<AgentSessionReadState>
+  applySourceChange: (request: unknown) => AgentBridgeCommandResult<AgentSourceChangeResult>
 }
 
 const createAgentTransportClient = (
   desktopTransport: ReturnType<typeof setupDesktopTransportPreload>
 ): AgentTransportClient => {
-  const route = (method: string, params?: unknown): AgentBridgeRoutedCommandResult => {
+  const route = <TData,>(
+    method: AgentBridgeCommandName,
+    params?: unknown
+  ): AgentBridgeCommandResult<TData> => {
     const response = desktopTransport.route({
       id: `${method}-test`,
       method,
@@ -301,7 +307,7 @@ const createAgentTransportClient = (
     if ('error' in response) {
       return {
         ok: false,
-        command: response.error.data.command ?? method,
+        command: method,
         error: response.error.data.bridgeError ?? {
           code: response.error.data.code as AgentBridgeErrorCode,
           message: response.error.message,
@@ -309,13 +315,11 @@ const createAgentTransportClient = (
       }
     }
 
-    return response.result
+    return response.result as AgentBridgeCommandResult<TData>
   }
 
   const readSession = () => {
-    const session = expectBridgeSuccess(
-      route('getSessionState') as AgentBridgeCommandResult<AgentSessionReadState>
-    )
+    const session = expectBridgeSuccess(route<AgentSessionReadState>('getSessionState'))
     return session
   }
 
@@ -331,13 +335,13 @@ const createAgentTransportClient = (
     get commandNames() {
       return readSession().commandNames
     },
-    getAgentInstructions: () => route('getAgentInstructions'),
-    getProject: () => route('getProject'),
-    getPreviewContext: () => route('getPreviewContext'),
-    getDiagnostics: () => route('getDiagnostics'),
-    getPreviewEvidence: () => route('getPreviewEvidence'),
-    getSessionState: () => route('getSessionState'),
-    applySourceChange: (request) => route('applySourceChange', request),
+    getAgentInstructions: () => route<AgentInstructionsPayload>('getAgentInstructions'),
+    getProject: () => route<AgentProjectReadState>('getProject'),
+    getPreviewContext: () => route<AgentPreviewReadState>('getPreviewContext'),
+    getDiagnostics: () => route<PreviewDiagnostics>('getDiagnostics'),
+    getPreviewEvidence: () => route<PreviewEvidence>('getPreviewEvidence'),
+    getSessionState: () => route<AgentSessionReadState>('getSessionState'),
+    applySourceChange: (request) => route<AgentSourceChangeResult>('applySourceChange', request),
   }
 }
 
@@ -924,7 +928,7 @@ describe('ProjectControls layout', () => {
     await waitFor(() => expect(writeText).toHaveBeenCalledTimes(1))
 
     const instructions = writeText.mock.calls[0]?.[0] ?? ''
-    expect(window.__AKSEL_ARCADE_DESKTOP__.startAgentTransportSession).toHaveBeenCalledTimes(1)
+    expect(desktopTransport.api.startAgentTransportSession).toHaveBeenCalledTimes(1)
     expect(instructions).toBe(
       `curl -sS -X POST '${endpoint.endpoint}' -H 'Authorization: ${endpoint.authorizationHeader}' -H 'Content-Type: application/json' --data '{"jsonrpc":"2.0","id":"agent-instructions-1","method":"getAgentInstructions"}'`
     )

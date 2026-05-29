@@ -1033,3 +1033,14 @@ Verification:
 - Browser smoke check at http://127.0.0.1:5173/aksel-arcade/ confirmed Web Arcade renders, has no console errors, no Agent access text, and no `window.__AKSEL_ARCADE_AGENT_BRIDGE__`.
 
 Next note: #103 can rename/version the command contract separately. Do not reintroduce a Web Arcade Agent global or Web-facing pairing handoff while doing that follow-up; keep Agent access Desktop transport-only unless a new ADR reverses this boundary.
+
+### 2026-05-29 - PR #107 review follow-up
+
+Fixed one scoped build-mode regression found during PR review:
+
+- Reproduced `npm run build` failing in `tsc -b` because the Desktop transport test clients returned broad routed result unions after the browser-global bridge removal.
+- Tightened the transport test client method result types for project, preview, diagnostics, evidence, session state, instructions, and source changes.
+- Replaced build-mode-unsafe dynamic `window` casts in the legacy-global absence assertions with `Reflect.get` / `Reflect.deleteProperty`.
+- Swapped one nullable `window.__AKSEL_ARCADE_DESKTOP__` assertion for the existing Desktop preload fixture reference.
+
+Verification completed with `npm run typecheck`, `npm run build`, `CI=1 npm run test -- --run`, and `npm run lint` (existing hook dependency warnings only).

@@ -8,8 +8,11 @@ import { AppHeader } from '@/components/Header/AppHeader'
 import type { UseShareLinkOptions } from '@/hooks/useShareLink'
 import type {
   AgentBridgeCommandResult,
+  AgentBridgeCommandName,
   AgentBridgeErrorCode,
-  AgentBridgeRoutedCommandResult,
+  AgentPreviewReadState,
+  AgentProjectReadState,
+  AgentSourceChangeResult,
 } from '@/services/agentBridge'
 import type {
   DesktopAgentTransportRequestHandler,
@@ -155,9 +158,9 @@ const expectBridgeSuccess = <TData,>(result: AgentBridgeCommandResult<TData>): T
 }
 
 type AgentTransportClient = {
-  getProject: () => AgentBridgeRoutedCommandResult
-  getPreviewContext: () => AgentBridgeRoutedCommandResult
-  applySourceChange: (request: unknown) => AgentBridgeRoutedCommandResult
+  getProject: () => AgentBridgeCommandResult<AgentProjectReadState>
+  getPreviewContext: () => AgentBridgeCommandResult<AgentPreviewReadState>
+  applySourceChange: (request: unknown) => AgentBridgeCommandResult<AgentSourceChangeResult>
 }
 
 let currentDesktopTransport: ReturnType<typeof setupDesktopTransportPreload> | null = null
@@ -229,7 +232,10 @@ const isPromiseLike = <TValue,>(value: TValue | Promise<TValue>): value is Promi
 const createAgentTransportClient = (
   desktopTransport: ReturnType<typeof setupDesktopTransportPreload>
 ): AgentTransportClient => {
-  const route = (method: string, params?: unknown): AgentBridgeRoutedCommandResult => {
+  const route = <TData,>(
+    method: AgentBridgeCommandName,
+    params?: unknown
+  ): AgentBridgeCommandResult<TData> => {
     const response = desktopTransport.route({
       id: `${method}-test`,
       method,
@@ -239,7 +245,7 @@ const createAgentTransportClient = (
     if ('error' in response) {
       return {
         ok: false,
-        command: response.error.data.command ?? method,
+        command: method,
         error: response.error.data.bridgeError ?? {
           code: response.error.data.code as AgentBridgeErrorCode,
           message: response.error.message,
@@ -247,13 +253,13 @@ const createAgentTransportClient = (
       }
     }
 
-    return response.result
+    return response.result as AgentBridgeCommandResult<TData>
   }
 
   return {
-    getProject: () => route('getProject'),
-    getPreviewContext: () => route('getPreviewContext'),
-    applySourceChange: (request) => route('applySourceChange', request),
+    getProject: () => route<AgentProjectReadState>('getProject'),
+    getPreviewContext: () => route<AgentPreviewReadState>('getPreviewContext'),
+    applySourceChange: (request) => route<AgentSourceChangeResult>('applySourceChange', request),
   }
 }
 
@@ -286,7 +292,7 @@ const startAgentAccess = async () => {
   fireEvent.click(screen.getByRole('menuitemcheckbox', { name: /agent-tilgang/i }))
 
   await waitFor(() => expect(screen.getByRole('status').textContent).toBe('Status: aktiv'))
-  expect((window as Window & Record<string, unknown>)[LEGACY_AGENT_BRIDGE_GLOBAL]).toBeUndefined()
+  expect(Reflect.get(window, LEGACY_AGENT_BRIDGE_GLOBAL)).toBeUndefined()
   if (!currentDesktopTransport) {
     throw new Error('Expected Desktop transport preload to be installed before Agent access starts.')
   }
@@ -352,7 +358,7 @@ describe('Share popover integration', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     currentDesktopTransport = null
-    delete (window as Window & Record<string, unknown>)[LEGACY_AGENT_BRIDGE_GLOBAL]
+    Reflect.deleteProperty(window, LEGACY_AGENT_BRIDGE_GLOBAL)
     delete window.__AKSEL_ARCADE_DESKTOP__
     // Clear persisted compression multipliers so each test starts from a clean slate
     window.localStorage.clear()
@@ -381,7 +387,7 @@ describe('Share popover integration', () => {
     encodeSpy?.mockRestore()
     strategySpy?.mockRestore()
     currentDesktopTransport = null
-    delete (window as Window & Record<string, unknown>)[LEGACY_AGENT_BRIDGE_GLOBAL]
+    Reflect.deleteProperty(window, LEGACY_AGENT_BRIDGE_GLOBAL)
     delete window.__AKSEL_ARCADE_DESKTOP__
   })
 
