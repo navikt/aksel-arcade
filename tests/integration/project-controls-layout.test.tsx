@@ -222,12 +222,6 @@ const expectBridgeFailure = <TData,>(
   return result.error
 }
 
-const getRollbackLabels = (): string[] =>
-  screen
-    .queryAllByRole('menuitem')
-    .map((item) => item.textContent ?? '')
-    .filter((label) => label.startsWith('Gjenopprett '))
-
 const captureAgentState = (bridge: AgentBridge) => {
   const project = expectBridgeSuccess(callBridgeCommand(() => bridge.getProject()))
   const preview = expectBridgeSuccess(callBridgeCommand(() => bridge.getPreviewContext()))
@@ -238,7 +232,6 @@ const captureAgentState = (bridge: AgentBridge) => {
     preview,
     permissions: session.permissions,
     statusText: screen.getByRole('status').textContent,
-    rollbackLabels: getRollbackLabels(),
   }
 }
 
@@ -729,7 +722,6 @@ describe('ProjectControls layout', () => {
         ok: true,
         command: 'applySourceChange',
         data: {
-          checkpointId: expect.any(String),
           changedFields: ['jsxCode', 'viewportSize', 'theme', 'name'],
         },
       },
@@ -750,11 +742,7 @@ describe('ProjectControls layout', () => {
         viewportSize: 'LG',
       })
     })
-    expect(
-      screen.getByRole('menuitem', {
-        name: /gjenopprett desktop transport update \(JSX \+ Skjermstørrelse \+ Tema \+ Navn\)/i,
-      })
-    ).toBeTruthy()
+    expect(screen.queryByRole('menuitem', { name: /gjenopprett/i })).toBeNull()
 
     const beforeInvalid = captureAgentState(bridge)
     const invalidResponse = await desktopTransport.route({
@@ -816,7 +804,7 @@ describe('ProjectControls layout', () => {
     })
   })
 
-  it('restores Desktop transport Checkpoints only from the human Agent menu', async () => {
+  it('applies Desktop transport changes without exposing rollback controls', async () => {
     const desktopTransport = setupDesktopTransportPreload()
     renderHeader()
 
@@ -827,31 +815,29 @@ describe('ProjectControls layout', () => {
       )
     )
 
-    const original = captureAgentState(bridge)
     const nextJsx =
-      'export default function App() { return <Heading>Human rollback transport update</Heading> }'
-    const nextHooks = 'export const useAgentFixture = () => "desktop-rollback"'
+      'export default function App() { return <Heading>Immediate transport update</Heading> }'
+    const nextHooks = 'export const useAgentFixture = () => "desktop-change"'
     const acceptedResponse = await desktopTransport.route({
-      id: 'rollback-change-1',
+      id: 'desktop-change-1',
       method: 'applySourceChange',
       params: {
-        summary: 'Desktop rollback update',
+        summary: 'Desktop immediate update',
         jsxCode: nextJsx,
         hooksCode: nextHooks,
         viewportSize: 'XS',
         theme: 'light',
-        name: 'Desktop Rollback Project',
+        name: 'Desktop Immediate Project',
       },
     })
 
     expect(acceptedResponse).toMatchObject({
       jsonrpc: '2.0',
-      id: 'rollback-change-1',
+      id: 'desktop-change-1',
       result: {
         ok: true,
         command: 'applySourceChange',
         data: {
-          checkpointId: expect.any(String),
           changedFields: ['jsxCode', 'hooksCode', 'viewportSize', 'theme', 'name'],
         },
       },
@@ -864,7 +850,7 @@ describe('ProjectControls layout', () => {
       )
 
       expect(updatedProject).toMatchObject({
-        name: 'Desktop Rollback Project',
+        name: 'Desktop Immediate Project',
         jsxCode: nextJsx,
         hooksCode: nextHooks,
       })
@@ -874,19 +860,15 @@ describe('ProjectControls layout', () => {
       })
     })
 
-    const restoreItem = await screen.findByRole('menuitem', {
-      name: /gjenopprett desktop rollback update \(JSX \+ Hooks \+ Skjermstørrelse \+ Tema \+ Navn\)/i,
-    })
     const changed = captureAgentState(bridge)
+    expect(screen.queryByRole('menuitem', { name: /gjenopprett/i })).toBeNull()
 
     for (const method of ['restoreCheckpoint', 'deleteCheckpoint']) {
       await expect(
         desktopTransport.route({
           id: `${method}-1`,
           method,
-          params: {
-            checkpointId: 'checkpoint-id-reported-to-agent',
-          },
+          params: {},
         })
       ).resolves.toMatchObject({
         error: {
@@ -899,30 +881,13 @@ describe('ProjectControls layout', () => {
     }
     expect(captureAgentState(bridge)).toEqual(changed)
 
-    fireEvent.click(restoreItem)
-
-    await waitFor(() => {
-      const restoredProject = expectBridgeSuccess(callBridgeCommand(() => bridge.getProject()))
-      const restoredPreview = expectBridgeSuccess(
-        callBridgeCommand(() => bridge.getPreviewContext())
-      )
-
-      expect(restoredProject).toEqual(original.project)
-      expect(restoredPreview).toEqual(original.preview)
-    })
-
-    fireEvent.click(await findAgentAccessButton())
     fireEvent.click(screen.getByRole('menuitemcheckbox', { name: /agent-tilgang/i }))
 
     expect(screen.getByRole('status').textContent).toBe('Status: inaktiv')
-    expect(
-      screen.queryByRole('menuitem', {
-        name: /gjenopprett desktop rollback update/i,
-      })
-    ).toBeNull()
+    expect(screen.queryByRole('menuitem', { name: /gjenopprett/i })).toBeNull()
   })
 
-  it('keeps Desktop packages clean after transport reads, changes, rollback, stop, and import', async () => {
+  it('keeps Desktop packages clean after transport reads, changes, stop, and import', async () => {
     const desktopTransport = setupDesktopTransportPreload()
     const deterministicProjectId = '22222222-2222-4222-8222-222222222222'
     vi.mocked(globalThis.crypto.randomUUID).mockReturnValueOnce(deterministicProjectId)
@@ -975,7 +940,7 @@ describe('ProjectControls layout', () => {
         },
       })
 
-      const checkpointSummary = 'Confidential package checkpoint summary'
+      const changeSummary = 'Confidential package change summary'
       const nextJsx =
         'export default function App() { return <Heading>Desktop package export</Heading> }'
       const nextHooks = 'export const useAgentFixture = () => "package-export"'
@@ -983,7 +948,7 @@ describe('ProjectControls layout', () => {
         id: 'package-change-1',
         method: 'applySourceChange',
         params: {
-          summary: checkpointSummary,
+          summary: changeSummary,
           jsxCode: nextJsx,
           hooksCode: nextHooks,
           viewportSize: 'XS',
@@ -999,7 +964,6 @@ describe('ProjectControls layout', () => {
           ok: true,
           command: 'applySourceChange',
           data: {
-            checkpointId: desktopTransport.endpoint.sessionId,
             changedFields: ['jsxCode', 'hooksCode', 'viewportSize', 'theme', 'name'],
           },
         },
@@ -1020,7 +984,7 @@ describe('ProjectControls layout', () => {
         desktopTransport.endpoint.sessionId,
         desktopTransport.endpoint.endpoint,
         desktopTransport.endpoint.authorizationHeader,
-        checkpointSummary,
+        changeSummary,
         '__AKSEL_ARCADE_AGENT_BRIDGE__',
       ]
       const activePackage = await exportCurrentProjectPackage(capturedBlobs)
@@ -1038,22 +1002,14 @@ describe('ProjectControls layout', () => {
       })
       expectCleanPackage(activePackage.packageData, activePackage.text, forbiddenPackageValues)
 
-      fireEvent.click(
-        await screen.findByRole('menuitem', {
-          name: /gjenopprett confidential package checkpoint summary \(JSX \+ Hooks \+ Skjermstørrelse \+ Tema \+ Navn\)/i,
-        })
-      )
-      await waitFor(() => {
-        expect(expectBridgeSuccess(callBridgeCommand(() => bridge.getProject()))).toEqual(
-          original.project
-        )
-        expect(expectBridgeSuccess(callBridgeCommand(() => bridge.getPreviewContext()))).toEqual(
-          original.preview
-        )
-      })
+      expect(screen.queryByRole('menuitem', { name: /gjenopprett/i })).toBeNull()
 
-      fireEvent.click(await findAgentAccessButton())
-      fireEvent.click(screen.getByRole('menuitemcheckbox', { name: /agent-tilgang/i }))
+      let accessToggle = screen.queryByRole('menuitemcheckbox', { name: /agent-tilgang/i })
+      if (!accessToggle) {
+        fireEvent.click(await findAgentAccessButton())
+        accessToggle = screen.getByRole('menuitemcheckbox', { name: /agent-tilgang/i })
+      }
+      fireEvent.click(accessToggle)
       expect(screen.getByRole('status').textContent).toBe('Status: inaktiv')
       expect(window.__AKSEL_ARCADE_AGENT_BRIDGE__).toBeUndefined()
 
@@ -1061,13 +1017,13 @@ describe('ProjectControls layout', () => {
 
       expect(getPackagePortableShape(stoppedPackage.packageData)).toEqual(normalPackageShape)
       expect(stoppedPackage.packageData.project).toMatchObject({
-        name: original.project.name,
+        name: 'Transport Package Project',
         code: {
-          jsxCode: original.project.jsxCode,
-          hooksCode: original.project.hooksCode,
+          jsxCode: nextJsx,
+          hooksCode: nextHooks,
         },
         ui: {
-          viewportSize: original.preview.viewportSize,
+          viewportSize: 'XS',
         },
       })
       expectCleanPackage(stoppedPackage.packageData, stoppedPackage.text, forbiddenPackageValues)
@@ -1088,11 +1044,7 @@ describe('ProjectControls layout', () => {
       fireEvent.click(await findAgentAccessButton())
       expect(await screen.findByText(/Koble til agent/i)).toBeTruthy()
       expect(screen.getByRole('status').textContent).toBe('Status: inaktiv')
-      expect(
-        screen.queryByRole('menuitem', {
-          name: /gjenopprett confidential package checkpoint summary/i,
-        })
-      ).toBeNull()
+      expect(screen.queryByRole('menuitem', { name: /gjenopprett/i })).toBeNull()
     } finally {
       global.URL.createObjectURL = originalCreateObjectURL
       global.URL.revokeObjectURL = originalRevokeObjectURL
@@ -1482,11 +1434,10 @@ describe('ProjectControls layout', () => {
     })
   })
 
-  it('applies source replacements with automatic Checkpoints and human rollback', async () => {
+  it('applies source replacements as normal project edits without rollback state', async () => {
     renderHeader()
 
     const bridge = await startAgentAccess()
-    const originalProject = expectBridgeSuccess(callBridgeCommand(() => bridge.getProject()))
     const nextJsx = 'export default function App() { return <Heading>Agent update</Heading> }'
     const nextHooks = 'export const useAgentFixture = () => "changed"'
 
@@ -1504,7 +1455,6 @@ describe('ProjectControls layout', () => {
       command: 'applySourceChange',
     })
     expect(changeData).toEqual({
-      checkpointId: expect.any(String),
       changedFields: ['jsxCode', 'hooksCode'],
     })
     expect(screen.getByRole('status').textContent).toBe('Status: aktiv')
@@ -1514,25 +1464,13 @@ describe('ProjectControls layout', () => {
       expect(updatedProject.jsxCode).toBe(nextJsx)
       expect(updatedProject.hooksCode).toBe(nextHooks)
     })
-
-    fireEvent.click(
-      await screen.findByRole('menuitem', {
-        name: /gjenopprett replace source for demo \(JSX \+ Hooks\)/i,
-      })
-    )
-
-    await waitFor(() => {
-      const restoredProject = expectBridgeSuccess(callBridgeCommand(() => bridge.getProject()))
-      expect(restoredProject.jsxCode).toBe(originalProject.jsxCode)
-      expect(restoredProject.hooksCode).toBe(originalProject.hooksCode)
-    })
+    expect(screen.queryByRole('menuitem', { name: /gjenopprett/i })).toBeNull()
   })
 
-  it('captures rapid sequential Checkpoints against the latest accepted Agent state', async () => {
+  it('applies rapid sequential changes against the latest accepted Agent state', async () => {
     renderHeader()
 
     const bridge = await startAgentAccess()
-    const originalProject = expectBridgeSuccess(callBridgeCommand(() => bridge.getProject()))
     const firstJsx = 'export default function App() { return <Heading>First rapid</Heading> }'
     const secondJsx = 'export default function App() { return <Heading>Second rapid</Heading> }'
     const results: AgentBridgeCommandResult<unknown>[] = []
@@ -1561,31 +1499,7 @@ describe('ProjectControls layout', () => {
         secondJsx
       )
     })
-
-    fireEvent.click(
-      await screen.findByRole('menuitem', {
-        name: /gjenopprett second rapid change \(JSX\)/i,
-      })
-    )
-
-    await waitFor(() => {
-      expect(expectBridgeSuccess(callBridgeCommand(() => bridge.getProject())).jsxCode).toBe(
-        firstJsx
-      )
-    })
-
-    fireEvent.click(await findAgentAccessButton())
-    fireEvent.click(
-      await screen.findByRole('menuitem', {
-        name: /gjenopprett first rapid change \(JSX\)/i,
-      })
-    )
-
-    await waitFor(() => {
-      expect(expectBridgeSuccess(callBridgeCommand(() => bridge.getProject())).jsxCode).toBe(
-        originalProject.jsxCode
-      )
-    })
+    expect(screen.queryByRole('menuitem', { name: /gjenopprett/i })).toBeNull()
   })
 
   it('applies preview setting replacements with default Agent permissions', async () => {
@@ -1603,7 +1517,6 @@ describe('ProjectControls layout', () => {
 
     const changeData = expectBridgeSuccess(result)
     expect(changeData).toEqual({
-      checkpointId: expect.any(String),
       changedFields: ['viewportSize', 'theme'],
     })
 
@@ -1616,11 +1529,7 @@ describe('ProjectControls layout', () => {
         },
       })
     })
-    expect(
-      screen.getByRole('menuitem', {
-        name: /gjenopprett switch preview context \(skjermstørrelse \+ tema\)/i,
-      })
-    ).toBeTruthy()
+    expect(screen.queryByRole('menuitem', { name: /gjenopprett/i })).toBeNull()
   })
 
   it('applies project metadata replacements with default Agent permissions', async () => {
@@ -1638,7 +1547,6 @@ describe('ProjectControls layout', () => {
 
     const changeData = expectBridgeSuccess(acceptedResult)
     expect(changeData).toEqual({
-      checkpointId: expect.any(String),
       changedFields: ['name'],
     })
     await waitFor(() => {
@@ -1648,11 +1556,10 @@ describe('ProjectControls layout', () => {
     })
   })
 
-  it('applies combined source, preview, and metadata replacements atomically with rollback', async () => {
+  it('applies combined source, preview, and metadata replacements atomically', async () => {
     renderHeader()
 
     const bridge = await startAgentAccess()
-    const original = captureAgentState(bridge)
     const nextJsx = 'export default function App() { return <Heading>Combined</Heading> }'
     const nextHooks = 'export const useAgentFixture = () => "combined"'
 
@@ -1669,7 +1576,6 @@ describe('ProjectControls layout', () => {
 
     const changeData = expectBridgeSuccess(result)
     expect(changeData).toEqual({
-      checkpointId: expect.any(String),
       changedFields: ['jsxCode', 'hooksCode', 'viewportSize', 'theme', 'name'],
     })
 
@@ -1689,25 +1595,10 @@ describe('ProjectControls layout', () => {
         viewportSize: 'LG',
       })
     })
-
-    fireEvent.click(
-      await screen.findByRole('menuitem', {
-        name: /gjenopprett combined agent update \(JSX \+ Hooks \+ Skjermstørrelse \+ Tema \+ Navn\)/i,
-      })
-    )
-
-    await waitFor(() => {
-      const restoredProject = expectBridgeSuccess(callBridgeCommand(() => bridge.getProject()))
-      const restoredPreview = expectBridgeSuccess(
-        callBridgeCommand(() => bridge.getPreviewContext())
-      )
-
-      expect(restoredProject).toEqual(original.project)
-      expect(restoredPreview).toEqual(original.preview)
-    })
+    expect(screen.queryByRole('menuitem', { name: /gjenopprett/i })).toBeNull()
   })
 
-  it('caps automatic source Checkpoints at ten recent entries', async () => {
+  it('does not accumulate Agent rollback entries for accepted source changes', async () => {
     renderHeader()
 
     const bridge = await startAgentAccess()
@@ -1723,13 +1614,11 @@ describe('ProjectControls layout', () => {
     }
 
     await waitFor(() => {
-      const rollbackItems = screen
-        .getAllByRole('menuitem')
-        .filter((item) => item.textContent?.startsWith('Gjenopprett change'))
-      expect(rollbackItems).toHaveLength(10)
+      expect(expectBridgeSuccess(callBridgeCommand(() => bridge.getProject())).jsxCode).toContain(
+        'Change 11'
+      )
     })
-    expect(screen.queryByRole('menuitem', { name: /^Gjenopprett change 1 \(/i })).toBeNull()
-    expect(screen.getByRole('menuitem', { name: /^Gjenopprett change 11 \(/i })).toBeTruthy()
+    expect(screen.queryByRole('menuitem', { name: /gjenopprett/i })).toBeNull()
   })
 
   it('rejects malformed and unsupported Agent change requests without mutating Agent state', async () => {
@@ -1739,7 +1628,7 @@ describe('ProjectControls layout', () => {
     expectBridgeSuccess(
       callBridgeCommand(() =>
         bridge.applySourceChange({
-          summary: 'Seed checkpoint',
+          summary: 'Seed change',
           jsxCode: 'export default function App() { return <Heading>Seed</Heading> }',
         })
       )
@@ -1848,7 +1737,7 @@ describe('ProjectControls layout', () => {
     }
   })
 
-  it('rejects oversized source changes before mutation or Checkpoint creation', async () => {
+  it('rejects oversized source changes before mutation', async () => {
     renderHeader()
 
     const bridge = await startAgentAccess()

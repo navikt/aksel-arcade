@@ -50,7 +50,6 @@ const createApplySuccess = (
   ok: true,
   command: 'applySourceChange',
   data: {
-    checkpointId: 'checkpoint-1',
     changedFields,
   },
 })
@@ -253,15 +252,13 @@ describe('desktop Agent transport protocol', () => {
     })
   })
 
-  it('does not expose Agent-triggered Checkpoint rollback methods', () => {
+  it('does not expose Agent-triggered recovery methods', () => {
     for (const method of ['restoreCheckpoint', 'deleteCheckpoint']) {
       expect(
         routeRequest({
           id: `${method}-1`,
           method,
-          params: {
-            checkpointId: 'checkpoint-1',
-          },
+          params: {},
           sessionId: session.id,
         }).response
       ).toMatchObject({

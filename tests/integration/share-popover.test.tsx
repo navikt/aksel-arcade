@@ -115,7 +115,7 @@ const renderHeader = (
 const findAgentAccessButton = () => screen.findByRole('button', { name: /koble til agent/i })
 
 const normalizeWhitespace = (value: string): string => value.replace(/\s+/g, ' ').trim()
-const AGENT_CHECKPOINT_SUMMARY = 'Confidential checkpoint summary'
+const AGENT_CHANGE_SUMMARY = 'Confidential Agent change summary'
 const AGENT_ARTIFACT_KEY_PATTERN =
   /agent|session|permission|activity|bridge|checkpoint|rollback|evidence|diagnostic/i
 
@@ -309,10 +309,10 @@ describe('Share popover integration', () => {
       expect(screen.queryByLabelText(/share project/i)).toBeNull()
 
       const bridge = await startAgentAccess()
-      const changeData = expectBridgeSuccess(
+      expectBridgeSuccess(
         callBridgeCommand(() =>
           bridge.applySourceChange({
-            summary: AGENT_CHECKPOINT_SUMMARY,
+            summary: AGENT_CHANGE_SUMMARY,
             jsxCode: nextJsx,
             hooksCode: nextHooks,
             viewportSize: 'XS',
@@ -367,8 +367,7 @@ describe('Share popover integration', () => {
           viewportSize: 'XS',
         },
       })
-      expect(exportedText).not.toContain(changeData.checkpointId)
-      expect(exportedText).not.toContain(AGENT_CHECKPOINT_SUMMARY)
+      expect(exportedText).not.toContain(AGENT_CHANGE_SUMMARY)
       expect(exportedText).not.toContain('__AKSEL_ARCADE_AGENT_BRIDGE__')
       expect(collectObjectKeys(exported).join(' ')).not.toMatch(AGENT_ARTIFACT_KEY_PATTERN)
     } finally {
