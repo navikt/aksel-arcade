@@ -105,7 +105,6 @@ const createApplySuccess = (
   ok: true,
   command: 'applySourceChange',
   data: {
-    checkpointId: 'checkpoint-1',
     changedFields,
   },
 })
@@ -218,7 +217,7 @@ describe('agent bridge command router', () => {
     expect(JSON.stringify(instructions)).not.toContain(
       context.diagnostics.sandboxConsoleMessages[0]!.message
     )
-    expect(JSON.stringify(instructions)).not.toContain('checkpoint-1')
+    expect(JSON.stringify(instructions)).not.toMatch(/checkpoint|rollback/i)
     expect(recordedCommands).toEqual(['getAgentInstructions'])
   })
 

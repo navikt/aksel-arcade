@@ -57,7 +57,6 @@ export interface AgentSourceChangeRequest {
 }
 
 export interface AgentSourceChangeResult {
-  checkpointId: string
   changedFields: AgentChangeField[]
 }
 
@@ -303,7 +302,7 @@ const createAgentInstructionsMarkdown = (
     'Active permission state:',
     ...permissionLines,
     '',
-    'Read scope: arcade-session. Do not read project packages, share payloads, browser storage, clipboard data, cookies, unrelated page state, Checkpoints, or host application UI state.',
+    'Read scope: arcade-session. Do not read project packages, share payloads, browser storage, clipboard data, cookies, unrelated page state, or host application UI state.',
     '',
     'Arcade authoring contract summary:',
     ARCADE_AUTHORING_CONTRACT_SUMMARY,
@@ -592,7 +591,7 @@ export const createAgentInstructions = (
     `Currently available command names: ${AGENT_BRIDGE_COMMAND_NAMES.map((command) => `${command}()`).join(', ')}`,
     'Use getDiagnostics() to read preview status, compile errors, runtime errors, and bounded sandbox console messages after changes.',
     'Use getPreviewEvidence() to read permission-gated, sanitized layout evidence from only the sandboxed Preview frame.',
-    'To replace allowed fields, call applySourceChange({ summary, jsxCode?, hooksCode?, viewportSize?, theme?, name? }). A non-empty human-readable summary is required, and the human controls rollback from the Agent menu.',
+    'To replace allowed fields, call applySourceChange({ summary, jsxCode?, hooksCode?, viewportSize?, theme?, name? }). A non-empty human-readable summary is required. Accepted changes apply immediately as normal Arcade project edits.',
     'After applySourceChange() returns ok, treat immediate Preview evidence as provisional: poll getDiagnostics() until status is no longer "transpiling" or "rendering" before final visual validation.',
     'When diagnostics settle to "idle", read getPreviewEvidence() to validate the visible result. When status is "error", read diagnostics again for compile/runtime details instead.',
     ...transportLines,

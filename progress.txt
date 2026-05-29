@@ -972,3 +972,23 @@ Followed up on the Desktop Agent menu gating PR:
 - Verified in real Electron Desktop Arcade that the settled menu width is 360px both before and after `Agent-tilgang` is checked.
 
 Next note: if more content is added to the Agent action menu, adjust the reserved `.agent-menu` width together with the full-content design to avoid reintroducing checkbox-triggered layout shift.
+
+### 2026-05-29 - Issue #101: Remove Desktop Agent Checkpoints and rollback
+
+Selected #101 as the highest-priority `ready-for-agent` issue from #100-#103 because ADR 0005 centers on removing Agent Checkpoints/rollback and #103 is explicitly blocked by this cleanup.
+
+Implemented:
+
+- Removed Desktop Agent Checkpoint state, rollback restore logic, and Agent menu restore controls.
+- Changed accepted `applySourceChange` results to return only `changedFields`; accepted changes now apply immediately as ordinary Arcade project edits.
+- Removed Checkpoint/rollback language from Agent instructions while keeping the existing `applySourceChange` command name for #103.
+- Updated bridge, Desktop transport, share/export, and integration tests to assert no checkpoint identifiers or rollback UI are created or exported.
+
+Verification:
+
+- npm run typecheck
+- CI=true npm run test
+- npm run lint (passes with the existing hook dependency warnings)
+- Browser smoke check at http://127.0.0.1:5173/aksel-arcade/ for app render and console output.
+
+Next note: #103 can now handle the command rename/versioning separately; avoid reintroducing Agent-specific recovery state when updating the bridge contract.

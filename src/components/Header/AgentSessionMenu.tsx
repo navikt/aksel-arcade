@@ -2,7 +2,6 @@ import { useCallback, useState } from 'react'
 import { ActionMenu, Box, Button, Detail, VStack } from '@navikt/ds-react'
 import { FilesIcon, RobotIcon } from '@navikt/aksel-icons'
 import { useAgentSession } from '@/hooks/useAgentSession'
-import { type AgentChangeField } from '@/services/agentBridge'
 import { collectPreviewEvidenceFromFrame } from '@/services/previewEvidence'
 import { useSettings } from '@/contexts/SettingsContext'
 import { useProject } from '@/hooks/useProject'
@@ -18,9 +17,7 @@ export const AgentSessionMenu = () => {
   )
   const {
     agentPairingHandoffCommand,
-    checkpoints,
     isActive,
-    restoreCheckpoint,
     statusText,
     startAgentSession,
     stopAgentSession,
@@ -135,42 +132,9 @@ export const AgentSessionMenu = () => {
             >
               {copyStatus === 'error' ? 'Prøv igjen' : 'Kopier agentkommando'}
             </ActionMenu.Item>
-            {checkpoints.length > 0 && (
-              <>
-                <ActionMenu.Divider />
-                <ActionMenu.Group label="Kontrollpunkter">
-                  {checkpoints.map((checkpoint) => (
-                    <ActionMenu.Item
-                      key={checkpoint.id}
-                      onSelect={() => restoreCheckpoint(checkpoint.id)}
-                    >
-                      {`Gjenopprett ${checkpoint.summary} (${formatChangedFields(checkpoint.changedFields)})`}
-                    </ActionMenu.Item>
-                  ))}
-                </ActionMenu.Group>
-              </>
-            )}
           </>
         )}
       </ActionMenu.Content>
     </ActionMenu>
   )
-}
-
-const formatChangedFields = (fields: AgentChangeField[]): string =>
-  fields.map(formatChangedField).join(' + ')
-
-const formatChangedField = (field: AgentChangeField): string => {
-  switch (field) {
-    case 'jsxCode':
-      return 'JSX'
-    case 'hooksCode':
-      return 'Hooks'
-    case 'viewportSize':
-      return 'Skjermstørrelse'
-    case 'theme':
-      return 'Tema'
-    case 'name':
-      return 'Navn'
-  }
 }
