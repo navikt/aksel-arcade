@@ -281,13 +281,11 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     const snapshot = shareHydration.snapshot
 
     try {
-      const nextProject = buildProjectFromSnapshot(snapshot, project)
+      const nextProject = buildProjectFromSnapshot(snapshot)
       notifyAgentSessionProjectReplaced()
       setProjectState(nextProject)
 
       const nextEditorState = createDefaultEditorState()
-      nextEditorState.activeTab =
-        snapshot.activeFileId === SNAPSHOT_FILE_IDS.hooks ? 'Hooks' : 'JSX'
       setEditorState(nextEditorState)
 
       setPreviewState((prev) => ({
@@ -340,20 +338,38 @@ const DEFAULT_SHARE_DECODE_ERROR: ShareDecodeError = {
   message: 'We could not decode this share link. Please request a new one.',
 }
 
-const buildProjectFromSnapshot = (snapshot: ProjectSnapshot, previous: Project): Project => {
-  const nextJsx = findSnapshotContent(snapshot, SNAPSHOT_FILE_IDS.jsx) ?? previous.jsxCode
-  const nextHooks = findSnapshotContent(snapshot, SNAPSHOT_FILE_IDS.hooks) ?? previous.hooksCode
+const buildProjectFromSnapshot = (snapshot: ProjectSnapshot): Project => {
+  const freshProject = createDefaultProject()
+  const now = new Date().toISOString()
+  const nextJsx =
+    findSnapshotContent(snapshot, SNAPSHOT_FILE_IDS.jsx) ??
+    findSnapshotContentByName(snapshot, 'App.tsx') ??
+    findSnapshotContent(snapshot, snapshot.activeFileId) ??
+    findFirstTsxContent(snapshot) ??
+    ''
+  const nextHooks =
+    findSnapshotContent(snapshot, SNAPSHOT_FILE_IDS.hooks) ??
+    findSnapshotContentByName(snapshot, 'hooks.ts') ??
+    ''
 
   return {
-    ...previous,
+    ...freshProject,
     jsxCode: nextJsx,
     hooksCode: nextHooks,
     viewportSize: snapshot.preview.viewport,
-    version: snapshot.version,
-    lastModified: new Date().toISOString(),
+    createdAt: now,
+    lastModified: now,
   }
 }
 
 const findSnapshotContent = (snapshot: ProjectSnapshot, fileId: string): string | undefined => {
   return snapshot.files.find((file) => file.id === fileId)?.content
+}
+
+const findSnapshotContentByName = (snapshot: ProjectSnapshot, name: string): string | undefined => {
+  return snapshot.files.find((file) => file.name === name)?.content
+}
+
+const findFirstTsxContent = (snapshot: ProjectSnapshot): string | undefined => {
+  return snapshot.files.find((file) => file.language === 'tsx')?.content
 }

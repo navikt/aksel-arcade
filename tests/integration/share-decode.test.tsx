@@ -4,21 +4,49 @@ import { describe, expect, it, beforeEach } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { AppProvider, useProject } from '@/hooks/useProject'
-import { SettingsProvider } from '@/contexts/SettingsContext'
+import { SettingsProvider, useSettings } from '@/contexts/SettingsContext'
 import { createDefaultProject } from '@/utils/projectDefaults'
-import { createShareSnapshot } from '@/services/storage'
-import { encodeSharePayload, createShareToken, LEGACY_SHARE_FORMAT_VERSION } from '@/utils/shareEncoding'
+import { createShareSnapshot, SNAPSHOT_FILE_IDS } from '@/services/storage'
+import {
+  encodeSharePayload,
+  createShareToken,
+  LEGACY_SHARE_FORMAT_VERSION,
+} from '@/utils/shareEncoding'
 import { decodeShareToken } from '@/utils/shareDecoding'
 import { getCompressionStrategy } from '@/services/compressionStrategies'
-import type { ProjectSnapshot } from '@/types/project'
+import type { Project, ProjectSnapshot } from '@/types/project'
+import { getViewportWidth } from '@/types/viewports'
 import { repairPackedSnapshotJson, unpackSnapshot } from '@/utils/snapshotPacking'
 
 const Harness = () => {
-  const { project, shareHydration, applySharedSnapshot, dismissShareHydration } = useProject()
+  const {
+    project,
+    editorState,
+    previewState,
+    updateEditorState,
+    shareHydration,
+    applySharedSnapshot,
+    dismissShareHydration,
+  } = useProject()
+  const { theme } = useSettings()
 
   return (
     <div>
+      <div data-testid="project-id">{project.id}</div>
+      <div data-testid="project-name">{project.name}</div>
+      <div data-testid="project-version">{project.version}</div>
+      <div data-testid="project-created-at">{project.createdAt}</div>
+      <div data-testid="project-last-modified">{project.lastModified}</div>
+      <div data-testid="project-panel-layout">{project.panelLayout}</div>
+      <div data-testid="project-viewport">{project.viewportSize}</div>
       <div data-testid="jsx-code">{project.jsxCode}</div>
+      <div data-testid="hooks-code">{project.hooksCode}</div>
+      <div data-testid="editor-active-tab">{editorState.activeTab}</div>
+      <div data-testid="preview-current-viewport">{previewState.currentViewport}</div>
+      <div data-testid="preview-viewport-width">{previewState.viewportWidth}</div>
+      <div data-testid="settings-theme">{theme}</div>
+      <div data-testid="share-status">{shareHydration.status}</div>
+      <button onClick={() => updateEditorState({ activeTab: 'Hooks' })}>Set local Hooks tab</button>
       {shareHydration.status === 'ready' && (
         <div>
           <span>share-ready</span>
@@ -52,6 +80,7 @@ const renderHarness = () => {
 }
 
 const fixturesDir = path.resolve(process.cwd(), 'tests/fixtures/share')
+const STORAGE_KEY = 'aksel-arcade:project'
 
 const loadShareFixture = async (fileName: string): Promise<ProjectSnapshot> => {
   const raw = await fs.readFile(path.join(fixturesDir, fileName), 'utf-8')
@@ -62,7 +91,10 @@ const loadCorruptedPackedFixture = async (): Promise<{
   corruptedPacked: string
   expectedSnapshot: ProjectSnapshot
 }> => {
-  const raw = await fs.readFile(path.join(fixturesDir, 'packed-with-unescaped-quotes.json'), 'utf-8')
+  const raw = await fs.readFile(
+    path.join(fixturesDir, 'packed-with-unescaped-quotes.json'),
+    'utf-8'
+  )
   return JSON.parse(raw) as {
     corruptedPacked: string
     expectedSnapshot: ProjectSnapshot
@@ -73,6 +105,7 @@ describe('share decode integration', () => {
   const user = userEvent.setup()
 
   beforeEach(() => {
+    localStorage.clear()
     window.history.replaceState({}, '', '/')
   })
 
@@ -91,6 +124,84 @@ describe('share decode integration', () => {
     })
 
     expect(screen.getByTestId('jsx-code').textContent).toContain('Shared integration test')
+    expect(window.location.search).not.toContain('share=')
+  })
+
+  it('loads v3 Web share URLs as fresh local projects from shared source and preview preferences', async () => {
+    const previousProject: Project = {
+      id: '11111111-1111-4111-8111-111111111111',
+      name: 'Previous local project',
+      jsxCode: 'export default function App() { return <div>Previous JSX</div> }',
+      hooksCode: 'export function usePreviousHook() { return "Previous Hooks" }',
+      viewportSize: 'XS',
+      panelLayout: 'editor-right',
+      version: '1.0.0',
+      createdAt: '2024-01-01T00:00:00.000Z',
+      lastModified: '2024-01-02T00:00:00.000Z',
+    }
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(previousProject))
+
+    const senderProject = createDefaultProject()
+    senderProject.name = 'Sender project name'
+    senderProject.version = '2.0.0'
+    senderProject.jsxCode =
+      'export default function App() { return <Heading>Shared v3 JSX</Heading> }'
+    senderProject.hooksCode = 'export function useSharedHook() { return "Shared v3 Hooks" }'
+
+    const token = await createShareTokenForSnapshot(
+      createShareSnapshot(senderProject, {
+        activeFileId: SNAPSHOT_FILE_IDS.hooks,
+        preview: {
+          viewport: 'LG',
+          zoom: 0.75,
+          theme: 'light',
+          sandboxFlags: { outlines: true },
+        },
+        settings: {
+          autosave: false,
+          linting: false,
+          showLineNumbers: false,
+        },
+      })
+    )
+    window.history.replaceState({}, '', `/?share=${encodeURIComponent(token)}&foo=bar`)
+
+    renderHarness()
+
+    await screen.findByText('share-ready')
+    expect(screen.getByTestId('project-id').textContent).toBe(previousProject.id)
+    expect(screen.getByTestId('project-name').textContent).toBe(previousProject.name)
+
+    await user.click(screen.getByRole('button', { name: /set local hooks tab/i }))
+    expect(screen.getByTestId('editor-active-tab').textContent).toBe('Hooks')
+
+    await user.click(screen.getByRole('button', { name: /load shared project/i }))
+
+    await waitFor(() => {
+      expect(screen.getByTestId('share-status').textContent).toBe('idle')
+    })
+
+    expect(screen.getByTestId('project-id').textContent).not.toBe(previousProject.id)
+    expect(screen.getByTestId('project-id').textContent).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+    )
+    expect(screen.getByTestId('project-name').textContent).toBe('Untitled Project')
+    expect(screen.getByTestId('project-name').textContent).not.toBe(senderProject.name)
+    expect(screen.getByTestId('project-created-at').textContent).not.toBe(previousProject.createdAt)
+    expect(screen.getByTestId('project-last-modified').textContent).not.toBe(
+      previousProject.lastModified
+    )
+    expect(screen.getByTestId('project-version').textContent).toBe('1.0.0')
+    expect(screen.getByTestId('project-panel-layout').textContent).toBe('editor-left')
+    expect(screen.getByTestId('jsx-code').textContent).toContain('Shared v3 JSX')
+    expect(screen.getByTestId('hooks-code').textContent).toContain('Shared v3 Hooks')
+    expect(screen.getByTestId('project-viewport').textContent).toBe('LG')
+    expect(screen.getByTestId('preview-current-viewport').textContent).toBe('LG')
+    expect(screen.getByTestId('preview-viewport-width').textContent).toBe(
+      String(getViewportWidth('LG'))
+    )
+    expect(screen.getByTestId('settings-theme').textContent).toBe('light')
+    expect(screen.getByTestId('editor-active-tab').textContent).toBe('JSX')
     expect(window.location.search).not.toContain('share=')
   })
 
@@ -258,6 +369,10 @@ const createShareTokenForCode = async (code: string): Promise<string> => {
   project.jsxCode = code
 
   const snapshot = createShareSnapshot(project)
+  return createShareTokenForSnapshot(snapshot)
+}
+
+const createShareTokenForSnapshot = async (snapshot: ProjectSnapshot): Promise<string> => {
   const envelope = await encodeSharePayload(snapshot)
   return createShareToken(envelope)
 }

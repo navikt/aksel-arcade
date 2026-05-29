@@ -1187,3 +1187,21 @@ Verification:
 - npm run lint (passes with the existing hook dependency warnings)
 
 Next note: keep `npm run build` in the validation loop for share URL changes because it exercises `tsc -b`, which can catch declaration/assertion issues that `tsc --noEmit` misses.
+
+### 2026-05-29 - Issue #117: Fresh v3 Web share URL loads
+
+Implemented:
+
+- Changed shared Web URL loading so applying a decoded share creates a fresh local Untitled Project identity instead of merging into the previous local project.
+- Kept only the shared JSX, Hooks, viewport, and theme from the v3 URL; local project id, name, timestamps, schema version, panel layout, and active editor tab now come from fresh defaults.
+- Added integration coverage for loading a v3 share over an existing local project, including new identity, default project name/layout/tab, shared source and preview state, and share query removal.
+
+Verification:
+
+- npm install
+- npm run typecheck
+- npm run lint (passes with the existing hook dependency warnings)
+- CI=1 npm run test
+- Browser smoke check at http://127.0.0.1:5175/aksel-arcade/ loaded a v3 share as a fresh Untitled Project with a new UUID, shared source, LG/light preview, default panel layout, stripped share query, and no console errors.
+
+Next note: keep Web share URL loads constrained to shared source plus shareable preview preferences; do not reintroduce ProjectSnapshot identity, settings, workspace preferences, or active-tab restoration.
