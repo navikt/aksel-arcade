@@ -9,13 +9,14 @@ import {
   encodeSharePayload,
   computeChecksum,
   estimateShareUrlLength,
+  LEGACY_SHARE_FORMAT_VERSION,
   SHARE_FORMAT_VERSION,
   SHARE_METADATA_VERSION,
   SHARE_URL_CHAR_LIMIT,
 } from '@/utils/shareEncoding'
 import { fromBase64Url } from '@/utils/base64'
 import { createDefaultProject } from '@/utils/projectDefaults'
-import { createShareSnapshot } from '@/services/storage'
+import { createShareSnapshot, SNAPSHOT_FILE_IDS } from '@/services/storage'
 
 const snapshotFixture: ProjectSnapshot = {
   version: '1.0.0',
@@ -43,6 +44,126 @@ const snapshotFixture: ProjectSnapshot = {
   updatedAt: Date.now(),
 }
 
+const createNonShareableStateFixture = (): {
+  snapshot: ProjectSnapshot
+  expectedPayload: {
+    source: {
+      jsx: string
+      hooks: string
+    }
+    preview: {
+      viewport: ProjectSnapshot['preview']['viewport']
+      theme: ProjectSnapshot['preview']['theme']
+    }
+  }
+  excludedSnippets: string[]
+} => {
+  const project = createDefaultProject()
+  project.id = '11111111-1111-4111-8111-111111111111'
+  project.name = 'Sender-only project name'
+  project.version = '9.9.9'
+  project.createdAt = '2024-01-01T00:00:00.000Z'
+  project.lastModified = '2024-01-02T00:00:00.000Z'
+  project.jsxCode = 'export default function App() { return <div>Shareable JSX</div> }'
+  project.hooksCode = 'export function useShareableHook() { return "Shareable Hooks" }'
+
+  const snapshot = createShareSnapshot(project, {
+    files: [
+      {
+        id: SNAPSHOT_FILE_IDS.jsx,
+        name: 'SenderOnlyApp.tsx',
+        language: 'tsx',
+        content: project.jsxCode,
+        order: 10,
+        isReadonly: true,
+      },
+      {
+        id: SNAPSHOT_FILE_IDS.hooks,
+        name: 'sender-only-hooks.ts',
+        language: 'tsx',
+        content: project.hooksCode,
+        order: 20,
+      },
+      {
+        id: 'sender-only-extra-file',
+        name: 'SenderOnlyMetadata.tsx',
+        language: 'tsx',
+        content: 'export const senderOnlyExtraFile = true',
+        order: 30,
+      },
+    ],
+    activeFileId: SNAPSHOT_FILE_IDS.hooks,
+    preview: {
+      viewport: 'LG',
+      zoom: 0.42,
+      theme: 'light',
+      sandboxFlags: { outlines: true },
+    },
+    settings: {
+      autosave: false,
+      linting: false,
+      showLineNumbers: false,
+    },
+  })
+  snapshot.updatedAt = 1700000000000
+
+  return {
+    snapshot,
+    expectedPayload: {
+      source: {
+        jsx: project.jsxCode,
+        hooks: project.hooksCode,
+      },
+      preview: {
+        viewport: 'LG',
+        theme: 'light',
+      },
+    },
+    excludedSnippets: [
+      project.id,
+      project.name,
+      project.version,
+      project.createdAt,
+      project.lastModified,
+      'files',
+      'activeFileId',
+      SNAPSHOT_FILE_IDS.jsx,
+      SNAPSHOT_FILE_IDS.hooks,
+      'SenderOnlyApp.tsx',
+      'sender-only-hooks.ts',
+      'SenderOnlyMetadata.tsx',
+      'sender-only-extra-file',
+      'senderOnlyExtraFile',
+      'language',
+      'order',
+      'isReadonly',
+      'settings',
+      'autosave',
+      'linting',
+      'showLineNumbers',
+      'updatedAt',
+      String(snapshot.updatedAt),
+      'zoom',
+      '0.42',
+      'sandboxFlags',
+      'outlines',
+      'warningThreshold',
+      'charLimit',
+      '1234',
+      '2345',
+    ],
+  }
+}
+
+const createShareUrlForSnapshot = async (
+  snapshot: ProjectSnapshot,
+  formatVersion = SHARE_FORMAT_VERSION
+): Promise<string> => {
+  const envelope = await encodeSharePayload(snapshot, { formatVersion })
+  const token = createShareToken(envelope)
+  return buildShareUrl(token, 'https://example.com/playground')
+}
+
 describe('shareEncoding utilities', () => {
   it('computes a stable checksum for identical payloads', async () => {
     const serialized = JSON.stringify(snapshotFixture)
@@ -64,29 +185,39 @@ describe('shareEncoding utilities', () => {
     expect(token).not.toContain(' ')
   })
 
-  it('serializes only the v3 Web share URL payload fields', async () => {
-    const envelope = await encodeSharePayload(snapshotFixture)
+  it('serializes newly generated v3 payloads without non-shareable project state', async () => {
+    const { snapshot, expectedPayload, excludedSnippets } = createNonShareableStateFixture()
+    const envelope = await encodeSharePayload(snapshot, {
+      warningThresholdHit: true,
+      warningThreshold: 1234,
+      charLimit: 2345,
+    })
     const serialized = decompressFromEncodedURIComponent(envelope.compressed)
 
     expect(serialized).toBeTruthy()
     const payload = JSON.parse(serialized ?? '')
 
-    expect(payload).toEqual({
-      source: {
-        jsx: "export default function App() { return <div>Test</div> }",
-        hooks: '',
-      },
-      preview: {
-        viewport: 'MD',
-        theme: 'dark',
-      },
-    })
-    expect(serialized).not.toContain('activeFileId')
-    expect(serialized).not.toContain('files')
-    expect(serialized).not.toContain('settings')
-    expect(serialized).not.toContain('updatedAt')
-    expect(serialized).not.toContain('zoom')
-    expect(serialized).not.toContain('sandboxFlags')
+    expect(payload).toEqual(expectedPayload)
+    expect(Object.keys(payload).sort()).toEqual(['preview', 'source'])
+    expect(Object.keys(payload.source).sort()).toEqual(['hooks', 'jsx'])
+    expect(Object.keys(payload.preview).sort()).toEqual(['theme', 'viewport'])
+    for (const snippet of excludedSnippets) {
+      expect(serialized).not.toContain(snippet)
+    }
+  })
+
+  it('generates shorter v3 Web share URLs than equivalent legacy v2 full-snapshot URLs', async () => {
+    const representativeSnapshots = [
+      createShareSnapshot(createDefaultProject()),
+      createNonShareableStateFixture().snapshot,
+    ]
+
+    for (const snapshot of representativeSnapshots) {
+      const v3Url = await createShareUrlForSnapshot(snapshot)
+      const legacyV2Url = await createShareUrlForSnapshot(snapshot, LEGACY_SHARE_FORMAT_VERSION)
+
+      expect(v3Url.length).toBeLessThan(legacyV2Url.length)
+    }
   })
 
   it('keeps share URL warning and limit metadata out of v3 tokens', async () => {

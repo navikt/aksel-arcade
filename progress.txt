@@ -1245,3 +1245,22 @@ Verification:
 - Browser smoke check at http://127.0.0.1:5177/aksel-arcade/ confirmed the updated warning wording, no `Last updated` metadata, a working load action, and no console errors.
 
 Next note: #120 can now add minimality and URL-size proof coverage without carrying share-load UI wording debt; keep recipient-facing Web share copy aligned with "shared project" and avoid reintroducing sender timestamps or metadata.
+
+### 2026-05-29 - Issue #120: Prove Web share URL payload minimality
+
+Implemented:
+
+- Added focused unit coverage proving newly generated v3 Web share URL payloads contain only source JSX/Hooks plus shareable preview viewport/theme.
+- Expanded the v3 minimality assertions to reject settings, timestamps, file metadata, project identity/name/version values, active snapshot/editor file state, preview zoom, sandbox flags, warning thresholds, and character limits.
+- Added representative URL-size comparisons showing v3 share URLs are shorter than equivalent legacy v2 full-snapshot URLs.
+- Extended the UI-generated share-link E2E hydration test to assert the copied token is v3 and that loading it creates a fresh Untitled Project rather than preserving the sender project name.
+
+Verification:
+
+- npm install
+- npm run typecheck
+- CI=1 npm run test
+- npm run lint (passes with the existing hook dependency warnings)
+- npm run test:e2e -- share-link.spec.ts -g "hydrates a shared snapshot"
+
+Next note: the full `share-link.spec.ts` Playwright file still has an older large-template scenario that can enter the share-generation error state locally; this change only adds the v3/fresh-project assertions to the hydrate path and does not modify that size-limit scenario.
