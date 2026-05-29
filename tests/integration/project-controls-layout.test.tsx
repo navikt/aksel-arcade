@@ -36,6 +36,7 @@ import {
   ARCADE_PROJECT_IMPORT_ACCEPT,
   ARCADE_PROJECT_PACKAGE_EXTENSION,
   ARCADE_PROJECT_PACKAGE_FORMAT,
+  ARCADE_PROJECT_PACKAGE_FORMAT_VERSION,
   ARCADE_PROJECT_PACKAGE_MIME_TYPE,
   createArcadeProjectPackage,
   createShareSnapshot,
@@ -186,9 +187,8 @@ const exportCurrentProjectPackage = async (
 const getPackagePortableShape = (packageData: ArcadeProjectPackage) => ({
   root: Object.keys(packageData).sort(),
   project: Object.keys(packageData.project).sort(),
-  code: Object.keys(packageData.project.code).sort(),
-  ui: Object.keys(packageData.project.ui).sort(),
-  meta: packageData.meta ? Object.keys(packageData.meta).sort() : [],
+  source: Object.keys(packageData.project.source).sort(),
+  preview: Object.keys(packageData.project.preview).sort(),
 })
 
 const expectCleanPackage = (
@@ -197,6 +197,7 @@ const expectCleanPackage = (
   forbiddenValues: string[]
 ) => {
   expect(packageData.format).toBe(ARCADE_PROJECT_PACKAGE_FORMAT)
+  expect(packageData.formatVersion).toBe(ARCADE_PROJECT_PACKAGE_FORMAT_VERSION)
   expect(collectObjectKeys(packageData).join(' ')).not.toMatch(
     AGENT_PACKAGE_ARTIFACT_KEY_PATTERN
   )
@@ -222,7 +223,7 @@ const createProjectPackageFileForCode = (name: string, jsxCode: string): File =>
   project.jsxCode = jsxCode
 
   return createProjectPackageFile(
-    JSON.stringify(createArcadeProjectPackage(project, { includeAIMeta: false }))
+    JSON.stringify(createArcadeProjectPackage(project))
   )
 }
 
@@ -1323,12 +1324,12 @@ describe('ProjectControls layout', () => {
       expect(getPackagePortableShape(activePackage.packageData)).toEqual(normalPackageShape)
       expect(activePackage.packageData.project).toMatchObject({
         name: 'Transport Package Project',
-        code: {
-          jsxCode: nextJsx,
-          hooksCode: nextHooks,
+        source: {
+          jsx: nextJsx,
+          hooks: nextHooks,
         },
-        ui: {
-          viewportSize: 'XS',
+        preview: {
+          viewport: 'XS',
         },
       })
       expectCleanPackage(activePackage.packageData, activePackage.text, forbiddenPackageValues)
@@ -1349,12 +1350,12 @@ describe('ProjectControls layout', () => {
       expect(getPackagePortableShape(stoppedPackage.packageData)).toEqual(normalPackageShape)
       expect(stoppedPackage.packageData.project).toMatchObject({
         name: 'Transport Package Project',
-        code: {
-          jsxCode: nextJsx,
-          hooksCode: nextHooks,
+        source: {
+          jsx: nextJsx,
+          hooks: nextHooks,
         },
-        ui: {
-          viewportSize: 'XS',
+        preview: {
+          viewport: 'XS',
         },
       })
       expectCleanPackage(stoppedPackage.packageData, stoppedPackage.text, forbiddenPackageValues)
