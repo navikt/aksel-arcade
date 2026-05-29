@@ -4,6 +4,7 @@ import fs from 'node:fs'
 import type { ShareGenerationTelemetryEvent } from '@/services/telemetry'
 
 const SHARED_PREVIEW_TEXT = 'Shared via E2E'
+const SENDER_PROJECT_NAME = 'Sender identity should stay local'
 const SHARED_CODE = `export default function App() {
   return <div>${SHARED_PREVIEW_TEXT}</div>
 }`
@@ -29,7 +30,7 @@ const ensureArtifactDir = () => {
 
 test.describe('Share link flow', () => {
   test('hydrates a shared snapshot generated from the UI', async ({ page, browser }) => {
-    await page.addInitScript(({ sharedCode }) => {
+    await page.addInitScript(({ sharedCode, senderProjectName }) => {
       window.__COPIED_SHARE_URL__ = ''
       Object.defineProperty(navigator, 'clipboard', {
         value: {
@@ -45,7 +46,7 @@ test.describe('Share link flow', () => {
       const project = {
         version: '1.0.0',
         id: self.crypto?.randomUUID ? self.crypto.randomUUID() : `share-${Math.random()}`,
-        name: 'Shared via E2E',
+        name: senderProjectName,
         jsxCode: sharedCode,
         hooksCode: '',
         viewportSize: 'MD',
@@ -54,7 +55,7 @@ test.describe('Share link flow', () => {
         lastModified: now,
       }
       localStorage.setItem('aksel-arcade:project', JSON.stringify(project))
-    }, { sharedCode: SHARED_CODE })
+    }, { sharedCode: SHARED_CODE, senderProjectName: SENDER_PROJECT_NAME })
 
     await page.goto('/')
 
@@ -73,6 +74,8 @@ test.describe('Share link flow', () => {
       throw new Error('Share URL was not captured')
     }
     expect(shareUrl).toMatch(/\?share=/)
+    const shareToken = new URL(shareUrl).searchParams.get('share')
+    expect(shareToken?.startsWith('3.')).toBe(true)
 
     const recipientContext = await browser.newContext()
     const recipientPage = await recipientContext.newPage()
@@ -84,6 +87,8 @@ test.describe('Share link flow', () => {
 
     const previewFrame = recipientPage.frameLocator('[data-testid="preview-iframe"]')
     await expect(previewFrame.getByText(SHARED_PREVIEW_TEXT)).toBeVisible()
+    await expect(recipientPage.getByText('Untitled Project')).toBeVisible()
+    await expect(recipientPage.getByText(SENDER_PROJECT_NAME)).toHaveCount(0)
 
     await recipientContext.close()
   })
