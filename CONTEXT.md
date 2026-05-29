@@ -17,7 +17,7 @@ A review-facing display preference of an **Arcade project**, such as the viewpor
 _Avoid_: Workspace preference, editor layout
 
 **Workspace preference**:
-A local product-surface preference for arranging Arcade itself around an **Arcade project**, such as editor panel placement.
+A local product-surface preference for arranging Arcade itself around an **Arcade project**, such as editor panel placement. In **Web Arcade**, workspace preferences belong to the current **Web Arcade working copy**.
 _Avoid_: Preview preference, project content
 
 **Arcade project package**:
@@ -28,9 +28,21 @@ _Avoid_: Arcade project, save file, document, AI export bundle
 A Web Arcade link that carries only the portable **Arcade project** data needed to load a shared prototype: **Arcade project source** and shareable **Preview preferences**. Opening one creates a fresh local **Arcade project** identity without preserving sender identity, timestamps, diagnostics, preview evidence, or **Workspace preferences**.
 _Avoid_: Project code URL, save file, telemetry bundle
 
+**Web Arcade URL**:
+The ordinary browser address for opening **Web Arcade** without project data. It opens a new default **Web Arcade working copy** unless it is a **Web share URL**.
+_Avoid_: Web share URL, project URL
+
 **Web Arcade**:
 The browser-hosted product surface for working with **Arcade projects**.
 _Avoid_: Browser-only Arcade, original Arcade
+
+**Web Arcade working copy**:
+A tab-scoped editing instance of an **Arcade project** in **Web Arcade**, including its name, **Arcade project source**, **Preview preferences**, and **Workspace preferences**. It survives reloads in its own tab, and duplicating the tab forks the visible work into an independent working copy; a new tab opened through a **Web Arcade URL** starts as a new default working copy. Autosave belongs to the working copy, not to a browser-wide last project, and closed working copies are not a durable project library.
+_Avoid_: Synchronized tab, shared browser project
+
+**Reset editor**:
+A Web Arcade action that replaces only the current **Web Arcade working copy** with the default Untitled Project.
+_Avoid_: Clear storage, reload
 
 **Desktop Arcade**:
 The desktop product surface for working with the same **Arcade projects** as **Web Arcade**.
@@ -108,4 +120,36 @@ Domain expert: "Then the package should contain the project name, Arcade project
 
 Developer: "The user opened a Web share URL from a colleague."
 
-Domain expert: "Create a fresh local Arcade project identity from the shared Arcade project source and preview preferences. Do not preserve sender identity, timestamps, diagnostics, preview evidence, or workspace preferences."
+Domain expert: "Replace only the current Web Arcade working copy with a fresh local Arcade project identity from the shared Arcade project source and preview preferences. Do not preserve sender identity, timestamps, diagnostics, preview evidence, or workspace preferences."
+
+Developer: "The user copied the ordinary Web Arcade URL into a new tab."
+
+Domain expert: "Open a new default Web Arcade working copy. Only a Web share URL carries project data."
+
+Developer: "The user has the same Web Arcade project open in two browser tabs."
+
+Domain expert: "Treat them as separate Web Arcade working copies. A change in one tab should not replace work in the other unless the user explicitly imports or shares that project data."
+
+Developer: "The user opens a new blank Web Arcade tab."
+
+Domain expert: "Start a new default Web Arcade working copy. Do not restore another tab's work into it."
+
+Developer: "The user reloads a Web Arcade tab with unsent work."
+
+Domain expert: "Restore that tab's Web Arcade working copy after reload. Reloading is not the same as opening a new blank tab."
+
+Developer: "The user duplicates a Web Arcade tab."
+
+Domain expert: "Fork the visible work, including the name, into a separate Web Arcade working copy. The two tabs may start identical, but edits diverge immediately."
+
+Developer: "The user wants to throw away the current Web Arcade working copy."
+
+Domain expert: "Use Reset editor. It replaces only the current working copy with the default Untitled Project; it does not clear other tabs."
+
+Developer: "The user imports an Arcade project package in a Web Arcade tab."
+
+Domain expert: "Replace only that tab's Web Arcade working copy with the imported Arcade project data."
+
+Developer: "The user needs to keep a Web Arcade prototype after closing the tab."
+
+Domain expert: "Use Share or Export. A closed Web Arcade working copy is not a durable project library entry."
