@@ -3,8 +3,6 @@ import {
   DEFAULT_AGENT_PERMISSIONS,
   createAgentBridgeCommandRouter,
   createAgentPairingHandoffCommand,
-  publishAgentBridge,
-  removeAgentBridge,
   type AgentBridgeController,
   type AgentBridgeCommandResult,
   type AgentBridgeErrorCode,
@@ -122,10 +120,8 @@ export const useAgentSession = ({
   )
 
   const cleanupAgentSession = useCallback((reason: DesktopAgentSessionEndReason) => {
-    const sessionId = activeSessionIdRef.current
     coordinatorRef.current?.stopSession(reason)
     activeSessionIdRef.current = null
-    removeAgentBridge(sessionId ?? undefined)
   }, [])
 
   const applyAgentChange = useCallback(
@@ -220,20 +216,6 @@ export const useAgentSession = ({
       setSession(null)
     })
   }, [cleanupAgentSession])
-
-  useEffect(() => {
-    if (!session) {
-      removeAgentBridge()
-      return
-    }
-
-    activeSessionIdRef.current = session.id
-    publishAgentBridge(session, createBridgeController())
-
-    return () => {
-      removeAgentBridge(session.id)
-    }
-  }, [activeSessionIdRef, createBridgeController, session])
 
   useEffect(() => {
     if (!session) {

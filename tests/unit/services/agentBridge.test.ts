@@ -5,7 +5,6 @@ import {
   DEFAULT_AGENT_PERMISSIONS,
   createAgentInstructions,
   createAgentPairingHandoffCommand,
-  createAgentBridge,
   createAgentBridgeCommandRouter,
   isAgentBridgeCommandName,
   isAgentBridgeReadCommandName,
@@ -374,23 +373,6 @@ describe('agent bridge command router', () => {
     expect(recordedCommands).toEqual([])
   })
 
-  it('keeps the browser bridge API as a compatibility wrapper over the router', () => {
-    const request = {
-      summary: 'Update JSX',
-      jsxCode: '<Button>Updated</Button>',
-    }
-    const { controller, recordedCommands } = createController()
-    const bridge = createAgentBridge(desktopSession, controller)
-
-    expect(bridge.commandNames).toEqual(AGENT_BRIDGE_COMMAND_NAMES)
-    expect(expectBridgeSuccess(bridge.getAgentInstructions())).toMatchObject({
-      version: 1,
-      sessionId: desktopSession.id,
-    })
-    expect(expectBridgeSuccess(bridge.getProject())).toEqual(createReadContext().project)
-    expect(bridge.applySourceChange(request)).toEqual(createApplySuccess())
-    expect(recordedCommands).toEqual(['getAgentInstructions', 'getProject', 'applySourceChange'])
-  })
 })
 
 describe('agent instructions', () => {
@@ -462,8 +444,9 @@ describe('agent instructions', () => {
   it('keeps inactive copied instructions free of transport secrets', () => {
     const instructions = createAgentInstructions(DEFAULT_AGENT_PERMISSIONS)
 
-    expect(instructions).toContain('window.__AKSEL_ARCADE_AGENT_BRIDGE__')
+    expect(instructions).toContain('Agent access is available only in Desktop Arcade')
     expect(instructions).not.toMatch(/Endpoint:|Authorization: Bearer|copied-agent-secret/i)
+    expect(instructions).not.toContain('__AKSEL_ARCADE_AGENT_BRIDGE__')
     expect(instructions).not.toMatch(/[?&](token|credential|authorization)=/i)
   })
 })

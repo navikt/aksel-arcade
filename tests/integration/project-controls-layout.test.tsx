@@ -10,19 +10,25 @@ import {
   type PreviewDiagnostics,
 } from '@/services/previewDiagnostics'
 import type {
-  AgentBridge,
   AgentBridgeCommandResult,
+  AgentBridgeCommandName,
   AgentBridgeErrorCode,
+  AgentInstructionsPayload,
+  AgentPreviewReadState,
+  AgentProjectReadState,
+  AgentSourceChangeResult,
+  AgentSessionReadState,
 } from '@/services/agentBridge'
 import type {
   DesktopAgentTransportRequestHandler,
   DesktopAgentTransportRouteRequest,
   DesktopAgentTransportRouteResponse,
 } from '@/services/desktopAgentTransportProtocol'
-import type { PreviewEvidenceElement } from '@/services/previewEvidence'
+import type { PreviewEvidence, PreviewEvidenceElement } from '@/services/previewEvidence'
 import {
   DESKTOP_ARCADE_CAPABILITIES,
   WEB_ARCADE_CAPABILITIES,
+  type DesktopArcadePreloadApi,
   type ShellCapabilities,
 } from '@/services/shellCapabilities'
 import {
@@ -37,6 +43,17 @@ import {
 import { createShareToken, encodeSharePayload } from '@/utils/shareEncoding'
 
 const noop = () => {}
+const LEGACY_AGENT_BRIDGE_GLOBAL = '__AKSEL_ARCADE_AGENT_BRIDGE__'
+
+const getLegacyAgentBridgeGlobal = () => Reflect.get(window, LEGACY_AGENT_BRIDGE_GLOBAL)
+
+const clearLegacyAgentBridgeGlobal = () => {
+  Reflect.deleteProperty(window, LEGACY_AGENT_BRIDGE_GLOBAL)
+}
+
+const expectLegacyAgentBridgeAbsent = () => {
+  expect(getLegacyAgentBridgeGlobal()).toBeUndefined()
+}
 
 interface HarnessProps {
   includePreview?: boolean
@@ -102,6 +119,11 @@ const Harness = ({
 }
 
 const renderHeader = (options?: HarnessProps) => {
+  const shellCapabilities = options?.shellCapabilities ?? DESKTOP_ARCADE_CAPABILITIES
+  if (shellCapabilities.agentSessions.enabled && !window.__AKSEL_ARCADE_DESKTOP__) {
+    setupDesktopTransportPreload()
+  }
+
   return render(
     <SettingsProvider>
       <AppProvider>
@@ -254,7 +276,76 @@ const expectBridgeFailure = <TData,>(
   return result.error
 }
 
-const captureAgentState = (bridge: AgentBridge) => {
+type AgentTransportClient = {
+  readonly sessionId: string
+  readonly status: 'active'
+  readonly permissions: AgentSessionReadState['permissions']
+  readonly readScope: 'arcade-session'
+  readonly commandNames: AgentSessionReadState['commandNames']
+  getAgentInstructions: () => AgentBridgeCommandResult<AgentInstructionsPayload>
+  getProject: () => AgentBridgeCommandResult<AgentProjectReadState>
+  getPreviewContext: () => AgentBridgeCommandResult<AgentPreviewReadState>
+  getDiagnostics: () => AgentBridgeCommandResult<PreviewDiagnostics>
+  getPreviewEvidence: () => AgentBridgeCommandResult<PreviewEvidence>
+  getSessionState: () => AgentBridgeCommandResult<AgentSessionReadState>
+  applySourceChange: (request: unknown) => AgentBridgeCommandResult<AgentSourceChangeResult>
+}
+
+const createAgentTransportClient = (
+  desktopTransport: ReturnType<typeof setupDesktopTransportPreload>
+): AgentTransportClient => {
+  const route = <TData,>(
+    method: AgentBridgeCommandName,
+    params?: unknown
+  ): AgentBridgeCommandResult<TData> => {
+    const response = desktopTransport.route({
+      id: `${method}-test`,
+      method,
+      params,
+    })
+
+    if ('error' in response) {
+      return {
+        ok: false,
+        command: method,
+        error: response.error.data.bridgeError ?? {
+          code: response.error.data.code as AgentBridgeErrorCode,
+          message: response.error.message,
+        },
+      }
+    }
+
+    return response.result as AgentBridgeCommandResult<TData>
+  }
+
+  const readSession = () => {
+    const session = expectBridgeSuccess(route<AgentSessionReadState>('getSessionState'))
+    return session
+  }
+
+  return {
+    get sessionId() {
+      return readSession().sessionId
+    },
+    status: 'active',
+    get permissions() {
+      return readSession().permissions
+    },
+    readScope: 'arcade-session',
+    get commandNames() {
+      return readSession().commandNames
+    },
+    getAgentInstructions: () => route<AgentInstructionsPayload>('getAgentInstructions'),
+    getProject: () => route<AgentProjectReadState>('getProject'),
+    getPreviewContext: () => route<AgentPreviewReadState>('getPreviewContext'),
+    getDiagnostics: () => route<PreviewDiagnostics>('getDiagnostics'),
+    getPreviewEvidence: () => route<PreviewEvidence>('getPreviewEvidence'),
+    getSessionState: () => route<AgentSessionReadState>('getSessionState'),
+    applySourceChange: (request) => route<AgentSourceChangeResult>('applySourceChange', request),
+  }
+}
+
+const captureAgentState = (bridge: AgentTransportClient) => {
   const project = expectBridgeSuccess(callBridgeCommand(() => bridge.getProject()))
   const preview = expectBridgeSuccess(callBridgeCommand(() => bridge.getPreviewContext()))
   const session = expectBridgeSuccess(callBridgeCommand(() => bridge.getSessionState()))
@@ -268,7 +359,6 @@ const captureAgentState = (bridge: AgentBridge) => {
 }
 
 const expectProjectReplacementRevokedAgentAccess = async (
-  bridge: AgentBridge,
   desktopTransport: ReturnType<typeof setupDesktopTransportPreload>,
   stopCallIndex: number
 ) => {
@@ -279,10 +369,8 @@ const expectProjectReplacementRevokedAgentAccess = async (
       'project-replaced'
     )
   )
-  expect(window.__AKSEL_ARCADE_AGENT_BRIDGE__).toBeUndefined()
-  expectBridgeFailure(callBridgeCommand(() => bridge.getProject()), 'session-revoked')
-  const revokedPayload = JSON.stringify(callBridgeCommand(() => bridge.getSessionState()))
-  expect(revokedPayload).not.toContain('project-replaced')
+  expectLegacyAgentBridgeAbsent()
+  expect(desktopTransport.hasRequestHandler()).toBe(false)
 
   await ensureAgentMenuOpen()
   expect(screen.getByRole('status').textContent).toBe('Status: inaktiv')
@@ -294,13 +382,14 @@ const startAgentAccess = async () => {
   await ensureAgentMenuOpen()
   fireEvent.click(screen.getByRole('menuitemcheckbox', { name: /agent-tilgang/i }))
 
-  await waitFor(() => expect(window.__AKSEL_ARCADE_AGENT_BRIDGE__).toBeDefined())
-  const bridge = window.__AKSEL_ARCADE_AGENT_BRIDGE__
-  if (!bridge) {
-    throw new Error('Expected Agent bridge to be published after access starts.')
+  await waitFor(() => expect(screen.getByRole('status').textContent).toBe('Status: aktiv'))
+  expectLegacyAgentBridgeAbsent()
+  if (!currentDesktopTransport) {
+    throw new Error('Expected Desktop transport preload to be installed before Agent access starts.')
   }
+  await waitFor(() => expect(currentDesktopTransport?.hasRequestHandler()).toBe(true))
 
-  return bridge
+  return createAgentTransportClient(currentDesktopTransport)
 }
 
 const selectSettingsMenuItem = async (name: RegExp) => {
@@ -328,16 +417,23 @@ const closeAgentMenuIfOpen = async () => {
   }
 }
 
-const setupDesktopTransportPreload = (
+let currentDesktopTransport: ReturnType<typeof setupDesktopTransportPreload> | null = null
+
+function setupDesktopTransportPreload(
   sessionId: ReturnType<Crypto['randomUUID']> = '11111111-1111-4111-8111-111111111111'
-) => {
+) {
   let transportRequestHandler: DesktopAgentTransportRequestHandler | null = null
   const endpoint = {
     endpoint: 'http://127.0.0.1:48123',
     sessionId,
     authorizationHeader: 'Bearer copied-agent-secret',
   }
-  const api = {
+  const api: DesktopArcadePreloadApi & {
+    getShellCapabilities: ReturnType<typeof vi.fn>
+    startAgentTransportSession: ReturnType<typeof vi.fn>
+    stopAgentTransportSession: ReturnType<typeof vi.fn>
+    setAgentTransportRequestHandler: ReturnType<typeof vi.fn>
+  } = {
     getShellCapabilities: vi.fn().mockResolvedValue(DESKTOP_ARCADE_CAPABILITIES),
     startAgentTransportSession: vi.fn().mockResolvedValue(endpoint),
     stopAgentTransportSession: vi.fn().mockResolvedValue(true),
@@ -351,22 +447,23 @@ const setupDesktopTransportPreload = (
   window.__AKSEL_ARCADE_DESKTOP__ = api
   vi.spyOn(globalThis.crypto, 'randomUUID').mockReturnValue(sessionId)
 
-  return {
+  const fixture = {
     api,
     endpoint,
-    route: async (
+    hasRequestHandler: () => transportRequestHandler !== null,
+    route: (
       request: Omit<DesktopAgentTransportRouteRequest, 'sessionId'> & {
         sessionId?: string
       }
-    ): Promise<DesktopAgentTransportRouteResponse> => {
+    ): DesktopAgentTransportRouteResponse => {
       if (!transportRequestHandler) {
         throw new Error('Expected Desktop transport request handler to be registered.')
       }
       const handler = transportRequestHandler
 
-      let response: DesktopAgentTransportRouteResponse | undefined
-      await act(async () => {
-        response = await handler({
+      let response: DesktopAgentTransportRouteResponse | Promise<DesktopAgentTransportRouteResponse> | undefined
+      act(() => {
+        response = handler({
           ...request,
           sessionId: request.sessionId ?? sessionId,
         })
@@ -375,11 +472,20 @@ const setupDesktopTransportPreload = (
       if (!response) {
         throw new Error('Expected Desktop transport request handler to return a response.')
       }
+      if (isPromiseLike(response)) {
+        throw new Error('Expected Desktop transport request handler to return synchronously.')
+      }
 
       return response
     },
   }
+
+  currentDesktopTransport = fixture
+  return fixture
 }
+
+const isPromiseLike = <TValue,>(value: TValue | Promise<TValue>): value is Promise<TValue> =>
+  typeof (value as Promise<TValue>).then === 'function'
 
 const dispatchSandboxMessage = (data: unknown) => {
   const iframe = screen.getByTestId('preview-iframe') as HTMLIFrameElement
@@ -506,13 +612,15 @@ describe('ProjectControls layout', () => {
     vi.clearAllMocks()
     window.localStorage.clear()
     window.history.replaceState({}, '', '/')
-    delete window.__AKSEL_ARCADE_AGENT_BRIDGE__
+    currentDesktopTransport = null
+    clearLegacyAgentBridgeGlobal()
     delete window.__AKSEL_ARCADE_DESKTOP__
   })
 
   afterEach(() => {
     vi.restoreAllMocks()
-    delete window.__AKSEL_ARCADE_AGENT_BRIDGE__
+    currentDesktopTransport = null
+    clearLegacyAgentBridgeGlobal()
     delete window.__AKSEL_ARCADE_DESKTOP__
   })
 
@@ -526,7 +634,7 @@ describe('ProjectControls layout', () => {
 
     expect(importInput.accept).toBe(ARCADE_PROJECT_IMPORT_ACCEPT)
     expect(screen.queryByRole('button', { name: /koble til agent/i })).toBeNull()
-    expect(window.__AKSEL_ARCADE_AGENT_BRIDGE__).toBeUndefined()
+    expectLegacyAgentBridgeAbsent()
     expect(
       importButton.compareDocumentPosition(shareButton) & Node.DOCUMENT_POSITION_FOLLOWING
     ).toBeTruthy()
@@ -538,7 +646,7 @@ describe('ProjectControls layout', () => {
 
     expect(await screen.findByText(/Share URL length/i)).toBeTruthy()
     expect(screen.getByText(/Strategy:/i)).toBeTruthy()
-    expect(window.__AKSEL_ARCADE_AGENT_BRIDGE__).toBeUndefined()
+    expectLegacyAgentBridgeAbsent()
   })
 
   it('keeps Desktop Arcade Agent access available and Share URL absent', async () => {
@@ -561,13 +669,13 @@ describe('ProjectControls layout', () => {
     expect(screen.queryByText(/Switch to light mode/i)).toBeNull()
   })
 
-  it('keeps Agent bridge inactive by default and publishes it only for a temporary session', async () => {
+  it('keeps the legacy Agent browser bridge absent while Desktop transport is temporary', async () => {
     vi.spyOn(globalThis.crypto, 'randomUUID').mockReturnValue(
       '11111111-1111-4111-8111-111111111111'
     )
     const { unmount } = renderHeader()
 
-    expect(window.__AKSEL_ARCADE_AGENT_BRIDGE__).toBeUndefined()
+    expectLegacyAgentBridgeAbsent()
 
     fireEvent.click(await findAgentAccessButton())
 
@@ -601,7 +709,12 @@ describe('ProjectControls layout', () => {
     expect(screen.getByText(/kommandoen gir agenten tilgang/i)).toBeTruthy()
     expect(screen.getByText('Del bare med agenten du vil gi tilgang.')).toBeTruthy()
     expect(screen.getByRole('menuitem', { name: /Kopier agentkommando/i })).toBeTruthy()
-    const activeBridge = window.__AKSEL_ARCADE_AGENT_BRIDGE__
+    expectLegacyAgentBridgeAbsent()
+    await waitFor(() => expect(currentDesktopTransport?.hasRequestHandler()).toBe(true))
+    if (!currentDesktopTransport) {
+      throw new Error('Expected Desktop transport fixture to be active.')
+    }
+    const activeBridge = createAgentTransportClient(currentDesktopTransport)
     expect(activeBridge).toMatchObject({
       sessionId: '11111111-1111-4111-8111-111111111111',
       status: 'active',
@@ -653,23 +766,18 @@ describe('ProjectControls layout', () => {
     fireEvent.click(screen.getByRole('menuitemcheckbox', { name: /agent-tilgang/i }))
 
     expect(screen.getByRole('status').textContent).toBe('Status: inaktiv')
-    expect(window.__AKSEL_ARCADE_AGENT_BRIDGE__).toBeUndefined()
-    expect(activeBridge?.getProject()).toMatchObject({
-      ok: false,
-      command: 'getProject',
-      error: {
-        code: 'session-revoked',
-      },
-    })
+    expectLegacyAgentBridgeAbsent()
+    await waitFor(() => expect(currentDesktopTransport?.hasRequestHandler()).toBe(false))
 
     fireEvent.click(screen.getByRole('menuitemcheckbox', { name: /agent-tilgang/i }))
-    await waitFor(() => expect(window.__AKSEL_ARCADE_AGENT_BRIDGE__).toBeDefined())
+    await waitFor(() => expect(currentDesktopTransport?.hasRequestHandler()).toBe(true))
+    expectLegacyAgentBridgeAbsent()
 
     unmount()
-    expect(window.__AKSEL_ARCADE_AGENT_BRIDGE__).toBeUndefined()
+    expectLegacyAgentBridgeAbsent()
 
     renderHeader()
-    expect(window.__AKSEL_ARCADE_AGENT_BRIDGE__).toBeUndefined()
+    expectLegacyAgentBridgeAbsent()
 
     fireEvent.click(await findAgentAccessButton())
     expect(
@@ -687,19 +795,19 @@ describe('ProjectControls layout', () => {
     vi.spyOn(window, 'confirm').mockReturnValue(true)
     renderHeader()
 
-    let bridge = await startAgentAccess()
+    await startAgentAccess()
     await selectSettingsMenuItem(/Reset editor/i)
-    await expectProjectReplacementRevokedAgentAccess(bridge, desktopTransport, 1)
+    await expectProjectReplacementRevokedAgentAccess(desktopTransport, 1)
 
-    bridge = await startAgentAccess()
+    await startAgentAccess()
     await selectSettingsMenuItem(/Oppsummeringsside for søknadsdialoger/i)
-    await expectProjectReplacementRevokedAgentAccess(bridge, desktopTransport, 2)
+    await expectProjectReplacementRevokedAgentAccess(desktopTransport, 2)
 
-    bridge = await startAgentAccess()
+    await startAgentAccess()
     await selectSettingsMenuItem(/Hooks demo/i)
-    await expectProjectReplacementRevokedAgentAccess(bridge, desktopTransport, 3)
+    await expectProjectReplacementRevokedAgentAccess(desktopTransport, 3)
 
-    bridge = await startAgentAccess()
+    await startAgentAccess()
     fireEvent.change(screen.getByLabelText(/import project file/i), {
       target: {
         files: [
@@ -711,7 +819,7 @@ describe('ProjectControls layout', () => {
       },
     })
     await waitFor(() => expect(screen.getByText('Imported Replacement Project')).toBeTruthy())
-    await expectProjectReplacementRevokedAgentAccess(bridge, desktopTransport, 4)
+    await expectProjectReplacementRevokedAgentAccess(desktopTransport, 4)
   })
 
   it('revokes active Agent access when loading a shared project snapshot', async () => {
@@ -723,14 +831,14 @@ describe('ProjectControls layout', () => {
     renderHeader()
 
     const loadSharedProject = await screen.findByRole('button', { name: /load shared project/i })
-    const bridge = await startAgentAccess()
+    await startAgentAccess()
 
     fireEvent.click(loadSharedProject)
 
     await waitFor(() =>
       expect(screen.getByTestId('project-jsx-code').textContent).toContain('Shared replacement')
     )
-    await expectProjectReplacementRevokedAgentAccess(bridge, desktopTransport, 1)
+    await expectProjectReplacementRevokedAgentAccess(desktopTransport, 1)
   })
 
   it('keeps Agent access active for normal edits, preview changes, layout changes, and Agent changes', async () => {
@@ -776,7 +884,8 @@ describe('ProjectControls layout', () => {
     })
 
     expect(desktopTransport.api.stopAgentTransportSession).not.toHaveBeenCalled()
-    expect(window.__AKSEL_ARCADE_AGENT_BRIDGE__).toBeDefined()
+    expect(desktopTransport.hasRequestHandler()).toBe(true)
+    expectLegacyAgentBridgeAbsent()
     await ensureAgentMenuOpen()
     expect(screen.getByRole('status').textContent).toBe('Status: aktiv')
     await closeAgentMenuIfOpen()
@@ -808,17 +917,8 @@ describe('ProjectControls layout', () => {
       value: { writeText },
     })
     const sessionId = '11111111-1111-4111-8111-111111111111'
-    const endpoint = {
-      endpoint: 'http://127.0.0.1:48123',
-      sessionId,
-      authorizationHeader: 'Bearer copied-agent-secret',
-    }
-    window.__AKSEL_ARCADE_DESKTOP__ = {
-      getShellCapabilities: vi.fn().mockResolvedValue(DESKTOP_ARCADE_CAPABILITIES),
-      startAgentTransportSession: vi.fn().mockResolvedValue(endpoint),
-      stopAgentTransportSession: vi.fn().mockResolvedValue(true),
-    }
-    vi.spyOn(globalThis.crypto, 'randomUUID').mockReturnValue(sessionId)
+    const desktopTransport = setupDesktopTransportPreload(sessionId)
+    const { endpoint } = desktopTransport
 
     renderHeader()
 
@@ -828,7 +928,7 @@ describe('ProjectControls layout', () => {
     await waitFor(() => expect(writeText).toHaveBeenCalledTimes(1))
 
     const instructions = writeText.mock.calls[0]?.[0] ?? ''
-    expect(window.__AKSEL_ARCADE_DESKTOP__.startAgentTransportSession).toHaveBeenCalledTimes(1)
+    expect(desktopTransport.api.startAgentTransportSession).toHaveBeenCalledTimes(1)
     expect(instructions).toBe(
       `curl -sS -X POST '${endpoint.endpoint}' -H 'Authorization: ${endpoint.authorizationHeader}' -H 'Content-Type: application/json' --data '{"jsonrpc":"2.0","id":"agent-instructions-1","method":"getAgentInstructions"}'`
     )
@@ -861,12 +961,12 @@ describe('ProjectControls layout', () => {
       )
     )
 
-    await expect(
+    expect(
       desktopTransport.route({
         id: 'instructions-1',
         method: 'getAgentInstructions',
       })
-    ).resolves.toMatchObject({
+    ).toMatchObject({
       jsonrpc: '2.0',
       id: 'instructions-1',
       result: {
@@ -950,12 +1050,12 @@ describe('ProjectControls layout', () => {
     })
     expect(captureAgentState(bridge)).toEqual(beforeInvalid)
 
-    await expect(
+    expect(
       desktopTransport.route({
         id: 'shell-1',
         method: 'openShell',
       })
-    ).resolves.toMatchObject({
+    ).toMatchObject({
       error: {
         code: -32601,
         data: {
@@ -964,7 +1064,7 @@ describe('ProjectControls layout', () => {
       },
     })
 
-    await expect(
+    expect(
       desktopTransport.route({
         id: 'stale-1',
         method: 'applySourceChange',
@@ -974,7 +1074,7 @@ describe('ProjectControls layout', () => {
         },
         sessionId: 'stale-session',
       })
-    ).resolves.toMatchObject({
+    ).toMatchObject({
       error: {
         code: -32001,
         data: {
@@ -1044,13 +1144,13 @@ describe('ProjectControls layout', () => {
     expect(screen.queryByRole('menuitem', { name: /gjenopprett/i })).toBeNull()
 
     for (const method of ['restoreCheckpoint', 'deleteCheckpoint']) {
-      await expect(
+      expect(
         desktopTransport.route({
           id: `${method}-1`,
           method,
           params: {},
         })
-      ).resolves.toMatchObject({
+      ).toMatchObject({
         error: {
           code: -32601,
           data: {
@@ -1101,12 +1201,12 @@ describe('ProjectControls layout', () => {
       )
 
       const original = captureAgentState(bridge)
-      await expect(
+      expect(
         desktopTransport.route({
           id: 'read-before-package-export',
           method: 'getProject',
         })
-      ).resolves.toMatchObject({
+      ).toMatchObject({
         jsonrpc: '2.0',
         id: 'read-before-package-export',
         result: {
@@ -1191,7 +1291,7 @@ describe('ProjectControls layout', () => {
       }
       fireEvent.click(accessToggle)
       expect(screen.getByRole('status').textContent).toBe('Status: inaktiv')
-      expect(window.__AKSEL_ARCADE_AGENT_BRIDGE__).toBeUndefined()
+      expectLegacyAgentBridgeAbsent()
 
       const stoppedPackage = await exportCurrentProjectPackage(capturedBlobs)
 
@@ -1209,7 +1309,7 @@ describe('ProjectControls layout', () => {
       expectCleanPackage(stoppedPackage.packageData, stoppedPackage.text, forbiddenPackageValues)
 
       unmount()
-      expect(window.__AKSEL_ARCADE_AGENT_BRIDGE__).toBeUndefined()
+      expectLegacyAgentBridgeAbsent()
       renderHeader()
 
       fireEvent.change(screen.getByLabelText(/import project file/i), {
@@ -1219,7 +1319,7 @@ describe('ProjectControls layout', () => {
       })
 
       await waitFor(() => expect(screen.getByText('Transport Package Project')).toBeTruthy())
-      expect(window.__AKSEL_ARCADE_AGENT_BRIDGE__).toBeUndefined()
+      expectLegacyAgentBridgeAbsent()
 
       fireEvent.click(await findAgentAccessButton())
       expect(await screen.findByText(/Koble til agent/i)).toBeTruthy()
@@ -1234,11 +1334,8 @@ describe('ProjectControls layout', () => {
   it('shows copy failure feedback and lets the user retry without revealing secrets', async () => {
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
     const sessionId = '11111111-1111-4111-8111-111111111111'
-    const endpoint = {
-      endpoint: 'http://127.0.0.1:48123',
-      sessionId,
-      authorizationHeader: 'Bearer copied-agent-secret',
-    }
+    const desktopTransport = setupDesktopTransportPreload(sessionId)
+    const { endpoint } = desktopTransport
     const command = `curl -sS -X POST '${endpoint.endpoint}' -H 'Authorization: ${endpoint.authorizationHeader}' -H 'Content-Type: application/json' --data '{"jsonrpc":"2.0","id":"agent-instructions-1","method":"getAgentInstructions"}'`
     const writeText = vi
       .fn()
@@ -1252,13 +1349,6 @@ describe('ProjectControls layout', () => {
       configurable: true,
       value: { writeText },
     })
-    window.__AKSEL_ARCADE_DESKTOP__ = {
-      getShellCapabilities: vi.fn().mockResolvedValue(DESKTOP_ARCADE_CAPABILITIES),
-      startAgentTransportSession: vi.fn().mockResolvedValue(endpoint),
-      stopAgentTransportSession: vi.fn().mockResolvedValue(true),
-    }
-    vi.spyOn(globalThis.crypto, 'randomUUID').mockReturnValue(sessionId)
-
     renderHeader()
 
     await startAgentAccess()
@@ -1286,19 +1376,7 @@ describe('ProjectControls layout', () => {
   it('returns Arcade-scoped read state with simplified Agent status', async () => {
     renderHeader()
 
-    fireEvent.click(await findAgentAccessButton())
-    expect(await screen.findByText(/Koble til agent/i)).toBeTruthy()
-    fireEvent.click(
-      screen.getByRole('menuitemcheckbox', {
-        name: /agent-tilgang/i,
-      })
-    )
-
-    await waitFor(() => expect(window.__AKSEL_ARCADE_AGENT_BRIDGE__).toBeDefined())
-    const bridge = window.__AKSEL_ARCADE_AGENT_BRIDGE__
-    if (!bridge) {
-      throw new Error('Expected Agent bridge to be published after access starts.')
-    }
+    const bridge = await startAgentAccess()
 
     const projectResult = callBridgeCommand(() => bridge.getProject())
     expect(projectResult).toMatchObject({
@@ -1361,7 +1439,7 @@ describe('ProjectControls layout', () => {
     )
   })
 
-  it('returns preview diagnostics, keeps simplified status, and revokes stale reads', async () => {
+  it('returns preview diagnostics, keeps simplified status, and unregisters the Desktop transport handler on stop', async () => {
     renderHeader({ includePreview: true })
 
     const bridge = await startAgentAccess()
@@ -1388,13 +1466,7 @@ describe('ProjectControls layout', () => {
 
     fireEvent.click(screen.getByRole('menuitemcheckbox', { name: /agent-tilgang/i }))
 
-    expect(callBridgeCommand(() => bridge.getDiagnostics())).toMatchObject({
-      ok: false,
-      command: 'getDiagnostics',
-      error: {
-        code: 'session-revoked',
-      },
-    })
+    await waitFor(() => expect(currentDesktopTransport?.hasRequestHandler()).toBe(false))
   })
 
   it('returns sanitized Preview evidence from only the sandboxed frame', async () => {
@@ -1484,7 +1556,7 @@ describe('ProjectControls layout', () => {
     )
   })
 
-  it('revokes stale Preview evidence reads after Agent access stops', async () => {
+  it('unregisters the Desktop transport handler for Preview evidence after Agent access stops', async () => {
     renderHeader({ includePreview: true })
 
     const bridge = await startAgentAccess()
@@ -1496,13 +1568,7 @@ describe('ProjectControls layout', () => {
     fireEvent.click(screen.getByRole('menuitemcheckbox', { name: /agent-tilgang/i }))
     expect(screen.getByRole('status').textContent).toBe('Status: inaktiv')
 
-    expect(callBridgeCommand(() => bridge.getPreviewEvidence())).toMatchObject({
-      ok: false,
-      command: 'getPreviewEvidence',
-      error: {
-        code: 'session-revoked',
-      },
-    })
+    await waitFor(() => expect(currentDesktopTransport?.hasRequestHandler()).toBe(false))
   })
 
   it('returns runtime error diagnostics from normal preview state', async () => {
@@ -1601,7 +1667,7 @@ describe('ProjectControls layout', () => {
     })
 
     expect(bridge.permissions.projectMetadata).toBe(true)
-    expect(window.__AKSEL_ARCADE_AGENT_BRIDGE__?.permissions.projectMetadata).toBe(true)
+    expectLegacyAgentBridgeAbsent()
 
     const updatedSession = callBridgeCommand(() => bridge.getSessionState())
     expect(updatedSession).toMatchObject({

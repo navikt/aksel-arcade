@@ -6,7 +6,19 @@ import { AppProvider, useProject } from '@/hooks/useProject'
 import { SettingsProvider } from '@/contexts/SettingsContext'
 import { AppHeader } from '@/components/Header/AppHeader'
 import type { UseShareLinkOptions } from '@/hooks/useShareLink'
-import type { AgentBridgeCommandResult } from '@/services/agentBridge'
+import type {
+  AgentBridgeCommandResult,
+  AgentBridgeCommandName,
+  AgentBridgeErrorCode,
+  AgentPreviewReadState,
+  AgentProjectReadState,
+  AgentSourceChangeResult,
+} from '@/services/agentBridge'
+import type {
+  DesktopAgentTransportRequestHandler,
+  DesktopAgentTransportRouteRequest,
+  DesktopAgentTransportRouteResponse,
+} from '@/services/desktopAgentTransportProtocol'
 import * as shareEncoding from '@/utils/shareEncoding'
 import * as storage from '@/services/storage'
 import type { CompressionStrategy } from '@/services/compressionStrategies'
@@ -14,6 +26,7 @@ import * as compressionStrategies from '@/services/compressionStrategies'
 import {
   DESKTOP_ARCADE_CAPABILITIES,
   WEB_ARCADE_CAPABILITIES,
+  type DesktopArcadePreloadApi,
   type ShellCapabilities,
 } from '@/services/shellCapabilities'
 
@@ -118,6 +131,7 @@ const normalizeWhitespace = (value: string): string => value.replace(/\s+/g, ' '
 const AGENT_CHANGE_SUMMARY = 'Confidential Agent change summary'
 const AGENT_ARTIFACT_KEY_PATTERN =
   /agent|session|permission|activity|bridge|checkpoint|rollback|evidence|diagnostic/i
+const LEGACY_AGENT_BRIDGE_GLOBAL = '__AKSEL_ARCADE_AGENT_BRIDGE__'
 
 const callBridgeCommand = <TResult,>(command: () => TResult): TResult => {
   let result: TResult | undefined
@@ -141,6 +155,112 @@ const expectBridgeSuccess = <TData,>(result: AgentBridgeCommandResult<TData>): T
   }
 
   return result.data
+}
+
+type AgentTransportClient = {
+  getProject: () => AgentBridgeCommandResult<AgentProjectReadState>
+  getPreviewContext: () => AgentBridgeCommandResult<AgentPreviewReadState>
+  applySourceChange: (request: unknown) => AgentBridgeCommandResult<AgentSourceChangeResult>
+}
+
+let currentDesktopTransport: ReturnType<typeof setupDesktopTransportPreload> | null = null
+
+function setupDesktopTransportPreload(
+  sessionId: ReturnType<Crypto['randomUUID']> = '11111111-1111-4111-8111-111111111111'
+) {
+  let transportRequestHandler: DesktopAgentTransportRequestHandler | null = null
+  const endpoint = {
+    endpoint: 'http://127.0.0.1:48123',
+    sessionId,
+    authorizationHeader: 'Bearer copied-agent-secret',
+  }
+  const api: DesktopArcadePreloadApi & {
+    getShellCapabilities: ReturnType<typeof vi.fn>
+    startAgentTransportSession: ReturnType<typeof vi.fn>
+    stopAgentTransportSession: ReturnType<typeof vi.fn>
+    setAgentTransportRequestHandler: ReturnType<typeof vi.fn>
+  } = {
+    getShellCapabilities: vi.fn().mockResolvedValue(DESKTOP_ARCADE_CAPABILITIES),
+    startAgentTransportSession: vi.fn().mockResolvedValue(endpoint),
+    stopAgentTransportSession: vi.fn().mockResolvedValue(true),
+    setAgentTransportRequestHandler: vi.fn(
+      (handler: DesktopAgentTransportRequestHandler | null) => {
+        transportRequestHandler = handler
+      }
+    ),
+  }
+
+  window.__AKSEL_ARCADE_DESKTOP__ = api
+  vi.spyOn(globalThis.crypto, 'randomUUID').mockReturnValue(sessionId)
+
+  const fixture = {
+    route: (
+      request: Omit<DesktopAgentTransportRouteRequest, 'sessionId'> & {
+        sessionId?: string
+      }
+    ): DesktopAgentTransportRouteResponse => {
+      if (!transportRequestHandler) {
+        throw new Error('Expected Desktop transport request handler to be registered.')
+      }
+
+      let response: DesktopAgentTransportRouteResponse | Promise<DesktopAgentTransportRouteResponse> | undefined
+      act(() => {
+        response = transportRequestHandler?.({
+          ...request,
+          sessionId: request.sessionId ?? sessionId,
+        })
+      })
+
+      if (!response) {
+        throw new Error('Expected Desktop transport request handler to return a response.')
+      }
+      if (isPromiseLike(response)) {
+        throw new Error('Expected Desktop transport request handler to return synchronously.')
+      }
+
+      return response
+    },
+  }
+
+  currentDesktopTransport = fixture
+  return fixture
+}
+
+const isPromiseLike = <TValue,>(value: TValue | Promise<TValue>): value is Promise<TValue> =>
+  typeof (value as Promise<TValue>).then === 'function'
+
+const createAgentTransportClient = (
+  desktopTransport: ReturnType<typeof setupDesktopTransportPreload>
+): AgentTransportClient => {
+  const route = <TData,>(
+    method: AgentBridgeCommandName,
+    params?: unknown
+  ): AgentBridgeCommandResult<TData> => {
+    const response = desktopTransport.route({
+      id: `${method}-test`,
+      method,
+      params,
+    })
+
+    if ('error' in response) {
+      return {
+        ok: false,
+        command: method,
+        error: response.error.data.bridgeError ?? {
+          code: response.error.data.code as AgentBridgeErrorCode,
+          message: response.error.message,
+        },
+      }
+    }
+
+    return response.result as AgentBridgeCommandResult<TData>
+  }
+
+  return {
+    getProject: () => route<AgentProjectReadState>('getProject'),
+    getPreviewContext: () => route<AgentPreviewReadState>('getPreviewContext'),
+    applySourceChange: (request) => route<AgentSourceChangeResult>('applySourceChange', request),
+  }
 }
 
 const collectObjectKeys = (value: unknown): string[] => {
@@ -171,13 +291,13 @@ const startAgentAccess = async () => {
   expect(await screen.findByText(/Koble til agent/i)).toBeTruthy()
   fireEvent.click(screen.getByRole('menuitemcheckbox', { name: /agent-tilgang/i }))
 
-  await waitFor(() => expect(window.__AKSEL_ARCADE_AGENT_BRIDGE__).toBeDefined())
-  const bridge = window.__AKSEL_ARCADE_AGENT_BRIDGE__
-  if (!bridge) {
-    throw new Error('Expected Agent bridge to be published after access starts.')
+  await waitFor(() => expect(screen.getByRole('status').textContent).toBe('Status: aktiv'))
+  expect(Reflect.get(window, LEGACY_AGENT_BRIDGE_GLOBAL)).toBeUndefined()
+  if (!currentDesktopTransport) {
+    throw new Error('Expected Desktop transport preload to be installed before Agent access starts.')
   }
 
-  return bridge
+  return createAgentTransportClient(currentDesktopTransport)
 }
 
 const computeShareLinkChars = (payloadLength: number): number => {
@@ -237,6 +357,9 @@ describe('Share popover integration', () => {
 
   beforeEach(() => {
     vi.clearAllMocks()
+    currentDesktopTransport = null
+    Reflect.deleteProperty(window, LEGACY_AGENT_BRIDGE_GLOBAL)
+    delete window.__AKSEL_ARCADE_DESKTOP__
     // Clear persisted compression multipliers so each test starts from a clean slate
     window.localStorage.clear()
     Object.defineProperty(window.navigator, 'onLine', {
@@ -263,6 +386,9 @@ describe('Share popover integration', () => {
     vi.useRealTimers()
     encodeSpy?.mockRestore()
     strategySpy?.mockRestore()
+    currentDesktopTransport = null
+    Reflect.deleteProperty(window, LEGACY_AGENT_BRIDGE_GLOBAL)
+    delete window.__AKSEL_ARCADE_DESKTOP__
   })
 
   it('generates a share link and copies it to the clipboard', async () => {
@@ -305,6 +431,7 @@ describe('Share popover integration', () => {
     global.URL.revokeObjectURL = (() => {}) as typeof URL.revokeObjectURL
 
     try {
+      setupDesktopTransportPreload()
       renderHeader(undefined, DESKTOP_ARCADE_CAPABILITIES)
       expect(screen.queryByLabelText(/share project/i)).toBeNull()
 

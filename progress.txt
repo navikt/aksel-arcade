@@ -1012,3 +1012,35 @@ Verification:
 - Desktop-mode browser smoke check at http://127.0.0.1:5173/aksel-arcade/ confirmed reset revokes the Agent session with `project-replaced`, removes the bridge/transport handler, returns the UI to inactive, and leaves no console errors.
 
 Next note: keep future project replacement entry points wired through `replaceProject` or `notifyAgentSessionProjectReplaced()` before exposing replacement state; do not expose `project-replaced` over Agent protocol responses.
+
+### 2026-05-29 - Issue #100: Remove Web Arcade Agent access surface
+
+Selected #100 as the highest-priority `ready-for-agent` feature from #100 and #103 because it removes the remaining Web-facing Agent access surface, while #103 is a later bridge contract rename/versioning follow-up.
+
+Implemented:
+
+- Removed the legacy browser-global Agent bridge publication path (`window.__AKSEL_ARCADE_AGENT_BRIDGE__`) and its window typing.
+- Kept Desktop Arcade Agent access routed only through the Desktop Agent transport handler while preserving the existing command router contract.
+- Updated copied/inactive Agent instructions and current docs so Web Arcade is documented as having no Agent UI, Agent runtime, browser-global bridge, or Agent pairing handoff.
+- Refactored Agent integration, share fallback, unit, and diagnostics coverage to exercise Desktop transport instead of the removed browser-global bridge.
+- Added Web/Desktop regression assertions that Web Arcade keeps Share URL available without exposing any Agent access surface or legacy global.
+
+Verification:
+
+- npm run typecheck
+- CI=1 npm run test -- --run
+- npm run lint (passes with the existing hook dependency warnings)
+- Browser smoke check at http://127.0.0.1:5173/aksel-arcade/ confirmed Web Arcade renders, has no console errors, no Agent access text, and no `window.__AKSEL_ARCADE_AGENT_BRIDGE__`.
+
+Next note: #103 can rename/version the command contract separately. Do not reintroduce a Web Arcade Agent global or Web-facing pairing handoff while doing that follow-up; keep Agent access Desktop transport-only unless a new ADR reverses this boundary.
+
+### 2026-05-29 - PR #107 review follow-up
+
+Fixed one scoped build-mode regression found during PR review:
+
+- Reproduced `npm run build` failing in `tsc -b` because the Desktop transport test clients returned broad routed result unions after the browser-global bridge removal.
+- Tightened the transport test client method result types for project, preview, diagnostics, evidence, session state, instructions, and source changes.
+- Replaced build-mode-unsafe dynamic `window` casts in the legacy-global absence assertions with `Reflect.get` / `Reflect.deleteProperty`.
+- Swapped one nullable `window.__AKSEL_ARCADE_DESKTOP__` assertion for the existing Desktop preload fixture reference.
+
+Verification completed with `npm run typecheck`, `npm run build`, `CI=1 npm run test -- --run`, and `npm run lint` (existing hook dependency warnings only).
