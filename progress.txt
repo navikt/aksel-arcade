@@ -1044,3 +1044,22 @@ Fixed one scoped build-mode regression found during PR review:
 - Swapped one nullable `window.__AKSEL_ARCADE_DESKTOP__` assertion for the existing Desktop preload fixture reference.
 
 Verification completed with `npm run typecheck`, `npm run build`, `CI=1 npm run test -- --run`, and `npm run lint` (existing hook dependency warnings only).
+
+### 2026-05-29 - Issue #103: Rename and version the Agent change command
+
+Selected #103 because it was the single `ready-for-agent` feature requested for this branch.
+
+Implemented:
+
+- Renamed the Desktop Agent mutation command from `applySourceChange` to `applyAgentChange` across the Agent bridge, Desktop transport routing, copied instructions, and transport-backed tests.
+- Bumped the Agent bridge protocol/instructions version to 2 and exposed that version from both `getAgentInstructions` and `getSessionState`.
+- Kept successful Agent change responses scoped to `changedFields` only, with no checkpoint, rollback, summary echo, or change-record identifier.
+- Left stale `applySourceChange` calls unsupported instead of shimming them to the new command.
+
+Verification:
+
+- npm run typecheck
+- CI=1 npm run test
+- npm run lint (passes with the existing hook dependency warnings)
+
+Next note: future Agent protocol changes should keep Desktop transport as the only Agent access surface and should bump `AGENT_BRIDGE_PROTOCOL_VERSION` whenever command names or result shapes change.

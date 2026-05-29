@@ -12,7 +12,7 @@ import type {
   AgentBridgeErrorCode,
   AgentPreviewReadState,
   AgentProjectReadState,
-  AgentSourceChangeResult,
+  AgentChangeResult,
 } from '@/services/agentBridge'
 import type {
   DesktopAgentTransportRequestHandler,
@@ -160,7 +160,7 @@ const expectBridgeSuccess = <TData,>(result: AgentBridgeCommandResult<TData>): T
 type AgentTransportClient = {
   getProject: () => AgentBridgeCommandResult<AgentProjectReadState>
   getPreviewContext: () => AgentBridgeCommandResult<AgentPreviewReadState>
-  applySourceChange: (request: unknown) => AgentBridgeCommandResult<AgentSourceChangeResult>
+  applyAgentChange: (request: unknown) => AgentBridgeCommandResult<AgentChangeResult>
 }
 
 let currentDesktopTransport: ReturnType<typeof setupDesktopTransportPreload> | null = null
@@ -259,7 +259,7 @@ const createAgentTransportClient = (
   return {
     getProject: () => route<AgentProjectReadState>('getProject'),
     getPreviewContext: () => route<AgentPreviewReadState>('getPreviewContext'),
-    applySourceChange: (request) => route<AgentSourceChangeResult>('applySourceChange', request),
+    applyAgentChange: (request) => route<AgentChangeResult>('applyAgentChange', request),
   }
 }
 
@@ -438,7 +438,7 @@ describe('Share popover integration', () => {
       const bridge = await startAgentAccess()
       expectBridgeSuccess(
         callBridgeCommand(() =>
-          bridge.applySourceChange({
+          bridge.applyAgentChange({
             summary: AGENT_CHANGE_SUMMARY,
             jsxCode: nextJsx,
             hooksCode: nextHooks,

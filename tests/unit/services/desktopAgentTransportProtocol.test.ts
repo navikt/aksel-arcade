@@ -1,12 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import {
+  AGENT_BRIDGE_PROTOCOL_VERSION,
   DEFAULT_AGENT_PERMISSIONS,
   createAgentBridgeCommandRouter,
   type AgentBridgeCommandResult,
   type AgentBridgeController,
   type AgentBridgeReadContext,
   type AgentChangeField,
-  type AgentSourceChangeResult,
+  type AgentChangeResult,
 } from '@/services/agentBridge'
 import {
   routeDesktopAgentTransportRequest,
@@ -46,9 +47,9 @@ const readContext: AgentBridgeReadContext = {
 
 const createApplySuccess = (
   changedFields: AgentChangeField[] = ['jsxCode']
-): AgentBridgeCommandResult<AgentSourceChangeResult> => ({
+): AgentBridgeCommandResult<AgentChangeResult> => ({
   ok: true,
-  command: 'applySourceChange',
+  command: 'applyAgentChange',
   data: {
     changedFields,
   },
@@ -56,7 +57,7 @@ const createApplySuccess = (
 
 const createController = (
   active = true,
-  applyResult: AgentBridgeCommandResult<AgentSourceChangeResult> = createApplySuccess()
+  applyResult: AgentBridgeCommandResult<AgentChangeResult> = createApplySuccess()
 ) => {
   const appliedRequests: unknown[] = []
   const controller: AgentBridgeController = {
@@ -64,7 +65,7 @@ const createController = (
     getPermissions: () => DEFAULT_AGENT_PERMISSIONS,
     isSessionActive: () => active,
     recordActivity: () => undefined,
-    applySourceChange: (request) => {
+    applyAgentChange: (request) => {
       appliedRequests.push(request)
       return applyResult
     },
@@ -112,7 +113,7 @@ const createController = (
 const routeRequest = (
   request: DesktopAgentTransportRouteRequest,
   active = true,
-  applyResult?: AgentBridgeCommandResult<AgentSourceChangeResult>
+  applyResult?: AgentBridgeCommandResult<AgentChangeResult>
 ) => {
   const fixture = createController(active, applyResult)
   const response = routeDesktopAgentTransportRequest(request, {
@@ -158,7 +159,7 @@ describe('desktop Agent transport protocol', () => {
         ok: true,
         command: 'getAgentInstructions',
         data: {
-          version: 1,
+          version: AGENT_BRIDGE_PROTOCOL_VERSION,
           sessionId: session.id,
           endpoint: session.transportEndpoint.endpoint,
           authorizationHeader: session.transportEndpoint.authorizationHeader,
@@ -172,7 +173,7 @@ describe('desktop Agent transport protocol', () => {
     expect(JSON.stringify(response)).not.toContain('sandboxConsoleMessages')
   })
 
-  it('routes authenticated applySourceChange params through the Agent bridge router', () => {
+  it('routes authenticated applyAgentChange params through the Agent bridge router', () => {
     const params = {
       summary: 'Transport update',
       jsxCode: '<Button>Updated through transport</Button>',
@@ -180,7 +181,7 @@ describe('desktop Agent transport protocol', () => {
     }
     const { appliedRequests, response } = routeRequest({
       id: 'change-1',
-      method: 'applySourceChange',
+      method: 'applyAgentChange',
       params,
       sessionId: session.id,
     })
@@ -201,14 +202,14 @@ describe('desktop Agent transport protocol', () => {
     const { appliedRequests, response } = routeRequest(
       {
         id: 'change-1',
-        method: 'applySourceChange',
+        method: 'applyAgentChange',
         params,
         sessionId: session.id,
       },
       true,
       {
         ok: false,
-        command: 'applySourceChange',
+        command: 'applyAgentChange',
         error: {
           code: 'invalid-request',
           message: 'A non-empty human-readable summary is required.',
@@ -223,7 +224,7 @@ describe('desktop Agent transport protocol', () => {
         code: -32002,
         data: {
           code: 'invalid-request',
-          command: 'applySourceChange',
+          command: 'applyAgentChange',
           bridgeError: {
             code: 'invalid-request',
           },
@@ -244,12 +245,34 @@ describe('desktop Agent transport protocol', () => {
       error: {
         code: -32601,
         message:
-          'Unsupported Agent transport method "openShell". Supported methods: getAgentInstructions, getProject, getPreviewContext, getDiagnostics, getPreviewEvidence, getSessionState, applySourceChange.',
+          'Unsupported Agent transport method "openShell". Supported methods: getAgentInstructions, getProject, getPreviewContext, getDiagnostics, getPreviewEvidence, getSessionState, applyAgentChange.',
         data: {
           code: 'unsupported-method',
         },
       },
     })
+
+    const staleCommand = routeRequest({
+      id: 'stale-command-1',
+      method: 'applySourceChange',
+      params: {
+        summary: 'Stale command',
+        jsxCode: '<Button>Should not apply</Button>',
+      },
+      sessionId: session.id,
+    })
+
+    expect(staleCommand.response).toMatchObject({
+      error: {
+        code: -32601,
+        message:
+          'Unsupported Agent transport method "applySourceChange". Supported methods: getAgentInstructions, getProject, getPreviewContext, getDiagnostics, getPreviewEvidence, getSessionState, applyAgentChange.',
+        data: {
+          code: 'unsupported-method',
+        },
+      },
+    })
+    expect(staleCommand.appliedRequests).toEqual([])
   })
 
   it('does not expose Agent-triggered recovery methods', () => {
@@ -292,7 +315,7 @@ describe('desktop Agent transport protocol', () => {
     const { appliedRequests, response } = routeRequest(
       {
         id: 'revoked-1',
-        method: 'applySourceChange',
+        method: 'applyAgentChange',
         params: {
           summary: 'Should not mutate',
           jsxCode: '<Button>Revoked</Button>',
@@ -307,7 +330,7 @@ describe('desktop Agent transport protocol', () => {
         code: -32002,
         data: {
           code: 'session-revoked',
-          command: 'applySourceChange',
+          command: 'applyAgentChange',
         },
       },
     })

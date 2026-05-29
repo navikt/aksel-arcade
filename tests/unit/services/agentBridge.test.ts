@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   AGENT_BRIDGE_COMMAND_NAMES,
+  AGENT_BRIDGE_PROTOCOL_VERSION,
   AGENT_BRIDGE_READ_COMMAND_NAMES,
   DEFAULT_AGENT_PERMISSIONS,
   createAgentInstructions,
@@ -14,7 +15,7 @@ import {
   type AgentBridgeReadContext,
   type AgentChangeField,
   type AgentPermissions,
-  type AgentSourceChangeResult,
+  type AgentChangeResult,
 } from '@/services/agentBridge'
 import {
   PREVIEW_EVIDENCE_ROOT_SELECTOR,
@@ -100,9 +101,9 @@ const createPreviewEvidence = (): PreviewEvidence => ({
 
 const createApplySuccess = (
   changedFields: AgentChangeField[] = ['jsxCode']
-): AgentBridgeCommandResult<AgentSourceChangeResult> => ({
+): AgentBridgeCommandResult<AgentChangeResult> => ({
   ok: true,
-  command: 'applySourceChange',
+  command: 'applyAgentChange',
   data: {
     changedFields,
   },
@@ -113,7 +114,7 @@ const createController = (
     active?: boolean
     permissions?: Partial<AgentPermissions>
     previewEvidence?: PreviewEvidenceCaptureResult
-    applyResult?: AgentBridgeCommandResult<AgentSourceChangeResult>
+    applyResult?: AgentBridgeCommandResult<AgentChangeResult>
   } = {}
 ) => {
   const context = createReadContext()
@@ -131,7 +132,7 @@ const createController = (
     recordActivity: (command) => {
       recordedCommands.push(command)
     },
-    applySourceChange: (request) => {
+    applyAgentChange: (request) => {
       appliedRequests.push(request)
       return options.applyResult ?? createApplySuccess()
     },
@@ -170,6 +171,7 @@ describe('agent bridge command router', () => {
     expect(expectBridgeSuccess(router.routeCommand('getProject'))).toEqual(context.project)
     expect(expectBridgeSuccess(router.routeCommand('getPreviewContext'))).toEqual(context.preview)
     expect(expectBridgeSuccess(router.routeCommand('getSessionState'))).toEqual({
+      version: AGENT_BRIDGE_PROTOCOL_VERSION,
       sessionId: session.id,
       status: 'active',
       startedAt: session.startedAt,
@@ -187,7 +189,7 @@ describe('agent bridge command router', () => {
     const instructions = expectBridgeSuccess(router.routeCommand('getAgentInstructions'))
 
     expect(instructions).toMatchObject({
-      version: 1,
+      version: AGENT_BRIDGE_PROTOCOL_VERSION,
       sessionId: desktopSession.id,
       startedAt: desktopSession.startedAt,
       endpoint: desktopSession.transportEndpoint.endpoint,
@@ -210,6 +212,11 @@ describe('agent bridge command router', () => {
       `Authorization: ${desktopSession.transportEndpoint.authorizationHeader}`
     )
     expect(instructions.arcadeAuthoringContract.summary).toMatch(/active Arcade project/i)
+    expect(instructions.commandNames).toContain('applyAgentChange')
+    expect(instructions.commandNames).not.toContain('applySourceChange')
+    expect(instructions.instructionsMarkdown).toContain(
+      'Accepted changes apply immediately after validation.'
+    )
     expect(JSON.stringify(instructions)).not.toContain(context.project.name)
     expect(JSON.stringify(instructions)).not.toContain(context.project.jsxCode)
     expect(JSON.stringify(instructions)).not.toContain(context.project.hooksCode)
@@ -291,7 +298,7 @@ describe('agent bridge command router', () => {
     })
   })
 
-  it('routes applySourceChange requests through the existing mutation validator', () => {
+  it('routes applyAgentChange requests through the existing mutation validator', () => {
     const request = {
       summary: 'Update JSX',
       jsxCode: '<Button>Updated</Button>',
@@ -299,14 +306,14 @@ describe('agent bridge command router', () => {
     const { appliedRequests, controller, recordedCommands } = createController()
     const router = createAgentBridgeCommandRouter(session, controller)
 
-    expect(router.routeCommand('applySourceChange', request)).toEqual(createApplySuccess())
+    expect(router.routeCommand('applyAgentChange', request)).toEqual(createApplySuccess())
     expect(appliedRequests).toEqual([request])
-    expect(recordedCommands).toEqual(['applySourceChange'])
+    expect(recordedCommands).toEqual(['applyAgentChange'])
 
     const rejected = createController({
       applyResult: {
         ok: false,
-        command: 'applySourceChange',
+        command: 'applyAgentChange',
         error: {
           code: 'invalid-request',
           message: 'A non-empty human-readable summary is required.',
@@ -315,9 +322,9 @@ describe('agent bridge command router', () => {
     })
     const rejectedRouter = createAgentBridgeCommandRouter(session, rejected.controller)
 
-    expect(rejectedRouter.routeCommand('applySourceChange', {})).toMatchObject({
+    expect(rejectedRouter.routeCommand('applyAgentChange', {})).toMatchObject({
       ok: false,
-      command: 'applySourceChange',
+      command: 'applyAgentChange',
       error: {
         code: 'invalid-request',
       },
@@ -327,10 +334,12 @@ describe('agent bridge command router', () => {
   })
 
   it('rejects unsupported commands with a structured router error', () => {
-    const { controller, recordedCommands } = createController()
+    const { appliedRequests, controller, recordedCommands } = createController()
     const router = createAgentBridgeCommandRouter(session, controller)
 
     expect(isAgentBridgeCommandName('getProject')).toBe(true)
+    expect(isAgentBridgeCommandName('applyAgentChange')).toBe(true)
+    expect(isAgentBridgeCommandName('applySourceChange')).toBe(false)
     expect(isAgentBridgeCommandName('openShell')).toBe(false)
     expect(router.routeCommand('openShell')).toEqual({
       ok: false,
@@ -338,9 +347,19 @@ describe('agent bridge command router', () => {
       error: {
         code: 'unsupported-command',
         message:
-          'Unsupported Agent bridge command "openShell". Supported commands: getAgentInstructions, getProject, getPreviewContext, getDiagnostics, getPreviewEvidence, getSessionState, applySourceChange.',
+          'Unsupported Agent bridge command "openShell". Supported commands: getAgentInstructions, getProject, getPreviewContext, getDiagnostics, getPreviewEvidence, getSessionState, applyAgentChange.',
       },
     })
+    expect(router.routeCommand('applySourceChange', { summary: 'Stale command' })).toEqual({
+      ok: false,
+      command: 'applySourceChange',
+      error: {
+        code: 'unsupported-command',
+        message:
+          'Unsupported Agent bridge command "applySourceChange". Supported commands: getAgentInstructions, getProject, getPreviewContext, getDiagnostics, getPreviewEvidence, getSessionState, applyAgentChange.',
+      },
+    })
+    expect(appliedRequests).toEqual([])
     expect(recordedCommands).toEqual([])
   })
 
@@ -355,9 +374,9 @@ describe('agent bridge command router', () => {
         code: 'session-revoked',
       },
     })
-    expect(router.routeCommand('applySourceChange', { summary: 'No-op' })).toMatchObject({
+    expect(router.routeCommand('applyAgentChange', { summary: 'No-op' })).toMatchObject({
       ok: false,
-      command: 'applySourceChange',
+      command: 'applyAgentChange',
       error: {
         code: 'session-revoked',
       },
@@ -391,6 +410,7 @@ describe('agent instructions', () => {
     expect(command).not.toMatch(/\b(jq|mcp|helper)\b/i)
     expect(command).not.toMatch(/[?&](token|credential|authorization)=/i)
     expect(command).not.toContain('getProject')
+    expect(command).not.toContain('applyAgentChange')
     expect(command).not.toContain('applySourceChange')
   })
 
@@ -419,12 +439,15 @@ describe('agent instructions', () => {
     expect(instructions).toContain('Authorization: Bearer copied-agent-secret')
     expect(instructions).toMatch(/Content-Type: application\/json and the Authorization header/i)
     expect(instructions).toContain(
-      'Supported JSON-RPC methods: getAgentInstructions, getProject, getPreviewContext, getDiagnostics, getPreviewEvidence, getSessionState, applySourceChange.'
+      'Supported JSON-RPC methods: getAgentInstructions, getProject, getPreviewContext, getDiagnostics, getPreviewEvidence, getSessionState, applyAgentChange.'
     )
     expect(instructions).toContain(
-      'Full Agent bridge command names: getAgentInstructions, getProject, getPreviewContext, getDiagnostics, getPreviewEvidence, getSessionState, applySourceChange.'
+      'Full Agent bridge command names: getAgentInstructions, getProject, getPreviewContext, getDiagnostics, getPreviewEvidence, getSessionState, applyAgentChange.'
     )
-    expect(instructions).toContain('"method":"applySourceChange"')
+    expect(instructions).toContain('"method":"applyAgentChange"')
+    expect(instructions).toContain('Accepted changes apply immediately after validation')
+    expect(instructions).not.toContain('applySourceChange')
+    expect(instructions).not.toMatch(/checkpoint|rollback/i)
     expect(instructions).toContain(
       'poll getDiagnostics() until status is no longer "transpiling" or "rendering" before final visual validation'
     )

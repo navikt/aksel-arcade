@@ -9,6 +9,7 @@ import {
   MAX_SANDBOX_CONSOLE_MESSAGES,
   type PreviewDiagnostics,
 } from '@/services/previewDiagnostics'
+import { AGENT_BRIDGE_PROTOCOL_VERSION } from '@/services/agentBridge'
 import type {
   AgentBridgeCommandResult,
   AgentBridgeCommandName,
@@ -16,7 +17,7 @@ import type {
   AgentInstructionsPayload,
   AgentPreviewReadState,
   AgentProjectReadState,
-  AgentSourceChangeResult,
+  AgentChangeResult,
   AgentSessionReadState,
 } from '@/services/agentBridge'
 import type {
@@ -288,7 +289,7 @@ type AgentTransportClient = {
   getDiagnostics: () => AgentBridgeCommandResult<PreviewDiagnostics>
   getPreviewEvidence: () => AgentBridgeCommandResult<PreviewEvidence>
   getSessionState: () => AgentBridgeCommandResult<AgentSessionReadState>
-  applySourceChange: (request: unknown) => AgentBridgeCommandResult<AgentSourceChangeResult>
+  applyAgentChange: (request: unknown) => AgentBridgeCommandResult<AgentChangeResult>
 }
 
 const createAgentTransportClient = (
@@ -341,7 +342,7 @@ const createAgentTransportClient = (
     getDiagnostics: () => route<PreviewDiagnostics>('getDiagnostics'),
     getPreviewEvidence: () => route<PreviewEvidence>('getPreviewEvidence'),
     getSessionState: () => route<AgentSessionReadState>('getSessionState'),
-    applySourceChange: (request) => route<AgentSourceChangeResult>('applySourceChange', request),
+    applyAgentChange: (request) => route<AgentChangeResult>('applyAgentChange', request),
   }
 }
 
@@ -715,6 +716,9 @@ describe('ProjectControls layout', () => {
       throw new Error('Expected Desktop transport fixture to be active.')
     }
     const activeBridge = createAgentTransportClient(currentDesktopTransport)
+    expect(expectBridgeSuccess(callBridgeCommand(() => activeBridge.getSessionState())).version).toBe(
+      AGENT_BRIDGE_PROTOCOL_VERSION
+    )
     expect(activeBridge).toMatchObject({
       sessionId: '11111111-1111-4111-8111-111111111111',
       status: 'active',
@@ -732,7 +736,7 @@ describe('ProjectControls layout', () => {
         'getDiagnostics',
         'getPreviewEvidence',
         'getSessionState',
-        'applySourceChange',
+        'applyAgentChange',
       ],
     })
     expect(activeBridge?.getAgentInstructions).toEqual(expect.any(Function))
@@ -741,7 +745,7 @@ describe('ProjectControls layout', () => {
     expect(activeBridge?.getDiagnostics).toEqual(expect.any(Function))
     expect(activeBridge?.getPreviewEvidence).toEqual(expect.any(Function))
     expect(activeBridge?.getSessionState).toEqual(expect.any(Function))
-    expect(activeBridge?.applySourceChange).toEqual(expect.any(Function))
+    expect(activeBridge?.applyAgentChange).toEqual(expect.any(Function))
     expect(activeBridge?.commandNames.join(' ')).not.toMatch(/share|export/i)
     expect(activeBridge?.commandNames).not.toContain('restoreCheckpoint')
     expect(activeBridge as unknown as Record<string, unknown>).not.toHaveProperty(
@@ -860,7 +864,7 @@ describe('ProjectControls layout', () => {
       'export default function App() { return <Heading>Agent change stays active</Heading> }'
     expectBridgeSuccess(
       callBridgeCommand(() =>
-        bridge.applySourceChange({
+        bridge.applyAgentChange({
           summary: 'Normal Agent-applied change',
           jsxCode: nextJsx,
           viewportSize: 'XS',
@@ -939,7 +943,7 @@ describe('ProjectControls layout', () => {
     expect(instructions).not.toContain('window.__AKSEL_ARCADE_AGENT_BRIDGE__')
     expect(instructions).not.toContain('Desktop loopback JSON-RPC transport')
     expect(instructions).not.toContain('getProject')
-    expect(instructions).not.toContain('applySourceChange')
+    expect(instructions).not.toContain('applyAgentChange')
     expect(instructions).not.toMatch(/\b(jq|mcp|helper)\b/i)
     expect(instructions).toContain('"jsonrpc":"2.0"')
     expect(instructions).not.toMatch(/[?&](token|credential|authorization)=/i)
@@ -973,7 +977,7 @@ describe('ProjectControls layout', () => {
         ok: true,
         command: 'getAgentInstructions',
         data: {
-          version: 1,
+          version: AGENT_BRIDGE_PROTOCOL_VERSION,
           sessionId: desktopTransport.endpoint.sessionId,
           endpoint: desktopTransport.endpoint.endpoint,
           authorizationHeader: desktopTransport.endpoint.authorizationHeader,
@@ -982,10 +986,36 @@ describe('ProjectControls layout', () => {
       },
     })
 
+    expect(
+      desktopTransport.route({
+        id: 'session-state-1',
+        method: 'getSessionState',
+      })
+    ).toMatchObject({
+      jsonrpc: '2.0',
+      id: 'session-state-1',
+      result: {
+        ok: true,
+        command: 'getSessionState',
+        data: {
+          version: AGENT_BRIDGE_PROTOCOL_VERSION,
+          commandNames: [
+            'getAgentInstructions',
+            'getProject',
+            'getPreviewContext',
+            'getDiagnostics',
+            'getPreviewEvidence',
+            'getSessionState',
+            'applyAgentChange',
+          ],
+        },
+      },
+    })
+
     const nextJsx = 'export default function App() { return <Heading>Transport update</Heading> }'
     const acceptedResponse = await desktopTransport.route({
       id: 'change-1',
-      method: 'applySourceChange',
+      method: 'applyAgentChange',
       params: {
         summary: 'Desktop transport update',
         jsxCode: nextJsx,
@@ -995,12 +1025,12 @@ describe('ProjectControls layout', () => {
       },
     })
 
-    expect(acceptedResponse).toMatchObject({
+    expect(acceptedResponse).toEqual({
       jsonrpc: '2.0',
       id: 'change-1',
       result: {
         ok: true,
-        command: 'applySourceChange',
+        command: 'applyAgentChange',
         data: {
           changedFields: ['jsxCode', 'viewportSize', 'theme', 'name'],
         },
@@ -1027,7 +1057,7 @@ describe('ProjectControls layout', () => {
     const beforeInvalid = captureAgentState(bridge)
     const invalidResponse = await desktopTransport.route({
       id: 'invalid-1',
-      method: 'applySourceChange',
+      method: 'applyAgentChange',
       params: {
         summary: 'Invalid viewport',
         viewportSize: 'XXL',
@@ -1041,7 +1071,7 @@ describe('ProjectControls layout', () => {
         code: -32002,
         data: {
           code: 'invalid-request',
-          command: 'applySourceChange',
+          command: 'applyAgentChange',
           bridgeError: {
             code: 'invalid-request',
           },
@@ -1066,8 +1096,29 @@ describe('ProjectControls layout', () => {
 
     expect(
       desktopTransport.route({
-        id: 'stale-1',
+        id: 'stale-command-1',
         method: 'applySourceChange',
+        params: {
+          summary: 'Stale command',
+          jsxCode: 'export default function App() { return <Heading>Stale command</Heading> }',
+        },
+      })
+    ).toMatchObject({
+      error: {
+        code: -32601,
+        message:
+          'Unsupported Agent transport method "applySourceChange". Supported methods: getAgentInstructions, getProject, getPreviewContext, getDiagnostics, getPreviewEvidence, getSessionState, applyAgentChange.',
+        data: {
+          code: 'unsupported-method',
+        },
+      },
+    })
+    expect(captureAgentState(bridge)).toEqual(beforeInvalid)
+
+    expect(
+      desktopTransport.route({
+        id: 'stale-1',
+        method: 'applyAgentChange',
         params: {
           summary: 'Stale session',
           jsxCode: 'export default function App() { return <Heading>Stale</Heading> }',
@@ -1100,7 +1151,7 @@ describe('ProjectControls layout', () => {
     const nextHooks = 'export const useAgentFixture = () => "desktop-change"'
     const acceptedResponse = await desktopTransport.route({
       id: 'desktop-change-1',
-      method: 'applySourceChange',
+      method: 'applyAgentChange',
       params: {
         summary: 'Desktop immediate update',
         jsxCode: nextJsx,
@@ -1116,7 +1167,7 @@ describe('ProjectControls layout', () => {
       id: 'desktop-change-1',
       result: {
         ok: true,
-        command: 'applySourceChange',
+        command: 'applyAgentChange',
         data: {
           changedFields: ['jsxCode', 'hooksCode', 'viewportSize', 'theme', 'name'],
         },
@@ -1226,7 +1277,7 @@ describe('ProjectControls layout', () => {
       const nextHooks = 'export const useAgentFixture = () => "package-export"'
       const acceptedResponse = await desktopTransport.route({
         id: 'package-change-1',
-        method: 'applySourceChange',
+        method: 'applyAgentChange',
         params: {
           summary: changeSummary,
           jsxCode: nextJsx,
@@ -1242,7 +1293,7 @@ describe('ProjectControls layout', () => {
         id: 'package-change-1',
         result: {
           ok: true,
-          command: 'applySourceChange',
+          command: 'applyAgentChange',
           data: {
             changedFields: ['jsxCode', 'hooksCode', 'viewportSize', 'theme', 'name'],
           },
@@ -1423,7 +1474,7 @@ describe('ProjectControls layout', () => {
           'getDiagnostics',
           'getPreviewEvidence',
           'getSessionState',
-          'applySourceChange',
+          'applyAgentChange',
         ],
       },
     })
@@ -1688,7 +1739,7 @@ describe('ProjectControls layout', () => {
     const nextHooks = 'export const useAgentFixture = () => "changed"'
 
     const changeResult = callBridgeCommand(() =>
-      bridge.applySourceChange({
+      bridge.applyAgentChange({
         summary: 'Replace source for demo',
         jsxCode: nextJsx,
         hooksCode: nextHooks,
@@ -1698,7 +1749,7 @@ describe('ProjectControls layout', () => {
     const changeData = expectBridgeSuccess(changeResult)
     expect(changeResult).toMatchObject({
       ok: true,
-      command: 'applySourceChange',
+      command: 'applyAgentChange',
     })
     expect(changeData).toEqual({
       changedFields: ['jsxCode', 'hooksCode'],
@@ -1723,13 +1774,13 @@ describe('ProjectControls layout', () => {
 
     act(() => {
       results.push(
-        bridge.applySourceChange({
+        bridge.applyAgentChange({
           summary: 'First rapid change',
           jsxCode: firstJsx,
         })
       )
       results.push(
-        bridge.applySourceChange({
+        bridge.applyAgentChange({
           summary: 'Second rapid change',
           jsxCode: secondJsx,
         })
@@ -1754,7 +1805,7 @@ describe('ProjectControls layout', () => {
     const bridge = await startAgentAccess()
 
     const result = callBridgeCommand(() =>
-      bridge.applySourceChange({
+      bridge.applyAgentChange({
         summary: 'Switch preview context',
         viewportSize: 'XS',
         theme: 'light',
@@ -1785,7 +1836,7 @@ describe('ProjectControls layout', () => {
     expect(bridge.permissions.projectMetadata).toBe(true)
 
     const acceptedResult = callBridgeCommand(() =>
-      bridge.applySourceChange({
+      bridge.applyAgentChange({
         summary: 'Rename project',
         name: 'Agent Named Project',
       })
@@ -1810,7 +1861,7 @@ describe('ProjectControls layout', () => {
     const nextHooks = 'export const useAgentFixture = () => "combined"'
 
     const result = callBridgeCommand(() =>
-      bridge.applySourceChange({
+      bridge.applyAgentChange({
         summary: 'Combined Agent update',
         jsxCode: nextJsx,
         hooksCode: nextHooks,
@@ -1851,7 +1902,7 @@ describe('ProjectControls layout', () => {
 
     for (let index = 1; index <= 11; index += 1) {
       const result = callBridgeCommand(() =>
-        bridge.applySourceChange({
+        bridge.applyAgentChange({
           summary: `change ${index}`,
           jsxCode: `export default function App() { return <Heading>Change ${index}</Heading> }`,
         })
@@ -1873,7 +1924,7 @@ describe('ProjectControls layout', () => {
     const bridge = await startAgentAccess()
     expectBridgeSuccess(
       callBridgeCommand(() =>
-        bridge.applySourceChange({
+        bridge.applyAgentChange({
           summary: 'Seed change',
           jsxCode: 'export default function App() { return <Heading>Seed</Heading> }',
         })
@@ -1975,7 +2026,7 @@ describe('ProjectControls layout', () => {
     ]
 
     for (const { request, code, message } of invalidRequests) {
-      const result = callBridgeCommand(() => bridge.applySourceChange(request))
+      const result = callBridgeCommand(() => bridge.applyAgentChange(request))
       const error = expectBridgeFailure(result, code)
       expect(error.message).toMatch(message)
       expect(screen.getByRole('status').textContent).toBe(before.statusText)
@@ -1993,7 +2044,7 @@ describe('ProjectControls layout', () => {
 }`
 
     const result = callBridgeCommand(() =>
-      bridge.applySourceChange({
+      bridge.applyAgentChange({
         summary: 'Oversized source replacement',
         jsxCode: oversizedJsx,
       })
@@ -2014,7 +2065,7 @@ describe('ProjectControls layout', () => {
 }`
 
     const result = callBridgeCommand(() =>
-      bridge.applySourceChange({
+      bridge.applyAgentChange({
         summary: 'Introduce invalid JSX',
         jsxCode: invalidJsx,
       })
