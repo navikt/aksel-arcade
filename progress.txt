@@ -1205,3 +1205,23 @@ Verification:
 - Browser smoke check at http://127.0.0.1:5175/aksel-arcade/ loaded a v3 share as a fresh Untitled Project with a new UUID, shared source, LG/light preview, default panel layout, stripped share query, and no console errors.
 
 Next note: keep Web share URL loads constrained to shared source plus shareable preview preferences; do not reintroduce ProjectSnapshot identity, settings, workspace preferences, or active-tab restoration.
+
+### 2026-05-29 - Issue #118: Normalize legacy v2 share links
+
+Implemented:
+
+- Selected #118 as the highest-priority ready-for-agent issue from #118-#120 because it is the compatibility slice that #120 depends on.
+- Kept temporary v2 full-snapshot share-link decoding available, but normalized decoded v2 snapshots through the Web share URL boundary before application.
+- Preserved only canonical JSX/Hooks source plus shareable preview viewport/theme from v2 links; sender schema version, file metadata, settings, timestamp, preview zoom, sandbox flags, and active tab are discarded.
+- Rejected legacy v2 links that are missing either canonical source part instead of falling back to recipient/default code.
+- Marked the v2 path as temporary in code/tests with a revisit note after one release cycle.
+
+Verification:
+
+- npm install
+- npm run typecheck
+- npm run lint (passes with the existing hook dependency warnings)
+- npm run test -- --run
+- Browser smoke check at http://127.0.0.1:5176/aksel-arcade/ confirmed the app renders and the console is clear.
+
+Next note: #120 can now add minimality/URL-size proof coverage on top of both v3 minimal payloads and the v2 normalization/rejection path.

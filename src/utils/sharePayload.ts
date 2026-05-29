@@ -27,6 +27,20 @@ export const createWebShareUrlPayload = (snapshot: ProjectSnapshot): WebShareUrl
   },
 })
 
+export const normalizeLegacyV2FullSnapshotToWebShareSnapshot = (
+  snapshot: ProjectSnapshot
+): ProjectSnapshot =>
+  webShareUrlPayloadToSnapshot({
+    source: {
+      jsx: requireCanonicalSource(snapshot, SNAPSHOT_FILE_IDS.jsx, 'JSX'),
+      hooks: requireCanonicalSource(snapshot, SNAPSHOT_FILE_IDS.hooks, 'Hooks'),
+    },
+    preview: {
+      viewport: snapshot.preview.viewport,
+      theme: snapshot.preview.theme,
+    },
+  })
+
 export const serializeWebShareUrlPayload = (payload: WebShareUrlPayloadV3): string =>
   JSON.stringify({
     source: {
@@ -127,6 +141,18 @@ const findFileContentByName = (snapshot: ProjectSnapshot, name: string): string 
 
 const findFirstTsxContent = (snapshot: ProjectSnapshot): string | undefined =>
   snapshot.files.find((file) => file.language === 'tsx')?.content
+
+const requireCanonicalSource = (
+  snapshot: ProjectSnapshot,
+  fileId: string,
+  label: string
+): string => {
+  const content = findFileContent(snapshot, fileId)
+  if (content === undefined) {
+    throw new Error(`Legacy v2 share link is missing canonical ${label} source`)
+  }
+  return content
+}
 
 function assertRecord(value: unknown, label: string): asserts value is Record<string, unknown> {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {

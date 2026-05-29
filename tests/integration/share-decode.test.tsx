@@ -82,11 +82,6 @@ const renderHarness = () => {
 const fixturesDir = path.resolve(process.cwd(), 'tests/fixtures/share')
 const STORAGE_KEY = 'aksel-arcade:project'
 
-const loadShareFixture = async (fileName: string): Promise<ProjectSnapshot> => {
-  const raw = await fs.readFile(path.join(fixturesDir, fileName), 'utf-8')
-  return JSON.parse(raw) as ProjectSnapshot
-}
-
 const loadCorruptedPackedFixture = async (): Promise<{
   corruptedPacked: string
   expectedSnapshot: ProjectSnapshot
@@ -205,6 +200,80 @@ describe('share decode integration', () => {
     expect(window.location.search).not.toContain('share=')
   })
 
+  it('loads legacy v2 full-snapshot share URLs as fresh local projects', async () => {
+    const previousProject: Project = {
+      id: '11111111-1111-4111-8111-111111111111',
+      name: 'Previous local project',
+      jsxCode: 'export default function App() { return <div>Previous JSX</div> }',
+      hooksCode: 'export function usePreviousHook() { return "Previous Hooks" }',
+      viewportSize: 'XS',
+      panelLayout: 'editor-right',
+      version: '1.0.0',
+      createdAt: '2024-01-01T00:00:00.000Z',
+      lastModified: '2024-01-02T00:00:00.000Z',
+    }
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(previousProject))
+
+    const senderProject = createDefaultProject()
+    senderProject.name = 'Sender legacy project name'
+    senderProject.version = '9.9.9'
+    senderProject.jsxCode =
+      'export default function App() { return <Heading>Shared legacy JSX</Heading> }'
+    senderProject.hooksCode = 'export function useSharedHook() { return "Shared legacy Hooks" }'
+
+    const legacySnapshot = createShareSnapshot(senderProject, {
+      activeFileId: SNAPSHOT_FILE_IDS.hooks,
+      preview: {
+        viewport: 'MD',
+        zoom: 0.5,
+        theme: 'light',
+        sandboxFlags: { outlines: true },
+      },
+      settings: {
+        autosave: false,
+        linting: false,
+        showLineNumbers: false,
+      },
+    })
+    legacySnapshot.updatedAt = 1234567890
+    const token = await createLegacyV2ShareTokenForSnapshot(legacySnapshot)
+    window.history.replaceState({}, '', `/?share=${encodeURIComponent(token)}&foo=bar`)
+
+    renderHarness()
+
+    await screen.findByText('share-ready')
+    expect(screen.getByTestId('project-id').textContent).toBe(previousProject.id)
+
+    await user.click(screen.getByRole('button', { name: /set local hooks tab/i }))
+    expect(screen.getByTestId('editor-active-tab').textContent).toBe('Hooks')
+
+    await user.click(screen.getByRole('button', { name: /load shared project/i }))
+
+    await waitFor(() => {
+      expect(screen.getByTestId('share-status').textContent).toBe('idle')
+    })
+
+    expect(screen.getByTestId('project-id').textContent).not.toBe(previousProject.id)
+    expect(screen.getByTestId('project-name').textContent).toBe('Untitled Project')
+    expect(screen.getByTestId('project-name').textContent).not.toBe(senderProject.name)
+    expect(screen.getByTestId('project-created-at').textContent).not.toBe(previousProject.createdAt)
+    expect(screen.getByTestId('project-last-modified').textContent).not.toBe(
+      previousProject.lastModified
+    )
+    expect(screen.getByTestId('project-version').textContent).toBe('1.0.0')
+    expect(screen.getByTestId('project-panel-layout').textContent).toBe('editor-left')
+    expect(screen.getByTestId('jsx-code').textContent).toContain('Shared legacy JSX')
+    expect(screen.getByTestId('hooks-code').textContent).toContain('Shared legacy Hooks')
+    expect(screen.getByTestId('project-viewport').textContent).toBe('MD')
+    expect(screen.getByTestId('preview-current-viewport').textContent).toBe('MD')
+    expect(screen.getByTestId('preview-viewport-width').textContent).toBe(
+      String(getViewportWidth('MD'))
+    )
+    expect(screen.getByTestId('settings-theme').textContent).toBe('light')
+    expect(screen.getByTestId('editor-active-tab').textContent).toBe('JSX')
+    expect(window.location.search).not.toContain('share=')
+  })
+
   it('surfaces tamper errors when payload checksum fails', async () => {
     const token = await createShareTokenForCode('Should tamper fail')
     const tampered = tamperChecksum(token)
@@ -215,8 +284,8 @@ describe('share decode integration', () => {
     await screen.findByText('share-error')
   })
 
-  it('hydrates packed-deflate share tokens from fixtures', async () => {
-    const summarySnapshot = await loadShareFixture('summary-page.json')
+  it('hydrates temporary legacy packed-deflate share tokens', async () => {
+    const summarySnapshot = createLegacyPackedSnapshot('Packed deflate legacy')
     const strategy = getCompressionStrategy('packed-deflate-b91')
     if (!strategy) {
       throw new Error('packed-deflate-b91 strategy is not registered')
@@ -247,10 +316,11 @@ describe('share decode integration', () => {
     })
 
     expect(window.location.search).not.toContain('share=')
+    expect(screen.getByTestId('jsx-code').textContent).toContain('Packed deflate legacy')
   })
 
-  it('hydrates packed-brotli q11 tokens from fixtures', async () => {
-    const hooksSnapshot = await loadShareFixture('hooks-demo.json')
+  it('hydrates temporary legacy packed-brotli q11 share tokens', async () => {
+    const hooksSnapshot = createLegacyPackedSnapshot('Packed brotli legacy')
     const strategy = getCompressionStrategy('packed-brotli-q11-b91')
     if (!strategy) {
       throw new Error('packed-brotli-q11-b91 strategy is not registered')
@@ -280,6 +350,7 @@ describe('share decode integration', () => {
     })
 
     expect(window.location.search).not.toContain('share=')
+    expect(screen.getByTestId('jsx-code').textContent).toContain('Packed brotli legacy')
   })
 
   it('repairs stray quotes inside packed snapshots before decoding', async () => {
@@ -375,6 +446,27 @@ const createShareTokenForCode = async (code: string): Promise<string> => {
 const createShareTokenForSnapshot = async (snapshot: ProjectSnapshot): Promise<string> => {
   const envelope = await encodeSharePayload(snapshot)
   return createShareToken(envelope)
+}
+
+const createLegacyV2ShareTokenForSnapshot = async (snapshot: ProjectSnapshot): Promise<string> => {
+  const envelope = await encodeSharePayload(snapshot, {
+    formatVersion: LEGACY_SHARE_FORMAT_VERSION,
+  })
+  return createShareToken(envelope)
+}
+
+const createLegacyPackedSnapshot = (label: string): ProjectSnapshot => {
+  const project = createDefaultProject()
+  project.jsxCode = `export default function App() { return <div>${label}</div> }`
+  project.hooksCode = `export function usePackedLegacyHook() { return "${label}" }`
+  return createShareSnapshot(project, {
+    preview: {
+      viewport: 'LG',
+      theme: 'dark',
+      zoom: 0.8,
+      sandboxFlags: { outlines: true },
+    },
+  })
 }
 
 const tamperChecksum = (token: string): string => {

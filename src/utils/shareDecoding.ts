@@ -16,6 +16,7 @@ import {
 } from '@/utils/snapshotPacking'
 import { recordShareDecodeTelemetry } from '@/services/telemetry'
 import {
+  normalizeLegacyV2FullSnapshotToWebShareSnapshot,
   parseWebShareUrlPayload,
   webShareUrlPayloadToSnapshot,
 } from '@/utils/sharePayload'
@@ -155,10 +156,17 @@ const decodeSharePayloadWithStrategy = async (
     }
   }
 
-  const { snapshot, repairApplied } = await decodeSnapshotWithStrategy(metadata)
+  const { snapshot: decodedSnapshot, repairApplied } = await decodeSnapshotWithStrategy(metadata)
+  const snapshot =
+    metadata.formatVersion === LEGACY_SHARE_FORMAT_VERSION
+      // Temporary v2 rollout bridge: discard full-snapshot-only fields before apply.
+      // Revisit removal after one release cycle per ADR 0007.
+      ? normalizeLegacyV2FullSnapshotToWebShareSnapshot(decodedSnapshot)
+      : decodedSnapshot
+
   return {
     snapshot,
-    checksumPayload: getChecksumPayloadForStrategy(snapshot, metadata.strategyId),
+    checksumPayload: getChecksumPayloadForStrategy(decodedSnapshot, metadata.strategyId),
     repairApplied,
   }
 }
