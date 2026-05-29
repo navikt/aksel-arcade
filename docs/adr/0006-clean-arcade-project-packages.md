@@ -1,0 +1,3 @@
+# Clean Arcade project packages
+
+Arcade project packages are strict, shell-neutral `.akselarcade` JSON files for transferring one Arcade project between Web Arcade and Desktop Arcade. New packages use `format: "aksel-arcade/project-package"` with a new format version and contain only the project name, Arcade project source, and viewport preview preference; they exclude AI metadata, setup instructions, explanatory text, documentation links, production-import guidance, local identity, timestamps, diagnostics, preview evidence, workspace preferences, legacy JSON forms, and unknown extra fields. This deliberately breaks compatibility with older noisy exports so the file itself remains a clean Arcade-to-Arcade transfer artifact rather than an AI/export bundle.

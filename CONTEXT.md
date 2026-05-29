@@ -8,9 +8,21 @@ Aksel Arcade is a playground for creating Aksel-based React prototypes with live
 A shell-neutral user-owned prototype in Aksel Arcade, including its editable source and preview preferences.
 _Avoid_: File, document, artifact
 
+**Arcade project source**:
+The two editable code parts of an **Arcade project**: JSX and Hooks.
+_Avoid_: Files, filesystem, project code
+
+**Preview preference**:
+A review-facing display preference of an **Arcade project**, such as the viewport used to open its preview.
+_Avoid_: Workspace preference, editor layout
+
+**Workspace preference**:
+A local product-surface preference for arranging Arcade itself around an **Arcade project**, such as editor panel placement.
+_Avoid_: Preview preference, project content
+
 **Arcade project package**:
-A portable share artifact, usually named with the `.akselarcade` extension, that contains one **Arcade project** for import, export, or desktop file opening.
-_Avoid_: Arcade project, save file, document
+A shell-neutral portable share artifact named with the `.akselarcade` extension that contains only the importable **Arcade project** data needed for import, export, or desktop file opening: name, **Arcade project source**, and viewport **Preview preference**. Importing one creates a new local **Arcade project** identity rather than preserving the source project instance; it excludes AI metadata, setup instructions, explanatory text, documentation links, production-import guidance, diagnostics, preview evidence, and **Workspace preferences**.
+_Avoid_: Arcade project, save file, document, AI export bundle
 
 **Web Arcade**:
 The browser-hosted product surface for working with **Arcade projects**.
@@ -85,3 +97,7 @@ Domain expert: "Good. That pairs the agent with this active Arcade project only;
 Developer: "The agent session applied an agent change to the Arcade project."
 
 Domain expert: "Show it in the live preview. If the user does not want more agent changes, stop Agent access."
+
+Developer: "The user exported an Arcade project package to send a prototype to a colleague."
+
+Domain expert: "Then the package should contain the project name, Arcade project source, and viewport preview preference only. It should not carry AI instructions, local identity, diagnostics, preview evidence, or workspace preferences."
