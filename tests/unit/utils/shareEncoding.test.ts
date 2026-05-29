@@ -1,13 +1,19 @@
 import { describe, expect, it } from 'vitest'
+import { decompressFromEncodedURIComponent } from 'lz-string'
 import type { ProjectSnapshot } from '@/types/project'
 import {
   buildShareUrl,
   createShareToken,
+  decodeShareTokenMetadata,
+  DEFAULT_COMPRESSION_STRATEGY_ID,
   encodeSharePayload,
   computeChecksum,
   estimateShareUrlLength,
+  SHARE_FORMAT_VERSION,
+  SHARE_METADATA_VERSION,
   SHARE_URL_CHAR_LIMIT,
 } from '@/utils/shareEncoding'
+import { fromBase64Url } from '@/utils/base64'
 import { createDefaultProject } from '@/utils/projectDefaults'
 import { createShareSnapshot } from '@/services/storage'
 
@@ -51,10 +57,59 @@ describe('shareEncoding utilities', () => {
     const envelope = await encodeSharePayload(snapshotFixture)
     const token = createShareToken(envelope)
 
+    expect(envelope.formatVersion).toBe(SHARE_FORMAT_VERSION)
     expect(envelope.compressed.length).toBeGreaterThan(0)
     expect(envelope.checksum.length).toBeGreaterThanOrEqual(43)
     expect(token.split('.', 4)).toHaveLength(4)
     expect(token).not.toContain(' ')
+  })
+
+  it('serializes only the v3 Web share URL payload fields', async () => {
+    const envelope = await encodeSharePayload(snapshotFixture)
+    const serialized = decompressFromEncodedURIComponent(envelope.compressed)
+
+    expect(serialized).toBeTruthy()
+    const payload = JSON.parse(serialized ?? '')
+
+    expect(payload).toEqual({
+      source: {
+        jsx: "export default function App() { return <div>Test</div> }",
+        hooks: '',
+      },
+      preview: {
+        viewport: 'MD',
+        theme: 'dark',
+      },
+    })
+    expect(serialized).not.toContain('activeFileId')
+    expect(serialized).not.toContain('files')
+    expect(serialized).not.toContain('settings')
+    expect(serialized).not.toContain('updatedAt')
+    expect(serialized).not.toContain('zoom')
+    expect(serialized).not.toContain('sandboxFlags')
+  })
+
+  it('keeps share URL warning and limit metadata out of v3 tokens', async () => {
+    const envelope = await encodeSharePayload(snapshotFixture, {
+      warningThresholdHit: true,
+      warningThreshold: 10,
+      charLimit: 20,
+    })
+    const token = createShareToken(envelope)
+    const [, metadataSegment] = token.split('.', 4)
+    const metadataWire = JSON.parse(new TextDecoder().decode(fromBase64Url(metadataSegment)))
+
+    expect(metadataWire).toEqual({
+      v: SHARE_METADATA_VERSION,
+      s: DEFAULT_COMPRESSION_STRATEGY_ID,
+    })
+    expect(decodeShareTokenMetadata(metadataSegment)).toEqual({
+      metadataVersion: SHARE_METADATA_VERSION,
+      strategyId: DEFAULT_COMPRESSION_STRATEGY_ID,
+      warningThresholdHit: undefined,
+      warningThreshold: undefined,
+      charLimit: undefined,
+    })
   })
 
   it('builds share URL with ?share param', async () => {

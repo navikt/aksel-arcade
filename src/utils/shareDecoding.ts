@@ -1,19 +1,24 @@
 import type { CompressionStrategyId, ProjectSnapshot, ShareUrlMetadata } from '@/types/project'
 import {
   computeChecksum,
+  LEGACY_SHARE_FORMAT_VERSION,
   SHARE_FORMAT_VERSION,
   SHARE_METADATA_VERSION,
   SHARE_URL_PARAM,
   decodeShareTokenMetadata,
   DEFAULT_COMPRESSION_STRATEGY_ID,
 } from '@/utils/shareEncoding'
-import { getCompressionStrategy } from '@/services/compressionStrategies'
+import { decodeSerializedPayload, getCompressionStrategy } from '@/services/compressionStrategies'
 import {
   serializePackedSnapshot,
   consumePackedSnapshotRepairState,
   resetPackedSnapshotRepairState,
 } from '@/utils/snapshotPacking'
 import { recordShareDecodeTelemetry } from '@/services/telemetry'
+import {
+  parseWebShareUrlPayload,
+  webShareUrlPayloadToSnapshot,
+} from '@/utils/sharePayload'
 
 export type ShareDecodeErrorCode =
   | 'missing-token'
@@ -70,9 +75,9 @@ export const decodeShareToken = async (token: string): Promise<ShareDecodeResult
   let repairApplied = false
 
   try {
-    const { snapshot, repairApplied: packedRepairApplied } = await decodeSnapshotWithStrategy(metadata)
-    repairApplied = packedRepairApplied
-    const checksumPayload = getChecksumPayloadForStrategy(snapshot, metadata.strategyId)
+    const decoded = await decodeSharePayloadWithStrategy(metadata)
+    repairApplied = decoded.repairApplied
+    const { snapshot, checksumPayload } = decoded
     const computedChecksum = await computeChecksum(checksumPayload)
 
     if (computedChecksum !== metadata.checksum) {
@@ -135,6 +140,27 @@ const decodeSnapshotWithStrategy = async (
   const snapshot = await strategy.decode(metadata.payload)
   const repairApplied = consumePackedSnapshotRepairState()
   return { snapshot, repairApplied }
+}
+
+const decodeSharePayloadWithStrategy = async (
+  metadata: ShareUrlMetadata,
+): Promise<{ snapshot: ProjectSnapshot; checksumPayload: string; repairApplied: boolean }> => {
+  if (metadata.formatVersion === SHARE_FORMAT_VERSION) {
+    const serialized = await decodeSerializedPayload(metadata.strategyId, metadata.payload)
+    const payload = parseWebShareUrlPayload(serialized)
+    return {
+      snapshot: webShareUrlPayloadToSnapshot(payload),
+      checksumPayload: serialized,
+      repairApplied: false,
+    }
+  }
+
+  const { snapshot, repairApplied } = await decodeSnapshotWithStrategy(metadata)
+  return {
+    snapshot,
+    checksumPayload: getChecksumPayloadForStrategy(snapshot, metadata.strategyId),
+    repairApplied,
+  }
 }
 
 const getChecksumPayloadForStrategy = (
@@ -206,7 +232,7 @@ const parseShareToken = (token: string): ShareUrlMetadata => {
     }
   }
 
-  if (version !== SHARE_FORMAT_VERSION) {
+  if (version !== LEGACY_SHARE_FORMAT_VERSION && version !== SHARE_FORMAT_VERSION) {
     throw createDecodeError('unsupported-version')
   }
 
@@ -240,7 +266,7 @@ const parseShareToken = (token: string): ShareUrlMetadata => {
     checksum,
     payload,
     strategyId: decodedMetadata.strategyId,
-    warningThresholdHit: decodedMetadata.warningThresholdHit,
+    warningThresholdHit: decodedMetadata.warningThresholdHit ?? false,
     warningThreshold: decodedMetadata.warningThreshold,
     charLimit: decodedMetadata.charLimit,
   }
