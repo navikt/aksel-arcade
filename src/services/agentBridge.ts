@@ -45,7 +45,7 @@ export type AgentPreviewField = 'viewportSize' | 'theme'
 export type AgentMetadataField = 'name'
 export type AgentChangeField = AgentSourceField | AgentPreviewField | AgentMetadataField
 
-export interface AgentSourceChangeRequest {
+export interface AgentChangeRequest {
   summary: string
   jsxCode?: string
   hooksCode?: string
@@ -54,7 +54,7 @@ export interface AgentSourceChangeRequest {
   name?: string
 }
 
-export interface AgentSourceChangeResult {
+export interface AgentChangeResult {
   changedFields: AgentChangeField[]
 }
 
@@ -67,6 +67,8 @@ export type AgentBridgeErrorCode =
   | 'payload-too-large'
   | 'preview-unavailable'
 
+export const AGENT_BRIDGE_PROTOCOL_VERSION = 2
+
 export const AGENT_BRIDGE_COMMAND_NAMES = [
   'getAgentInstructions',
   'getProject',
@@ -74,7 +76,7 @@ export const AGENT_BRIDGE_COMMAND_NAMES = [
   'getDiagnostics',
   'getPreviewEvidence',
   'getSessionState',
-  'applySourceChange',
+  'applyAgentChange',
 ] as const
 
 export type AgentBridgeCommandName = (typeof AGENT_BRIDGE_COMMAND_NAMES)[number]
@@ -91,6 +93,7 @@ export const AGENT_BRIDGE_READ_COMMAND_NAMES = [
 export type AgentBridgeReadCommandName = (typeof AGENT_BRIDGE_READ_COMMAND_NAMES)[number]
 
 export interface AgentSessionReadState {
+  version: typeof AGENT_BRIDGE_PROTOCOL_VERSION
   sessionId: string
   status: 'active'
   startedAt: string
@@ -100,7 +103,7 @@ export interface AgentSessionReadState {
 }
 
 export interface AgentInstructionsPayload {
-  version: 1
+  version: typeof AGENT_BRIDGE_PROTOCOL_VERSION
   instructionsMarkdown: string
   sessionId: string
   startedAt: string
@@ -148,7 +151,7 @@ export type AgentBridgeRoutedCommandResult =
   | AgentBridgeCommandResult<PreviewDiagnostics>
   | AgentBridgeCommandResult<PreviewEvidence>
   | AgentBridgeCommandResult<AgentSessionReadState>
-  | AgentBridgeCommandResult<AgentSourceChangeResult>
+  | AgentBridgeCommandResult<AgentChangeResult>
   | AgentBridgeCommandFailure<string>
 
 export interface AgentBridgeController {
@@ -156,12 +159,12 @@ export interface AgentBridgeController {
   getPermissions: () => AgentPermissions
   isSessionActive: () => boolean
   recordActivity: (command: AgentBridgeCommandName) => void
-  applySourceChange: (request: unknown) => AgentBridgeCommandResult<AgentSourceChangeResult>
+  applyAgentChange: (request: unknown) => AgentBridgeCommandResult<AgentChangeResult>
   getPreviewEvidence: () => PreviewEvidenceCaptureResult
 }
 
 export interface AgentBridgeCommandRouter {
-  version: 1
+  version: typeof AGENT_BRIDGE_PROTOCOL_VERSION
   sessionId: string
   status: 'active'
   startedAt: string
@@ -175,9 +178,9 @@ export interface AgentBridgeCommandRouter {
   routeCommand(command: 'getPreviewEvidence'): AgentBridgeCommandResult<PreviewEvidence>
   routeCommand(command: 'getSessionState'): AgentBridgeCommandResult<AgentSessionReadState>
   routeCommand(
-    command: 'applySourceChange',
+    command: 'applyAgentChange',
     request: unknown
-  ): AgentBridgeCommandResult<AgentSourceChangeResult>
+  ): AgentBridgeCommandResult<AgentChangeResult>
   routeCommand(command: string, request?: unknown): AgentBridgeRoutedCommandResult
 }
 
@@ -277,7 +280,7 @@ const createAgentInstructionsMarkdown = (
     `Authorization: ${transportEndpoint.authorizationHeader}`,
     `Supported command names: ${AGENT_BRIDGE_COMMAND_NAMES.join(', ')}`,
     '',
-    'Read Arcade-scoped state with getProject, getPreviewContext, getDiagnostics, getPreviewEvidence, and getSessionState. Submit allowed changes with applySourceChange({ summary, jsxCode?, hooksCode?, viewportSize?, theme?, name? }).',
+    'Read Arcade-scoped state with getProject, getPreviewContext, getDiagnostics, getPreviewEvidence, and getSessionState. Submit allowed changes with applyAgentChange({ summary, jsxCode?, hooksCode?, viewportSize?, theme?, name? }). Accepted changes apply immediately after validation.',
     'After changes, poll getDiagnostics until the preview is idle or reports an error, then use Preview evidence for visual validation when permitted.',
     '',
     'Active permission state:',
@@ -296,7 +299,7 @@ const createAgentInstructionsPayload = (
   transportEndpoint: DesktopAgentTransportEndpoint,
   permissions: AgentPermissions
 ): AgentInstructionsPayload => ({
-  version: 1,
+  version: AGENT_BRIDGE_PROTOCOL_VERSION,
   instructionsMarkdown: createAgentInstructionsMarkdown(session, transportEndpoint, permissions),
   sessionId: session.id,
   startedAt: session.startedAt,
@@ -347,9 +350,9 @@ export const createAgentBridgeCommandRouter = (
   function routeCommand(command: 'getPreviewEvidence'): AgentBridgeCommandResult<PreviewEvidence>
   function routeCommand(command: 'getSessionState'): AgentBridgeCommandResult<AgentSessionReadState>
   function routeCommand(
-    command: 'applySourceChange',
+    command: 'applyAgentChange',
     request: unknown
-  ): AgentBridgeCommandResult<AgentSourceChangeResult>
+  ): AgentBridgeCommandResult<AgentChangeResult>
   function routeCommand(command: string, request?: unknown): AgentBridgeRoutedCommandResult {
     if (!isAgentBridgeCommandName(command)) {
       return createUnsupportedCommandFailure(command)
@@ -417,6 +420,7 @@ export const createAgentBridgeCommandRouter = (
         return readCommand(
           'getSessionState',
           (): AgentSessionReadState => ({
+            version: AGENT_BRIDGE_PROTOCOL_VERSION,
             sessionId: session.id,
             status: 'active',
             startedAt: session.startedAt,
@@ -425,13 +429,13 @@ export const createAgentBridgeCommandRouter = (
             commandNames: [...AGENT_BRIDGE_COMMAND_NAMES],
           })
         )
-      case 'applySourceChange':
+      case 'applyAgentChange':
         if (!controller.isSessionActive()) {
           return createSessionRevokedFailure(command)
         }
 
         {
-          const result = controller.applySourceChange(request)
+          const result = controller.applyAgentChange(request)
           if (result.ok) {
             controller.recordActivity(command)
           }
@@ -442,7 +446,7 @@ export const createAgentBridgeCommandRouter = (
   }
 
   return {
-    version: 1,
+    version: AGENT_BRIDGE_PROTOCOL_VERSION,
     sessionId: session.id,
     status: 'active',
     startedAt: session.startedAt,
@@ -502,7 +506,7 @@ export const createAgentInstructions = (
         `curl -sS -X POST '${transportEndpoint.endpoint}' \\`,
         `  -H 'Authorization: ${transportEndpoint.authorizationHeader}' \\`,
         `  -H 'Content-Type: application/json' \\`,
-        `  --data '{"jsonrpc":"2.0","id":"agent-request-2","method":"applySourceChange","params":{"summary":"Describe the change","jsxCode":"export default function App() { return <Heading>Agent update</Heading> }"}}'`,
+        `  --data '{"jsonrpc":"2.0","id":"agent-request-2","method":"applyAgentChange","params":{"summary":"Describe the change","jsxCode":"export default function App() { return <Heading>Agent update</Heading> }"}}'`,
         'Do not put the credential in the URL or query parameters; those requests are rejected.',
         '',
         'Provider-neutral usage examples:',
@@ -521,8 +525,8 @@ export const createAgentInstructions = (
     `Currently available command names: ${AGENT_BRIDGE_COMMAND_NAMES.map((command) => `${command}()`).join(', ')}`,
     'Use getDiagnostics() to read preview status, compile errors, runtime errors, and bounded sandbox console messages after changes.',
     'Use getPreviewEvidence() to read permission-gated, sanitized layout evidence from only the sandboxed Preview frame.',
-    'To replace allowed fields, call applySourceChange({ summary, jsxCode?, hooksCode?, viewportSize?, theme?, name? }). A non-empty human-readable summary is required. Accepted changes apply immediately as normal Arcade project edits.',
-    'After applySourceChange() returns ok, treat immediate Preview evidence as provisional: poll getDiagnostics() until status is no longer "transpiling" or "rendering" before final visual validation.',
+    'To replace allowed fields, call applyAgentChange({ summary, jsxCode?, hooksCode?, viewportSize?, theme?, name? }). A non-empty human-readable summary is required. Accepted changes apply immediately after validation as normal Arcade project edits.',
+    'After applyAgentChange() returns ok, treat immediate Preview evidence as provisional: poll getDiagnostics() until status is no longer "transpiling" or "rendering" before final visual validation.',
     'When diagnostics settle to "idle", read getPreviewEvidence() to validate the visible result. When status is "error", read diagnostics again for compile/runtime details instead.',
     ...transportLines,
     '',

@@ -150,7 +150,7 @@ test.describe('Agent diagnostics', () => {
 
       const response = transport.route({
         id: 'change-1',
-        method: 'applySourceChange',
+        method: 'applyAgentChange',
         params: {
           summary: 'Trigger render failure',
           jsxCode: `export default function App() {

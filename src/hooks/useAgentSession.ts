@@ -10,7 +10,7 @@ import {
   type AgentChangeField,
   type AgentPermissions,
   type AgentSourceField,
-  type AgentSourceChangeResult,
+  type AgentChangeResult,
 } from '@/services/agentBridge'
 import {
   createDesktopAgentSessionCoordinator,
@@ -125,7 +125,7 @@ export const useAgentSession = ({
   }, [])
 
   const applyAgentChange = useCallback(
-    (request: unknown): AgentBridgeCommandResult<AgentSourceChangeResult> => {
+    (request: unknown): AgentBridgeCommandResult<AgentChangeResult> => {
       const parsedRequest = parseAgentChangeRequest(request)
       if (!parsedRequest.ok) {
         return createAgentChangeFailure(parsedRequest.code, parsedRequest.message)
@@ -153,7 +153,7 @@ export const useAgentSession = ({
       if (!sizeStatus.valid) {
         return createAgentChangeFailure(
           'payload-too-large',
-          sizeStatus.message ?? 'Agent source change exceeds the project size limit.'
+          sizeStatus.message ?? 'Agent change exceeds the project size limit.'
         )
       }
 
@@ -171,7 +171,7 @@ export const useAgentSession = ({
 
       return {
         ok: true,
-        command: 'applySourceChange',
+        command: 'applyAgentChange',
         data: {
           changedFields: [...parsedRequest.changedFields],
         },
@@ -186,7 +186,7 @@ export const useAgentSession = ({
       getPermissions: () => permissionsRef.current,
       isSessionActive: () => activeSessionIdRef.current === session?.id,
       recordActivity: () => undefined,
-      applySourceChange: applyAgentChange,
+      applyAgentChange: applyAgentChange,
       getPreviewEvidence,
     }),
     [applyAgentChange, getPreviewEvidence, session?.id]
@@ -265,27 +265,27 @@ export const useAgentSession = ({
   }
 }
 
-interface ParsedSourceChangeRequest {
+interface ParsedAgentChangeRequest {
   ok: true
   changedFields: AgentChangeField[]
   projectUpdates: AgentProjectUpdates
   theme?: ThemeMode
 }
 
-interface InvalidSourceChangeRequest {
+interface InvalidAgentChangeRequest {
   ok: false
   code: AgentBridgeErrorCode
   message: string
 }
 
-type SourceChangeParseResult = ParsedSourceChangeRequest | InvalidSourceChangeRequest
+type AgentChangeParseResult = ParsedAgentChangeRequest | InvalidAgentChangeRequest
 
 const createAgentChangeFailure = (
   code: AgentBridgeErrorCode,
   message: string
-): AgentBridgeCommandResult<AgentSourceChangeResult> => ({
+): AgentBridgeCommandResult<AgentChangeResult> => ({
   ok: false,
-  command: 'applySourceChange',
+  command: 'applyAgentChange',
   error: {
     code,
     message,
@@ -303,7 +303,7 @@ const AGENT_CHANGE_REQUEST_KEYS = [
 const AGENT_CHANGE_REQUEST_KEY_SET = new Set<string>(AGENT_CHANGE_REQUEST_KEYS)
 const VALID_VIEWPORT_SIZES = VIEWPORTS.map(({ id }) => id)
 
-const parseAgentChangeRequest = (request: unknown): SourceChangeParseResult => {
+const parseAgentChangeRequest = (request: unknown): AgentChangeParseResult => {
   if (!request || typeof request !== 'object' || Array.isArray(request)) {
     return {
       ok: false,
@@ -322,7 +322,7 @@ const parseAgentChangeRequest = (request: unknown): SourceChangeParseResult => {
       code: 'unsupported-field',
       message: `Unsupported Agent change field${
         unsupportedFields.length === 1 ? '' : 's'
-      }: ${unsupportedFields.join(', ')}. applySourceChange accepts only summary, jsxCode, hooksCode, viewportSize, theme, and name.`,
+      }: ${unsupportedFields.join(', ')}. applyAgentChange accepts only summary, jsxCode, hooksCode, viewportSize, theme, and name.`,
     }
   }
 

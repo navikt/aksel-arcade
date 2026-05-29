@@ -106,7 +106,7 @@ export const routeDesktopAgentTransportRequest = (
   }
 
   const result =
-    method === 'applySourceChange'
+    method === 'applyAgentChange'
       ? router.routeCommand(method, request.params)
       : router.routeCommand(method)
   if (!result.ok) {
