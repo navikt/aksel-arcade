@@ -119,7 +119,7 @@ export const AppHeader = ({
     const hasUnsavedChanges = saveStatus === 'saving' || saveStatus === 'idle'
     if (hasUnsavedChanges) {
       const confirmed = window.confirm(
-        'You have unsaved changes. Importing a project will replace your current work. Continue?'
+        'You have unsaved changes. Importing an Arcade project package will replace your current work. Continue?'
       )
       if (!confirmed) return
     }
@@ -439,8 +439,7 @@ export const AppHeader = ({
                               <VStack gap="space-12">
                                 <VStack gap="space-4">
                                   <BodyLong size="small">
-                                    This project is too large for a share link. Use Export package
-                                    instead.
+                                    This project is too large for a share link. Use Export instead.
                                   </BodyLong>
                                   {shareLengthDetailText && (
                                     <Detail
@@ -565,7 +564,7 @@ export const AppHeader = ({
           accept={ARCADE_PROJECT_IMPORT_ACCEPT}
           onChange={handleFileChange}
           style={{ display: 'none' }}
-          aria-label="Import project file"
+          aria-label="Import .akselarcade Arcade project package"
         />
       </HStack>
     </Box>
@@ -579,7 +578,7 @@ const getShareErrorMessage = (code: ShareLinkErrorCode): string => {
     case 'storage-unavailable':
       return 'Browser storage is blocked, so we cannot package your project. Enable storage access and retry.'
     case 'oversize':
-      return 'This project is too large for a share link. Use Export package instead.'
+      return 'This project is too large for a share link. Use Export instead.'
     default:
       return 'Something went wrong while generating the share link. Please try again.'
   }

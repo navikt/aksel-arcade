@@ -1118,3 +1118,22 @@ Verification:
 - Browser smoke check at http://127.0.0.1:5176/aksel-arcade/ imported a clean `.akselarcade` package, restored name/source/Hooks/viewport, kept default panel layout, and had no console errors.
 
 Next note: #111 can now align the visible import/export copy and broader validation tests with this strict clean package contract. Keep `.akselarcade` described as an Arcade project package, not a legacy JSON file or AI export bundle.
+
+### 2026-05-29 - Issue #111: Align clean package UI and validation tests
+
+Implemented:
+
+- Kept the visible Export and Import controls as button-only affordances while aligning import accessibility/warning copy with Arcade project package terminology.
+- Tightened import rejection messages so legacy/noisy/invalid package content clearly says it is not a clean `.akselarcade` Arcade project package.
+- Updated stale Aksel metadata comments so copied-out AI/setup guidance is no longer described as part of Arcade project package exports.
+- Updated the migration regression e2e flow away from legacy `.json` imports and metadata-rich exports; it now verifies the strict v2 clean package shape and `.akselarcade` import path.
+
+Verification:
+
+- npm install
+- npm run typecheck
+- npm run lint (passes with the existing hook dependency warnings)
+- CI=1 npm run test
+- Browser smoke check at http://127.0.0.1:5177/aksel-arcade/ confirmed Export emits the strict clean v2 package shape, Import loads a clean `.akselarcade` package with fresh local project state, and the console is clear after reload.
+
+Next note: future package work should keep visible Export/Import UI minimal, keep clean packages limited to name/source/viewport, and update both unit/integration and e2e coverage if the package contract changes.

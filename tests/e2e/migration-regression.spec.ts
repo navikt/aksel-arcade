@@ -3,6 +3,9 @@ import fs from 'node:fs/promises'
 
 const STORAGE_KEY = 'aksel-arcade:project'
 const NOW = '2026-05-25T00:00:00.000Z'
+const PACKAGE_FORMAT = 'aksel-arcade/project-package'
+const PACKAGE_FORMAT_VERSION = 2
+const PACKAGE_EXTENSION = '.akselarcade'
 
 const savedProject = {
   version: '1.0.0',
@@ -25,11 +28,13 @@ const savedProject = {
   lastModified: NOW,
 }
 
-const importedProject = {
-  ...savedProject,
-  id: '22222222-2222-4222-8222-222222222222',
-  name: 'Imported migration regression',
-  jsxCode: `export default function App() {
+const importedPackage = {
+  format: PACKAGE_FORMAT,
+  formatVersion: PACKAGE_FORMAT_VERSION,
+  project: {
+    name: 'Imported migration regression',
+    source: {
+      jsx: `export default function App() {
   return (
     <Box padding="space-16" background="raised" borderRadius="8">
       <VStack gap="space-12">
@@ -39,6 +44,27 @@ const importedProject = {
     </Box>
   )
 }`,
+      hooks: '',
+    },
+    preview: {
+      viewport: 'MD',
+    },
+  },
+}
+
+function collectObjectKeys(value: unknown): string[] {
+  if (!value || typeof value !== 'object') {
+    return []
+  }
+
+  if (Array.isArray(value)) {
+    return value.flatMap(collectObjectKeys)
+  }
+
+  return Object.entries(value).flatMap(([key, nestedValue]) => [
+    key,
+    ...collectObjectKeys(nestedValue),
+  ])
 }
 
 async function waitForPreviewText(page: Page, text: string) {
@@ -140,14 +166,50 @@ test.describe('Aksel v8 migration regression hardening', () => {
     if (!downloadPath) {
       throw new Error('Expected Playwright to provide an export download path')
     }
-    const exportedProject = JSON.parse(await fs.readFile(downloadPath, 'utf-8')) as {
-      meta?: { designSystem?: string; packageVersions?: Record<string, string> }
+    const exportedText = await fs.readFile(downloadPath, 'utf-8')
+    const exportedProjectPackage = JSON.parse(exportedText) as {
+      format: string
+      formatVersion: number
+      project: {
+        name: string
+        source: { jsx: string; hooks: string }
+        preview: { viewport: string }
+      }
     }
-    expect(exportedProject.meta?.designSystem).toBe('Aksel v8')
-    expect(exportedProject.meta?.packageVersions?.['@navikt/ds-react']).toBe('8.11.0')
+    expect(exportedProjectPackage).toMatchObject({
+      format: PACKAGE_FORMAT,
+      formatVersion: PACKAGE_FORMAT_VERSION,
+      project: {
+        name: 'Untitled Project',
+        source: {
+          hooks: '',
+        },
+        preview: {
+          viewport: 'MD',
+        },
+      },
+    })
+    expect(Object.keys(exportedProjectPackage).sort()).toEqual([
+      'format',
+      'formatVersion',
+      'project',
+    ])
+    expect(Object.keys(exportedProjectPackage.project).sort()).toEqual([
+      'name',
+      'preview',
+      'source',
+    ])
+    expect(Object.keys(exportedProjectPackage.project.source).sort()).toEqual(['hooks', 'jsx'])
+    expect(Object.keys(exportedProjectPackage.project.preview)).toEqual(['viewport'])
+    expect(collectObjectKeys(exportedProjectPackage).join(' ')).not.toMatch(
+      /agent|session|credential|endpoint|permission|checkpoint|diagnostic|evidence|transport|meta|exportedAt|createdAt|lastModified|panelLayout/i
+    )
+    expect(exportedText).not.toContain('Aksel v8')
+    expect(exportedText).not.toContain('@navikt/ds-react')
+    expect(exportedText).not.toContain(savedProject.id)
 
-    const importPath = testInfo.outputPath('aksel-arcade-import.json')
-    await fs.writeFile(importPath, JSON.stringify(importedProject), 'utf-8')
+    const importPath = testInfo.outputPath(`aksel-arcade-import${PACKAGE_EXTENSION}`)
+    await fs.writeFile(importPath, JSON.stringify(importedPackage), 'utf-8')
     const fileChooserPromise = page.waitForEvent('filechooser')
     await page.getByRole('button', { name: /^Import$/ }).click()
     const fileChooser = await fileChooserPromise

@@ -630,7 +630,9 @@ describe('ProjectControls layout', () => {
     renderHeader({ shellCapabilities: WEB_ARCADE_CAPABILITIES })
 
     const importButton = screen.getByRole('button', { name: /^import$/i })
-    const importInput = screen.getByLabelText(/import project file/i) as HTMLInputElement
+    const importInput = screen.getByLabelText(
+      /import \.akselarcade arcade project package/i
+    ) as HTMLInputElement
     const shareButton = screen.getByLabelText(/share project/i)
     const settingsButton = screen.getByRole('button', { name: /settings/i })
 
@@ -813,7 +815,7 @@ describe('ProjectControls layout', () => {
     await expectProjectReplacementRevokedAgentAccess(desktopTransport, 3)
 
     await startAgentAccess()
-    fireEvent.change(screen.getByLabelText(/import project file/i), {
+    fireEvent.change(screen.getByLabelText(/import \.akselarcade arcade project package/i), {
       target: {
         files: [
           createProjectPackageFileForCode(
@@ -1236,7 +1238,9 @@ describe('ProjectControls layout', () => {
 
     try {
       const { unmount } = renderHeader()
-      const importInput = screen.getByLabelText(/import project file/i) as HTMLInputElement
+      const importInput = screen.getByLabelText(
+        /import \.akselarcade arcade project package/i
+      ) as HTMLInputElement
 
       expect(screen.queryByLabelText(/share project/i)).toBeNull()
       expect(screen.getByRole('button', { name: /^Export$/i })).toBeTruthy()
@@ -1364,7 +1368,7 @@ describe('ProjectControls layout', () => {
       expectLegacyAgentBridgeAbsent()
       renderHeader()
 
-      fireEvent.change(screen.getByLabelText(/import project file/i), {
+      fireEvent.change(screen.getByLabelText(/import \.akselarcade arcade project package/i), {
         target: {
           files: [createProjectPackageFile(activePackage.text)],
         },

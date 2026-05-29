@@ -16,6 +16,8 @@ const CURRENT_VERSION = '1.0.0'
 export const ARCADE_PROJECT_PACKAGE_FORMAT = 'aksel-arcade/project-package' as const
 export const ARCADE_PROJECT_PACKAGE_FORMAT_VERSION = 2
 export const ARCADE_PROJECT_PACKAGE_EXTENSION = '.akselarcade' as const
+const CLEAN_PACKAGE_REJECTION_MESSAGE =
+  'Package is not a clean .akselarcade Arcade project package'
 export const ARCADE_PROJECT_PACKAGE_MIME_TYPE =
   'application/vnd.nav.aksel-arcade.project-package+json'
 export const ARCADE_PROJECT_IMPORT_ACCEPT = [
@@ -283,7 +285,7 @@ export const importProject = async (file: File): Promise<ImportResult> => {
       return {
         project: null,
         success: false,
-        error: 'Invalid JSON file',
+        error: 'Invalid .akselarcade Arcade project package JSON',
       }
     }
 
@@ -294,7 +296,7 @@ export const importProject = async (file: File): Promise<ImportResult> => {
       return {
         project: null,
         success: false,
-        error: `Validation failed: ${error instanceof Error ? error.message : String(error)}`,
+        error: formatCleanPackageRejection(error),
       }
     }
 
@@ -333,7 +335,7 @@ const buildProjectFromCleanPackage = (payload: unknown): Project => {
 
 const parseCleanArcadeProjectPackage = (payload: unknown): ArcadeProjectPackage['project'] => {
   if (!isRecord(payload)) {
-    throw new Error('Package is not a clean .akselarcade Arcade project package')
+    throw new Error(CLEAN_PACKAGE_REJECTION_MESSAGE)
   }
 
   assertExactKeys(payload, ['format', 'formatVersion', 'project'], 'package')
@@ -420,6 +422,13 @@ const assertExactKeys = (
 }
 
 const formatKeyList = (keys: string[]): string => keys.map((key) => `"${key}"`).join(', ')
+
+const formatCleanPackageRejection = (error: unknown): string => {
+  const message = error instanceof Error ? error.message : String(error)
+  return message.startsWith(CLEAN_PACKAGE_REJECTION_MESSAGE)
+    ? message
+    : `${CLEAN_PACKAGE_REJECTION_MESSAGE}: ${message}`
+}
 
 const normalizeImportedProject = (project: unknown): Project => {
   validateProjectSchema(project)
