@@ -167,7 +167,7 @@ Web Arcade is the default dev mode: Share URL is available and Agent access is n
 npm run desktop:dev
 ```
 
-The desktop script starts Vite on `127.0.0.1:5173` and opens an Electron shell around the same renderer. Desktop capabilities are supplied only through a narrow preload IPC bridge, so React components stay browser-like: the Electron shell receives the Desktop Arcade capability set without direct Node, socket, process, or filesystem access. The same renderer URL opened in a normal browser remains Web Arcade with Share URL available and no Agent access.
+The desktop script starts Vite on `127.0.0.1:5173` and opens an Electron shell around the same renderer. Desktop capabilities are supplied only through a narrow preload IPC bridge, so React components stay browser-like: the Electron shell receives the Desktop Arcade capability set without direct Node, socket, process, or filesystem access. The same renderer URL opened in a normal browser remains Web Arcade with Share URL available and no Agent access, Agent runtime, browser-global Agent bridge, or Agent pairing handoff.
 
 ### Tech Stack
 
@@ -185,7 +185,7 @@ The desktop script starts Vite on `127.0.0.1:5173` and opens an Electron shell a
 
 ## 🏗️ Architecture
 
-Aksel Arcade runs entirely in the browser:
+Aksel Arcade's shared renderer runs client-side:
 
 ```
 ┌─────────────────────────────────────┐
@@ -204,6 +204,7 @@ Aksel Arcade runs entirely in the browser:
 - **Safe execution**: User code runs in isolated iframe
 - **Offline-capable**: All dependencies bundled at build time
 - **localStorage persistence**: Auto-save without servers
+- **Explicit shells**: Web Arcade keeps browser sharing and no Agent access; Desktop Arcade adds Agent access only through the narrow desktop transport.
 
 ## 🧰 Troubleshooting
 

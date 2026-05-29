@@ -4,8 +4,6 @@ import { clonePreviewDiagnostics, type PreviewDiagnostics } from '@/services/pre
 import type { PreviewEvidence, PreviewEvidenceCaptureResult } from '@/services/previewEvidence'
 import type { DesktopAgentTransportEndpoint } from '@/services/desktopAgentSessionCoordinator'
 
-export const AGENT_BRIDGE_GLOBAL = '__AKSEL_ARCADE_AGENT_BRIDGE__'
-
 export type AgentPermissionKey =
   | 'sourceChanges'
   | 'previewSettings'
@@ -181,23 +179,6 @@ export interface AgentBridgeCommandRouter {
     request: unknown
   ): AgentBridgeCommandResult<AgentSourceChangeResult>
   routeCommand(command: string, request?: unknown): AgentBridgeRoutedCommandResult
-}
-
-export interface AgentBridge {
-  version: 1
-  sessionId: string
-  status: 'active'
-  startedAt: string
-  permissions: AgentPermissions
-  readScope: 'arcade-session'
-  commandNames: readonly AgentBridgeCommandName[]
-  getAgentInstructions: () => AgentBridgeCommandResult<AgentInstructionsPayload>
-  getProject: () => AgentBridgeCommandResult<AgentProjectReadState>
-  getPreviewContext: () => AgentBridgeCommandResult<AgentPreviewReadState>
-  getDiagnostics: () => AgentBridgeCommandResult<PreviewDiagnostics>
-  getPreviewEvidence: () => AgentBridgeCommandResult<PreviewEvidence>
-  getSessionState: () => AgentBridgeCommandResult<AgentSessionReadState>
-  applySourceChange: (request: unknown) => AgentBridgeCommandResult<AgentSourceChangeResult>
 }
 
 export const DEFAULT_AGENT_PERMISSIONS: AgentPermissions = {
@@ -474,32 +455,6 @@ export const createAgentBridgeCommandRouter = (
   }
 }
 
-export const createAgentBridge = (
-  session: AgentBridgeSession,
-  controller: AgentBridgeController
-): AgentBridge => {
-  const router = createAgentBridgeCommandRouter(session, controller)
-
-  return {
-    version: router.version,
-    sessionId: router.sessionId,
-    status: router.status,
-    startedAt: router.startedAt,
-    get permissions() {
-      return router.permissions
-    },
-    readScope: router.readScope,
-    commandNames: [...router.commandNames],
-    getAgentInstructions: () => router.routeCommand('getAgentInstructions'),
-    getProject: () => router.routeCommand('getProject'),
-    getPreviewContext: () => router.routeCommand('getPreviewContext'),
-    getDiagnostics: () => router.routeCommand('getDiagnostics'),
-    getPreviewEvidence: () => router.routeCommand('getPreviewEvidence'),
-    getSessionState: () => router.routeCommand('getSessionState'),
-    applySourceChange: (request) => router.routeCommand('applySourceChange', request),
-  }
-}
-
 const GET_AGENT_INSTRUCTIONS_JSON_RPC_REQUEST =
   '{"jsonrpc":"2.0","id":"agent-instructions-1","method":"getAgentInstructions"}'
 
@@ -521,30 +476,6 @@ export const createAgentPairingHandoffCommand = (
     '--data',
     shellQuote(GET_AGENT_INSTRUCTIONS_JSON_RPC_REQUEST),
   ].join(' ')
-
-export const publishAgentBridge = (
-  session: AgentBridgeSession,
-  controller: AgentBridgeController
-): void => {
-  if (typeof window === 'undefined') {
-    return
-  }
-
-  window[AGENT_BRIDGE_GLOBAL] = createAgentBridge(session, controller)
-}
-
-export const removeAgentBridge = (sessionId?: string): void => {
-  if (typeof window === 'undefined') {
-    return
-  }
-
-  const bridge = window[AGENT_BRIDGE_GLOBAL]
-  if (sessionId && bridge?.sessionId !== sessionId) {
-    return
-  }
-
-  delete window[AGENT_BRIDGE_GLOBAL]
-}
 
 export const createAgentInstructions = (
   permissions: AgentPermissions,
@@ -585,8 +516,7 @@ export const createAgentInstructions = (
   return [
     'Aksel Arcade external-agent instructions',
     '',
-    `Bridge global: window.${AGENT_BRIDGE_GLOBAL}`,
-    'The human must start temporary Agent access before this global exists. If it is missing, ask the human to start access from the Agent menu.',
+    'Agent access is available only in Desktop Arcade. The human must start temporary Agent access and copy the Desktop loopback JSON-RPC handoff before an external agent can connect.',
     '',
     `Currently available command names: ${AGENT_BRIDGE_COMMAND_NAMES.map((command) => `${command}()`).join(', ')}`,
     'Use getDiagnostics() to read preview status, compile errors, runtime errors, and bounded sandbox console messages after changes.',
