@@ -29,6 +29,22 @@ const createTestProject = (overrides: Partial<Project> = {}): Project => ({
   ...overrides,
 })
 
+const createLegacyPortableProject = (project: Project) => ({
+  version: project.version,
+  id: project.id,
+  name: project.name,
+  createdAt: project.createdAt,
+  lastModified: project.lastModified,
+  code: {
+    jsxCode: project.jsxCode,
+    hooksCode: project.hooksCode,
+  },
+  ui: {
+    viewportSize: project.viewportSize,
+    panelLayout: project.panelLayout,
+  },
+})
+
 const collectObjectKeys = (value: unknown): string[] => {
   if (!value || typeof value !== 'object') {
     return []
@@ -337,7 +353,7 @@ describe('Storage Service', () => {
       document.createElement = originalCreateElement
     })
 
-    it('creates portable package data with current project content only', () => {
+    it('creates clean package data with current project content only', () => {
       const project = {
         ...createTestProject({
           name: 'Portable Package Test',
@@ -358,29 +374,20 @@ describe('Storage Service', () => {
         transport: { token: 'transport-secret' },
       } as Project & Record<string, unknown>
 
-      const packageData = createArcadeProjectPackage(project, {
-        includeAIMeta: false,
-        exportedAt: '2026-05-27T00:00:00.000Z',
-      })
+      const packageData = createArcadeProjectPackage(project)
       const serialized = JSON.stringify(packageData)
 
       expect(packageData).toEqual({
         format: ARCADE_PROJECT_PACKAGE_FORMAT,
         formatVersion: ARCADE_PROJECT_PACKAGE_FORMAT_VERSION,
-        exportedAt: '2026-05-27T00:00:00.000Z',
         project: {
-          version: project.version,
-          id: project.id,
           name: 'Portable Package Test',
-          createdAt: project.createdAt,
-          lastModified: project.lastModified,
-          code: {
-            jsxCode: '<HStack><Button>Click</Button></HStack>',
-            hooksCode: 'export const useCounter = () => 1',
+          source: {
+            jsx: '<HStack><Button>Click</Button></HStack>',
+            hooks: 'export const useCounter = () => 1',
           },
-          ui: {
-            viewportSize: 'LG',
-            panelLayout: 'editor-right',
+          preview: {
+            viewport: 'LG',
           },
         },
       })
@@ -393,11 +400,11 @@ describe('Storage Service', () => {
       expect(serialized).not.toContain('evidence-secret')
       expect(serialized).not.toContain('transport-secret')
       expect(collectObjectKeys(packageData).join(' ')).not.toMatch(
-        /agent|session|credential|endpoint|permission|checkpoint|diagnostic|evidence|transport/i
+        /agent|session|credential|endpoint|permission|checkpoint|diagnostic|evidence|transport|meta|exportedAt|createdAt|lastModified|id|panelLayout/i
       )
     })
 
-    it('includes current Aksel v8 metadata in exported packages', async () => {
+    it('exports the clean package shape without metadata', async () => {
       const mockUrl = 'blob:mock-url'
       let capturedBlob: Blob | null = null
       const originalCreateObjectURL = global.URL.createObjectURL
@@ -413,7 +420,7 @@ describe('Storage Service', () => {
 
       const project: Project = {
         ...createTestProject(),
-        name: 'Export Metadata Test',
+        name: 'Export Shape Test',
         jsxCode: '<HStack><Button>Click</Button></HStack>',
       }
 
@@ -428,26 +435,32 @@ describe('Storage Service', () => {
         const exported = JSON.parse(exportedText) as {
           format: string
           formatVersion: number
-          meta: {
-            designSystem: string
-            packageVersions: Record<string, string>
-            setup: { cssImport: string; install: string }
-            authoring: { playground: string; production: string }
-            breakpoints: Record<string, string>
+          project: {
+            name: string
+            source: { jsx: string; hooks: string }
+            preview: { viewport: string }
           }
         }
 
         expect(exported.format).toBe(ARCADE_PROJECT_PACKAGE_FORMAT)
         expect(exported.formatVersion).toBe(ARCADE_PROJECT_PACKAGE_FORMAT_VERSION)
-        expect(exported.meta.designSystem).toBe('Aksel v8')
-        expect(exported.meta.packageVersions['@navikt/ds-react']).toBe('8.11.0')
-        expect(exported.meta.packageVersions['@navikt/ds-css']).toBe('8.11.0')
-        expect(exported.meta.packageVersions['@navikt/aksel-icons']).toBe('8.11.0')
-        expect(exported.meta.setup.cssImport).toBe("import '@navikt/ds-css';")
-        expect(exported.meta.setup.install).toContain('--save-exact')
-        expect(exported.meta.authoring.playground).toContain('import-free')
-        expect(exported.meta.authoring.production).toContain('@navikt/ds-react')
-        expect(exported.meta.breakpoints['2xl']).toBe('1440px')
+        expect(exported.project).toEqual({
+          name: 'Export Shape Test',
+          source: {
+            jsx: '<HStack><Button>Click</Button></HStack>',
+            hooks: '',
+          },
+          preview: {
+            viewport: 'MD',
+          },
+        })
+        expect(Object.keys(exported).sort()).toEqual(['format', 'formatVersion', 'project'])
+        expect(Object.keys(exported.project).sort()).toEqual(['name', 'preview', 'source'])
+        expect(Object.keys(exported.project.source).sort()).toEqual(['hooks', 'jsx'])
+        expect(Object.keys(exported.project.preview)).toEqual(['viewport'])
+        expect(exportedText).not.toMatch(
+          /meta|AI|instruction|documentation|setup|production|exportedAt|createdAt|lastModified|id|panelLayout|diagnostic|evidence/i
+        )
       } finally {
         global.URL.createObjectURL = originalCreateObjectURL
         global.URL.revokeObjectURL = originalRevokeObjectURL
@@ -528,28 +541,10 @@ describe('Storage Service', () => {
         createdAt: '2026-05-20T00:00:00.000Z',
         lastModified: '2026-05-21T00:00:00.000Z',
       })
-      const packageData = createArcadeProjectPackage(sourceProject, {
-        includeAIMeta: false,
-        exportedAt: '2026-05-22T00:00:00.000Z',
-      })
-      const packageWithLocalState = {
-        ...packageData,
-        agentSession: {
-          id: 'agent-session-secret',
-          credential: 'credential-secret',
-          endpoint: 'http://127.0.0.1:1234',
-        },
-        project: {
-          ...packageData.project,
-          checkpoints: [{ id: 'checkpoint-secret' }],
-          diagnostics: [{ message: 'diagnostic-secret' }],
-          previewEvidence: { dom: 'evidence-secret' },
-          transport: { token: 'transport-secret' },
-        },
-      }
+      const packageData = createArcadeProjectPackage(sourceProject)
 
       const file = createMockFile(
-        JSON.stringify(packageWithLocalState),
+        JSON.stringify(packageData),
         'package-import.akselarcade',
         ARCADE_PROJECT_PACKAGE_MIME_TYPE
       )
@@ -563,9 +558,8 @@ describe('Storage Service', () => {
         jsxCode: '<VStack><Heading>Packaged</Heading></VStack>',
         hooksCode: 'export const usePackaged = () => "ok"',
         viewportSize: 'XL',
-        panelLayout: 'editor-right',
+        panelLayout: 'editor-left',
         version: '1.0.0',
-        createdAt: '2026-05-20T00:00:00.000Z',
       })
       expect(result.project!.id).not.toBe(sourceProject.id)
       expect(new Date(result.project!.lastModified).getTime()).toBeGreaterThanOrEqual(
@@ -579,6 +573,47 @@ describe('Storage Service', () => {
       )
     })
 
+    it('should keep importing legacy v1 Arcade project packages', async () => {
+      const sourceProject = createTestProject({
+        name: 'Legacy Package Import Test',
+        jsxCode: '<Box>Legacy package</Box>',
+        hooksCode: 'export const useLegacyPackage = () => "ok"',
+        viewportSize: 'SM',
+        panelLayout: 'editor-right',
+        createdAt: '2026-05-18T00:00:00.000Z',
+        lastModified: '2026-05-19T00:00:00.000Z',
+      })
+      const legacyPackage = {
+        format: ARCADE_PROJECT_PACKAGE_FORMAT,
+        formatVersion: 1,
+        exportedAt: '2026-05-20T00:00:00.000Z',
+        project: createLegacyPortableProject(sourceProject),
+        meta: { aiInstructions: 'legacy-package-ai-secret' },
+      }
+
+      const file = createMockFile(
+        JSON.stringify(legacyPackage),
+        'legacy-package.akselarcade',
+        ARCADE_PROJECT_PACKAGE_MIME_TYPE
+      )
+
+      const result = await importProject(file)
+
+      expect(result.success).toBe(true)
+      expect(result.error).toBeUndefined()
+      expect(result.project).toMatchObject({
+        name: 'Legacy Package Import Test',
+        jsxCode: '<Box>Legacy package</Box>',
+        hooksCode: 'export const useLegacyPackage = () => "ok"',
+        viewportSize: 'SM',
+        panelLayout: 'editor-right',
+        version: '1.0.0',
+        createdAt: '2026-05-18T00:00:00.000Z',
+      })
+      expect(result.project!.id).not.toBe(sourceProject.id)
+      expect(JSON.stringify(result.project)).not.toContain('legacy-package-ai-secret')
+    })
+
     it('should keep importing pre-package nested JSON exports', async () => {
       const sourceProject = createTestProject({
         name: 'Nested JSON Import Test',
@@ -588,7 +623,7 @@ describe('Storage Service', () => {
         panelLayout: 'editor-left',
       })
       const legacyNestedJson = {
-        ...createArcadeProjectPackage(sourceProject, { includeAIMeta: false }).project,
+        ...createLegacyPortableProject(sourceProject),
         meta: { agentSession: 'nested-meta-secret' },
         project: { owner: 'legacy-project-metadata' },
         transport: { endpoint: 'http://127.0.0.1:9999' },

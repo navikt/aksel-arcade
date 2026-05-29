@@ -1063,3 +1063,36 @@ Verification:
 - npm run lint (passes with the existing hook dependency warnings)
 
 Next note: future Agent protocol changes should keep Desktop transport as the only Agent access surface and should bump `AGENT_BRIDGE_PROTOCOL_VERSION` whenever command names or result shapes change.
+
+### 2026-05-29 - Issue #109: Export clean Arcade project packages
+
+Selected #109 as the highest-priority `ready-for-agent` feature from #109, #110, and #111 because #110 is blocked by #109 and #111 is blocked by both #109 and #110.
+
+Implemented:
+
+- Changed new `.akselarcade` exports to `formatVersion: 2` clean Arcade project packages containing only `project.name`, `project.source.jsx`, `project.source.hooks`, and `project.preview.viewport`.
+- Removed AI metadata, setup/docs guidance, exported timestamps, local identity, project timestamps, diagnostics, preview evidence, workspace preferences, and legacy portable fields from new package exports.
+- Kept empty Hooks source as an explicit empty string in the clean package shape.
+- Added a minimal additive v2 package reader so newly exported packages remain importable; strict import rejection of legacy/noisy packages is still intentionally left for #110.
+- Updated export/import regression tests and Desktop export fallback coverage for the clean `source`/`preview` package shape.
+
+Verification:
+
+- npm run typecheck
+- npm run lint (passes with the existing hook dependency warnings)
+- CI=1 npm run test
+- Browser smoke check at http://127.0.0.1:5174/aksel-arcade/ confirmed the app renders, the Export button produces the clean v2 package shape, and the console is clear after reload.
+
+Next note: #110 should replace the current permissive import path with strict clean-package validation, reject v1/noisy/legacy JSON packages and unknown extras, and keep imported workspace preferences sourced from the importing surface defaults.
+
+### 2026-05-29 - PR #113 review follow-up
+
+Addressed one scoped review finding before merge:
+
+- Added explicit regression coverage for importing legacy `formatVersion: 1` Arcade project packages while #109 keeps the v1 reader as a compatibility bridge until #110 tightens import validation.
+
+Verification:
+
+- npm run typecheck
+- npm run lint (passes with the existing hook dependency warnings)
+- CI=1 npm run test

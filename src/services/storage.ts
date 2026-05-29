@@ -6,7 +6,6 @@ import type {
   ProjectSizeStatus,
   ProjectSnapshot,
 } from '@/types/project'
-import { AKSEL_METADATA, AI_INSTRUCTIONS, extractUsedComponents } from '@/data/akselMetadata'
 import { createDefaultProject } from '@/utils/projectDefaults'
 import { generateSecureUUID } from '@/utils/crypto'
 
@@ -15,7 +14,7 @@ const MAX_PROJECT_SIZE_BYTES = 5 * 1024 * 1024 // 5MB
 const WARN_PROJECT_SIZE_BYTES = 4 * 1024 * 1024 // 4MB
 const CURRENT_VERSION = '1.0.0'
 export const ARCADE_PROJECT_PACKAGE_FORMAT = 'aksel-arcade/project-package' as const
-export const ARCADE_PROJECT_PACKAGE_FORMAT_VERSION = 1
+export const ARCADE_PROJECT_PACKAGE_FORMAT_VERSION = 2
 export const ARCADE_PROJECT_PACKAGE_EXTENSION = '.akselarcade' as const
 export const ARCADE_PROJECT_PACKAGE_MIME_TYPE =
   'application/vnd.nav.aksel-arcade.project-package+json'
@@ -47,37 +46,22 @@ export interface ImportResult {
 }
 
 export interface ExportProjectOptions {
-  includeAIMeta?: boolean
   exportedAt?: string
-}
-
-export interface PortableArcadeProject {
-  version: string
-  id: string
-  name: string
-  createdAt: string
-  lastModified: string
-  code: {
-    jsxCode: string
-    hooksCode: string
-  }
-  ui: {
-    viewportSize: Project['viewportSize']
-    panelLayout: Project['panelLayout']
-  }
-}
-
-type ArcadeProjectPackageMeta = typeof AKSEL_METADATA & {
-  usedComponents: ReturnType<typeof extractUsedComponents>
-  aiInstructions: string
 }
 
 export interface ArcadeProjectPackage {
   format: typeof ARCADE_PROJECT_PACKAGE_FORMAT
   formatVersion: typeof ARCADE_PROJECT_PACKAGE_FORMAT_VERSION
-  exportedAt: string
-  project: PortableArcadeProject
-  meta?: ArcadeProjectPackageMeta
+  project: {
+    name: string
+    source: {
+      jsx: string
+      hooks: string
+    }
+    preview: {
+      viewport: Project['viewportSize']
+    }
+  }
 }
 
 export interface ShareSnapshotOverrides {
@@ -246,62 +230,30 @@ export const loadProject = (): LoadResult => {
 }
 
 export const createArcadeProjectPackage = (
-  project: Project,
-  options: ExportProjectOptions = {}
+  project: Project
 ): ArcadeProjectPackage => {
-  const includeAIMeta = options.includeAIMeta ?? true
-  const packageData: ArcadeProjectPackage = {
+  return {
     format: ARCADE_PROJECT_PACKAGE_FORMAT,
     formatVersion: ARCADE_PROJECT_PACKAGE_FORMAT_VERSION,
-    exportedAt: options.exportedAt ?? new Date().toISOString(),
     project: {
-      version: project.version,
-      id: project.id,
       name: project.name,
-      createdAt: project.createdAt,
-      lastModified: project.lastModified,
-      code: {
-        jsxCode: project.jsxCode,
-        hooksCode: project.hooksCode,
+      source: {
+        jsx: project.jsxCode,
+        hooks: project.hooksCode,
       },
-      ui: {
-        viewportSize: project.viewportSize,
-        panelLayout: project.panelLayout,
+      preview: {
+        viewport: project.viewportSize,
       },
     },
   }
-
-  // Add AI enrichment metadata (optional)
-  if (includeAIMeta) {
-    const usedComponents = extractUsedComponents(project.jsxCode)
-
-    packageData.meta = {
-      designSystem: AKSEL_METADATA.designSystem,
-      designSystemVersion: AKSEL_METADATA.designSystemVersion,
-      framework: AKSEL_METADATA.framework,
-      runtime: AKSEL_METADATA.runtime,
-      packages: AKSEL_METADATA.packages,
-      packageVersions: AKSEL_METADATA.packageVersions,
-      setup: AKSEL_METADATA.setup,
-      authoring: AKSEL_METADATA.authoring,
-      tokens: AKSEL_METADATA.tokens,
-      breakpoints: AKSEL_METADATA.breakpoints,
-      documentation: AKSEL_METADATA.documentation,
-      usedComponents,
-      aiInstructions: AI_INSTRUCTIONS,
-    }
-  }
-
-  return packageData
 }
 
 export const exportProject = (
   project: Project,
-  optionsOrIncludeAIMeta: ExportProjectOptions | boolean = {}
+  options: ExportProjectOptions = {}
 ): void => {
-  const options = normalizeExportProjectOptions(optionsOrIncludeAIMeta)
   const exportedAt = options.exportedAt ?? new Date().toISOString()
-  const packageData = createArcadeProjectPackage(project, { ...options, exportedAt })
+  const packageData = createArcadeProjectPackage(project)
   const json = JSON.stringify(packageData, null, 2)
   const blob = new Blob([json], { type: ARCADE_PROJECT_PACKAGE_MIME_TYPE })
   const url = URL.createObjectURL(blob)
@@ -316,13 +268,6 @@ export const exportProject = (
 
   URL.revokeObjectURL(url)
 }
-
-const normalizeExportProjectOptions = (
-  optionsOrIncludeAIMeta: ExportProjectOptions | boolean
-): ExportProjectOptions =>
-  typeof optionsOrIncludeAIMeta === 'boolean'
-    ? { includeAIMeta: optionsOrIncludeAIMeta }
-    : optionsOrIncludeAIMeta
 
 export const importProject = async (file: File): Promise<ImportResult> => {
   try {
@@ -404,11 +349,35 @@ const extractArcadeProjectPackage = (payload: Record<string, unknown>): Project 
     throw new Error('Unsupported Arcade project package format')
   }
 
-  if (payload.formatVersion !== ARCADE_PROJECT_PACKAGE_FORMAT_VERSION) {
-    throw new Error('Unsupported Arcade project package version')
+  if (payload.formatVersion === ARCADE_PROJECT_PACKAGE_FORMAT_VERSION) {
+    return buildProjectFromCleanPackage(payload.project)
   }
 
-  return buildProjectFromPortable(payload.project)
+  if (payload.formatVersion === 1) {
+    return buildProjectFromPortable(payload.project)
+  }
+
+  throw new Error('Unsupported Arcade project package version')
+}
+
+const buildProjectFromCleanPackage = (cleanProject: unknown): Project => {
+  if (!isCleanPackageProjectPayload(cleanProject)) {
+    throw new Error('Project package is missing clean project content')
+  }
+
+  const now = new Date().toISOString()
+
+  return normalizeImportedProject({
+    version: CURRENT_VERSION,
+    id: '00000000-0000-4000-8000-000000000000',
+    name: cleanProject.name,
+    jsxCode: cleanProject.source.jsx,
+    hooksCode: cleanProject.source.hooks,
+    viewportSize: cleanProject.preview.viewport,
+    panelLayout: createDefaultProject().panelLayout,
+    createdAt: now,
+    lastModified: now,
+  })
 }
 
 const buildProjectFromPortable = (portable: unknown): Project => {
@@ -462,6 +431,21 @@ const isPortableProjectPayload = (
   code: Record<string, unknown>
   ui: Record<string, unknown>
 } => isRecord(payload) && isRecord(payload.code) && isRecord(payload.ui)
+
+const isCleanPackageProjectPayload = (
+  payload: unknown
+): payload is Record<string, unknown> & {
+  name: string
+  source: Record<string, unknown> & { jsx: string; hooks: string }
+  preview: Record<string, unknown> & { viewport: Project['viewportSize'] }
+} =>
+  isRecord(payload) &&
+  isRecord(payload.source) &&
+  isRecord(payload.preview) &&
+  typeof payload.name === 'string' &&
+  typeof payload.source.jsx === 'string' &&
+  typeof payload.source.hooks === 'string' &&
+  typeof payload.preview.viewport === 'string'
 
 export const clearStorage = (): void => {
   localStorage.removeItem(STORAGE_KEY)

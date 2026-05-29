@@ -473,12 +473,12 @@ describe('Share popover integration', () => {
         format: string
         project: {
           name: string
-          code: {
-            jsxCode: string
-            hooksCode: string
+          source: {
+            jsx: string
+            hooks: string
           }
-          ui: {
-            viewportSize: string
+          preview: {
+            viewport: string
           }
         }
       }
@@ -486,12 +486,12 @@ describe('Share popover integration', () => {
       expect(exported.format).toBe('aksel-arcade/project-package')
       expect(exported.project).toMatchObject({
         name: 'Fallback Export Project',
-        code: {
-          jsxCode: nextJsx,
-          hooksCode: nextHooks,
+        source: {
+          jsx: nextJsx,
+          hooks: nextHooks,
         },
-        ui: {
-          viewportSize: 'XS',
+        preview: {
+          viewport: 'XS',
         },
       })
       expect(exportedText).not.toContain(AGENT_CHANGE_SUMMARY)
