@@ -653,6 +653,36 @@ describe('ProjectControls layout', () => {
     expectLegacyAgentBridgeAbsent()
   })
 
+  it('confirms import with an Aksel Dialog and custom action label', async () => {
+    const nativeConfirmSpy = vi.spyOn(window, 'confirm')
+    const inputClickSpy = vi.spyOn(HTMLInputElement.prototype, 'click').mockImplementation(() => {})
+
+    renderHeader({ shellCapabilities: WEB_ARCADE_CAPABILITIES })
+
+    fireEvent.click(screen.getByRole('button', { name: /^Import$/i }))
+
+    expect(nativeConfirmSpy).not.toHaveBeenCalled()
+    expect(inputClickSpy).not.toHaveBeenCalled()
+    expect(screen.getByRole('alertdialog', { name: /bekreft import/i })).toBeTruthy()
+    expect(
+      screen.getByText(
+        'Prosjektet du vil importere erstatter det du jobber på nå. Vil du fortsette?'
+      )
+    ).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Importer' })).toBeTruthy()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Importer' }))
+
+    expect(inputClickSpy).toHaveBeenCalledTimes(1)
+    await waitFor(() => {
+      expect(
+        screen.queryByText(
+          'Prosjektet du vil importere erstatter det du jobber på nå. Vil du fortsette?'
+        )
+      ).toBeNull()
+    })
+  })
+
   it('keeps Desktop Arcade Agent access available and Share URL absent', async () => {
     renderHeader()
 

@@ -1137,3 +1137,18 @@ Verification:
 - Browser smoke check at http://127.0.0.1:5177/aksel-arcade/ confirmed Export emits the strict clean v2 package shape, Import loads a clean `.akselarcade` package with fresh local project state, and the console is clear after reload.
 
 Next note: future package work should keep visible Export/Import UI minimal, keep clean packages limited to name/source/viewport, and update both unit/integration and e2e coverage if the package contract changes.
+
+### 2026-05-29 - Issue #111 follow-up: Import confirmation Dialog
+
+Implemented:
+
+- Replaced the native import `confirm()` prompt with an Aksel `Dialog` so the destructive import confirmation can use the requested Norwegian message and a custom `Importer` action label.
+- Added integration coverage that the Dialog appears, native `window.confirm` is not used, and the file picker is opened only from the `Importer` action.
+
+Verification:
+
+- npm run typecheck
+- CI=1 npm run test -- tests/integration/project-controls-layout.test.tsx
+- npm run lint (passes with the existing hook dependency warnings)
+- CI=1 npm run test
+- Browser smoke check at http://127.0.0.1:5178/aksel-arcade/ confirmed the Aksel Dialog text, `Avbryt` button, `Importer` button, and clear console.
