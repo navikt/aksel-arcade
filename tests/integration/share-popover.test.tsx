@@ -52,7 +52,7 @@ const Harness = ({
 }: HarnessProps) => {
   const {
     project,
-    setProject,
+    replaceProject,
     updateProject,
     resetToIntro,
     loadFormSummaryTemplate,
@@ -77,7 +77,7 @@ const Harness = ({
         projectName={project.name}
         onProjectNameChange={name => updateProject({ name })}
         currentProject={project}
-        onProjectImported={setProject}
+        onProjectImported={replaceProject}
         saveStatus="idle"
         projectSizeBytes={0}
         onResetToIntro={resetToIntro}

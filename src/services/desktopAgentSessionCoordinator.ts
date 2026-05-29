@@ -11,7 +11,12 @@ import { generateSecureUUID } from '@/utils/crypto'
 
 export type DesktopAgentSessionStatus = 'inactive' | 'active'
 
-export type DesktopAgentSessionEndReason = 'stop' | 'reload' | 'quit' | 'renderer-unmount'
+export type DesktopAgentSessionEndReason =
+  | 'stop'
+  | 'reload'
+  | 'quit'
+  | 'renderer-unmount'
+  | 'project-replaced'
 
 export interface DesktopAgentSessionSnapshot extends AgentBridgeSession {
   status: 'active'

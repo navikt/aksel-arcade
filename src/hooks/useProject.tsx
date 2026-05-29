@@ -33,6 +33,7 @@ import {
   type ShareDecodeError,
 } from '@/utils/shareDecoding'
 import { appendSandboxConsoleMessage } from '@/services/previewDiagnostics'
+import { notifyAgentSessionProjectReplaced } from '@/services/agentSessionLifecycle'
 
 interface ShareHydrationState {
   status: 'idle' | 'decoding' | 'ready' | 'error'
@@ -57,7 +58,7 @@ interface AppState {
 
   // Actions
   updateProject: (updates: Partial<Project>) => void
-  setProject: (project: Project) => void
+  replaceProject: (project: Project) => void
   updateEditorState: (updates: Partial<EditorState>) => void
   updatePreviewState: (updates: Partial<PreviewState>) => void
   recordSandboxConsoleMessage: (message: SandboxConsoleMessage) => void
@@ -167,7 +168,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     }))
   }
 
-  const setProject = (newProject: Project) => {
+  const replaceProject = (newProject: Project) => {
+    notifyAgentSessionProjectReplaced()
     setProjectState(newProject)
   }
 
@@ -226,6 +228,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     )
     if (confirmed) {
       const introProject = createDefaultProject()
+      notifyAgentSessionProjectReplaced()
       setProjectState({
         ...project,
         jsxCode: introProject.jsxCode,
@@ -243,6 +246,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     )
     if (confirmed) {
       // Clear any potential storage conflicts by updating project cleanly
+      notifyAgentSessionProjectReplaced()
       setProjectState({
         ...project,
         jsxCode: FORM_SUMMARY_JSX_CODE,
@@ -257,6 +261,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const loadHooksDemo = () => {
     const confirmed = window.confirm('Load Hooks demo? This will replace your current code.')
     if (confirmed) {
+      notifyAgentSessionProjectReplaced()
       setProjectState({
         ...project,
         jsxCode: HOOKS_DEMO_JSX_CODE,
@@ -277,6 +282,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
     try {
       const nextProject = buildProjectFromSnapshot(snapshot, project)
+      notifyAgentSessionProjectReplaced()
       setProjectState(nextProject)
 
       const nextEditorState = createDefaultEditorState()
@@ -310,7 +316,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     isComponentPaletteOpen,
     isSettingsOpen,
     updateProject,
-    setProject,
+    replaceProject,
     updateEditorState,
     updatePreviewState,
     recordSandboxConsoleMessage,

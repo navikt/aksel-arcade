@@ -147,15 +147,21 @@ describe('desktopAgentSessionCoordinator', () => {
     })
   })
 
-  it('uses cleanup reasons for reload and quit invalidation', async () => {
+  it('uses cleanup reasons for reload, project replacement, and quit invalidation', async () => {
     const { coordinator, stoppedSessions } = createDeterministicCoordinator()
 
     await coordinator.startSession()
     coordinator.stopSession('reload')
     await coordinator.startSession()
+    coordinator.stopSession('project-replaced')
+    await coordinator.startSession()
     coordinator.stopSession('quit')
 
-    expect(stoppedSessions.map(({ reason }) => reason)).toEqual(['reload', 'quit'])
+    expect(stoppedSessions.map(({ reason }) => reason)).toEqual([
+      'reload',
+      'project-replaced',
+      'quit',
+    ])
     expect(coordinator.getStatus()).toBe('inactive')
   })
 
@@ -237,6 +243,45 @@ describe('desktopAgentSessionCoordinator', () => {
         },
         reason: 'reload',
       },
+    ])
+  })
+
+  it('keeps the project-replaced reason when startup is cancelled by project replacement', async () => {
+    let resolveStart!: (endpoint: DesktopAgentTransportEndpoint) => void
+    const stoppedSessions: Array<{
+      session: DesktopAgentTransportSession
+      reason: DesktopAgentSessionEndReason
+    }> = []
+    const coordinator = createDesktopAgentSessionCoordinator({
+      createSessionId: () => 'agent-session-1',
+      createPairingCredential: () => 'credential-1',
+      createTimestamp: () => '2026-05-27T08:00:00.000Z',
+      transportAdapter: {
+        startSession: () =>
+          new Promise<DesktopAgentTransportEndpoint>((resolve) => {
+            resolveStart = resolve
+          }),
+        stopSession: (session, reason) => {
+          stoppedSessions.push({ session, reason })
+        },
+      },
+    })
+
+    const startPromise = coordinator.startSession()
+    expect(coordinator.getStatus()).toBe('active')
+
+    coordinator.stopSession('project-replaced')
+    resolveStart({
+      endpoint: 'http://127.0.0.1:48123',
+      sessionId: 'agent-session-1',
+      authorizationHeader: 'Bearer credential-1',
+    })
+
+    await expect(startPromise).rejects.toThrow(/startup was cancelled/)
+    expect(coordinator.getStatus()).toBe('inactive')
+    expect(stoppedSessions.map(({ reason }) => reason)).toEqual([
+      'project-replaced',
+      'project-replaced',
     ])
   })
 
