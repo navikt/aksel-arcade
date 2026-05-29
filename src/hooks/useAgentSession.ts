@@ -32,6 +32,7 @@ import { VIEWPORTS } from '@/types/viewports'
 import { validateProjectSize } from '@/services/storage'
 import { collectPreviewDiagnostics, type PreviewDiagnostics } from '@/services/previewDiagnostics'
 import type { PreviewEvidenceCaptureResult } from '@/services/previewEvidence'
+import { subscribeToAgentSessionProjectReplacement } from '@/services/agentSessionLifecycle'
 
 type AgentProjectUpdates = Partial<Pick<Project, 'name' | 'jsxCode' | 'hooksCode' | 'viewportSize'>>
 
@@ -210,6 +211,14 @@ export const useAgentSession = ({
       window.removeEventListener('beforeunload', cleanupForReload)
       cleanupAgentSession('renderer-unmount')
     }
+  }, [cleanupAgentSession])
+
+  useEffect(() => {
+    return subscribeToAgentSessionProjectReplacement(() => {
+      cleanupAgentSession('project-replaced')
+      setPermissions({ ...DEFAULT_AGENT_PERMISSIONS })
+      setSession(null)
+    })
   }, [cleanupAgentSession])
 
   useEffect(() => {

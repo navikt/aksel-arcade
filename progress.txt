@@ -992,3 +992,23 @@ Verification:
 - Browser smoke check at http://127.0.0.1:5173/aksel-arcade/ for app render and console output.
 
 Next note: #103 can now handle the command rename/versioning separately; avoid reintroducing Agent-specific recovery state when updating the bridge contract.
+
+### 2026-05-29 - Issue #102: Revoke Agent access on project replacement
+
+Selected #102 as the highest-priority `ready-for-agent` issue from #100, #102, and #103 because it is unblocked and closes the Desktop Agent consent boundary called out in ADR 0005. #103 remains blocked by #101, and #100 is separate Web/Desktop surface cleanup.
+
+Implemented:
+
+- Added a Desktop Agent project-replacement lifecycle signal so replacement actions revoke any active Agent session before the new Arcade project is exposed.
+- Routed import/open package, shared snapshot load, reset-to-intro, and built-in template/demo loads through replacement revocation with the internal `project-replaced` stop reason.
+- Kept normal edits, project renames, viewport/theme changes, panel layout changes, and agent-applied changes from stopping Agent access.
+- Added regression coverage for replacement revocation, stale bridge failures without stop-reason leakage, and non-replacement edits staying active.
+
+Verification:
+
+- npm run lint (passes with the existing hook dependency warnings)
+- npm run typecheck
+- CI=1 npm run test
+- Desktop-mode browser smoke check at http://127.0.0.1:5173/aksel-arcade/ confirmed reset revokes the Agent session with `project-replaced`, removes the bridge/transport handler, returns the UI to inactive, and leaves no console errors.
+
+Next note: keep future project replacement entry points wired through `replaceProject` or `notifyAgentSessionProjectReplaced()` before exposing replacement state; do not expose `project-replaced` over Agent protocol responses.

@@ -27,7 +27,7 @@ function App({ shellCapabilities = WEB_ARCADE_CAPABILITIES }: AppProps) {
   const {
     project,
     updateProject,
-    setProject,
+    replaceProject,
     resetToIntro,
     loadFormSummaryTemplate,
     loadHooksDemo,
@@ -66,7 +66,7 @@ function App({ shellCapabilities = WEB_ARCADE_CAPABILITIES }: AppProps) {
 
   // T092: Handle imported project
   const handleProjectImported = (importedProject: Project) => {
-    setProject(importedProject)
+    replaceProject(importedProject)
   }
 
   return (

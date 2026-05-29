@@ -4,6 +4,7 @@ import { AppProvider, useProject } from '@/hooks/useProject'
 import { SettingsProvider, useSettings } from '@/contexts/SettingsContext'
 import { AppHeader } from '@/components/Header/AppHeader'
 import { PreviewPane } from '@/components/Preview/PreviewPane'
+import { createDefaultProject } from '@/utils/projectDefaults'
 import {
   MAX_SANDBOX_CONSOLE_MESSAGES,
   type PreviewDiagnostics,
@@ -29,8 +30,11 @@ import {
   ARCADE_PROJECT_PACKAGE_EXTENSION,
   ARCADE_PROJECT_PACKAGE_FORMAT,
   ARCADE_PROJECT_PACKAGE_MIME_TYPE,
+  createArcadeProjectPackage,
+  createShareSnapshot,
   type ArcadeProjectPackage,
 } from '@/services/storage'
+import { createShareToken, encodeSharePayload } from '@/utils/shareEncoding'
 
 const noop = () => {}
 
@@ -45,11 +49,13 @@ const Harness = ({
 }: HarnessProps) => {
   const {
     project,
-    setProject,
+    replaceProject,
     updateProject,
     resetToIntro,
     loadFormSummaryTemplate,
     loadHooksDemo,
+    shareHydration,
+    applySharedSnapshot,
   } = useProject()
   const { setTheme } = useSettings()
 
@@ -59,7 +65,7 @@ const Harness = ({
         projectName={project.name}
         onProjectNameChange={(name) => updateProject({ name })}
         currentProject={project}
-        onProjectImported={setProject}
+        onProjectImported={replaceProject}
         saveStatus="idle"
         projectSizeBytes={0}
         onResetToIntro={resetToIntro}
@@ -82,6 +88,14 @@ const Harness = ({
       >
         Update Agent read fixture
       </button>
+      <div data-testid="project-jsx-code" hidden>
+        {project.jsxCode}
+      </div>
+      {shareHydration.status === 'ready' && (
+        <button type="button" onClick={applySharedSnapshot}>
+          Load shared project
+        </button>
+      )}
       {includePreview && <PreviewPane />}
     </>
   )
@@ -98,6 +112,7 @@ const renderHeader = (options?: HarnessProps) => {
 }
 
 const findAgentAccessButton = () => screen.findByRole('button', { name: /koble til agent/i })
+const queryAgentAccessToggle = () => screen.queryByRole('menuitemcheckbox', { name: /agent-tilgang/i })
 
 const collectObjectKeys = (value: unknown): string[] => {
   if (!value || typeof value !== 'object') {
@@ -178,6 +193,23 @@ const createProjectPackageFile = (text: string): File => {
   return file
 }
 
+const createProjectPackageFileForCode = (name: string, jsxCode: string): File => {
+  const project = createDefaultProject()
+  project.name = name
+  project.jsxCode = jsxCode
+
+  return createProjectPackageFile(
+    JSON.stringify(createArcadeProjectPackage(project, { includeAIMeta: false }))
+  )
+}
+
+const createShareTokenForCode = async (jsxCode: string): Promise<string> => {
+  const project = createDefaultProject()
+  project.jsxCode = jsxCode
+
+  return createShareToken(await encodeSharePayload(createShareSnapshot(project)))
+}
+
 const callBridgeCommand = <TResult,>(command: () => TResult): TResult => {
   let result: TResult | undefined
 
@@ -235,9 +267,31 @@ const captureAgentState = (bridge: AgentBridge) => {
   }
 }
 
+const expectProjectReplacementRevokedAgentAccess = async (
+  bridge: AgentBridge,
+  desktopTransport: ReturnType<typeof setupDesktopTransportPreload>,
+  stopCallIndex: number
+) => {
+  await waitFor(() =>
+    expect(desktopTransport.api.stopAgentTransportSession).toHaveBeenNthCalledWith(
+      stopCallIndex,
+      desktopTransport.endpoint.sessionId,
+      'project-replaced'
+    )
+  )
+  expect(window.__AKSEL_ARCADE_AGENT_BRIDGE__).toBeUndefined()
+  expectBridgeFailure(callBridgeCommand(() => bridge.getProject()), 'session-revoked')
+  const revokedPayload = JSON.stringify(callBridgeCommand(() => bridge.getSessionState()))
+  expect(revokedPayload).not.toContain('project-replaced')
+
+  await ensureAgentMenuOpen()
+  expect(screen.getByRole('status').textContent).toBe('Status: inaktiv')
+  expect(screen.queryByRole('alert')).toBeNull()
+  await closeAgentMenuIfOpen()
+}
+
 const startAgentAccess = async () => {
-  fireEvent.click(await findAgentAccessButton())
-  expect(await screen.findByText(/Koble til agent/i)).toBeTruthy()
+  await ensureAgentMenuOpen()
   fireEvent.click(screen.getByRole('menuitemcheckbox', { name: /agent-tilgang/i }))
 
   await waitFor(() => expect(window.__AKSEL_ARCADE_AGENT_BRIDGE__).toBeDefined())
@@ -247,6 +301,31 @@ const startAgentAccess = async () => {
   }
 
   return bridge
+}
+
+const selectSettingsMenuItem = async (name: RegExp) => {
+  fireEvent.click(screen.getByRole('button', { name: /settings/i }))
+  fireEvent.click(await screen.findByRole('menuitem', { name }))
+}
+
+const ensureAgentMenuOpen = async () => {
+  if (queryAgentAccessToggle()) {
+    return
+  }
+
+  const button = await findAgentAccessButton()
+  fireEvent.click(button)
+  if (!queryAgentAccessToggle()) {
+    fireEvent.click(button)
+  }
+
+  expect(await screen.findByRole('menuitemcheckbox', { name: /agent-tilgang/i })).toBeTruthy()
+}
+
+const closeAgentMenuIfOpen = async () => {
+  if (queryAgentAccessToggle()) {
+    fireEvent.click(await findAgentAccessButton())
+  }
 }
 
 const setupDesktopTransportPreload = (
@@ -426,6 +505,7 @@ describe('ProjectControls layout', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     window.localStorage.clear()
+    window.history.replaceState({}, '', '/')
     delete window.__AKSEL_ARCADE_AGENT_BRIDGE__
     delete window.__AKSEL_ARCADE_DESKTOP__
   })
@@ -600,6 +680,106 @@ describe('ProjectControls layout', () => {
       ).getAttribute('aria-checked')
     ).toBe('false')
     expect(screen.getByRole('status').textContent).toBe('Status: inaktiv')
+  })
+
+  it('revokes active Agent access before explicit project replacements are exposed', async () => {
+    const desktopTransport = setupDesktopTransportPreload()
+    vi.spyOn(window, 'confirm').mockReturnValue(true)
+    renderHeader()
+
+    let bridge = await startAgentAccess()
+    await selectSettingsMenuItem(/Reset editor/i)
+    await expectProjectReplacementRevokedAgentAccess(bridge, desktopTransport, 1)
+
+    bridge = await startAgentAccess()
+    await selectSettingsMenuItem(/Oppsummeringsside for søknadsdialoger/i)
+    await expectProjectReplacementRevokedAgentAccess(bridge, desktopTransport, 2)
+
+    bridge = await startAgentAccess()
+    await selectSettingsMenuItem(/Hooks demo/i)
+    await expectProjectReplacementRevokedAgentAccess(bridge, desktopTransport, 3)
+
+    bridge = await startAgentAccess()
+    fireEvent.change(screen.getByLabelText(/import project file/i), {
+      target: {
+        files: [
+          createProjectPackageFileForCode(
+            'Imported Replacement Project',
+            'export default function App() { return <Heading>Imported replacement</Heading> }'
+          ),
+        ],
+      },
+    })
+    await waitFor(() => expect(screen.getByText('Imported Replacement Project')).toBeTruthy())
+    await expectProjectReplacementRevokedAgentAccess(bridge, desktopTransport, 4)
+  })
+
+  it('revokes active Agent access when loading a shared project snapshot', async () => {
+    const desktopTransport = setupDesktopTransportPreload()
+    const token = await createShareTokenForCode(
+      'export default function App() { return <Heading>Shared replacement</Heading> }'
+    )
+    window.history.replaceState({}, '', `/?share=${encodeURIComponent(token)}`)
+    renderHeader()
+
+    const loadSharedProject = await screen.findByRole('button', { name: /load shared project/i })
+    const bridge = await startAgentAccess()
+
+    fireEvent.click(loadSharedProject)
+
+    await waitFor(() =>
+      expect(screen.getByTestId('project-jsx-code').textContent).toContain('Shared replacement')
+    )
+    await expectProjectReplacementRevokedAgentAccess(bridge, desktopTransport, 1)
+  })
+
+  it('keeps Agent access active for normal edits, preview changes, layout changes, and Agent changes', async () => {
+    const desktopTransport = setupDesktopTransportPreload()
+    renderHeader()
+
+    const bridge = await startAgentAccess()
+
+    fireEvent.click(screen.getByRole('button', { name: /update agent read fixture/i }))
+    await waitFor(() =>
+      expect(expectBridgeSuccess(callBridgeCommand(() => bridge.getProject())).name).toBe(
+        'Updated Agent Project'
+      )
+    )
+
+    await selectSettingsMenuItem(/Swap panel order/i)
+
+    const nextJsx =
+      'export default function App() { return <Heading>Agent change stays active</Heading> }'
+    expectBridgeSuccess(
+      callBridgeCommand(() =>
+        bridge.applySourceChange({
+          summary: 'Normal Agent-applied change',
+          jsxCode: nextJsx,
+          viewportSize: 'XS',
+          theme: 'light',
+          name: 'Agent Change Active Project',
+        })
+      )
+    )
+
+    await waitFor(() => {
+      expect(expectBridgeSuccess(callBridgeCommand(() => bridge.getProject()))).toMatchObject({
+        name: 'Agent Change Active Project',
+        jsxCode: nextJsx,
+      })
+      expect(expectBridgeSuccess(callBridgeCommand(() => bridge.getPreviewContext()))).toMatchObject(
+        {
+          theme: 'light',
+          viewportSize: 'XS',
+        }
+      )
+    })
+
+    expect(desktopTransport.api.stopAgentTransportSession).not.toHaveBeenCalled()
+    expect(window.__AKSEL_ARCADE_AGENT_BRIDGE__).toBeDefined()
+    await ensureAgentMenuOpen()
+    expect(screen.getByRole('status').textContent).toBe('Status: aktiv')
+    await closeAgentMenuIfOpen()
   })
 
   it('hides the Agent pairing handoff before Agent access is active', async () => {
