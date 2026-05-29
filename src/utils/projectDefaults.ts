@@ -1,7 +1,8 @@
-import type { Project } from '@/types/project'
+import type { Project, ViewportSize } from '@/types/project'
 import type { EditorState } from '@/types/editor'
 import type { PreviewState } from '@/types/preview'
 import { generateSecureUUID } from '@/utils/crypto'
+import { getViewportWidth } from '@/types/viewports'
 
 // Intro content that showcases features
 export const INTRO_JSX_CODE = `export default function App() {
@@ -496,7 +497,7 @@ export const createDefaultEditorState = (): EditorState => ({
   hooksErrors: [],
 })
 
-export const createDefaultPreviewState = (): PreviewState => ({
+export const createDefaultPreviewState = (viewportSize: ViewportSize = 'MD'): PreviewState => ({
   status: 'idle',
   transpiledCode: null,
   compileError: null,
@@ -504,8 +505,8 @@ export const createDefaultPreviewState = (): PreviewState => ({
   sandboxConsoleMessages: [],
   inspectEnabled: false,
   inspectedElement: null,
-  currentViewport: 'MD',
-  viewportWidth: 768,
+  currentViewport: viewportSize,
+  viewportWidth: getViewportWidth(viewportSize),
   lastRenderTime: Date.now(),
   renderDuration: 0,
 })

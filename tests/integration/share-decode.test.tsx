@@ -6,7 +6,7 @@ import userEvent from '@testing-library/user-event'
 import { AppProvider, useProject } from '@/hooks/useProject'
 import { SettingsProvider, useSettings } from '@/contexts/SettingsContext'
 import { createDefaultProject } from '@/utils/projectDefaults'
-import { createShareSnapshot, SNAPSHOT_FILE_IDS } from '@/services/storage'
+import { createShareSnapshot, saveProject, SNAPSHOT_FILE_IDS } from '@/services/storage'
 import {
   encodeSharePayload,
   createShareToken,
@@ -28,7 +28,7 @@ const Harness = () => {
     applySharedSnapshot,
     dismissShareHydration,
   } = useProject()
-  const { theme } = useSettings()
+  const { theme, panelOrder } = useSettings()
 
   return (
     <div>
@@ -45,6 +45,7 @@ const Harness = () => {
       <div data-testid="preview-current-viewport">{previewState.currentViewport}</div>
       <div data-testid="preview-viewport-width">{previewState.viewportWidth}</div>
       <div data-testid="settings-theme">{theme}</div>
+      <div data-testid="settings-panel-order">{panelOrder}</div>
       <div data-testid="share-status">{shareHydration.status}</div>
       <button onClick={() => updateEditorState({ activeTab: 'Hooks' })}>Set local Hooks tab</button>
       {shareHydration.status === 'ready' && (
@@ -80,7 +81,6 @@ const renderHarness = () => {
 }
 
 const fixturesDir = path.resolve(process.cwd(), 'tests/fixtures/share')
-const STORAGE_KEY = 'aksel-arcade:project'
 
 const loadCorruptedPackedFixture = async (): Promise<{
   corruptedPacked: string
@@ -101,6 +101,7 @@ describe('share decode integration', () => {
 
   beforeEach(() => {
     localStorage.clear()
+    sessionStorage.clear()
     window.history.replaceState({}, '', '/')
   })
 
@@ -122,6 +123,42 @@ describe('share decode integration', () => {
     expect(window.location.search).not.toContain('share=')
   })
 
+  it('restores a tab-scoped Web Arcade working copy across reload', async () => {
+    const workingCopyProject: Project = {
+      id: '11111111-1111-4111-8111-111111111111',
+      name: 'Reloaded working copy',
+      jsxCode: 'export default function App() { return <div>Reloaded JSX</div> }',
+      hooksCode: 'export function useReloadedHook() { return "Reloaded Hooks" }',
+      viewportSize: 'LG',
+      panelLayout: 'editor-right',
+      version: '1.0.0',
+      createdAt: '2024-01-01T00:00:00.000Z',
+      lastModified: '2024-01-02T00:00:00.000Z',
+    }
+    saveProject(workingCopyProject, {
+      preferences: {
+        theme: 'light',
+        panelOrder: 'preview-left',
+      },
+    })
+
+    renderHarness()
+
+    expect(screen.getByTestId('project-name').textContent).toBe('Reloaded working copy')
+    expect(screen.getByTestId('jsx-code').textContent).toContain('Reloaded JSX')
+    expect(screen.getByTestId('hooks-code').textContent).toContain('Reloaded Hooks')
+    expect(screen.getByTestId('project-viewport').textContent).toBe('LG')
+    expect(screen.getByTestId('project-panel-layout').textContent).toBe('editor-right')
+    expect(screen.getByTestId('preview-current-viewport').textContent).toBe('LG')
+    expect(screen.getByTestId('preview-viewport-width').textContent).toBe(
+      String(getViewportWidth('LG'))
+    )
+    await waitFor(() => {
+      expect(screen.getByTestId('settings-theme').textContent).toBe('light')
+      expect(screen.getByTestId('settings-panel-order').textContent).toBe('preview-left')
+    })
+  })
+
   it('loads v3 Web share URLs as fresh local projects from shared source and preview preferences', async () => {
     const previousProject: Project = {
       id: '11111111-1111-4111-8111-111111111111',
@@ -134,7 +171,7 @@ describe('share decode integration', () => {
       createdAt: '2024-01-01T00:00:00.000Z',
       lastModified: '2024-01-02T00:00:00.000Z',
     }
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(previousProject))
+    saveProject(previousProject)
 
     const senderProject = createDefaultProject()
     senderProject.name = 'Sender project name'
@@ -212,7 +249,7 @@ describe('share decode integration', () => {
       createdAt: '2024-01-01T00:00:00.000Z',
       lastModified: '2024-01-02T00:00:00.000Z',
     }
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(previousProject))
+    saveProject(previousProject)
 
     const senderProject = createDefaultProject()
     senderProject.name = 'Sender legacy project name'

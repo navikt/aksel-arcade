@@ -2,6 +2,7 @@ import { expect, test, type Page } from '@playwright/test'
 import fs from 'node:fs/promises'
 
 const STORAGE_KEY = 'aksel-arcade:project'
+const WORKING_COPY_FORMAT = 'aksel-arcade/web-working-copy'
 const NOW = '2026-05-25T00:00:00.000Z'
 const PACKAGE_FORMAT = 'aksel-arcade/project-package'
 const PACKAGE_FORMAT_VERSION = 2
@@ -88,10 +89,21 @@ test.describe('Aksel v8 migration regression hardening', () => {
     page,
   }) => {
     await page.addInitScript(
-      ({ key, project }) => {
-        localStorage.setItem(key, JSON.stringify(project))
+      ({ key, project, format }) => {
+        sessionStorage.setItem(
+          key,
+          JSON.stringify({
+            format,
+            formatVersion: 1,
+            project,
+            preferences: {
+              theme: 'dark',
+              panelOrder: 'code-left',
+            },
+          })
+        )
       },
-      { key: STORAGE_KEY, project: savedProject }
+      { key: STORAGE_KEY, project: savedProject, format: WORKING_COPY_FORMAT }
     )
 
     await page.goto('/')
@@ -136,6 +148,7 @@ test.describe('Aksel v8 migration regression hardening', () => {
         configurable: true,
       })
       localStorage.clear()
+      sessionStorage.clear()
     })
     page.on('dialog', (dialog) => dialog.accept())
 
@@ -229,7 +242,10 @@ test.describe('Aksel v8 migration regression hardening', () => {
   test('renders migration-sensitive aliases and built-in examples without imports', async ({
     page,
   }) => {
-    await page.addInitScript(() => localStorage.clear())
+    await page.addInitScript(() => {
+      localStorage.clear()
+      sessionStorage.clear()
+    })
     page.on('dialog', (dialog) => dialog.accept())
 
     await page.goto('/')

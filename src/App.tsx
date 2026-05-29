@@ -11,6 +11,7 @@ import { SplitPane } from './components/Layout/SplitPane'
 import { validateProjectSize, clearStorage } from './services/storage'
 import type { Project } from './types/project'
 import { WEB_ARCADE_CAPABILITIES, type ShellCapabilities } from './services/shellCapabilities'
+import { useSettings } from './contexts/SettingsContext'
 import './App.css'
 
 interface AppProps {
@@ -33,8 +34,10 @@ function App({ shellCapabilities = WEB_ARCADE_CAPABILITIES }: AppProps) {
     dismissShareHydration,
   } = context
 
+  const { theme, panelOrder } = useSettings()
+
   // T097: Auto-save integration
-  const { saveStatus, saveError } = useAutoSave(project)
+  const { saveStatus, saveError } = useAutoSave(project, { theme, panelOrder })
 
   // T094, T095, T096: Project size monitoring
   const [projectSizeBytes, setProjectSizeBytes] = useState(0)

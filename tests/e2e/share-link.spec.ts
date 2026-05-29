@@ -8,6 +8,7 @@ const SENDER_PROJECT_NAME = 'Sender identity should stay local'
 const SHARED_CODE = `export default function App() {
   return <div>${SHARED_PREVIEW_TEXT}</div>
 }`
+const WORKING_COPY_FORMAT = 'aksel-arcade/web-working-copy'
 const SHARE_CHAR_LIMIT = 4000
 const SHARE_WARNING_THRESHOLD = 3600
 const WARNING_FILLER_REPEAT = 9
@@ -30,32 +31,50 @@ const ensureArtifactDir = () => {
 
 test.describe('Share link flow', () => {
   test('hydrates a shared snapshot generated from the UI', async ({ page, browser }) => {
-    await page.addInitScript(({ sharedCode, senderProjectName }) => {
-      window.__COPIED_SHARE_URL__ = ''
-      Object.defineProperty(navigator, 'clipboard', {
-        value: {
-          writeText: (text: string) => {
-            window.__COPIED_SHARE_URL__ = text
-            return Promise.resolve()
+    await page.addInitScript(
+      ({ sharedCode, senderProjectName, format }) => {
+        window.__COPIED_SHARE_URL__ = ''
+        Object.defineProperty(navigator, 'clipboard', {
+          value: {
+            writeText: (text: string) => {
+              window.__COPIED_SHARE_URL__ = text
+              return Promise.resolve()
+            },
           },
-        },
-        configurable: true,
-      })
+          configurable: true,
+        })
 
-      const now = new Date().toISOString()
-      const project = {
-        version: '1.0.0',
-        id: self.crypto?.randomUUID ? self.crypto.randomUUID() : `share-${Math.random()}`,
-        name: senderProjectName,
-        jsxCode: sharedCode,
-        hooksCode: '',
-        viewportSize: 'MD',
-        panelLayout: 'editor-left',
-        createdAt: now,
-        lastModified: now,
+        const now = new Date().toISOString()
+        const project = {
+          version: '1.0.0',
+          id: self.crypto?.randomUUID ? self.crypto.randomUUID() : `share-${Math.random()}`,
+          name: senderProjectName,
+          jsxCode: sharedCode,
+          hooksCode: '',
+          viewportSize: 'MD',
+          panelLayout: 'editor-left',
+          createdAt: now,
+          lastModified: now,
+        }
+        sessionStorage.setItem(
+          'aksel-arcade:project',
+          JSON.stringify({
+            format,
+            formatVersion: 1,
+            project,
+            preferences: {
+              theme: 'dark',
+              panelOrder: 'code-left',
+            },
+          })
+        )
+      },
+      {
+        sharedCode: SHARED_CODE,
+        senderProjectName: SENDER_PROJECT_NAME,
+        format: WORKING_COPY_FORMAT,
       }
-      localStorage.setItem('aksel-arcade:project', JSON.stringify(project))
-    }, { sharedCode: SHARED_CODE, senderProjectName: SENDER_PROJECT_NAME })
+    )
 
     await page.goto('/')
 

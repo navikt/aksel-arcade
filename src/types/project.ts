@@ -1,6 +1,8 @@
 // Per Figma design (node 36:981) and Aksel breakpoints
 export type ViewportSize = '2XL' | 'XL' | 'LG' | 'MD' | 'SM' | 'XS'
 export type PanelLayout = 'editor-left' | 'editor-right'
+export type ThemeMode = 'light' | 'dark'
+export type PanelOrder = 'code-left' | 'preview-left'
 
 export interface Project {
   // Identity

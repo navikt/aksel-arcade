@@ -5,19 +5,23 @@ import type {
   ProjectSettingsSnapshot,
   ProjectSizeStatus,
   ProjectSnapshot,
+  PanelOrder,
+  ThemeMode,
 } from '@/types/project'
 import { createDefaultProject } from '@/utils/projectDefaults'
 import { generateSecureUUID } from '@/utils/crypto'
 
-const STORAGE_KEY = 'aksel-arcade:project'
+export const WEB_ARCADE_WORKING_COPY_STORAGE_KEY = 'aksel-arcade:project'
+const STORAGE_KEY = WEB_ARCADE_WORKING_COPY_STORAGE_KEY
+const WEB_ARCADE_WORKING_COPY_FORMAT = 'aksel-arcade/web-working-copy' as const
+const WEB_ARCADE_WORKING_COPY_FORMAT_VERSION = 1
 const MAX_PROJECT_SIZE_BYTES = 5 * 1024 * 1024 // 5MB
 const WARN_PROJECT_SIZE_BYTES = 4 * 1024 * 1024 // 4MB
 const CURRENT_VERSION = '1.0.0'
 export const ARCADE_PROJECT_PACKAGE_FORMAT = 'aksel-arcade/project-package' as const
 export const ARCADE_PROJECT_PACKAGE_FORMAT_VERSION = 2
 export const ARCADE_PROJECT_PACKAGE_EXTENSION = '.akselarcade' as const
-const CLEAN_PACKAGE_REJECTION_MESSAGE =
-  'Package is not a clean .akselarcade Arcade project package'
+const CLEAN_PACKAGE_REJECTION_MESSAGE = 'Package is not a clean .akselarcade Arcade project package'
 export const ARCADE_PROJECT_PACKAGE_MIME_TYPE =
   'application/vnd.nav.aksel-arcade.project-package+json'
 export const ARCADE_PROJECT_IMPORT_ACCEPT = [
@@ -32,8 +36,25 @@ export interface SaveResult {
   error?: string
 }
 
+export interface WebArcadeWorkingCopyPreferences {
+  theme: ThemeMode
+  panelOrder: PanelOrder
+}
+
+export interface SaveProjectOptions {
+  preferences?: WebArcadeWorkingCopyPreferences
+}
+
+interface WebArcadeWorkingCopyEnvelope {
+  format: typeof WEB_ARCADE_WORKING_COPY_FORMAT
+  formatVersion: typeof WEB_ARCADE_WORKING_COPY_FORMAT_VERSION
+  project: Project
+  preferences: WebArcadeWorkingCopyPreferences
+}
+
 export interface LoadResult {
   project: Project | null
+  preferences: WebArcadeWorkingCopyPreferences
   fromStorage: boolean
   migrated: boolean
   error?: string
@@ -71,6 +92,11 @@ export interface ShareSnapshotOverrides {
   settings?: Partial<ProjectSettingsSnapshot>
 }
 
+export const DEFAULT_WEB_ARCADE_WORKING_COPY_PREFERENCES: WebArcadeWorkingCopyPreferences = {
+  theme: 'dark',
+  panelOrder: 'code-left',
+}
+
 export const SNAPSHOT_FILE_IDS = {
   jsx: 'file-jsx',
   hooks: 'file-hooks',
@@ -99,7 +125,7 @@ export const validateProjectSize = (project: Project): ProjectSizeStatus => {
   return { valid: true, sizeBytes }
 }
 
-export const saveProject = (project: Project): SaveResult => {
+export const saveProject = (project: Project, options?: SaveProjectOptions): SaveResult => {
   // Update timestamp
   const projectToSave = {
     ...project,
@@ -117,8 +143,27 @@ export const saveProject = (project: Project): SaveResult => {
     }
   }
 
+  let preferences: WebArcadeWorkingCopyPreferences
+  try {
+    preferences = validateWorkingCopyPreferences(
+      options?.preferences ?? DEFAULT_WEB_ARCADE_WORKING_COPY_PREFERENCES
+    )
+  } catch (error) {
+    return {
+      success: false,
+      sizeBytes: 0,
+      error: `Validation error: ${error instanceof Error ? error.message : String(error)}`,
+    }
+  }
+
   // Serialize and measure size
-  const json = JSON.stringify(projectToSave)
+  const workingCopy: WebArcadeWorkingCopyEnvelope = {
+    format: WEB_ARCADE_WORKING_COPY_FORMAT,
+    formatVersion: WEB_ARCADE_WORKING_COPY_FORMAT_VERSION,
+    project: projectToSave,
+    preferences,
+  }
+  const json = JSON.stringify(workingCopy)
   const sizeBytes = new Blob([json]).size
 
   // Check size limits
@@ -130,9 +175,9 @@ export const saveProject = (project: Project): SaveResult => {
     }
   }
 
-  // Save to LocalStorage
+  // Save to tab-scoped sessionStorage so each Web Arcade tab owns its working copy.
   try {
-    localStorage.setItem(STORAGE_KEY, json)
+    sessionStorage.setItem(STORAGE_KEY, json)
   } catch (error) {
     return {
       success: false,
@@ -153,12 +198,13 @@ export const saveProject = (project: Project): SaveResult => {
 
 export const loadProject = (): LoadResult => {
   try {
-    const json = localStorage.getItem(STORAGE_KEY)
+    const json = sessionStorage.getItem(STORAGE_KEY)
 
-    // No saved project
+    // No tab-scoped working copy
     if (!json) {
       return {
         project: createDefaultProject(),
+        preferences: DEFAULT_WEB_ARCADE_WORKING_COPY_PREFERENCES,
         fromStorage: false,
         migrated: false,
       }
@@ -171,6 +217,7 @@ export const loadProject = (): LoadResult => {
     } catch {
       return {
         project: null,
+        preferences: DEFAULT_WEB_ARCADE_WORKING_COPY_PREFERENCES,
         fromStorage: true,
         migrated: false,
         error: 'Failed to parse stored project JSON',
@@ -179,27 +226,22 @@ export const loadProject = (): LoadResult => {
 
     // Migrate if necessary
     let project: Project
+    let preferences: WebArcadeWorkingCopyPreferences
     let migrated = false
 
-    if (
-      stored &&
-      typeof stored === 'object' &&
-      'version' in stored &&
-      stored.version !== CURRENT_VERSION
-    ) {
-      try {
-        project = migrateProject(stored)
-        migrated = true
-      } catch (error) {
-        return {
-          project: null,
-          fromStorage: true,
-          migrated: false,
-          error: `Migration failed: ${error instanceof Error ? error.message : String(error)}`,
-        }
+    try {
+      const restoredWorkingCopy = restoreStoredWorkingCopy(stored)
+      project = restoredWorkingCopy.project
+      preferences = restoredWorkingCopy.preferences
+      migrated = restoredWorkingCopy.migrated
+    } catch (error) {
+      return {
+        project: null,
+        preferences: DEFAULT_WEB_ARCADE_WORKING_COPY_PREFERENCES,
+        fromStorage: true,
+        migrated: false,
+        error: `Migration failed: ${error instanceof Error ? error.message : String(error)}`,
       }
-    } else {
-      project = stored as Project
     }
 
     // Validate
@@ -208,6 +250,7 @@ export const loadProject = (): LoadResult => {
     } catch (error) {
       return {
         project: null,
+        preferences: DEFAULT_WEB_ARCADE_WORKING_COPY_PREFERENCES,
         fromStorage: true,
         migrated,
         error: `Validation failed: ${error instanceof Error ? error.message : String(error)}`,
@@ -216,12 +259,14 @@ export const loadProject = (): LoadResult => {
 
     return {
       project,
+      preferences,
       fromStorage: true,
       migrated,
     }
   } catch (error) {
     return {
       project: null,
+      preferences: DEFAULT_WEB_ARCADE_WORKING_COPY_PREFERENCES,
       fromStorage: false,
       migrated: false,
       error: `Unexpected error: ${error instanceof Error ? error.message : String(error)}`,
@@ -448,7 +493,7 @@ const copyProjectFields = (project: Project): Project => ({
 })
 
 export const clearStorage = (): void => {
-  localStorage.removeItem(STORAGE_KEY)
+  sessionStorage.removeItem(STORAGE_KEY)
 }
 
 export const createShareSnapshot = (
@@ -506,6 +551,92 @@ const buildDefaultSnapshotFiles = (project: Project): ProjectFileSnapshot[] => {
     },
   ]
 }
+
+const restoreStoredWorkingCopy = (
+  stored: unknown
+): {
+  project: Project
+  preferences: WebArcadeWorkingCopyPreferences
+  migrated: boolean
+} => {
+  if (isWebArcadeWorkingCopyEnvelope(stored)) {
+    const restoredProject = restoreStoredProject(stored.project)
+    return {
+      ...restoredProject,
+      preferences: validateWorkingCopyPreferences(stored.preferences),
+    }
+  }
+
+  return {
+    ...restoreStoredProject(stored),
+    preferences: DEFAULT_WEB_ARCADE_WORKING_COPY_PREFERENCES,
+  }
+}
+
+const restoreStoredProject = (storedProject: unknown): { project: Project; migrated: boolean } => {
+  if (
+    storedProject &&
+    typeof storedProject === 'object' &&
+    'version' in storedProject &&
+    storedProject.version !== CURRENT_VERSION
+  ) {
+    return {
+      project: migrateProject(storedProject),
+      migrated: true,
+    }
+  }
+
+  return {
+    project: storedProject as Project,
+    migrated: false,
+  }
+}
+
+const isWebArcadeWorkingCopyEnvelope = (
+  stored: unknown
+): stored is WebArcadeWorkingCopyEnvelope => {
+  if (!isRecord(stored) || stored.format !== WEB_ARCADE_WORKING_COPY_FORMAT) {
+    return false
+  }
+
+  if (stored.formatVersion !== WEB_ARCADE_WORKING_COPY_FORMAT_VERSION) {
+    throw new Error(`Unsupported Web Arcade working copy version "${String(stored.formatVersion)}"`)
+  }
+
+  if (!('project' in stored)) {
+    throw new Error('Web Arcade working copy is missing project data')
+  }
+
+  if (!('preferences' in stored)) {
+    throw new Error('Web Arcade working copy is missing preferences')
+  }
+
+  return true
+}
+
+const validateWorkingCopyPreferences = (preferences: unknown): WebArcadeWorkingCopyPreferences => {
+  if (!isRecord(preferences)) {
+    throw new Error('Web Arcade working copy preferences must be an object')
+  }
+
+  if (!isThemeMode(preferences.theme)) {
+    throw new Error('Invalid Web Arcade working copy theme')
+  }
+
+  if (!isPanelOrder(preferences.panelOrder)) {
+    throw new Error('Invalid Web Arcade working copy panel order')
+  }
+
+  return {
+    theme: preferences.theme,
+    panelOrder: preferences.panelOrder,
+  }
+}
+
+const isThemeMode = (value: unknown): value is ThemeMode => value === 'light' || value === 'dark'
+
+const isPanelOrder = (value: unknown): value is PanelOrder =>
+  value === 'code-left' || value === 'preview-left'
 
 const validateProjectSchema: (project: unknown) => asserts project is Project = (project) => {
   if (!project || typeof project !== 'object') {

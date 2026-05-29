@@ -4,6 +4,7 @@ import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import App from '@/App'
 import { AppContext } from '@/hooks/useProject'
+import { SettingsProvider } from '@/contexts/SettingsContext'
 import { createShareSnapshot } from '@/services/storage'
 import {
   createDefaultEditorState,
@@ -50,33 +51,35 @@ describe('App share-load warning', () => {
     const dismissShareHydration = vi.fn()
 
     render(
-      <AppContext.Provider
-        value={{
-          project,
-          editorState: createDefaultEditorState(),
-          previewState: createDefaultPreviewState(),
-          previewIframeRef: { current: null },
-          isComponentPaletteOpen: false,
-          isSettingsOpen: false,
-          updateProject: vi.fn(),
-          replaceProject: vi.fn(),
-          updateEditorState: vi.fn(),
-          updatePreviewState: vi.fn(),
-          recordSandboxConsoleMessage: vi.fn(),
-          toggleComponentPalette: vi.fn(),
-          closeComponentPalette: vi.fn(),
-          toggleSettings: vi.fn(),
-          insertSnippet: vi.fn(),
-          resetToIntro: vi.fn(),
-          loadFormSummaryTemplate: vi.fn(),
-          loadHooksDemo: vi.fn(),
-          shareHydration: { status: 'ready', snapshot },
-          applySharedSnapshot,
-          dismissShareHydration,
-        }}
-      >
-        <App />
-      </AppContext.Provider>
+      <SettingsProvider>
+        <AppContext.Provider
+          value={{
+            project,
+            editorState: createDefaultEditorState(),
+            previewState: createDefaultPreviewState(),
+            previewIframeRef: { current: null },
+            isComponentPaletteOpen: false,
+            isSettingsOpen: false,
+            updateProject: vi.fn(),
+            replaceProject: vi.fn(),
+            updateEditorState: vi.fn(),
+            updatePreviewState: vi.fn(),
+            recordSandboxConsoleMessage: vi.fn(),
+            toggleComponentPalette: vi.fn(),
+            closeComponentPalette: vi.fn(),
+            toggleSettings: vi.fn(),
+            insertSnippet: vi.fn(),
+            resetToIntro: vi.fn(),
+            loadFormSummaryTemplate: vi.fn(),
+            loadHooksDemo: vi.fn(),
+            shareHydration: { status: 'ready', snapshot },
+            applySharedSnapshot,
+            dismissShareHydration,
+          }}
+        >
+          <App />
+        </AppContext.Provider>
+      </SettingsProvider>
     )
 
     expect(screen.getByText('Load shared project?')).toBeTruthy()

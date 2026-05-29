@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, type ReactNode } from 'react'
+import type { PanelOrder, ThemeMode } from '@/types/project'
 
-export type ThemeMode = 'light' | 'dark'
-export type PanelOrder = 'code-left' | 'preview-left'
+export type { PanelOrder, ThemeMode }
 
 interface SettingsContextValue {
   theme: ThemeMode
@@ -9,6 +9,7 @@ interface SettingsContextValue {
   toggleTheme: () => void
   togglePanelOrder: () => void
   setTheme: (nextTheme: ThemeMode) => void
+  setPanelOrder: (nextPanelOrder: PanelOrder) => void
 }
 
 const SettingsContext = createContext<SettingsContextValue | null>(null)
@@ -22,19 +23,32 @@ export const SettingsProvider = ({ children }: SettingsProviderProps) => {
   const [panelOrder, setPanelOrder] = useState<PanelOrder>('code-left')
 
   const toggleTheme = () => {
-    setThemeState(prev => (prev === 'dark' ? 'light' : 'dark'))
+    setThemeState((prev) => (prev === 'dark' ? 'light' : 'dark'))
   }
 
   const togglePanelOrder = () => {
-    setPanelOrder(prev => prev === 'code-left' ? 'preview-left' : 'code-left')
+    setPanelOrder((prev) => (prev === 'code-left' ? 'preview-left' : 'code-left'))
   }
 
   const setTheme = (nextTheme: ThemeMode) => {
     setThemeState(nextTheme)
   }
 
+  const setPanelOrderValue = (nextPanelOrder: PanelOrder) => {
+    setPanelOrder(nextPanelOrder)
+  }
+
   return (
-    <SettingsContext.Provider value={{ theme, panelOrder, toggleTheme, togglePanelOrder, setTheme }}>
+    <SettingsContext.Provider
+      value={{
+        theme,
+        panelOrder,
+        toggleTheme,
+        togglePanelOrder,
+        setTheme,
+        setPanelOrder: setPanelOrderValue,
+      }}
+    >
       {children}
     </SettingsContext.Provider>
   )
