@@ -1084,3 +1084,15 @@ Verification:
 - Browser smoke check at http://127.0.0.1:5174/aksel-arcade/ confirmed the app renders, the Export button produces the clean v2 package shape, and the console is clear after reload.
 
 Next note: #110 should replace the current permissive import path with strict clean-package validation, reject v1/noisy/legacy JSON packages and unknown extras, and keep imported workspace preferences sourced from the importing surface defaults.
+
+### 2026-05-29 - PR #113 review follow-up
+
+Addressed one scoped review finding before merge:
+
+- Added explicit regression coverage for importing legacy `formatVersion: 1` Arcade project packages while #109 keeps the v1 reader as a compatibility bridge until #110 tightens import validation.
+
+Verification:
+
+- npm run typecheck
+- npm run lint (passes with the existing hook dependency warnings)
+- CI=1 npm run test

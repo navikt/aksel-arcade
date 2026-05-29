@@ -573,6 +573,47 @@ describe('Storage Service', () => {
       )
     })
 
+    it('should keep importing legacy v1 Arcade project packages', async () => {
+      const sourceProject = createTestProject({
+        name: 'Legacy Package Import Test',
+        jsxCode: '<Box>Legacy package</Box>',
+        hooksCode: 'export const useLegacyPackage = () => "ok"',
+        viewportSize: 'SM',
+        panelLayout: 'editor-right',
+        createdAt: '2026-05-18T00:00:00.000Z',
+        lastModified: '2026-05-19T00:00:00.000Z',
+      })
+      const legacyPackage = {
+        format: ARCADE_PROJECT_PACKAGE_FORMAT,
+        formatVersion: 1,
+        exportedAt: '2026-05-20T00:00:00.000Z',
+        project: createLegacyPortableProject(sourceProject),
+        meta: { aiInstructions: 'legacy-package-ai-secret' },
+      }
+
+      const file = createMockFile(
+        JSON.stringify(legacyPackage),
+        'legacy-package.akselarcade',
+        ARCADE_PROJECT_PACKAGE_MIME_TYPE
+      )
+
+      const result = await importProject(file)
+
+      expect(result.success).toBe(true)
+      expect(result.error).toBeUndefined()
+      expect(result.project).toMatchObject({
+        name: 'Legacy Package Import Test',
+        jsxCode: '<Box>Legacy package</Box>',
+        hooksCode: 'export const useLegacyPackage = () => "ok"',
+        viewportSize: 'SM',
+        panelLayout: 'editor-right',
+        version: '1.0.0',
+        createdAt: '2026-05-18T00:00:00.000Z',
+      })
+      expect(result.project!.id).not.toBe(sourceProject.id)
+      expect(JSON.stringify(result.project)).not.toContain('legacy-package-ai-secret')
+    })
+
     it('should keep importing pre-package nested JSON exports', async () => {
       const sourceProject = createTestProject({
         name: 'Nested JSON Import Test',
