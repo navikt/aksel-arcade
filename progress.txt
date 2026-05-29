@@ -1285,3 +1285,10 @@ Verification:
 - Browser smoke check at http://127.0.0.1:5173/aksel-arcade/ confirmed sessionStorage reload restore, ordinary new-tab default behavior, and no runtime console errors.
 
 Next note: #129 can now scope explicit replacement flows (Web share URL, import, Reset editor) to the current Web Arcade working copy. Keep #130's UI copy cleanup separate; the Clear storage & reload affordance still exists pending that issue.
+
+### 2026-05-30 - PR #133 review follow-up
+
+Fixed one scoped ADR 0008 issue before merge:
+
+- Removed normal autosave `saving`/`saved`/idle status from the Web UI, leaving only an autosave failure indicator because save failure means same-tab reload safety is broken.
+- Added focused component coverage so normal autosave statuses render nothing while failure status remains visible.
