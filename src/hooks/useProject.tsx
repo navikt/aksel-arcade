@@ -89,9 +89,14 @@ export const useProject = () => {
 }
 
 export const AppProvider = ({ children }: { children: ReactNode }) => {
-  // T098: Load project from LocalStorage on initialization
+  const initialLoadResultRef = useRef<ReturnType<typeof loadProject> | null>(null)
+  if (!initialLoadResultRef.current) {
+    initialLoadResultRef.current = loadProject()
+  }
+
+  // T098: Load project from the current Web Arcade working copy on initialization
   const [project, setProjectState] = useState<Project>(() => {
-    const result = loadProject()
+    const result = initialLoadResultRef.current!
     if (result.error) {
       console.error('Failed to load project:', result.error)
       return createDefaultProject()
@@ -100,15 +105,31 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   })
 
   const [editorState, setEditorState] = useState<EditorState>(createDefaultEditorState())
-  const [previewState, setPreviewState] = useState<PreviewState>(createDefaultPreviewState())
+  const [previewState, setPreviewState] = useState<PreviewState>(() =>
+    createDefaultPreviewState(initialLoadResultRef.current?.project?.viewportSize)
+  )
   const previewIframeRef = useRef<HTMLIFrameElement | null>(null)
   const [isComponentPaletteOpen, setIsComponentPaletteOpen] = useState(false)
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
-  const { setTheme } = useSettings()
+  const { setTheme, setPanelOrder } = useSettings()
+  const restoredPreferencesRef = useRef(false)
   const [shareHydration, setShareHydration] = useState<ShareHydrationState>(() => {
     const token = getShareTokenFromLocation()
     return token ? { status: 'decoding', token } : { status: 'idle' }
   })
+
+  useEffect(() => {
+    if (restoredPreferencesRef.current) {
+      return
+    }
+
+    restoredPreferencesRef.current = true
+    const preferences = initialLoadResultRef.current?.preferences
+    if (preferences) {
+      setTheme(preferences.theme)
+      setPanelOrder(preferences.panelOrder)
+    }
+  }, [setPanelOrder, setTheme])
 
   useEffect(() => {
     if (shareHydration.status !== 'decoding' || !shareHydration.token) {

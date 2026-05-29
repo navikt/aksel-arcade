@@ -45,9 +45,9 @@ One of Aksel Arcade's most powerful features! Enable inspect mode to:
 
 ### 💾 Project Management
 - **Export/Import projects**: Save your work as JSON files and share with teammates
-- **Auto-save**: Your project persists in localStorage automatically
+- **Auto-save**: Your current Web Arcade working copy persists in tab-scoped storage for reload safety
 - **Edit project names**: Keep your prototypes organized
-- **Session recovery**: Return to your last project when you reopen the app
+- **Tab reload recovery**: Reload the same tab to restore its working copy; use Share or Export to keep work after closing it
 
 ### 🔗 Share Projects Instantly
 - **Header Share button**: Click the Link icon between Import and Settings to open the share popover without leaving your flow.
@@ -203,7 +203,7 @@ Aksel Arcade's shared renderer runs client-side:
 - **No backend**: Everything runs client-side
 - **Safe execution**: User code runs in isolated iframe
 - **Offline-capable**: All dependencies bundled at build time
-- **localStorage persistence**: Auto-save without servers
+- **Tab-scoped persistence**: Web Arcade working copies survive same-tab reloads without servers
 - **Explicit shells**: Web Arcade keeps browser sharing and no Agent access; Desktop Arcade adds Agent access only through the narrow desktop transport.
 
 ## 🧰 Troubleshooting

@@ -1,9 +1,9 @@
 /**
- * Mock localStorage for testing
- * Provides a clean in-memory implementation that mimics browser localStorage
+ * Mock browser Storage for testing.
+ * Provides a clean in-memory implementation that mimics localStorage/sessionStorage.
  */
 
-export class MockLocalStorage implements Storage {
+export class MockBrowserStorage implements Storage {
   private store: Map<string, string> = new Map()
 
   get length(): number {
@@ -32,8 +32,9 @@ export class MockLocalStorage implements Storage {
     const totalSize = Array.from(this.store.values())
       .concat(value)
       .reduce((sum, val) => sum + val.length, 0)
-    
-    if (totalSize > 10 * 1024 * 1024) { // 10MB simulated limit
+
+    if (totalSize > 10 * 1024 * 1024) {
+      // 10MB simulated limit
       throw new DOMException('QuotaExceededError', 'QuotaExceededError')
     }
 
@@ -46,12 +47,33 @@ export class MockLocalStorage implements Storage {
   }
 }
 
+export class MockLocalStorage extends MockBrowserStorage {}
+
+export class MockSessionStorage extends MockBrowserStorage {}
+
 /**
  * Setup localStorage mock for tests
  */
 export const setupLocalStorageMock = (): MockLocalStorage => {
   const mockStorage = new MockLocalStorage()
-  global.localStorage = mockStorage as unknown as Storage
+  Object.defineProperty(globalThis, 'localStorage', {
+    value: mockStorage,
+    configurable: true,
+    writable: true,
+  })
+  return mockStorage
+}
+
+/**
+ * Setup sessionStorage mock for tests
+ */
+export const setupSessionStorageMock = (): MockSessionStorage => {
+  const mockStorage = new MockSessionStorage()
+  Object.defineProperty(globalThis, 'sessionStorage', {
+    value: mockStorage,
+    configurable: true,
+    writable: true,
+  })
   return mockStorage
 }
 
@@ -59,7 +81,16 @@ export const setupLocalStorageMock = (): MockLocalStorage => {
  * Reset localStorage mock between tests
  */
 export const resetLocalStorageMock = (): void => {
-  if (global.localStorage) {
-    global.localStorage.clear()
+  if (globalThis.localStorage) {
+    globalThis.localStorage.clear()
+  }
+}
+
+/**
+ * Reset sessionStorage mock between tests
+ */
+export const resetSessionStorageMock = (): void => {
+  if (globalThis.sessionStorage) {
+    globalThis.sessionStorage.clear()
   }
 }

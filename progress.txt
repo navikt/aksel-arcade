@@ -1264,3 +1264,24 @@ Verification:
 - npm run test:e2e -- share-link.spec.ts -g "hydrates a shared snapshot"
 
 Next note: the full `share-link.spec.ts` Playwright file still has an older large-template scenario that can enter the share-generation error state locally; this change only adds the v3/fresh-project assertions to the hydrate path and does not modify that size-limit scenario.
+
+### 2026-05-30 - Issue #128: Persist Web Arcade working copies per tab
+
+Implemented:
+
+- Selected #128 as the highest-priority ready-for-agent issue from #128-#131 because #129, #130, and #131 are explicitly blocked by the tab-scoped working-copy model.
+- Moved Web Arcade autosave/load/reset persistence from the legacy browser-wide `localStorage` last-project key to tab-scoped `sessionStorage` under a versioned Web Arcade working-copy envelope.
+- Stored the full current working-copy surface needed for reload/duplicate semantics: project name, Arcade project source, viewport Preview preference, theme Preview preference, and panel-order Workspace preference.
+- Kept legacy `localStorage` project data ignored rather than migrated, so ordinary new Web Arcade URLs start from the default Untitled Project while same-tab reloads restore the tab working copy.
+- Added storage and integration coverage for tab reload restore, legacy browser-wide data ignoring, sessionStorage duplicate-tab fork modeling, and independent divergence after a copied working copy is edited.
+- Updated browser/E2E setup and README wording to reflect tab-scoped reload safety instead of a durable browser-wide project library.
+
+Verification:
+
+- npm install
+- npm run typecheck
+- npm run lint (passes with existing hook dependency warnings in `InspectionPopover` and `PreviewPane`)
+- CI=1 npm run test
+- Browser smoke check at http://127.0.0.1:5173/aksel-arcade/ confirmed sessionStorage reload restore, ordinary new-tab default behavior, and no runtime console errors.
+
+Next note: #129 can now scope explicit replacement flows (Web share URL, import, Reset editor) to the current Web Arcade working copy. Keep #130's UI copy cleanup separate; the Clear storage & reload affordance still exists pending that issue.

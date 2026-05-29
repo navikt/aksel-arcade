@@ -12,9 +12,18 @@ import {
   ARCADE_PROJECT_PACKAGE_FORMAT,
   ARCADE_PROJECT_PACKAGE_FORMAT_VERSION,
   ARCADE_PROJECT_PACKAGE_MIME_TYPE,
+  DEFAULT_WEB_ARCADE_WORKING_COPY_PREFERENCES,
+  WEB_ARCADE_WORKING_COPY_STORAGE_KEY,
+  type WebArcadeWorkingCopyPreferences,
 } from '@/services/storage'
 import type { Project } from '@/types/project'
-import { setupLocalStorageMock, resetLocalStorageMock } from '../../helpers/mockLocalStorage'
+import {
+  setupLocalStorageMock,
+  setupSessionStorageMock,
+  resetLocalStorageMock,
+  resetSessionStorageMock,
+  type MockSessionStorage,
+} from '../../helpers/mockLocalStorage'
 
 const createTestProject = (overrides: Partial<Project> = {}): Project => ({
   id: crypto.randomUUID(),
@@ -63,11 +72,13 @@ const collectObjectKeys = (value: unknown): string[] => {
 describe('Storage Service', () => {
   beforeEach(() => {
     setupLocalStorageMock()
+    setupSessionStorageMock()
     resetLocalStorageMock()
+    resetSessionStorageMock()
   })
 
   describe('saveProject', () => {
-    it('should save valid project to localStorage', () => {
+    it('should save valid project to tab-scoped sessionStorage', () => {
       const project: Project = {
         id: crypto.randomUUID(),
         name: 'Test Project',
@@ -86,11 +97,14 @@ describe('Storage Service', () => {
       expect(result.sizeBytes).toBeGreaterThan(0)
       expect(result.error).toBeUndefined()
 
-      // Verify it's actually in localStorage
-      const stored = localStorage.getItem('aksel-arcade:project')
+      // Verify the browser-wide legacy key is ignored and not written.
+      expect(localStorage.getItem(WEB_ARCADE_WORKING_COPY_STORAGE_KEY)).toBeNull()
+
+      const stored = sessionStorage.getItem(WEB_ARCADE_WORKING_COPY_STORAGE_KEY)
       expect(stored).toBeTruthy()
       const parsed = JSON.parse(stored!)
-      expect(parsed.name).toBe('Test Project')
+      expect(parsed.project.name).toBe('Test Project')
+      expect(parsed.preferences).toEqual(DEFAULT_WEB_ARCADE_WORKING_COPY_PREFERENCES)
     })
 
     it('should reject projects larger than 5MB', () => {
@@ -162,14 +176,38 @@ describe('Storage Service', () => {
       const result = saveProject(project)
       expect(result.success).toBe(true)
 
-      const stored = localStorage.getItem('aksel-arcade:project')
+      const stored = sessionStorage.getItem(WEB_ARCADE_WORKING_COPY_STORAGE_KEY)
       const parsed = JSON.parse(stored!)
 
       // lastModified should be updated to current time
-      expect(parsed.lastModified).not.toBe('2025-01-01T00:00:00.000Z')
-      expect(new Date(parsed.lastModified).getTime()).toBeGreaterThan(
+      expect(parsed.project.lastModified).not.toBe('2025-01-01T00:00:00.000Z')
+      expect(new Date(parsed.project.lastModified).getTime()).toBeGreaterThan(
         new Date('2025-01-01T00:00:00.000Z').getTime()
       )
+    })
+
+    it('should save Web Arcade working copy preferences with the project', () => {
+      const project = createTestProject({
+        name: 'Preference Project',
+        viewportSize: 'XL',
+        panelLayout: 'editor-right',
+      })
+      const preferences: WebArcadeWorkingCopyPreferences = {
+        theme: 'light',
+        panelOrder: 'preview-left',
+      }
+
+      const result = saveProject(project, { preferences })
+
+      expect(result.success).toBe(true)
+      const stored = sessionStorage.getItem(WEB_ARCADE_WORKING_COPY_STORAGE_KEY)
+      const parsed = JSON.parse(stored!)
+      expect(parsed.project).toMatchObject({
+        name: 'Preference Project',
+        viewportSize: 'XL',
+        panelLayout: 'editor-right',
+      })
+      expect(parsed.preferences).toEqual(preferences)
     })
   })
 
@@ -209,7 +247,7 @@ describe('Storage Service', () => {
     })
 
     it('should handle corrupted JSON gracefully', () => {
-      localStorage.setItem('aksel-arcade:project', '{invalid json')
+      sessionStorage.setItem(WEB_ARCADE_WORKING_COPY_STORAGE_KEY, '{invalid json')
 
       const result = loadProject()
 
@@ -220,12 +258,128 @@ describe('Storage Service', () => {
 
     it('should handle invalid project schema', () => {
       const invalid = { id: 'bad', name: 123 }
-      localStorage.setItem('aksel-arcade:project', JSON.stringify(invalid))
+      sessionStorage.setItem(WEB_ARCADE_WORKING_COPY_STORAGE_KEY, JSON.stringify(invalid))
 
       const result = loadProject()
 
       expect(result.project).toBeNull()
       expect(result.error).toContain('Validation failed')
+    })
+
+    it('should ignore legacy browser-wide saved project data', () => {
+      const legacyProject = createTestProject({
+        name: 'Legacy browser-wide project',
+        jsxCode: '<Box>Legacy should be ignored</Box>',
+      })
+      localStorage.setItem(WEB_ARCADE_WORKING_COPY_STORAGE_KEY, JSON.stringify(legacyProject))
+
+      const result = loadProject()
+
+      expect(result.fromStorage).toBe(false)
+      expect(result.project).toBeTruthy()
+      expect(result.project!.name).toBe('Untitled Project')
+      expect(result.project!.jsxCode).not.toContain('Legacy should be ignored')
+      expect(localStorage.getItem(WEB_ARCADE_WORKING_COPY_STORAGE_KEY)).toBeTruthy()
+    })
+
+    it('should restore tab-scoped Web Arcade working copy preferences', () => {
+      const project = createTestProject({
+        name: 'Restored working copy',
+        viewportSize: 'LG',
+        panelLayout: 'editor-right',
+      })
+      const preferences: WebArcadeWorkingCopyPreferences = {
+        theme: 'light',
+        panelOrder: 'preview-left',
+      }
+
+      saveProject(project, { preferences })
+      const result = loadProject()
+
+      expect(result.fromStorage).toBe(true)
+      expect(result.project).toMatchObject({
+        name: 'Restored working copy',
+        viewportSize: 'LG',
+        panelLayout: 'editor-right',
+      })
+      expect(result.preferences).toEqual(preferences)
+    })
+
+    it('should model duplicated tabs as forked sessionStorage working copies', () => {
+      const originalTabStorage = setupSessionStorageMock()
+      const initialProject = createTestProject({
+        name: 'Duplicated source tab',
+        jsxCode: '<Box>Original JSX</Box>',
+        hooksCode: 'export const useOriginal = () => "original"',
+        viewportSize: 'XL',
+        panelLayout: 'editor-right',
+      })
+      const initialPreferences: WebArcadeWorkingCopyPreferences = {
+        theme: 'light',
+        panelOrder: 'preview-left',
+      }
+      saveProject(initialProject, { preferences: initialPreferences })
+
+      const duplicatedPayload = originalTabStorage.getItem(WEB_ARCADE_WORKING_COPY_STORAGE_KEY)
+      const duplicatedTabStorage = setupSessionStorageMock()
+      duplicatedTabStorage.setItem(WEB_ARCADE_WORKING_COPY_STORAGE_KEY, duplicatedPayload!)
+
+      const duplicatedLoad = loadProject()
+      expect(duplicatedLoad.project).toMatchObject({
+        name: 'Duplicated source tab',
+        jsxCode: '<Box>Original JSX</Box>',
+        hooksCode: 'export const useOriginal = () => "original"',
+        viewportSize: 'XL',
+        panelLayout: 'editor-right',
+      })
+      expect(duplicatedLoad.preferences).toEqual(initialPreferences)
+
+      saveProject(
+        {
+          ...duplicatedLoad.project!,
+          name: 'Duplicated tab edit',
+          jsxCode: '<Box>Duplicate tab JSX</Box>',
+          viewportSize: 'SM',
+        },
+        { preferences: { theme: 'dark', panelOrder: 'code-left' } }
+      )
+
+      Object.defineProperty(globalThis, 'sessionStorage', {
+        value: originalTabStorage,
+        configurable: true,
+        writable: true,
+      })
+      saveProject(
+        {
+          ...initialProject,
+          name: 'Original tab edit',
+          hooksCode: 'export const useOriginal = () => "edited original"',
+          panelLayout: 'editor-left',
+        },
+        { preferences: initialPreferences }
+      )
+
+      const originalStored = parseStoredProject(originalTabStorage)
+      const duplicatedStored = parseStoredProject(duplicatedTabStorage)
+      expect(originalStored.project).toMatchObject({
+        name: 'Original tab edit',
+        jsxCode: '<Box>Original JSX</Box>',
+        hooksCode: 'export const useOriginal = () => "edited original"',
+        viewportSize: 'XL',
+        panelLayout: 'editor-left',
+      })
+      expect(originalStored.preferences).toEqual(initialPreferences)
+      expect(duplicatedStored.project).toMatchObject({
+        name: 'Duplicated tab edit',
+        jsxCode: '<Box>Duplicate tab JSX</Box>',
+        hooksCode: 'export const useOriginal = () => "original"',
+        viewportSize: 'SM',
+        panelLayout: 'editor-right',
+      })
+      expect(duplicatedStored.preferences).toEqual({
+        theme: 'dark',
+        panelOrder: 'code-left',
+      })
     })
   })
 
@@ -737,7 +891,7 @@ describe('Storage Service', () => {
   })
 
   describe('clearStorage', () => {
-    it('should remove project from localStorage', () => {
+    it('should remove project from tab-scoped sessionStorage', () => {
       const project: Project = {
         id: crypto.randomUUID(),
         name: 'Test',
@@ -751,10 +905,25 @@ describe('Storage Service', () => {
       }
 
       saveProject(project)
-      expect(localStorage.getItem('aksel-arcade:project')).toBeTruthy()
+      localStorage.setItem(WEB_ARCADE_WORKING_COPY_STORAGE_KEY, 'legacy browser-wide data')
+      expect(sessionStorage.getItem(WEB_ARCADE_WORKING_COPY_STORAGE_KEY)).toBeTruthy()
 
       clearStorage()
-      expect(localStorage.getItem('aksel-arcade:project')).toBeNull()
+      expect(sessionStorage.getItem(WEB_ARCADE_WORKING_COPY_STORAGE_KEY)).toBeNull()
+      expect(localStorage.getItem(WEB_ARCADE_WORKING_COPY_STORAGE_KEY)).toBe(
+        'legacy browser-wide data'
+      )
     })
   })
 })
+
+const parseStoredProject = (storage: MockSessionStorage) => {
+  const stored = storage.getItem(WEB_ARCADE_WORKING_COPY_STORAGE_KEY)
+  if (!stored) {
+    throw new Error('Expected Web Arcade working copy to be stored')
+  }
+  return JSON.parse(stored) as {
+    project: Project
+    preferences: WebArcadeWorkingCopyPreferences
+  }
+}
