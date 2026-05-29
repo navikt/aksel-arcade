@@ -595,6 +595,7 @@ describe('Storage Service', () => {
 
       expect(result.success).toBe(false)
       expect(result.project).toBeNull()
+      expect(result.error).toContain('Package is not a clean .akselarcade Arcade project package')
       expect(result.error).toContain('Invalid clean Arcade project package fields')
       expect(result.error).toContain('"agentSession"')
     })
@@ -623,6 +624,7 @@ describe('Storage Service', () => {
 
       expect(result.success).toBe(false)
       expect(result.project).toBeNull()
+      expect(result.error).toContain('Package is not a clean .akselarcade Arcade project package')
       expect(result.error).toContain('Unsupported Arcade project package version "1"')
     })
 
@@ -700,6 +702,7 @@ describe('Storage Service', () => {
 
         expect(result.success).toBe(false)
         expect(result.project).toBeNull()
+        expect(result.error).toContain('Package is not a clean .akselarcade Arcade project package')
         expect(result.error).toContain('Invalid clean Arcade project')
         expect(result.error).toContain(noisyPackage.expectedField)
       }
@@ -711,7 +714,7 @@ describe('Storage Service', () => {
       const result = await importProject(file)
 
       expect(result.success).toBe(false)
-      expect(result.error).toContain('Invalid JSON')
+      expect(result.error).toContain('Invalid .akselarcade Arcade project package JSON')
     })
 
     it('should reject invalid project structure', async () => {
@@ -722,7 +725,7 @@ describe('Storage Service', () => {
       const result = await importProject(file)
 
       expect(result.success).toBe(false)
-      expect(result.error).toContain('Validation failed')
+      expect(result.error).toContain('Package is not a clean .akselarcade Arcade project package')
     })
 
     it('should expose only clean Arcade project package import file types', () => {

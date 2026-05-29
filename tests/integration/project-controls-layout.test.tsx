@@ -630,7 +630,9 @@ describe('ProjectControls layout', () => {
     renderHeader({ shellCapabilities: WEB_ARCADE_CAPABILITIES })
 
     const importButton = screen.getByRole('button', { name: /^import$/i })
-    const importInput = screen.getByLabelText(/import project file/i) as HTMLInputElement
+    const importInput = screen.getByLabelText(
+      /import \.akselarcade arcade project package/i
+    ) as HTMLInputElement
     const shareButton = screen.getByLabelText(/share project/i)
     const settingsButton = screen.getByRole('button', { name: /settings/i })
 
@@ -649,6 +651,36 @@ describe('ProjectControls layout', () => {
     expect(await screen.findByText(/Share URL length/i)).toBeTruthy()
     expect(screen.getByText(/Strategy:/i)).toBeTruthy()
     expectLegacyAgentBridgeAbsent()
+  })
+
+  it('confirms import with an Aksel Dialog and custom action label', async () => {
+    const nativeConfirmSpy = vi.spyOn(window, 'confirm')
+    const inputClickSpy = vi.spyOn(HTMLInputElement.prototype, 'click').mockImplementation(() => {})
+
+    renderHeader({ shellCapabilities: WEB_ARCADE_CAPABILITIES })
+
+    fireEvent.click(screen.getByRole('button', { name: /^Import$/i }))
+
+    expect(nativeConfirmSpy).not.toHaveBeenCalled()
+    expect(inputClickSpy).not.toHaveBeenCalled()
+    expect(screen.getByRole('alertdialog', { name: /bekreft import/i })).toBeTruthy()
+    expect(
+      screen.getByText(
+        'Prosjektet du vil importere erstatter det du jobber på nå. Vil du fortsette?'
+      )
+    ).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Importer' })).toBeTruthy()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Importer' }))
+
+    expect(inputClickSpy).toHaveBeenCalledTimes(1)
+    await waitFor(() => {
+      expect(
+        screen.queryByText(
+          'Prosjektet du vil importere erstatter det du jobber på nå. Vil du fortsette?'
+        )
+      ).toBeNull()
+    })
   })
 
   it('keeps Desktop Arcade Agent access available and Share URL absent', async () => {
@@ -813,7 +845,7 @@ describe('ProjectControls layout', () => {
     await expectProjectReplacementRevokedAgentAccess(desktopTransport, 3)
 
     await startAgentAccess()
-    fireEvent.change(screen.getByLabelText(/import project file/i), {
+    fireEvent.change(screen.getByLabelText(/import \.akselarcade arcade project package/i), {
       target: {
         files: [
           createProjectPackageFileForCode(
@@ -1236,7 +1268,9 @@ describe('ProjectControls layout', () => {
 
     try {
       const { unmount } = renderHeader()
-      const importInput = screen.getByLabelText(/import project file/i) as HTMLInputElement
+      const importInput = screen.getByLabelText(
+        /import \.akselarcade arcade project package/i
+      ) as HTMLInputElement
 
       expect(screen.queryByLabelText(/share project/i)).toBeNull()
       expect(screen.getByRole('button', { name: /^Export$/i })).toBeTruthy()
@@ -1364,7 +1398,7 @@ describe('ProjectControls layout', () => {
       expectLegacyAgentBridgeAbsent()
       renderHeader()
 
-      fireEvent.change(screen.getByLabelText(/import project file/i), {
+      fireEvent.change(screen.getByLabelText(/import \.akselarcade arcade project package/i), {
         target: {
           files: [createProjectPackageFile(activePackage.text)],
         },

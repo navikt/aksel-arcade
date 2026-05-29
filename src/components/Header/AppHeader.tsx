@@ -13,6 +13,7 @@ import {
   Popover,
   Alert,
   Tag,
+  Dialog,
 } from '@navikt/ds-react'
 import {
   PencilIcon,
@@ -97,7 +98,9 @@ export const AppHeader = ({
   const clipboardBufferRef = useRef<HTMLTextAreaElement>(null)
   const lastGeneratedShareFingerprintRef = useRef<string | null>(null)
   const [shareOpen, setShareOpen] = useState(false)
+  const [importConfirmOpen, setImportConfirmOpen] = useState(false)
   const loadingDescriptionId = useId()
+  const importConfirmDialogId = useId()
   const slowDescriptionId = `${loadingDescriptionId}-delay`
   const { theme, toggleTheme, togglePanelOrder } = useSettings()
   const {
@@ -118,11 +121,14 @@ export const AppHeader = ({
   const handleImportClick = () => {
     const hasUnsavedChanges = saveStatus === 'saving' || saveStatus === 'idle'
     if (hasUnsavedChanges) {
-      const confirmed = window.confirm(
-        'You have unsaved changes. Importing a project will replace your current work. Continue?'
-      )
-      if (!confirmed) return
+      setImportConfirmOpen(true)
+      return
     }
+    fileInputRef.current?.click()
+  }
+
+  const handleConfirmImport = () => {
+    setImportConfirmOpen(false)
     fileInputRef.current?.click()
   }
 
@@ -358,6 +364,8 @@ export const AppHeader = ({
             size="small"
             icon={<FileImportIcon aria-hidden />}
             onClick={handleImportClick}
+            aria-haspopup="dialog"
+            aria-controls={importConfirmOpen ? importConfirmDialogId : undefined}
           >
             Import
           </Button>
@@ -439,8 +447,7 @@ export const AppHeader = ({
                               <VStack gap="space-12">
                                 <VStack gap="space-4">
                                   <BodyLong size="small">
-                                    This project is too large for a share link. Use Export package
-                                    instead.
+                                    This project is too large for a share link. Use Export instead.
                                   </BodyLong>
                                   {shareLengthDetailText && (
                                     <Detail
@@ -565,8 +572,32 @@ export const AppHeader = ({
           accept={ARCADE_PROJECT_IMPORT_ACCEPT}
           onChange={handleFileChange}
           style={{ display: 'none' }}
-          aria-label="Import project file"
+          aria-label="Import .akselarcade Arcade project package"
         />
+        <Dialog open={importConfirmOpen} onOpenChange={(open) => setImportConfirmOpen(open)}>
+          <Dialog.Popup
+            id={importConfirmDialogId}
+            role="alertdialog"
+            aria-label="Bekreft import"
+            closeOnOutsideClick={false}
+          >
+            <Dialog.Body>
+              <BodyLong>
+                Prosjektet du vil importere erstatter det du jobber på nå. Vil du fortsette?
+              </BodyLong>
+            </Dialog.Body>
+            <Dialog.Footer>
+              <Dialog.CloseTrigger>
+                <Button type="button" variant="secondary" data-color="neutral">
+                  Avbryt
+                </Button>
+              </Dialog.CloseTrigger>
+              <Button type="button" onClick={handleConfirmImport}>
+                Importer
+              </Button>
+            </Dialog.Footer>
+          </Dialog.Popup>
+        </Dialog>
       </HStack>
     </Box>
   )
@@ -579,7 +610,7 @@ const getShareErrorMessage = (code: ShareLinkErrorCode): string => {
     case 'storage-unavailable':
       return 'Browser storage is blocked, so we cannot package your project. Enable storage access and retry.'
     case 'oversize':
-      return 'This project is too large for a share link. Use Export package instead.'
+      return 'This project is too large for a share link. Use Export instead.'
     default:
       return 'Something went wrong while generating the share link. Please try again.'
   }

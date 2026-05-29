@@ -1,8 +1,8 @@
 /**
  * Aksel v8 Metadata Template
  *
- * This metadata is included in Arcade project package exports to provide AI assistants
- * with complete context for building production apps outside our editor.
+ * This metadata supports copied-out production guidance and catalog tests. It is
+ * intentionally not included in clean Arcade project package exports.
  *
  * Update this file when:
  * - Aksel package versions change
@@ -59,7 +59,7 @@ export interface AkselMetadata {
 
 /**
  * Current Aksel v8 metadata
- * Used when generating AI-enriched Arcade project package exports
+ * Used for copied-out production guidance outside clean Arcade project packages
  */
 export const AKSEL_METADATA: AkselMetadata = {
   designSystem: 'Aksel v8',
@@ -145,7 +145,7 @@ export const AKSEL_METADATA: AkselMetadata = {
 }
 
 /**
- * AI-friendly instructions for building apps from exported JSON
+ * AI-friendly instructions for building production apps from copied-out source
  */
 export const AI_INSTRUCTIONS = `This is a React prototype built with the Aksel v8 design system.
 
