@@ -1,0 +1,3 @@
+# Minimal Web share URL payloads
+
+Web share URLs will use a new minimal payload boundary instead of reusing full `ProjectSnapshot` data: new links carry only Arcade project source and shareable preview preferences, then load as a fresh local Untitled Project without sender identity, timestamps, settings, diagnostics, preview evidence, active editor tab, or token warning/limit metadata. Existing v2 full-snapshot links remain decodable during the v3 rollout and are normalized to the new load semantics; after one release cycle, removal of the legacy decoder should be revisited explicitly.

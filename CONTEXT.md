@@ -13,7 +13,7 @@ The two editable code parts of an **Arcade project**: JSX and Hooks.
 _Avoid_: Files, filesystem, project code
 
 **Preview preference**:
-A review-facing display preference of an **Arcade project**, such as the viewport used to open its preview.
+A review-facing display preference of an **Arcade project**, such as the viewport or theme used to open its preview.
 _Avoid_: Workspace preference, editor layout
 
 **Workspace preference**:
@@ -23,6 +23,10 @@ _Avoid_: Preview preference, project content
 **Arcade project package**:
 A shell-neutral portable share artifact named with the `.akselarcade` extension that contains only the importable **Arcade project** data needed for import, export, or desktop file opening: name, **Arcade project source**, and viewport **Preview preference**. Importing one creates a new local **Arcade project** identity rather than preserving the source project instance; it excludes AI metadata, setup instructions, explanatory text, documentation links, production-import guidance, diagnostics, preview evidence, and **Workspace preferences**.
 _Avoid_: Arcade project, save file, document, AI export bundle
+
+**Web share URL**:
+A Web Arcade link that carries only the portable **Arcade project** data needed to load a shared prototype: **Arcade project source** and shareable **Preview preferences**. Opening one creates a fresh local **Arcade project** identity without preserving sender identity, timestamps, diagnostics, preview evidence, or **Workspace preferences**.
+_Avoid_: Project code URL, save file, telemetry bundle
 
 **Web Arcade**:
 The browser-hosted product surface for working with **Arcade projects**.
@@ -101,3 +105,7 @@ Domain expert: "Show it in the live preview. If the user does not want more agen
 Developer: "The user exported an Arcade project package to send a prototype to a colleague."
 
 Domain expert: "Then the package should contain the project name, Arcade project source, and viewport preview preference only. It should not carry AI instructions, local identity, diagnostics, preview evidence, or workspace preferences."
+
+Developer: "The user opened a Web share URL from a colleague."
+
+Domain expert: "Create a fresh local Arcade project identity from the shared Arcade project source and preview preferences. Do not preserve sender identity, timestamps, diagnostics, preview evidence, or workspace preferences."
