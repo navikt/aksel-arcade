@@ -1225,3 +1225,23 @@ Verification:
 - Browser smoke check at http://127.0.0.1:5176/aksel-arcade/ confirmed the app renders and the console is clear.
 
 Next note: #120 can now add minimality/URL-size proof coverage on top of both v3 minimal payloads and the v2 normalization/rejection path.
+
+### 2026-05-29 - Issue #119: Clean share-load UI wording and metadata
+
+Implemented:
+
+- Selected #119 as the highest-priority ready-for-agent issue from #119-#120 because #119 unblocks #120, while #120 depends on this recipient-facing wording cleanup.
+- Updated the share-load warning to describe loading a shared project instead of a shared snapshot.
+- Removed the sender-facing `Last updated` timestamp from the warning so Web share URL loads do not expose metadata outside the agreed share boundary.
+- Kept the warning that loading the shared project replaces current work, and kept both load and dismiss actions wired to the existing share hydration handlers.
+- Added focused App-level regression coverage for the warning copy, absence of snapshot/timestamp metadata, and the load/dismiss actions.
+
+Verification:
+
+- npm install
+- npm run typecheck
+- npm run lint (passes with the existing hook dependency warnings)
+- CI=1 npm run test
+- Browser smoke check at http://127.0.0.1:5177/aksel-arcade/ confirmed the updated warning wording, no `Last updated` metadata, a working load action, and no console errors.
+
+Next note: #120 can now add minimality and URL-size proof coverage without carrying share-load UI wording debt; keep recipient-facing Web share copy aligned with "shared project" and avoid reintroducing sender timestamps or metadata.
