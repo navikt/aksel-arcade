@@ -1171,3 +1171,19 @@ Verification:
 - Browser smoke check at http://127.0.0.1:5179/aksel-arcade/ generated a v3 share URL, decoded metadata as `{ v: 1, s: "brotli-wasm-b64url" }`, verified the decoded payload checksum, and confirmed no console errors after reload.
 
 Next note: #117 should replace the current ProjectSnapshot compatibility adapter with deliberate fresh-local-project load semantics, keeping sender identity, timestamps, settings, active tab, zoom, and sandbox flags out of recipient state.
+
+### 2026-05-29 - PR #122 follow-up: Fix production build
+
+Fixed:
+
+- Reproduced the merged-PR build failure with `npm run build`; `tsc -b` rejected the assertion helper in `src/utils/sharePayload.ts` even though `npm run typecheck` had passed.
+- Converted the share payload record assertion helper from an inferred arrow function to a function declaration so TypeScript can apply the assertion signature under the production build project references.
+
+Verification:
+
+- npm run build
+- npm run typecheck
+- CI=1 npm run test
+- npm run lint (passes with the existing hook dependency warnings)
+
+Next note: keep `npm run build` in the validation loop for share URL changes because it exercises `tsc -b`, which can catch declaration/assertion issues that `tsc --noEmit` misses.

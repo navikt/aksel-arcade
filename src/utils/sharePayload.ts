@@ -128,7 +128,7 @@ const findFileContentByName = (snapshot: ProjectSnapshot, name: string): string 
 const findFirstTsxContent = (snapshot: ProjectSnapshot): string | undefined =>
   snapshot.files.find((file) => file.language === 'tsx')?.content
 
-const assertRecord = (value: unknown, label: string): asserts value is Record<string, unknown> => {
+function assertRecord(value: unknown, label: string): asserts value is Record<string, unknown> {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
     throw new Error(`${label} must be an object`)
   }
