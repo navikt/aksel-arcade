@@ -21,8 +21,6 @@ export const ARCADE_PROJECT_PACKAGE_MIME_TYPE =
 export const ARCADE_PROJECT_IMPORT_ACCEPT = [
   ARCADE_PROJECT_PACKAGE_EXTENSION,
   ARCADE_PROJECT_PACKAGE_MIME_TYPE,
-  '.json',
-  'application/json',
 ].join(',')
 
 export interface SaveResult {
@@ -229,9 +227,7 @@ export const loadProject = (): LoadResult => {
   }
 }
 
-export const createArcadeProjectPackage = (
-  project: Project
-): ArcadeProjectPackage => {
+export const createArcadeProjectPackage = (project: Project): ArcadeProjectPackage => {
   return {
     format: ARCADE_PROJECT_PACKAGE_FORMAT,
     formatVersion: ARCADE_PROJECT_PACKAGE_FORMAT_VERSION,
@@ -248,10 +244,7 @@ export const createArcadeProjectPackage = (
   }
 }
 
-export const exportProject = (
-  project: Project,
-  options: ExportProjectOptions = {}
-): void => {
+export const exportProject = (project: Project, options: ExportProjectOptions = {}): void => {
   const exportedAt = options.exportedAt ?? new Date().toISOString()
   const packageData = createArcadeProjectPackage(project)
   const json = JSON.stringify(packageData, null, 2)
@@ -271,6 +264,14 @@ export const exportProject = (
 
 export const importProject = async (file: File): Promise<ImportResult> => {
   try {
+    if (!isArcadeProjectPackageFile(file)) {
+      return {
+        project: null,
+        success: false,
+        error: `Only clean ${ARCADE_PROJECT_PACKAGE_EXTENSION} Arcade project packages can be imported`,
+      }
+    }
+
     // Read file
     const text = await file.text()
 
@@ -286,23 +287,15 @@ export const importProject = async (file: File): Promise<ImportResult> => {
       }
     }
 
-    // Extract portable project data from package or legacy JSON formats.
     let project: Project
     try {
-      project = extractImportedProject(imported)
+      project = buildProjectFromCleanPackage(imported)
     } catch (error) {
       return {
         project: null,
         success: false,
         error: `Validation failed: ${error instanceof Error ? error.message : String(error)}`,
       }
-    }
-
-    // Assign new ID and timestamp (treat as new project)
-    project = {
-      ...project,
-      id: generateSecureUUID(),
-      lastModified: new Date().toISOString(),
     }
 
     return {
@@ -318,58 +311,16 @@ export const importProject = async (file: File): Promise<ImportResult> => {
   }
 }
 
-const extractImportedProject = (payload: unknown): Project => {
-  if (!isRecord(payload)) {
-    throw new Error('Invalid project data')
-  }
+const isArcadeProjectPackageFile = (file: File): boolean =>
+  file.name.toLowerCase().endsWith(ARCADE_PROJECT_PACKAGE_EXTENSION)
 
-  const packagedProject = extractArcadeProjectPackage(payload)
-  if (packagedProject) {
-    return packagedProject
-  }
-
-  if (isPortableProjectPayload(payload)) {
-    return buildProjectFromPortable(payload)
-  }
-
-  if ('jsxCode' in payload && 'hooksCode' in payload) {
-    return buildProjectFromLegacyJson(payload)
-  }
-
-  throw new Error('Unrecognized project format')
-}
-
-const extractArcadeProjectPackage = (payload: Record<string, unknown>): Project | null => {
-  const hasPackageShape = 'format' in payload && 'formatVersion' in payload && 'project' in payload
-  if (!hasPackageShape) {
-    return null
-  }
-
-  if (payload.format !== ARCADE_PROJECT_PACKAGE_FORMAT) {
-    throw new Error('Unsupported Arcade project package format')
-  }
-
-  if (payload.formatVersion === ARCADE_PROJECT_PACKAGE_FORMAT_VERSION) {
-    return buildProjectFromCleanPackage(payload.project)
-  }
-
-  if (payload.formatVersion === 1) {
-    return buildProjectFromPortable(payload.project)
-  }
-
-  throw new Error('Unsupported Arcade project package version')
-}
-
-const buildProjectFromCleanPackage = (cleanProject: unknown): Project => {
-  if (!isCleanPackageProjectPayload(cleanProject)) {
-    throw new Error('Project package is missing clean project content')
-  }
-
+const buildProjectFromCleanPackage = (payload: unknown): Project => {
+  const cleanProject = parseCleanArcadeProjectPackage(payload)
   const now = new Date().toISOString()
 
   return normalizeImportedProject({
     version: CURRENT_VERSION,
-    id: '00000000-0000-4000-8000-000000000000',
+    id: generateSecureUUID(),
     name: cleanProject.name,
     jsxCode: cleanProject.source.jsx,
     hooksCode: cleanProject.source.hooks,
@@ -380,33 +331,95 @@ const buildProjectFromCleanPackage = (cleanProject: unknown): Project => {
   })
 }
 
-const buildProjectFromPortable = (portable: unknown): Project => {
-  if (!isPortableProjectPayload(portable)) {
-    throw new Error('Project package is missing portable project content')
+const parseCleanArcadeProjectPackage = (payload: unknown): ArcadeProjectPackage['project'] => {
+  if (!isRecord(payload)) {
+    throw new Error('Package is not a clean .akselarcade Arcade project package')
   }
 
-  return normalizeImportedProject({
-    version:
-      typeof portable.version === 'string' && portable.version.trim()
-        ? portable.version
-        : CURRENT_VERSION,
-    id: portable.id,
-    name: portable.name,
-    createdAt: portable.createdAt,
-    lastModified: portable.lastModified,
-    jsxCode: portable.code.jsxCode,
-    hooksCode: portable.code.hooksCode,
-    viewportSize: portable.ui.viewportSize,
-    panelLayout: portable.ui.panelLayout,
-  })
+  assertExactKeys(payload, ['format', 'formatVersion', 'project'], 'package')
+
+  if (payload.formatVersion !== ARCADE_PROJECT_PACKAGE_FORMAT_VERSION) {
+    throw new Error(`Unsupported Arcade project package version "${String(payload.formatVersion)}"`)
+  }
+
+  if (payload.format !== ARCADE_PROJECT_PACKAGE_FORMAT) {
+    throw new Error('Unsupported Arcade project package format')
+  }
+
+  return parseCleanPackageProject(payload.project)
 }
 
-const buildProjectFromLegacyJson = (legacyProject: Record<string, unknown>): Project => {
-  const project =
-    legacyProject.version === CURRENT_VERSION ? legacyProject : migrateProject(legacyProject)
+const parseCleanPackageProject = (payload: unknown): ArcadeProjectPackage['project'] => {
+  if (!isRecord(payload)) {
+    throw new Error('Project package is missing clean project content')
+  }
 
-  return normalizeImportedProject(project)
+  assertExactKeys(payload, ['name', 'source', 'preview'], 'project')
+
+  if (!isRecord(payload.source)) {
+    throw new Error('Project package source must be an object')
+  }
+
+  assertExactKeys(payload.source, ['jsx', 'hooks'], 'project source')
+
+  if (!isRecord(payload.preview)) {
+    throw new Error('Project package preview must be an object')
+  }
+
+  assertExactKeys(payload.preview, ['viewport'], 'project preview')
+
+  if (typeof payload.name !== 'string') {
+    throw new Error('Project package name must be a string')
+  }
+
+  if (typeof payload.source.jsx !== 'string') {
+    throw new Error('Project package JSX source must be a string')
+  }
+
+  if (typeof payload.source.hooks !== 'string') {
+    throw new Error('Project package Hooks source must be a string')
+  }
+
+  if (typeof payload.preview.viewport !== 'string') {
+    throw new Error('Project package preview viewport must be a string')
+  }
+
+  return {
+    name: payload.name,
+    source: {
+      jsx: payload.source.jsx,
+      hooks: payload.source.hooks,
+    },
+    preview: {
+      viewport: payload.preview.viewport as Project['viewportSize'],
+    },
+  }
 }
+
+const assertExactKeys = (
+  value: Record<string, unknown>,
+  allowedKeys: readonly string[],
+  label: string
+): void => {
+  const keys = Object.keys(value)
+  const missingKeys = allowedKeys.filter((key) => !keys.includes(key))
+  const unknownKeys = keys.filter((key) => !allowedKeys.includes(key))
+
+  if (!missingKeys.length && !unknownKeys.length) {
+    return
+  }
+
+  const details = [
+    missingKeys.length ? `missing ${formatKeyList(missingKeys)}` : null,
+    unknownKeys.length ? `unknown ${formatKeyList(unknownKeys)}` : null,
+  ]
+    .filter(Boolean)
+    .join('; ')
+
+  throw new Error(`Invalid clean Arcade project ${label} fields: ${details}`)
+}
+
+const formatKeyList = (keys: string[]): string => keys.map((key) => `"${key}"`).join(', ')
 
 const normalizeImportedProject = (project: unknown): Project => {
   validateProjectSchema(project)
@@ -424,28 +437,6 @@ const copyProjectFields = (project: Project): Project => ({
   createdAt: project.createdAt,
   lastModified: project.lastModified,
 })
-
-const isPortableProjectPayload = (
-  payload: unknown
-): payload is Record<string, unknown> & {
-  code: Record<string, unknown>
-  ui: Record<string, unknown>
-} => isRecord(payload) && isRecord(payload.code) && isRecord(payload.ui)
-
-const isCleanPackageProjectPayload = (
-  payload: unknown
-): payload is Record<string, unknown> & {
-  name: string
-  source: Record<string, unknown> & { jsx: string; hooks: string }
-  preview: Record<string, unknown> & { viewport: Project['viewportSize'] }
-} =>
-  isRecord(payload) &&
-  isRecord(payload.source) &&
-  isRecord(payload.preview) &&
-  typeof payload.name === 'string' &&
-  typeof payload.source.jsx === 'string' &&
-  typeof payload.source.hooks === 'string' &&
-  typeof payload.preview.viewport === 'string'
 
 export const clearStorage = (): void => {
   localStorage.removeItem(STORAGE_KEY)

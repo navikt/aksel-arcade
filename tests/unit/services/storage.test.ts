@@ -488,49 +488,6 @@ describe('Storage Service', () => {
       return file
     }
 
-    it('should validate and load JSON file', async () => {
-      const project = {
-        id: crypto.randomUUID(),
-        name: 'Import Test',
-        jsxCode: '<Box>Imported</Box>',
-        hooksCode: '',
-        viewportSize: 'SM',
-        panelLayout: 'editor-left',
-        version: '1.0.0',
-        createdAt: new Date().toISOString(),
-        lastModified: new Date().toISOString(),
-        agentSession: { credential: 'legacy-credential-secret' },
-        diagnostics: [{ message: 'legacy-diagnostic-secret' }],
-        transport: { endpoint: 'http://127.0.0.1:4321' },
-      } satisfies Project & Record<string, unknown>
-
-      const json = JSON.stringify(project)
-      const file = createMockFile(json, 'test.json')
-
-      const result = await importProject(file)
-
-      expect(result.success).toBe(true)
-      expect(result.error).toBeUndefined()
-      expect(result.project).toBeTruthy()
-      expect(result.project!.name).toBe('Import Test')
-      expect(result.project!.jsxCode).toBe('<Box>Imported</Box>')
-
-      // Should have new ID
-      expect(result.project!.id).not.toBe(project.id)
-
-      // lastModified should be updated (or at least be a valid ISO date)
-      const lastModified = new Date(result.project!.lastModified)
-      expect(lastModified.getTime()).toBeGreaterThanOrEqual(
-        new Date(project.lastModified).getTime()
-      )
-      expect(JSON.stringify(result.project)).not.toContain('legacy-credential-secret')
-      expect(JSON.stringify(result.project)).not.toContain('legacy-diagnostic-secret')
-      expect(JSON.stringify(result.project)).not.toContain('http://127.0.0.1:4321')
-      expect(collectObjectKeys(result.project).join(' ')).not.toMatch(
-        /agent|session|credential|endpoint|permission|checkpoint|diagnostic|evidence|transport/i
-      )
-    })
-
     it('should import Arcade project packages from .akselarcade files', async () => {
       const sourceProject = createTestProject({
         name: 'Package Import Test',
@@ -562,6 +519,7 @@ describe('Storage Service', () => {
         version: '1.0.0',
       })
       expect(result.project!.id).not.toBe(sourceProject.id)
+      expect(result.project!.createdAt).not.toBe(sourceProject.createdAt)
       expect(new Date(result.project!.lastModified).getTime()).toBeGreaterThanOrEqual(
         new Date(sourceProject.lastModified).getTime()
       )
@@ -573,22 +531,86 @@ describe('Storage Service', () => {
       )
     })
 
-    it('should keep importing legacy v1 Arcade project packages', async () => {
+    it('should validate the .akselarcade extension case-insensitively without trusting MIME', async () => {
+      const sourceProject = createTestProject({
+        name: 'Case-insensitive Package Import Test',
+        jsxCode: '<Box>Case-insensitive package</Box>',
+        hooksCode: 'export const useCaseInsensitivePackage = () => "ok"',
+        viewportSize: 'SM',
+      })
+      const packageData = createArcadeProjectPackage(sourceProject)
+
+      const file = createMockFile(
+        JSON.stringify(packageData),
+        'package-import.AKSELARCADE',
+        'application/json'
+      )
+
+      const result = await importProject(file)
+
+      expect(result.success).toBe(true)
+      expect(result.error).toBeUndefined()
+      expect(result.project).toMatchObject({
+        name: 'Case-insensitive Package Import Test',
+        jsxCode: '<Box>Case-insensitive package</Box>',
+        hooksCode: 'export const useCaseInsensitivePackage = () => "ok"',
+        viewportSize: 'SM',
+      })
+    })
+
+    it('should reject clean package content when the file is not .akselarcade', async () => {
+      const sourceProject = createTestProject({
+        name: 'Wrong Extension Test',
+        jsxCode: '<Box>Wrong extension</Box>',
+      })
+      const packageData = createArcadeProjectPackage(sourceProject)
+      const file = createMockFile(JSON.stringify(packageData), 'package-import.json')
+
+      const result = await importProject(file)
+
+      expect(result.success).toBe(false)
+      expect(result.project).toBeNull()
+      expect(result.error).toContain('Only clean .akselarcade Arcade project packages')
+    })
+
+    it('should reject legacy raw JSON project files', async () => {
+      const project = {
+        id: crypto.randomUUID(),
+        name: 'Legacy Raw JSON Test',
+        jsxCode: '<Box>Legacy raw JSON</Box>',
+        hooksCode: '',
+        viewportSize: 'SM',
+        panelLayout: 'editor-left',
+        version: '1.0.0',
+        createdAt: new Date().toISOString(),
+        lastModified: new Date().toISOString(),
+        agentSession: { credential: 'legacy-credential-secret' },
+        diagnostics: [{ message: 'legacy-diagnostic-secret' }],
+        transport: { endpoint: 'http://127.0.0.1:4321' },
+      } satisfies Project & Record<string, unknown>
+
+      const file = createMockFile(JSON.stringify(project), 'legacy-raw.akselarcade')
+
+      const result = await importProject(file)
+
+      expect(result.success).toBe(false)
+      expect(result.project).toBeNull()
+      expect(result.error).toContain('Invalid clean Arcade project package fields')
+      expect(result.error).toContain('"agentSession"')
+    })
+
+    it('should reject legacy v1 Arcade project packages', async () => {
       const sourceProject = createTestProject({
         name: 'Legacy Package Import Test',
         jsxCode: '<Box>Legacy package</Box>',
         hooksCode: 'export const useLegacyPackage = () => "ok"',
         viewportSize: 'SM',
         panelLayout: 'editor-right',
-        createdAt: '2026-05-18T00:00:00.000Z',
-        lastModified: '2026-05-19T00:00:00.000Z',
       })
       const legacyPackage = {
         format: ARCADE_PROJECT_PACKAGE_FORMAT,
         formatVersion: 1,
-        exportedAt: '2026-05-20T00:00:00.000Z',
         project: createLegacyPortableProject(sourceProject),
-        meta: { aiInstructions: 'legacy-package-ai-secret' },
       }
 
       const file = createMockFile(
@@ -599,56 +621,92 @@ describe('Storage Service', () => {
 
       const result = await importProject(file)
 
-      expect(result.success).toBe(true)
-      expect(result.error).toBeUndefined()
-      expect(result.project).toMatchObject({
-        name: 'Legacy Package Import Test',
-        jsxCode: '<Box>Legacy package</Box>',
-        hooksCode: 'export const useLegacyPackage = () => "ok"',
-        viewportSize: 'SM',
-        panelLayout: 'editor-right',
-        version: '1.0.0',
-        createdAt: '2026-05-18T00:00:00.000Z',
-      })
-      expect(result.project!.id).not.toBe(sourceProject.id)
-      expect(JSON.stringify(result.project)).not.toContain('legacy-package-ai-secret')
+      expect(result.success).toBe(false)
+      expect(result.project).toBeNull()
+      expect(result.error).toContain('Unsupported Arcade project package version "1"')
     })
 
-    it('should keep importing pre-package nested JSON exports', async () => {
+    it('should reject noisy packages with metadata, identity, preferences, or unknown fields', async () => {
       const sourceProject = createTestProject({
-        name: 'Nested JSON Import Test',
-        jsxCode: '<Box>Nested JSON</Box>',
-        hooksCode: 'export const useNested = () => true',
-        viewportSize: 'XS',
-        panelLayout: 'editor-left',
+        name: 'Noisy Package Test',
+        jsxCode: '<Box>Noisy package</Box>',
+        hooksCode: 'export const useNoisyPackage = () => "reject"',
+        viewportSize: 'LG',
+        panelLayout: 'editor-right',
       })
-      const legacyNestedJson = {
-        ...createLegacyPortableProject(sourceProject),
-        meta: { agentSession: 'nested-meta-secret' },
-        project: { owner: 'legacy-project-metadata' },
-        transport: { endpoint: 'http://127.0.0.1:9999' },
+      const packageData = createArcadeProjectPackage(sourceProject)
+      const noisyPackages = [
+        {
+          label: 'top-level metadata',
+          payload: {
+            ...packageData,
+            meta: { aiInstructions: 'legacy-package-ai-secret' },
+            exportedAt: '2026-05-20T00:00:00.000Z',
+          },
+          expectedField: '"meta"',
+        },
+        {
+          label: 'project identity and workspace preferences',
+          payload: {
+            ...packageData,
+            project: {
+              ...packageData.project,
+              id: sourceProject.id,
+              createdAt: sourceProject.createdAt,
+              lastModified: sourceProject.lastModified,
+              panelLayout: 'editor-right',
+            },
+          },
+          expectedField: '"id"',
+        },
+        {
+          label: 'source diagnostics',
+          payload: {
+            ...packageData,
+            project: {
+              ...packageData.project,
+              source: {
+                ...packageData.project.source,
+                diagnostics: [{ message: 'diagnostic-secret' }],
+              },
+            },
+          },
+          expectedField: '"diagnostics"',
+        },
+        {
+          label: 'preview workspace state',
+          payload: {
+            ...packageData,
+            project: {
+              ...packageData.project,
+              preview: {
+                ...packageData.project.preview,
+                zoom: 1,
+              },
+            },
+          },
+          expectedField: '"zoom"',
+        },
+      ]
+
+      for (const noisyPackage of noisyPackages) {
+        const file = createMockFile(
+          JSON.stringify(noisyPackage.payload),
+          `${noisyPackage.label}.akselarcade`,
+          ARCADE_PROJECT_PACKAGE_MIME_TYPE
+        )
+
+        const result = await importProject(file)
+
+        expect(result.success).toBe(false)
+        expect(result.project).toBeNull()
+        expect(result.error).toContain('Invalid clean Arcade project')
+        expect(result.error).toContain(noisyPackage.expectedField)
       }
-
-      const file = createMockFile(JSON.stringify(legacyNestedJson), 'legacy-nested.json')
-
-      const result = await importProject(file)
-
-      expect(result.success).toBe(true)
-      expect(result.error).toBeUndefined()
-      expect(result.project).toMatchObject({
-        name: 'Nested JSON Import Test',
-        jsxCode: '<Box>Nested JSON</Box>',
-        hooksCode: 'export const useNested = () => true',
-        viewportSize: 'XS',
-        panelLayout: 'editor-left',
-      })
-      expect(JSON.stringify(result.project)).not.toMatch(
-        /nested-meta-secret|legacy-project-metadata|127\.0\.0\.1/
-      )
     })
 
     it('should reject invalid JSON', async () => {
-      const file = createMockFile('{invalid json', 'test.json')
+      const file = createMockFile('{invalid json', 'test.akselarcade')
 
       const result = await importProject(file)
 
@@ -659,7 +717,7 @@ describe('Storage Service', () => {
     it('should reject invalid project structure', async () => {
       const invalid = { id: 'bad', name: 123 }
       const json = JSON.stringify(invalid)
-      const file = createMockFile(json, 'test.json')
+      const file = createMockFile(json, 'test.akselarcade')
 
       const result = await importProject(file)
 
@@ -667,11 +725,11 @@ describe('Storage Service', () => {
       expect(result.error).toContain('Validation failed')
     })
 
-    it('should expose package and legacy JSON import file types', () => {
+    it('should expose only clean Arcade project package import file types', () => {
       expect(ARCADE_PROJECT_IMPORT_ACCEPT).toContain(ARCADE_PROJECT_PACKAGE_EXTENSION)
       expect(ARCADE_PROJECT_IMPORT_ACCEPT).toContain(ARCADE_PROJECT_PACKAGE_MIME_TYPE)
-      expect(ARCADE_PROJECT_IMPORT_ACCEPT).toContain('.json')
-      expect(ARCADE_PROJECT_IMPORT_ACCEPT).toContain('application/json')
+      expect(ARCADE_PROJECT_IMPORT_ACCEPT).not.toContain('.json')
+      expect(ARCADE_PROJECT_IMPORT_ACCEPT).not.toContain('application/json')
     })
   })
 

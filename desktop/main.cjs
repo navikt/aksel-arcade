@@ -24,7 +24,7 @@ const DESKTOP_ARCADE_CAPABILITIES = Object.freeze({
   projectPackages: Object.freeze({
     enabled: true,
     defaultExtension: '.akselarcade',
-    legacyJsonImport: true,
+    legacyJsonImport: false,
   }),
 })
 

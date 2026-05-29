@@ -1096,3 +1096,25 @@ Verification:
 - npm run typecheck
 - npm run lint (passes with the existing hook dependency warnings)
 - CI=1 npm run test
+
+### 2026-05-29 - Issue #110: Strict clean package import
+
+Selected #110 as the highest-priority `ready-for-agent` feature from #110 and #111 because #111 is blocked by #110, so strict import validation has to land before UI/copy/test alignment.
+
+Implemented:
+
+- Restricted Web Arcade import to `.akselarcade` Arcade project packages only; `.json` and generic `application/json` file picker entries are no longer advertised.
+- Replaced permissive legacy import handling with strict v2 clean package validation for the shared renderer import path used by Web Arcade and Desktop Arcade.
+- Rejected raw legacy JSON projects, legacy `formatVersion: 1` packages, packages with `meta`/`exportedAt`, identity/timestamp fields, workspace preferences, diagnostics, preview extras, and any other unknown fields.
+- Kept successful imports creating a fresh local Arcade project identity while restoring package name, JSX source, Hooks source, and viewport preview preference; panel layout comes from the local defaults.
+- Updated Web/Desktop shell capabilities so `legacyJsonImport` is now false.
+- Added storage and shell capability regression coverage for the strict contract, extension handling, fresh identity, and rejection paths.
+
+Verification:
+
+- npm run typecheck
+- CI=1 npm run test
+- npm run lint (passes with the existing hook dependency warnings)
+- Browser smoke check at http://127.0.0.1:5176/aksel-arcade/ imported a clean `.akselarcade` package, restored name/source/Hooks/viewport, kept default panel layout, and had no console errors.
+
+Next note: #111 can now align the visible import/export copy and broader validation tests with this strict clean package contract. Keep `.akselarcade` described as an Arcade project package, not a legacy JSON file or AI export bundle.

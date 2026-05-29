@@ -22,7 +22,7 @@ describe('shellCapabilities', () => {
       projectPackages: {
         enabled: true,
         defaultExtension: '.akselarcade',
-        legacyJsonImport: true,
+        legacyJsonImport: false,
       },
     })
   })
@@ -35,7 +35,7 @@ describe('shellCapabilities', () => {
       projectPackages: {
         enabled: true,
         defaultExtension: '.akselarcade',
-        legacyJsonImport: true,
+        legacyJsonImport: false,
       },
     })
   })
