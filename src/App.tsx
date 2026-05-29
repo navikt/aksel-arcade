@@ -10,10 +10,7 @@ import { WarningNotification } from './components/Header/WarningNotification'
 import { SplitPane } from './components/Layout/SplitPane'
 import { validateProjectSize, clearStorage } from './services/storage'
 import type { Project } from './types/project'
-import {
-  WEB_ARCADE_CAPABILITIES,
-  type ShellCapabilities,
-} from './services/shellCapabilities'
+import { WEB_ARCADE_CAPABILITIES, type ShellCapabilities } from './services/shellCapabilities'
 import './App.css'
 
 interface AppProps {
@@ -76,7 +73,7 @@ function App({ shellCapabilities = WEB_ARCADE_CAPABILITIES }: AppProps) {
           <WarningNotification
             variant="warning"
             message="Load shared project?"
-            description={`Loading this shared snapshot will replace your current work. Last updated ${formatShareTimestamp(shareHydration.snapshot.updatedAt)}.`}
+            description="Loading this shared project will replace your current work."
             actions={[
               { label: 'Load shared project', variant: 'primary', onClick: applySharedSnapshot },
               { label: 'Keep my work', variant: 'secondary', onClick: dismissShareHydration },
@@ -129,14 +126,3 @@ function App({ shellCapabilities = WEB_ARCADE_CAPABILITIES }: AppProps) {
 }
 
 export default App
-
-const formatShareTimestamp = (timestamp: number): string => {
-  try {
-    return new Intl.DateTimeFormat(undefined, {
-      dateStyle: 'medium',
-      timeStyle: 'short',
-    }).format(new Date(timestamp))
-  } catch {
-    return new Date(timestamp).toLocaleString()
-  }
-}
