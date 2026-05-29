@@ -5,7 +5,7 @@ import { toBase64Url, fromBase64Url } from '@/utils/base64'
 import { serializePackedSnapshot, unpackSnapshot } from '@/utils/snapshotPacking'
 
 interface CompressionEncodeInput {
-  snapshot: ProjectSnapshot
+  snapshot?: ProjectSnapshot
   serialized?: string
 }
 
@@ -24,6 +24,7 @@ export interface CompressionStrategy {
   avgCpuMs: { encode: number; decode: number }
   libraryCostKb: number
   lossy?: boolean
+  supportsSerializedPayload: boolean
 }
 
 const BASE91_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!#$%&()*+,./:;<=>?@[]^_`{|}~\"'"
@@ -54,6 +55,7 @@ const strategyRegistry: Record<CompressionStrategyId, CompressionStrategy> = {
     },
     avgCpuMs: { encode: 5, decode: 3 },
     libraryCostKb: 3,
+    supportsSerializedPayload: true,
   },
   'fflate-deflate-b91': {
     id: 'fflate-deflate-b91',
@@ -72,6 +74,7 @@ const strategyRegistry: Record<CompressionStrategyId, CompressionStrategy> = {
     },
     avgCpuMs: { encode: 7, decode: 5 },
     libraryCostKb: 6,
+    supportsSerializedPayload: true,
   },
   'lzma-worker-b64url': {
     id: 'lzma-worker-b64url',
@@ -90,6 +93,7 @@ const strategyRegistry: Record<CompressionStrategyId, CompressionStrategy> = {
     },
     avgCpuMs: { encode: 20, decode: 12 },
     libraryCostKb: 28,
+    supportsSerializedPayload: true,
   },
   'brotli-wasm-b64url': {
     id: 'brotli-wasm-b64url',
@@ -110,6 +114,7 @@ const strategyRegistry: Record<CompressionStrategyId, CompressionStrategy> = {
     },
     avgCpuMs: { encode: 12, decode: 9 },
     libraryCostKb: 30,
+    supportsSerializedPayload: true,
   },
   'ast-minify-lz-string': {
     id: 'ast-minify-lz-string',
@@ -119,7 +124,7 @@ const strategyRegistry: Record<CompressionStrategyId, CompressionStrategy> = {
       return Math.ceil(minified * 0.62) + 120
     },
     encode: async (input) => {
-      const minifiedSnapshot = minifySnapshot(input.snapshot)
+      const minifiedSnapshot = minifySnapshot(ensureSnapshot(input))
       const serialized = JSON.stringify(minifiedSnapshot)
       const payload = compressToEncodedURIComponent(serialized)
       return { payload, serialized }
@@ -134,6 +139,7 @@ const strategyRegistry: Record<CompressionStrategyId, CompressionStrategy> = {
     avgCpuMs: { encode: 9, decode: 4 },
     libraryCostKb: 4,
     lossy: true,
+    supportsSerializedPayload: false,
   },
   'packed-deflate-b91': {
     id: 'packed-deflate-b91',
@@ -141,7 +147,7 @@ const strategyRegistry: Record<CompressionStrategyId, CompressionStrategy> = {
     estimateSize: (bytes) => Math.ceil(bytes * 0.7) + 120,
     encode: async (input) => {
       const serialized = ensureSerialized(input)
-      const packed = serializePackedSnapshot(input.snapshot)
+      const packed = serializePackedSnapshot(ensureSnapshot(input))
       const compressed = deflateSync(strToU8(packed, true), { level: 9 })
       const payload = encodeBase91(compressed)
       return { payload, serialized, checksumSource: packed }
@@ -153,6 +159,7 @@ const strategyRegistry: Record<CompressionStrategyId, CompressionStrategy> = {
     },
     avgCpuMs: { encode: 13, decode: 8 },
     libraryCostKb: 9,
+    supportsSerializedPayload: false,
   },
   'packed-brotli-q11-b91': {
     id: 'packed-brotli-q11-b91',
@@ -160,7 +167,7 @@ const strategyRegistry: Record<CompressionStrategyId, CompressionStrategy> = {
     estimateSize: (bytes) => Math.ceil(bytes * 0.5) + 120,
     encode: async (input) => {
       const serialized = ensureSerialized(input)
-      const packed = serializePackedSnapshot(input.snapshot)
+      const packed = serializePackedSnapshot(ensureSnapshot(input))
       const module = await loadBrotliModule()
       const compressed = module.compress(textEncoder.encode(packed), { quality: 11 })
       const payload = encodeBase91(compressed)
@@ -174,6 +181,7 @@ const strategyRegistry: Record<CompressionStrategyId, CompressionStrategy> = {
     },
     avgCpuMs: { encode: 15, decode: 6 },
     libraryCostKb: 1032,
+    supportsSerializedPayload: false,
   },
   'packed-brotli-q11-b64url': {
     id: 'packed-brotli-q11-b64url',
@@ -181,7 +189,7 @@ const strategyRegistry: Record<CompressionStrategyId, CompressionStrategy> = {
     estimateSize: (bytes) => Math.ceil(bytes * 0.4) + 85,
     encode: async (input) => {
       const serialized = ensureSerialized(input)
-      const packed = serializePackedSnapshot(input.snapshot)
+      const packed = serializePackedSnapshot(ensureSnapshot(input))
       const module = await loadBrotliModule()
       const compressed = module.compress(textEncoder.encode(packed), { quality: 11 })
       const payload = toBase64Url(compressed)
@@ -195,6 +203,7 @@ const strategyRegistry: Record<CompressionStrategyId, CompressionStrategy> = {
     },
     avgCpuMs: { encode: 15, decode: 6 },
     libraryCostKb: 1032,
+    supportsSerializedPayload: false,
   },
 }
 
@@ -206,11 +215,51 @@ export const getCompressionStrategy = (id: CompressionStrategyId): CompressionSt
   return strategyRegistry[id]
 }
 
+export const isSharePayloadCompressionStrategy = (strategy: CompressionStrategy): boolean =>
+  strategy.supportsSerializedPayload
+
+export const decodeSerializedPayload = async (
+  strategyId: CompressionStrategyId,
+  payload: string
+): Promise<string> => {
+  switch (strategyId) {
+    case 'lz-string-uri': {
+      const json = decompressFromEncodedURIComponent(payload)
+      if (!json) {
+        throw new Error('Failed to decode LZ-String payload')
+      }
+      return json
+    }
+    case 'fflate-deflate-b91': {
+      const compressed = decodeBase91(payload)
+      return strFromU8(inflateSync(compressed), true)
+    }
+    case 'lzma-worker-b64url': {
+      const bytes = fromBase64Url(payload)
+      return runLzmaDecompress(bytes)
+    }
+    case 'brotli-wasm-b64url': {
+      const module = await loadBrotliModule()
+      const bytes = fromBase64Url(payload)
+      return textDecoder.decode(module.decompress(bytes))
+    }
+    default:
+      throw new Error('unknown-strategy')
+  }
+}
+
 const ensureSerialized = (input: CompressionEncodeInput): string => {
   if (input.serialized) {
     return input.serialized
   }
-  return JSON.stringify(input.snapshot)
+  return JSON.stringify(ensureSnapshot(input))
+}
+
+const ensureSnapshot = (input: CompressionEncodeInput): ProjectSnapshot => {
+  if (!input.snapshot) {
+    throw new Error('Project snapshot is required for this compression strategy')
+  }
+  return input.snapshot
 }
 
 const parseSnapshot = (json: string): ProjectSnapshot => {

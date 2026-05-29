@@ -48,6 +48,7 @@ const createMockStrategy = (overrides?: Partial<CompressionStrategy>): Compressi
     },
     avgCpuMs: { encode: 1, decode: 1 },
     libraryCostKb: 1,
+    supportsSerializedPayload: true,
     ...overrides,
   }
 }
@@ -413,6 +414,34 @@ describe('Share popover integration', () => {
     await waitFor(() => expect(writeText).toHaveBeenCalled())
     expect(writeText.mock.calls[0][0]).toContain('?share=')
     expect(screen.queryByText(/Copied!/i)).toBeNull()
+  })
+
+  it('serializes only the v3 Web share payload when generating links', async () => {
+    renderHeader()
+
+    fireEvent.click(screen.getByLabelText(/share project/i))
+
+    await waitFor(() => expect(encodeSpy).toHaveBeenCalled())
+    const serialized = encodeSpy.mock.calls[0][1]?.serialized
+    if (!serialized) {
+      throw new Error('Expected share generation to pass a serialized payload.')
+    }
+
+    const payload = JSON.parse(serialized)
+    expect(Object.keys(payload).sort()).toEqual(['preview', 'source'])
+    expect(Object.keys(payload.source).sort()).toEqual(['hooks', 'jsx'])
+    expect(Object.keys(payload.preview).sort()).toEqual(['theme', 'viewport'])
+    expect(payload.source.jsx).toEqual(expect.any(String))
+    expect(payload.source.hooks).toEqual(expect.any(String))
+    expect(payload.preview).toEqual({
+      viewport: 'MD',
+      theme: 'dark',
+    })
+    expect(serialized).not.toContain('activeFileId')
+    expect(serialized).not.toContain('settings')
+    expect(serialized).not.toContain('updatedAt')
+    expect(serialized).not.toContain('warningThreshold')
+    expect(serialized).not.toContain('charLimit')
   })
 
   it('keeps Agent session artifacts out of Desktop export fallback payloads', async () => {

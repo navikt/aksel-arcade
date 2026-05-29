@@ -10,7 +10,7 @@ import {
   createShareToken,
   encodeSharePayload,
   estimateShareUrlLengthFromPayload,
-  serializeSnapshot,
+  serializeSharePayload,
   SHARE_URL_CHAR_LIMIT,
   SHARE_URL_WARNING_THRESHOLD,
 } from '@/utils/shareEncoding'
@@ -19,7 +19,11 @@ import {
   recordShareGenerationTelemetry,
   type ShareGenerationOutcome,
 } from '@/services/telemetry'
-import { listCompressionStrategies, type CompressionStrategy } from '@/services/compressionStrategies'
+import {
+  isSharePayloadCompressionStrategy,
+  listCompressionStrategies,
+  type CompressionStrategy,
+} from '@/services/compressionStrategies'
 
 const SLOW_GENERATION_THRESHOLD_MS = 9000
 
@@ -268,7 +272,7 @@ export const useShareLink = (options?: UseShareLinkOptions) => {
       if (generationDelayMs > 0) {
         await new Promise(resolve => setTimeout(resolve, generationDelayMs))
       }
-      const serialized = serializeSnapshot(snapshot)
+      const serialized = serializeSharePayload(snapshot)
       const contentSignature = await computeChecksum(serialized)
 
       if (
@@ -562,7 +566,7 @@ const rankCompressionStrategies = (
   baseUrl?: string,
   adjustEstimate?: EstimateAdjuster,
 ): StrategyEstimate[] => {
-  const strategies = listCompressionStrategies()
+  const strategies = listCompressionStrategies().filter(isSharePayloadCompressionStrategy)
   const estimates = strategies
     .map(strategy => {
       const basePayload = Math.ceil(Math.max(0, strategy.estimateSize(serializedLength)))
@@ -579,7 +583,7 @@ const rankCompressionStrategies = (
 }
 
 const encodeWithStrategy = async ({ snapshot, serialized, strategy }: EncodeWithStrategyInput) => {
-  const result = await strategy.encode({ snapshot, serialized })
+  const result = await strategy.encode({ serialized })
   const checksumSource = result.checksumSource ?? result.serialized ?? serialized
   return encodeSharePayload(snapshot, {
     serialized: result.serialized,

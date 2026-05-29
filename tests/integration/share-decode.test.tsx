@@ -7,7 +7,7 @@ import { AppProvider, useProject } from '@/hooks/useProject'
 import { SettingsProvider } from '@/contexts/SettingsContext'
 import { createDefaultProject } from '@/utils/projectDefaults'
 import { createShareSnapshot } from '@/services/storage'
-import { encodeSharePayload, createShareToken } from '@/utils/shareEncoding'
+import { encodeSharePayload, createShareToken, LEGACY_SHARE_FORMAT_VERSION } from '@/utils/shareEncoding'
 import { decodeShareToken } from '@/utils/shareDecoding'
 import { getCompressionStrategy } from '@/services/compressionStrategies'
 import type { ProjectSnapshot } from '@/types/project'
@@ -113,6 +113,7 @@ describe('share decode integration', () => {
 
     const encoded = await strategy.encode({ snapshot: summarySnapshot })
     const envelope = await encodeSharePayload(summarySnapshot, {
+      formatVersion: LEGACY_SHARE_FORMAT_VERSION,
       serialized: encoded.serialized,
       checksumSource: encoded.checksumSource,
       compressed: encoded.payload,
@@ -146,6 +147,7 @@ describe('share decode integration', () => {
 
     const encoded = await strategy.encode({ snapshot: hooksSnapshot })
     const envelope = await encodeSharePayload(hooksSnapshot, {
+      formatVersion: LEGACY_SHARE_FORMAT_VERSION,
       serialized: encoded.serialized,
       checksumSource: encoded.checksumSource,
       compressed: encoded.payload,

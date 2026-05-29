@@ -1,11 +1,16 @@
 import { compressToEncodedURIComponent } from 'lz-string'
 import type { CompressionStrategyId, ProjectSnapshot, SharePayloadEnvelope } from '@/types/project'
 import { fromBase64Url, toBase64Url } from '@/utils/base64'
+import {
+  createWebShareUrlPayload,
+  serializeWebShareUrlPayload,
+} from '@/utils/sharePayload'
 
 export const SHARE_URL_PARAM = 'share'
 export const SHARE_URL_WARNING_THRESHOLD = 3600
 export const SHARE_URL_CHAR_LIMIT = 4000
-export const SHARE_FORMAT_VERSION = 2
+export const LEGACY_SHARE_FORMAT_VERSION = 2
+export const SHARE_FORMAT_VERSION = 3
 export const SHARE_METADATA_VERSION = 1
 export const SHARE_URL_ESTIMATE_MULTIPLIER = 1.4
 export const DEFAULT_COMPRESSION_STRATEGY_ID: CompressionStrategyId = 'lz-string-uri'
@@ -13,6 +18,7 @@ export const DEFAULT_COMPRESSION_STRATEGY_ID: CompressionStrategyId = 'lz-string
 const SHARE_TOKEN_PLACEHOLDER = '__SHARE_TOKEN__'
 
 interface EncodeOptions {
+  formatVersion?: number
   serialized?: string
   checksum?: string
   checksumSource?: string
@@ -27,17 +33,17 @@ interface EncodeOptions {
 interface ShareTokenMetadataPayloadWire {
   v: number
   s: CompressionStrategyId
-  w: 0 | 1
-  t: number
-  c: number
+  w?: 0 | 1
+  t?: number
+  c?: number
 }
 
 export interface ShareTokenMetadata {
   metadataVersion: number
   strategyId: CompressionStrategyId
-  warningThresholdHit: boolean
-  warningThreshold: number
-  charLimit: number
+  warningThresholdHit?: boolean
+  warningThreshold?: number
+  charLimit?: number
 }
 
 const DEFAULT_TOKEN_METADATA: ShareTokenMetadata = {
@@ -49,11 +55,17 @@ const DEFAULT_TOKEN_METADATA: ShareTokenMetadata = {
 }
 
 const CHECKSUM_PLACEHOLDER = createChecksumPlaceholder()
-const METADATA_PLACEHOLDER = encodeShareTokenMetadata(DEFAULT_TOKEN_METADATA)
+const METADATA_PLACEHOLDER = encodeShareTokenMetadata(DEFAULT_TOKEN_METADATA, {
+  includeShareUiMetadata: false,
+})
 export const SHARE_TOKEN_FIXED_OVERHEAD = `${SHARE_FORMAT_VERSION}.${METADATA_PLACEHOLDER}.`.length + CHECKSUM_PLACEHOLDER.length
 
 export const serializeSnapshot = (snapshot: ProjectSnapshot): string => {
   return JSON.stringify(snapshot)
+}
+
+export const serializeSharePayload = (snapshot: ProjectSnapshot): string => {
+  return serializeWebShareUrlPayload(createWebShareUrlPayload(snapshot))
 }
 
 export const computeChecksum = async (payload: string): Promise<string> => {
@@ -67,13 +79,18 @@ export const encodeSharePayload = async (
   snapshot: ProjectSnapshot,
   options?: EncodeOptions
 ): Promise<SharePayloadEnvelope> => {
-  const json = options?.serialized ?? serializeSnapshot(snapshot)
+  const formatVersion = options?.formatVersion ?? SHARE_FORMAT_VERSION
+  const json = options?.serialized ?? (
+    formatVersion === LEGACY_SHARE_FORMAT_VERSION
+      ? serializeSnapshot(snapshot)
+      : serializeSharePayload(snapshot)
+  )
   const checksumPayload = options?.checksumSource ?? json
   const checksum = options?.checksum ?? (await computeChecksum(checksumPayload))
   const compressed = options?.compressed ?? compressToEncodedURIComponent(json)
 
   return {
-    formatVersion: SHARE_FORMAT_VERSION,
+    formatVersion,
     metadataVersion: options?.metadataVersion ?? SHARE_METADATA_VERSION,
     checksum,
     compressed,
@@ -86,13 +103,17 @@ export const encodeSharePayload = async (
 }
 
 export const createShareToken = (envelope: SharePayloadEnvelope): string => {
-  const metadataSegment = encodeShareTokenMetadata({
-    metadataVersion: envelope.metadataVersion,
-    strategyId: envelope.strategyId,
-    warningThresholdHit: envelope.warningThresholdHit,
-    warningThreshold: envelope.warningThreshold,
-    charLimit: envelope.charLimit,
-  })
+  const includeShareUiMetadata = envelope.formatVersion === LEGACY_SHARE_FORMAT_VERSION
+  const metadataSegment = encodeShareTokenMetadata(
+    {
+      metadataVersion: envelope.metadataVersion,
+      strategyId: envelope.strategyId,
+      warningThresholdHit: envelope.warningThresholdHit,
+      warningThreshold: envelope.warningThreshold,
+      charLimit: envelope.charLimit,
+    },
+    { includeShareUiMetadata },
+  )
 
   return `${envelope.formatVersion}.${metadataSegment}.${envelope.checksum}.${envelope.compressed}`
 }
@@ -131,9 +152,9 @@ export const decodeShareTokenMetadata = (segment: string): ShareTokenMetadata =>
     if (
       typeof payload?.v !== 'number' ||
       typeof payload?.s !== 'string' ||
-      (payload.w !== 0 && payload.w !== 1) ||
-      typeof payload?.t !== 'number' ||
-      typeof payload?.c !== 'number'
+      (payload.w !== undefined && payload.w !== 0 && payload.w !== 1) ||
+      (payload.t !== undefined && typeof payload.t !== 'number') ||
+      (payload.c !== undefined && typeof payload.c !== 'number')
     ) {
       throw new Error('Invalid share token metadata payload')
     }
@@ -141,7 +162,7 @@ export const decodeShareTokenMetadata = (segment: string): ShareTokenMetadata =>
     return {
       metadataVersion: payload.v,
       strategyId: payload.s as CompressionStrategyId,
-      warningThresholdHit: payload.w === 1,
+      warningThresholdHit: payload.w === undefined ? undefined : payload.w === 1,
       warningThreshold: payload.t,
       charLimit: payload.c,
     }
@@ -150,14 +171,21 @@ export const decodeShareTokenMetadata = (segment: string): ShareTokenMetadata =>
   }
 }
 
-function encodeShareTokenMetadata(metadata: ShareTokenMetadata): string {
+function encodeShareTokenMetadata(
+  metadata: ShareTokenMetadata,
+  options?: { includeShareUiMetadata?: boolean }
+): string {
   const payload: ShareTokenMetadataPayloadWire = {
     v: metadata.metadataVersion,
     s: metadata.strategyId,
-    w: metadata.warningThresholdHit ? 1 : 0,
-    t: metadata.warningThreshold,
-    c: metadata.charLimit,
   }
+
+  if (options?.includeShareUiMetadata) {
+    payload.w = metadata.warningThresholdHit ? 1 : 0
+    payload.t = metadata.warningThreshold ?? SHARE_URL_WARNING_THRESHOLD
+    payload.c = metadata.charLimit ?? SHARE_URL_CHAR_LIMIT
+  }
+
   const bytes = new TextEncoder().encode(JSON.stringify(payload))
   return toBase64Url(bytes)
 }

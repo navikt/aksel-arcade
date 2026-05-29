@@ -1152,3 +1152,22 @@ Verification:
 - npm run lint (passes with the existing hook dependency warnings)
 - CI=1 npm run test
 - Browser smoke check at http://127.0.0.1:5178/aksel-arcade/ confirmed the Aksel Dialog text, `Avbryt` button, `Importer` button, and clear console.
+
+### 2026-05-29 - Issue #116: Minimal Web share URL payloads
+
+Implemented:
+
+- Selected #116 as the highest-priority ready-for-agent issue in #116-#120 because it is unblocked and the dependency for the other Web share URL rollout slices.
+- Changed new Web share URL generation to emit format v3 from a share-specific payload containing only Arcade project source (`jsx`, `hooks`) and shareable preview preferences (`viewport`, `theme`).
+- Kept URL length, warning/oversize, strategy, and clipboard behavior locally computed while removing warning threshold and character limit metadata from v3 token metadata.
+- Left legacy v1/v2/full-snapshot decoding in place for rollout compatibility, while v3 decode verifies checksums against the minimal serialized payload.
+- Added focused coverage for v3 payload minimality, v3 token metadata shape, v3 decode, and legacy packed-token decode.
+
+Verification:
+
+- npm run typecheck
+- npm run lint (passes with the existing hook dependency warnings)
+- CI=1 npm run test
+- Browser smoke check at http://127.0.0.1:5179/aksel-arcade/ generated a v3 share URL, decoded metadata as `{ v: 1, s: "brotli-wasm-b64url" }`, verified the decoded payload checksum, and confirmed no console errors after reload.
+
+Next note: #117 should replace the current ProjectSnapshot compatibility adapter with deliberate fresh-local-project load semantics, keeping sender identity, timestamps, settings, active tab, zoom, and sandbox flags out of recipient state.
