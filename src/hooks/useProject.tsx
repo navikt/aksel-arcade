@@ -22,10 +22,14 @@ import {
   HOOKS_DEMO_JSX_CODE,
   HOOKS_DEMO_HOOKS_CODE,
 } from '@/utils/projectDefaults'
-import { loadProject, SNAPSHOT_FILE_IDS } from '@/services/storage'
+import {
+  DEFAULT_WEB_ARCADE_WORKING_COPY_PREFERENCES,
+  loadProject,
+  SNAPSHOT_FILE_IDS,
+  type WebArcadeWorkingCopyPreferences,
+} from '@/services/storage'
 import type { ComponentSnippet } from '@/types/snippets'
 import { useSettings } from '@/contexts/SettingsContext'
-import { getViewportWidth } from '@/types/viewports'
 import {
   decodeShareToken,
   getShareTokenFromLocation,
@@ -167,7 +171,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       if (cancelled) {
         return
       }
-      console.error('Share link decode failed', error)
+      console.error('Web share URL decode failed', error)
       setShareHydration({
         status: 'error',
         token,
@@ -189,9 +193,20 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     }))
   }
 
-  const replaceProject = (newProject: Project) => {
+  const replaceCurrentWorkingCopy = (
+    newProject: Project,
+    preferences: WebArcadeWorkingCopyPreferences
+  ) => {
     notifyAgentSessionProjectReplaced()
     setProjectState(newProject)
+    setEditorState(createDefaultEditorState())
+    setPreviewState(createDefaultPreviewState(newProject.viewportSize))
+    setTheme(preferences.theme)
+    setPanelOrder(preferences.panelOrder)
+  }
+
+  const replaceProject = (newProject: Project) => {
+    replaceCurrentWorkingCopy(newProject, DEFAULT_WEB_ARCADE_WORKING_COPY_PREFERENCES)
   }
 
   const updateEditorState = (updates: Partial<EditorState>) => {
@@ -245,19 +260,10 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
   const resetToIntro = () => {
     const confirmed = window.confirm(
-      'Reset editor to intro state? This will replace your current code.'
+      'Reset editor? This will replace only this Web Arcade working copy with the default Untitled Project.'
     )
     if (confirmed) {
-      const introProject = createDefaultProject()
-      notifyAgentSessionProjectReplaced()
-      setProjectState({
-        ...project,
-        jsxCode: introProject.jsxCode,
-        hooksCode: introProject.hooksCode,
-        lastModified: new Date().toISOString(),
-      })
-      // Reset editor state to JSX tab
-      setEditorState(createDefaultEditorState())
+      replaceCurrentWorkingCopy(createDefaultProject(), DEFAULT_WEB_ARCADE_WORKING_COPY_PREFERENCES)
     }
   }
 
@@ -303,19 +309,10 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
     try {
       const nextProject = buildProjectFromSnapshot(snapshot)
-      notifyAgentSessionProjectReplaced()
-      setProjectState(nextProject)
-
-      const nextEditorState = createDefaultEditorState()
-      setEditorState(nextEditorState)
-
-      setPreviewState((prev) => ({
-        ...prev,
-        currentViewport: snapshot.preview.viewport,
-        viewportWidth: getViewportWidth(snapshot.preview.viewport),
-      }))
-
-      setTheme(snapshot.preview.theme)
+      replaceCurrentWorkingCopy(nextProject, {
+        ...DEFAULT_WEB_ARCADE_WORKING_COPY_PREFERENCES,
+        theme: snapshot.preview.theme,
+      })
     } catch (error) {
       console.error('Failed to apply shared snapshot', error)
     } finally {
@@ -356,7 +353,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
 const DEFAULT_SHARE_DECODE_ERROR: ShareDecodeError = {
   code: 'decode-failed',
-  message: 'We could not decode this share link. Please request a new one.',
+  message: 'We could not decode this Web share URL. Please request a new one.',
 }
 
 const buildProjectFromSnapshot = (snapshot: ProjectSnapshot): Project => {

@@ -81,7 +81,7 @@ test.describe('Share link flow', () => {
     const shareButton = page.getByLabel('Share project')
     await shareButton.click()
 
-    const copyButton = page.getByRole('button', { name: /copy share link/i })
+    const copyButton = page.getByRole('button', { name: /copy web share url/i })
     await expect(copyButton).toBeEnabled()
     await copyButton.click()
 
@@ -100,8 +100,8 @@ test.describe('Share link flow', () => {
     const recipientPage = await recipientContext.newPage()
     await recipientPage.goto(shareUrl)
 
-    await expect(recipientPage.getByText(/replace your current work/i)).toBeVisible()
-    await recipientPage.getByRole('button', { name: /load shared project/i }).click()
+    await expect(recipientPage.getByText(/replace only this Web Arcade working copy/i)).toBeVisible()
+    await recipientPage.getByRole('button', { name: /load web share url/i }).click()
     await expect(recipientPage).not.toHaveURL(/share=/)
 
     const previewFrame = recipientPage.frameLocator('[data-testid="preview-iframe"]')
@@ -128,7 +128,7 @@ test.describe('Share link flow', () => {
     const shareButton = page.getByLabel('Share project')
     await shareButton.click()
 
-    const copyButton = page.getByRole('button', { name: /copy share link/i })
+    const copyButton = page.getByRole('button', { name: /copy web share url/i })
     await expect(copyButton).toBeEnabled()
     await copyButton.click()
 
@@ -197,7 +197,7 @@ test.describe('Share link flow', () => {
 
       await page.getByLabel('Share project').click()
 
-      const copyButton = page.getByRole('button', { name: /copy share link/i })
+      const copyButton = page.getByRole('button', { name: /copy web share url/i })
       // Summary template selects packed-deflate, which regularly needs ~9s locally, so keep
       // a 20s budget to avoid flaky CI runs while the packed snapshot finishes encoding.
       await expect(copyButton).toBeEnabled({ timeout: 20000 })

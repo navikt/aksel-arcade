@@ -404,9 +404,9 @@ describe('Share popover integration', () => {
 
     fireEvent.click(screen.getByLabelText(/share project/i))
 
-    expect(await screen.findByText(/Link is being generated/i)).toBeTruthy()
+    expect(await screen.findByText(/Web share URL is being generated/i)).toBeTruthy()
 
-    const copyButton = await screen.findByRole('button', { name: /copy share link/i })
+    const copyButton = await screen.findByRole('button', { name: /copy web share url/i })
     await waitFor(() => expect((copyButton as HTMLButtonElement).disabled).toBe(false))
 
     fireEvent.click(copyButton)
@@ -543,7 +543,7 @@ describe('Share popover integration', () => {
     fireEvent.click(screen.getByLabelText(/share project/i))
 
     expect(screen.getByText(/You appear to be offline/i)).toBeTruthy()
-    const copyButton = await screen.findByRole('button', { name: /copy share link/i })
+    const copyButton = await screen.findByRole('button', { name: /copy web share url/i })
     expect((copyButton as HTMLButtonElement).disabled).toBe(true)
     expect(screen.getByRole('button', { name: /Retry generation/i })).toBeTruthy()
   })
@@ -566,7 +566,7 @@ describe('Share popover integration', () => {
     renderHeader({ generationDelayMs: 1500, slowGenerationThresholdMs: 900 })
     fireEvent.click(screen.getByLabelText(/share project/i))
     await Promise.resolve()
-    expect(screen.getByText(/Link is being generated/i)).toBeTruthy()
+    expect(screen.getByText(/Web share URL is being generated/i)).toBeTruthy()
 
     await act(async () => {
       await vi.advanceTimersByTimeAsync(800)
@@ -584,7 +584,7 @@ describe('Share popover integration', () => {
     })
     await Promise.resolve()
     await Promise.resolve()
-    const copyButton = screen.getByRole('button', { name: /copy share link/i })
+    const copyButton = screen.getByRole('button', { name: /copy web share url/i })
     expect((copyButton as HTMLButtonElement).disabled).toBe(false)
   }, 15000)
 
@@ -615,7 +615,7 @@ describe('Share popover integration', () => {
     renderHeader()
     fireEvent.click(screen.getByLabelText(/share project/i))
 
-    expect(await screen.findByText(/too large for a share link/i)).toBeTruthy()
+    expect(await screen.findByText(/too large for a Web share URL/i)).toBeTruthy()
     const oversizeDetails = await screen.findByText((content, element) => {
       const matchesTarget = element?.classList.contains('share-popover__oversize-details')
       if (!matchesTarget) {
@@ -627,7 +627,7 @@ describe('Share popover integration', () => {
     })
     expect(oversizeDetails).toBeTruthy()
     expect(screen.getByRole('button', { name: /use export instead/i })).toBeTruthy()
-    expect(screen.queryByRole('button', { name: /copy share link/i })).toBeNull()
+    expect(screen.queryByRole('button', { name: /copy web share url/i })).toBeNull()
   })
 
   it('still encodes when estimates exceed the limit and reuses the measured result', async () => {
@@ -648,9 +648,9 @@ describe('Share popover integration', () => {
       fireEvent.click(screen.getByLabelText(/share project/i))
 
       expect(await screen.findByText(/Share URL length/i)).toBeTruthy()
-      expect(screen.queryByText(/too large for a share link/i)).toBeNull()
+      expect(screen.queryByText(/too large for a Web share URL/i)).toBeNull()
       expect(screen.queryByRole('button', { name: /use export instead/i })).toBeNull()
-      expect(screen.getByRole('button', { name: /copy share link/i })).toBeTruthy()
+      expect(screen.getByRole('button', { name: /copy web share url/i })).toBeTruthy()
       expect(exportSpy).not.toHaveBeenCalled()
     } finally {
       exportSpy.mockRestore()
@@ -670,7 +670,7 @@ describe('Share popover integration', () => {
     expect(await screen.findByText(/Share URL length/i)).toBeTruthy()
     expect(screen.queryByText(/Some browsers cap URLs at/i)).toBeNull()
     expect(screen.queryByRole('button', { name: /use export instead/i })).toBeNull()
-    expect(screen.getByRole('button', { name: /copy share link/i })).toBeTruthy()
+    expect(screen.getByRole('button', { name: /copy web share url/i })).toBeTruthy()
   })
 
   it('refreshes the share length when clicking the share button while the popover is open', async () => {

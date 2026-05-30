@@ -394,10 +394,10 @@ export const AppHeader = ({
                     </Heading>
                     {isGeneratingShare ? (
                       <HStack gap="space-8" align="center" role="status" aria-live="polite">
-                        <Loader size="xsmall" title="Generating share link" />
+                        <Loader size="xsmall" title="Generating Web share URL" />
                         <VStack gap="space-4">
                           <BodyLong size="small" id={loadingDescriptionId}>
-                            Link is being generated…
+                            Web share URL is being generated…
                           </BodyLong>
                           {shareState.showSlowGenerationNotice && (
                             <Detail
@@ -419,8 +419,8 @@ export const AppHeader = ({
                     ) : (
                       <>
                         <BodyLong size="small">
-                          Generate a secure link so teammates can load this project without
-                          downloading a package file.
+                          Generate a Web share URL so teammates can load this project without
+                          downloading an Arcade project package.
                         </BodyLong>
                         <VStack gap="space-12">
                           {shareState.status === 'error' && shareState.error && (
@@ -447,7 +447,8 @@ export const AppHeader = ({
                               <VStack gap="space-12">
                                 <VStack gap="space-4">
                                   <BodyLong size="small">
-                                    This project is too large for a share link. Use Export instead.
+                                    This project is too large for a Web share URL. Use Export
+                                    instead.
                                   </BodyLong>
                                   {shareLengthDetailText && (
                                     <Detail
@@ -471,8 +472,8 @@ export const AppHeader = ({
                           ) : (
                             <CopyButton
                               copyText={shareState.link ?? ''}
-                              text="Copy share link"
-                              activeText="Link copied"
+                              text="Copy Web share URL"
+                              activeText="Web share URL copied"
                               size="small"
                               variant="neutral"
                               disabled={shareState.status !== 'ready'}
@@ -583,7 +584,8 @@ export const AppHeader = ({
           >
             <Dialog.Body>
               <BodyLong>
-                Prosjektet du vil importere erstatter det du jobber på nå. Vil du fortsette?
+                Importing this Arcade project package replaces only this Web Arcade working copy.
+                Continue?
               </BodyLong>
             </Dialog.Body>
             <Dialog.Footer>
@@ -610,9 +612,9 @@ const getShareErrorMessage = (code: ShareLinkErrorCode): string => {
     case 'storage-unavailable':
       return 'Browser storage is blocked, so we cannot package your project. Enable storage access and retry.'
     case 'oversize':
-      return 'This project is too large for a share link. Use Export instead.'
+      return 'This project is too large for a Web share URL. Use Export instead.'
     default:
-      return 'Something went wrong while generating the share link. Please try again.'
+      return 'Something went wrong while generating the Web share URL. Please try again.'
   }
 }
 

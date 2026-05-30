@@ -285,17 +285,17 @@ const createDecodeError = (code: ShareDecodeErrorCode): ShareDecodeError => {
     case 'missing-token':
       return {
         code,
-        message: 'Share link is missing required data. Ask the sender to regenerate the link.',
+        message: 'Web share URL is missing required data. Ask the sender to regenerate the URL.',
       }
     case 'malformed-token':
       return {
         code,
-        message: 'Share link is incomplete or corrupted. Double-check the copied URL.',
+        message: 'Web share URL is incomplete or corrupted. Double-check the copied URL.',
       }
     case 'unsupported-version':
       return {
         code,
-        message: 'This share link was created with a newer format that is not supported yet.',
+        message: 'This Web share URL was created with a newer format that is not supported yet.',
       }
     case 'checksum-mismatch':
       return {
@@ -306,7 +306,7 @@ const createDecodeError = (code: ShareDecodeErrorCode): ShareDecodeError => {
     default:
       return {
         code: 'decode-failed',
-        message: 'We could not decode this share link. Please try again or request a new link.',
+        message: 'We could not decode this Web share URL. Please try again or request a new URL.',
       }
   }
 }

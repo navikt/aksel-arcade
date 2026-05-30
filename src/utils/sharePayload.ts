@@ -149,7 +149,7 @@ const requireCanonicalSource = (
 ): string => {
   const content = findFileContent(snapshot, fileId)
   if (content === undefined) {
-    throw new Error(`Legacy v2 share link is missing canonical ${label} source`)
+    throw new Error(`Legacy v2 Web share URL is missing canonical ${label} source`)
   }
   return content
 }
