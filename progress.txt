@@ -1334,3 +1334,24 @@ Verification:
 - Browser smoke check at http://127.0.0.1:5174/aksel-arcade/ confirmed the app renders, Settings > Editor shows Reset editor only, Clear storage & reload is absent, and there are no runtime console errors.
 
 Next note: #131 can now add multi-tab regression coverage across edit, reload, duplicate, share/import/reset, and autosave-error paths with #130's UI cleanup in place.
+
+### 2026-05-30 - Issue #131: Multi-tab Web Arcade regression coverage
+
+Implemented:
+
+- Added Playwright regression coverage dedicated to Web Arcade tab-scoped working copies.
+- Covered two ordinary Web Arcade tabs starting from independent default working copies, then diverging through edits without cross-tab overwrite.
+- Covered same-tab reload restoring only that tab's saved working copy while another tab keeps its own source.
+- Covered browser tab duplication by opening from the current tab, verifying the visible working copy is forked, and proving later edits diverge independently.
+- Covered Web share URL load, Arcade project package import, and Reset editor replacement in one tab while another tab remains unchanged.
+- Covered autosave failure feedback when tab-scoped `sessionStorage` persistence throws, preserving the #130 rule that normal autosave status stays hidden but failures remain visible.
+
+Verification:
+
+- npm install
+- npm run typecheck
+- npm run lint (passes with existing hook dependency warnings in `InspectionPopover` and `PreviewPane`)
+- CI=1 npm run test
+- CI=1 npm run test:e2e -- web-working-copy-tabs.spec.ts
+
+Next note: #131 is implemented as regression coverage only. The Playwright config reuses any existing dev server locally, so if a stale server is already listening on port 5173, stop that specific process or run in CI mode before re-running this spec.
