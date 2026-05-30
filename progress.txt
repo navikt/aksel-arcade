@@ -1355,3 +1355,27 @@ Verification:
 - CI=1 npm run test:e2e -- web-working-copy-tabs.spec.ts
 
 Next note: #131 is implemented as regression coverage only. The Playwright config reuses any existing dev server locally, so if a stale server is already listening on port 5173, stop that specific process or run in CI mode before re-running this spec.
+
+### 2026-05-30 - Issue #144: Unsigned local Desktop Arcade packaging
+
+Implemented:
+
+- Selected #144 as the highest-priority ready-for-agent issue from #143-#150 because #147, #148, and #149 explicitly depend on #144, while #143 is duplicate text and later issues are blocked.
+- Added `desktop:build`, `desktop:package`, `desktop:package:mac`, `desktop:package:win`, and `desktop:icons` npm scripts.
+- Added a Desktop-specific Vite config that emits relative asset URLs into `dist-desktop`, separate from the Web Arcade GitHub Pages `dist` build.
+- Added electron-builder config for the unsigned local target matrix: Windows x64 NSIS, macOS Apple Silicon DMG, and macOS Intel DMG.
+- Added Desktop app metadata for `Aksel Arcade` with `no.nav.aksel.arcade`, plus Desktop version injection via `AKSEL_ARCADE_DESKTOP_VERSION` without changing committed package versions.
+- Added icon generation from `public/aksel-favicon.svg` into local `build/desktop` `.ico` and `.icns` resources.
+- Updated docs for local unsigned packaging commands, artifact names, host prerequisites, and no-publish behavior.
+- Added unit coverage for Desktop build profile, artifact naming, metadata, target matrix, version injection, icon wiring, and unsigned publish settings.
+
+Verification:
+
+- npm run desktop:build
+- npm run typecheck
+- npm run test -- --run
+- npm run lint (passes with existing hook dependency warnings in `InspectionPopover` and `PreviewPane`)
+- npx electron-builder --config electron-builder.config.cjs --dir --publish never
+- AKSEL_ARCADE_DESKTOP_VERSION=0.1.0 npm run desktop:package:mac
+
+Next note: Windows installer generation is configured as `desktop:package:win`; running it from macOS or Linux may require Wine, as documented.

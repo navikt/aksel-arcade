@@ -39,6 +39,18 @@ The Windows installer is unsigned initially. macOS artifacts must use minimal ha
 
 Release notes should include generated commit/PR notes plus a short fixed download guide that maps Windows, Mac Apple Silicon, and Mac Intel users to the right installer. Do not publish checksum artifacts initially.
 
+## Local unsigned packaging
+
+Local development supports unsigned Desktop Arcade builds only. Run `npm run desktop:build` to generate Desktop icons from `public/aksel-favicon.svg`, build the sandbox bundle, and emit a Desktop-specific renderer to `dist-desktop` with relative asset URLs. This output is separate from the Web Arcade GitHub Pages build in `dist`.
+
+Run `AKSEL_ARCADE_DESKTOP_VERSION=0.1.0 npm run desktop:package` to build the full configured unsigned local target matrix into `release/desktop` without publishing. The matrix is Windows x64 NSIS, macOS Apple Silicon DMG, and macOS Intel DMG. For host-specific local packaging, use `npm run desktop:package:mac` or `npm run desktop:package:win`; macOS DMGs require macOS, and Windows NSIS builds from macOS or Linux may require Wine.
+
+The local packaging command uses `electron-builder.config.cjs`, installs the app as `Aksel Arcade`, uses `no.nav.aksel.arcade`, and names local artifacts with the same Desktop Arcade shape:
+
+- `Aksel-Arcade-X.Y.Z-windows-x64.exe`
+- `Aksel-Arcade-X.Y.Z-mac-arm64.dmg`
+- `Aksel-Arcade-X.Y.Z-mac-x64.dmg`
+
 ## Safety rules
 
 - Detect Desktop-impacting changes before entering the `desktop-release` environment.

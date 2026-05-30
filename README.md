@@ -150,6 +150,8 @@ Inspect mode helps you understand your UI structure:
 ```bash
 npm run dev              # Start development server
 npm run desktop:dev      # Start macOS-first Desktop Arcade dev shell
+npm run desktop:build    # Build Desktop Arcade renderer with local relative assets
+npm run desktop:package  # Build unsigned Desktop install artifacts without publishing
 npm run build            # Build for production
 npm run preview          # Preview production build
 npm test                 # Run unit tests
@@ -168,6 +170,18 @@ npm run desktop:dev
 ```
 
 The desktop script starts Vite on `127.0.0.1:5173` and opens an Electron shell around the same renderer. Desktop capabilities are supplied only through a narrow preload IPC bridge, so React components stay browser-like: the Electron shell receives the Desktop Arcade capability set without direct Node, socket, process, or filesystem access. The same renderer URL opened in a normal browser remains Web Arcade with Share URL available and no Agent access, Agent runtime, browser-global Agent bridge, or Agent pairing handoff.
+
+### Local unsigned Desktop packaging
+
+Use `npm run desktop:build` to create Desktop Arcade renderer output in `dist-desktop` with relative asset URLs, separate from the Web Arcade GitHub Pages build in `dist`. Use `AKSEL_ARCADE_DESKTOP_VERSION=0.1.0 npm run desktop:package` to build the configured unsigned local installers into `release/desktop` without publishing:
+
+| Platform | Artifact |
+| --- | --- |
+| Windows x64 | `Aksel-Arcade-X.Y.Z-windows-x64.exe` |
+| Mac Apple Silicon | `Aksel-Arcade-X.Y.Z-mac-arm64.dmg` |
+| Mac Intel | `Aksel-Arcade-X.Y.Z-mac-x64.dmg` |
+
+For host-specific local packaging, use `npm run desktop:package:mac` or `npm run desktop:package:win`. macOS DMGs require macOS, and Windows NSIS builds from macOS or Linux may require Wine.
 
 ### Tech Stack
 

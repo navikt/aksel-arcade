@@ -3,7 +3,9 @@ node_modules
 
 # Build outputs
 dist
+dist-desktop
 build
+release
 *.local
 
 # TypeScript build info

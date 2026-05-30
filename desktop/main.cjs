@@ -9,7 +9,7 @@ const STOP_AGENT_TRANSPORT_CHANNEL = 'aksel-arcade:stop-agent-transport-session'
 const ROUTE_AGENT_TRANSPORT_REQUEST_CHANNEL = 'aksel-arcade:route-agent-transport-request'
 const ROUTE_AGENT_TRANSPORT_RESPONSE_CHANNEL = 'aksel-arcade:route-agent-transport-response'
 const DEFAULT_RENDERER_URL = 'http://127.0.0.1:5173/aksel-arcade/'
-const DIST_DIR = path.resolve(__dirname, '..', 'dist')
+const DIST_DIR = path.resolve(__dirname, '..', 'dist-desktop')
 const AGENT_TRANSPORT_ROUTE_TIMEOUT_MS = 5000
 const agentLoopbackTransport = createAgentLoopbackJsonRpcTransport({
   routeRequest: routeAgentTransportRequest,
@@ -27,6 +27,8 @@ const DESKTOP_ARCADE_CAPABILITIES = Object.freeze({
     legacyJsonImport: false,
   }),
 })
+
+app.setName('Aksel Arcade')
 
 const getRendererUrl = () => process.env.AKSEL_ARCADE_RENDERER_URL || DEFAULT_RENDERER_URL
 
