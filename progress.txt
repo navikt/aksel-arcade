@@ -1313,3 +1313,24 @@ Verification:
 - Browser smoke check at http://127.0.0.1:5174/aksel-arcade/ confirmed app render, Web share URL copy, Reset editor confirmation, and no runtime console errors.
 
 Next note: #130 should remove the remaining Clear storage & reload affordance and finish the Web Arcade storage/autosave status UI cleanup; this branch intentionally leaves that separate feature untouched.
+
+### 2026-05-30 - Issue #130: Remove misleading Web Arcade storage UI
+
+Implemented:
+
+- Selected #130 as the highest-priority ready-for-agent issue from #130-#131 because #131 is explicitly blocked by #130 and should wait for this UI cleanup.
+- Removed the Web Arcade Settings > Editor "Clear storage & reload" action so the UI no longer suggests a browser-wide saved project or durable storage reset workflow.
+- Kept Reset editor available as the explicit action for replacing only the current Web Arcade working copy with the default Untitled Project.
+- Removed the now-unused clearStorage UI handler and its direct unit coverage; tab-scoped persistence remains owned by save/load and reset replacement flows.
+- Added integration coverage that Reset editor remains visible while Clear storage & reload is absent.
+- Confirmed the existing SaveStatusIndicator behavior still hides normal idle/saving/saved autosave states and only surfaces autosave failure feedback.
+
+Verification:
+
+- npm install
+- npm run typecheck
+- npm run lint (passes with existing hook dependency warnings in `InspectionPopover` and `PreviewPane`)
+- npm run test
+- Browser smoke check at http://127.0.0.1:5174/aksel-arcade/ confirmed the app renders, Settings > Editor shows Reset editor only, Clear storage & reload is absent, and there are no runtime console errors.
+
+Next note: #131 can now add multi-tab regression coverage across edit, reload, duplicate, share/import/reset, and autosave-error paths with #130's UI cleanup in place.

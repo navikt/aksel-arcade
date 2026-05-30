@@ -44,7 +44,6 @@ import {
 } from '@/services/storage'
 import { createShareToken, encodeSharePayload } from '@/utils/shareEncoding'
 
-const noop = () => {}
 const LEGACY_AGENT_BRIDGE_GLOBAL = '__AKSEL_ARCADE_AGENT_BRIDGE__'
 
 const getLegacyAgentBridgeGlobal = () => Reflect.get(window, LEGACY_AGENT_BRIDGE_GLOBAL)
@@ -88,7 +87,6 @@ const Harness = ({
         saveStatus="idle"
         projectSizeBytes={0}
         onResetToIntro={resetToIntro}
-        onClearStorage={noop}
         onLoadFormSummaryTemplate={loadFormSummaryTemplate}
         onLoadHooksDemo={loadHooksDemo}
         shellCapabilities={shellCapabilities}
@@ -651,6 +649,15 @@ describe('ProjectControls layout', () => {
     expect(await screen.findByText(/Share URL length/i)).toBeTruthy()
     expect(screen.getByText(/Strategy:/i)).toBeTruthy()
     expectLegacyAgentBridgeAbsent()
+  })
+
+  it('keeps Reset editor available without exposing browser-wide storage clearing', async () => {
+    renderHeader({ shellCapabilities: WEB_ARCADE_CAPABILITIES })
+
+    fireEvent.click(screen.getByRole('button', { name: /settings/i }))
+
+    expect(await screen.findByRole('menuitem', { name: /Reset editor/i })).toBeTruthy()
+    expect(screen.queryByRole('menuitem', { name: /Clear storage & reload/i })).toBeNull()
   })
 
   it('confirms import with an Aksel Dialog and custom action label', async () => {

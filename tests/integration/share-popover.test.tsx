@@ -53,8 +53,6 @@ const createMockStrategy = (overrides?: Partial<CompressionStrategy>): Compressi
   }
 }
 
-const noop = () => {}
-
 interface HarnessProps {
   shareOptions?: UseShareLinkOptions
   shellCapabilities?: ShellCapabilities
@@ -95,7 +93,6 @@ const Harness = ({
         saveStatus="idle"
         projectSizeBytes={0}
         onResetToIntro={resetToIntro}
-        onClearStorage={noop}
         onLoadFormSummaryTemplate={loadFormSummaryTemplate}
         onLoadHooksDemo={loadHooksDemo}
         shareOptions={shareOptions}

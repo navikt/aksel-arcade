@@ -6,7 +6,6 @@ import {
   createArcadeProjectPackage,
   importProject,
   validateProjectSize,
-  clearStorage,
   ARCADE_PROJECT_IMPORT_ACCEPT,
   ARCADE_PROJECT_PACKAGE_EXTENSION,
   ARCADE_PROJECT_PACKAGE_FORMAT,
@@ -887,32 +886,6 @@ describe('Storage Service', () => {
       expect(ARCADE_PROJECT_IMPORT_ACCEPT).toContain(ARCADE_PROJECT_PACKAGE_MIME_TYPE)
       expect(ARCADE_PROJECT_IMPORT_ACCEPT).not.toContain('.json')
       expect(ARCADE_PROJECT_IMPORT_ACCEPT).not.toContain('application/json')
-    })
-  })
-
-  describe('clearStorage', () => {
-    it('should remove project from tab-scoped sessionStorage', () => {
-      const project: Project = {
-        id: crypto.randomUUID(),
-        name: 'Test',
-        jsxCode: '',
-        hooksCode: '',
-        viewportSize: 'MD',
-        panelLayout: 'editor-left',
-        version: '1.0.0',
-        createdAt: new Date().toISOString(),
-        lastModified: new Date().toISOString(),
-      }
-
-      saveProject(project)
-      localStorage.setItem(WEB_ARCADE_WORKING_COPY_STORAGE_KEY, 'legacy browser-wide data')
-      expect(sessionStorage.getItem(WEB_ARCADE_WORKING_COPY_STORAGE_KEY)).toBeTruthy()
-
-      clearStorage()
-      expect(sessionStorage.getItem(WEB_ARCADE_WORKING_COPY_STORAGE_KEY)).toBeNull()
-      expect(localStorage.getItem(WEB_ARCADE_WORKING_COPY_STORAGE_KEY)).toBe(
-        'legacy browser-wide data'
-      )
     })
   })
 })
