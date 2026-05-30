@@ -39,6 +39,14 @@ The Windows installer is unsigned initially. macOS artifacts must use minimal ha
 
 Release notes should include generated commit/PR notes plus a short fixed download guide that maps Windows, Mac Apple Silicon, and Mac Intel users to the right installer. Do not publish checksum artifacts initially.
 
+## Release planning helper
+
+Run `npm run desktop:release-plan` before entering the `desktop-release` environment. The helper accepts newline- or comma-separated `DESKTOP_RELEASE_CHANGED_FILES` and `DESKTOP_RELEASE_TAGS` values, then prints a JSON plan.
+
+The plan requires a release for Desktop shell files, Desktop packaging/release automation, release-specific docs, and shared Arcade renderer files shipped by Desktop Arcade. It does not require a Desktop release for unrelated docs, tests, or the Web Arcade deploy workflow. The first release computes `0.1.0`; later releases patch-bump the highest valid `desktop-vX.Y.Z` tag while ignoring malformed or unrelated tags.
+
+For maintainer recovery dispatches, set `GITHUB_EVENT_NAME=workflow_dispatch` and `DESKTOP_RELEASE_REF_ON_PROTECTED_MASTER=true` only after verifying the selected commit is already on protected `master`. Accepted plans inject `AKSEL_ARCADE_DESKTOP_VERSION` for the packaging workspace and keep `package.json` unchanged in git.
+
 ## Local unsigned packaging
 
 Local development supports unsigned Desktop Arcade builds only. Run `npm run desktop:build` to generate Desktop icons from `public/aksel-favicon.svg`, build the sandbox bundle, and emit a Desktop-specific renderer to `dist-desktop` with relative asset URLs. This output is separate from the Web Arcade GitHub Pages build in `dist`.
