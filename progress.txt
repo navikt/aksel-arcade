@@ -1379,3 +1379,42 @@ Verification:
 - AKSEL_ARCADE_DESKTOP_VERSION=0.1.0 npm run desktop:package:mac
 
 Next note: Windows installer generation is configured as `desktop:package:win`; running it from macOS or Linux may require Wine, as documented.
+
+### 2026-05-31 - Issue #145: Desktop Arcade release planning
+
+Implemented:
+
+- Selected #145 as the highest-priority ready-for-agent issue from #143-#150 because #143 duplicates the already-present local packaging slice, while #147-#150 are blocked by earlier Desktop release automation work.
+- Added `npm run desktop:release-plan` backed by `scripts/desktop-release-plan.cjs`.
+- Added release/no-release classification for Desktop shell files, release automation, release-specific docs, generated Desktop resources, public/shared renderer assets, and Web-only or unrelated changes.
+- Added Desktop release tag planning with `desktop-vX.Y.Z` parsing, malformed/unrelated tag filtering, first-release `0.1.0`, and later patch bumps from the highest valid Desktop tag.
+- Added manual recovery dispatch validation that rejects refs not already verified on protected `master`.
+- Modeled Desktop version injection as `AKSEL_ARCADE_DESKTOP_VERSION` workspace state with no committed `package.json` version bump.
+- Documented the release planning helper and environment inputs in `docs/desktop-release.md`.
+- Added unit coverage for no-release changes, Desktop-impacting changes, first release, patch bumping, malformed tags, shared renderer changes, and accepted/rejected manual recovery refs.
+
+Verification:
+
+- npm run typecheck
+- npm run test -- --run
+- CI=1 npm run test
+- npm run type-check
+- npm run lint (passes with existing hook dependency warnings in `InspectionPopover` and `PreviewPane`)
+- DESKTOP_RELEASE_CHANGED_FILES=$'src/App.tsx\n.github/workflows/deploy.yml' DESKTOP_RELEASE_TAGS=$'desktop-v0.1.0\ndesktop-v0.1.bad\nv1.0.0' npm run desktop:release-plan
+- Browser smoke check at `http://127.0.0.1:5174/aksel-arcade/`
+
+### 2026-05-31 - PR #152 review follow-up
+
+Fixed:
+
+- Marked `vite.config.ts` as Desktop-impacting because `vite.desktop.config.ts` merges the shared Vite config into Desktop builds.
+- Added unit coverage so shared Vite config changes require a Desktop release, and removed `vite.config.ts` from the no-release test case.
+
+Verification:
+
+- npm run typecheck
+- CI=1 npm run test
+- npm run type-check
+- npm run lint (passes with existing hook dependency warnings in `InspectionPopover` and `PreviewPane`)
+- DESKTOP_RELEASE_CHANGED_FILES='vite.config.ts' DESKTOP_RELEASE_TAGS='desktop-v0.2.6' npm run desktop:release-plan
+- Browser smoke check at `http://127.0.0.1:5174/aksel-arcade/`
