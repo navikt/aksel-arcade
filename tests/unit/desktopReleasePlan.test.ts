@@ -70,7 +70,6 @@ describe("Desktop release planning", () => {
         "docs/prd/share-url.md",
         ".github/workflows/deploy.yml",
         "tests/unit/desktopReleasePlan.test.ts",
-        "vite.config.ts",
       ],
     });
 
@@ -158,6 +157,20 @@ describe("Desktop release planning", () => {
       desktopImpacting: true,
       desktopImpactingFiles: ["src/App.tsx"],
       nextDesktopVersion: "0.2.6",
+    });
+  });
+
+  it("treats the shared Vite config as Desktop-impacting because the Desktop build merges it", () => {
+    const plan = createPushPlan({
+      changedFiles: ["vite.config.ts"],
+      releaseTags: ["desktop-v0.2.6"],
+    });
+
+    expect(plan).toMatchObject({
+      releaseRequired: true,
+      desktopImpacting: true,
+      desktopImpactingFiles: ["vite.config.ts"],
+      nextDesktopVersion: "0.2.7",
     });
   });
 

@@ -1402,3 +1402,19 @@ Verification:
 - npm run lint (passes with existing hook dependency warnings in `InspectionPopover` and `PreviewPane`)
 - DESKTOP_RELEASE_CHANGED_FILES=$'src/App.tsx\n.github/workflows/deploy.yml' DESKTOP_RELEASE_TAGS=$'desktop-v0.1.0\ndesktop-v0.1.bad\nv1.0.0' npm run desktop:release-plan
 - Browser smoke check at `http://127.0.0.1:5174/aksel-arcade/`
+
+### 2026-05-31 - PR #152 review follow-up
+
+Fixed:
+
+- Marked `vite.config.ts` as Desktop-impacting because `vite.desktop.config.ts` merges the shared Vite config into Desktop builds.
+- Added unit coverage so shared Vite config changes require a Desktop release, and removed `vite.config.ts` from the no-release test case.
+
+Verification:
+
+- npm run typecheck
+- CI=1 npm run test
+- npm run type-check
+- npm run lint (passes with existing hook dependency warnings in `InspectionPopover` and `PreviewPane`)
+- DESKTOP_RELEASE_CHANGED_FILES='vite.config.ts' DESKTOP_RELEASE_TAGS='desktop-v0.2.6' npm run desktop:release-plan
+- Browser smoke check at `http://127.0.0.1:5174/aksel-arcade/`

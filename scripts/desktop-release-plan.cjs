@@ -11,6 +11,7 @@ const EXACT_DESKTOP_IMPACTING_PATHS = new Set([
   "index.html",
   "package-lock.json",
   "package.json",
+  "vite.config.ts",
   "vite.desktop.config.ts",
   "docs/desktop-release.md",
   "docs/adr/0009-desktop-arcade-release-pipeline.md",
