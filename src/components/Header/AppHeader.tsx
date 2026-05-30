@@ -24,7 +24,6 @@ import {
   SunIcon,
   ArrowsSquarepathIcon,
   ArrowUndoIcon,
-  TrashIcon,
   LinkIcon,
 } from '@navikt/aksel-icons'
 import { SaveStatusIndicator } from './SaveStatusIndicator'
@@ -71,7 +70,6 @@ interface AppHeaderProps {
   saveStatus: SaveStatus
   projectSizeBytes: number
   onResetToIntro: () => void
-  onClearStorage: () => void
   onLoadFormSummaryTemplate: () => void
   onLoadHooksDemo: () => void
   shareOptions?: UseShareLinkOptions
@@ -86,7 +84,6 @@ export const AppHeader = ({
   saveStatus,
   projectSizeBytes,
   onResetToIntro,
-  onClearStorage,
   onLoadFormSummaryTemplate,
   onLoadHooksDemo,
   shareOptions,
@@ -558,9 +555,6 @@ export const AppHeader = ({
               <ActionMenu.Group label="Editor">
                 <ActionMenu.Item icon={<ArrowUndoIcon aria-hidden />} onSelect={onResetToIntro}>
                   Reset editor
-                </ActionMenu.Item>
-                <ActionMenu.Item icon={<TrashIcon aria-hidden />} onSelect={onClearStorage}>
-                  Clear storage & reload
                 </ActionMenu.Item>
               </ActionMenu.Group>
             </ActionMenu.Content>

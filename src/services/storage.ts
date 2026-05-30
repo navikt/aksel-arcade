@@ -492,10 +492,6 @@ const copyProjectFields = (project: Project): Project => ({
   lastModified: project.lastModified,
 })
 
-export const clearStorage = (): void => {
-  sessionStorage.removeItem(STORAGE_KEY)
-}
-
 export const createShareSnapshot = (
   project: Project,
   overrides?: ShareSnapshotOverrides

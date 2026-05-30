@@ -8,7 +8,7 @@ import { EditorPane } from './components/Editor/EditorPane'
 import { PreviewPane } from './components/Preview/PreviewPane'
 import { WarningNotification } from './components/Header/WarningNotification'
 import { SplitPane } from './components/Layout/SplitPane'
-import { validateProjectSize, clearStorage } from './services/storage'
+import { validateProjectSize } from './services/storage'
 import type { Project } from './types/project'
 import { WEB_ARCADE_CAPABILITIES, type ShellCapabilities } from './services/shellCapabilities'
 import { useSettings } from './contexts/SettingsContext'
@@ -108,7 +108,6 @@ function App({ shellCapabilities = WEB_ARCADE_CAPABILITIES }: AppProps) {
           saveStatus={saveStatus}
           projectSizeBytes={projectSizeBytes}
           onResetToIntro={resetToIntro}
-          onClearStorage={clearStorage}
           onLoadFormSummaryTemplate={loadFormSummaryTemplate}
           onLoadHooksDemo={loadHooksDemo}
           shellCapabilities={shellCapabilities}
