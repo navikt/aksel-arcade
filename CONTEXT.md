@@ -45,8 +45,28 @@ A Web Arcade action that replaces only the current **Web Arcade working copy** w
 _Avoid_: Clear storage, reload
 
 **Desktop Arcade**:
-The desktop product surface for working with the same **Arcade projects** as **Web Arcade**.
+The downloadable desktop product surface for working with the same **Arcade projects** as **Web Arcade**.
 _Avoid_: Electron app, native app
+
+**Desktop Arcade release**:
+A versioned publication of **Desktop Arcade** for download, containing the supported platform-specific install artifacts for that version.
+_Avoid_: Web deploy, build run, artifact batch
+
+**Desktop install artifact**:
+A human-facing installer included in a **Desktop Arcade release** for one supported desktop platform and processor family.
+_Avoid_: Build output, ZIP bundle, auto-update feed
+
+**Desktop release credential**:
+A protected secret used only by release automation to sign or notarize **Desktop install artifacts**.
+_Avoid_: App secret, runtime secret, project data
+
+**Desktop Arcade version**:
+The SemVer identifier for a **Desktop Arcade release**.
+_Avoid_: Build number, deployment ID, Web Arcade version
+
+**Desktop-impacting change**:
+A change that alters **Desktop Arcade** itself, its release path, or shared **Arcade project** behavior shipped by **Desktop Arcade**.
+_Avoid_: Desktop-only change, every repository change
 
 **Agent session**:
 A Desktop Arcade-only revocable, consent-gated pairing relationship where an authorized external agent can inspect and change one active **Arcade project** while the human can stop access.
@@ -117,6 +137,14 @@ Domain expert: "Show it in the live preview. If the user does not want more agen
 Developer: "The user exported an Arcade project package to send a prototype to a colleague."
 
 Domain expert: "Then the package should contain the project name, Arcade project source, and viewport preview preference only. It should not carry AI instructions, local identity, diagnostics, preview evidence, or workspace preferences."
+
+Developer: "A Desktop-impacting change was merged."
+
+Domain expert: "Create a new Desktop Arcade release with the next Desktop Arcade version and the supported Desktop install artifacts. Do not treat it as a Web deploy."
+
+Developer: "A release job needs a signing secret."
+
+Domain expert: "That is a Desktop release credential. It belongs only to release automation and must not become app data, project data, or Web Arcade behavior."
 
 Developer: "The user opened a Web share URL from a colleague."
 
