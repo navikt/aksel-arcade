@@ -1292,3 +1292,24 @@ Fixed one scoped ADR 0008 issue before merge:
 
 - Removed normal autosave `saving`/`saved`/idle status from the Web UI, leaving only an autosave failure indicator because save failure means same-tab reload safety is broken.
 - Added focused component coverage so normal autosave statuses render nothing while failure status remains visible.
+
+### 2026-05-30 - Issue #129: Scope Web Arcade replacement actions
+
+Implemented:
+
+- Selected #129 as the highest-priority ready-for-agent issue from #129-#131 because #131 is blocked by #129/#130 and #129 is the foundational correctness fix for explicit replacement flows.
+- Centralized Web Arcade working-copy replacement so import, Web share URL load, and Reset editor replace the current working copy with fresh local project state, reset editor/preview state, and avoid touching other open tabs.
+- Reset editor now creates a fresh default Untitled Project identity instead of preserving the previous project id/name/source wrapper.
+- Web share URL loads carry shareable preview theme/viewport while resetting workspace preferences; Arcade project package imports reset workspace preferences because packages do not carry them.
+- Updated user-facing replacement copy to use Web share URL, Arcade project package, Reset editor, and Web Arcade working copy terms.
+- Added regression coverage for Reset editor fresh identity/default preferences and a two-tab Web share URL replacement path proving the original tab working copy and preferences stay unchanged.
+
+Verification:
+
+- npm install
+- npm run typecheck
+- npm run test -- --run
+- npm run lint (passes with existing hook dependency warnings in `InspectionPopover` and `PreviewPane`)
+- Browser smoke check at http://127.0.0.1:5174/aksel-arcade/ confirmed app render, Web share URL copy, Reset editor confirmation, and no runtime console errors.
+
+Next note: #130 should remove the remaining Clear storage & reload affordance and finish the Web Arcade storage/autosave status UI cleanup; this branch intentionally leaves that separate feature untouched.

@@ -199,7 +199,7 @@ export const useShareLink = (options?: UseShareLinkOptions) => {
         status: 'error',
         error: {
           code: 'offline',
-          message: 'Connect to the internet to generate a share link.',
+          message: 'Connect to the internet to generate a Web share URL.',
         },
         clipboardStatus: 'idle',
         showSlowGenerationNotice: false,
@@ -309,7 +309,7 @@ export const useShareLink = (options?: UseShareLinkOptions) => {
         adjustPayloadEstimate,
       )
       if (!rankedStrategies.length) {
-        throw new Error('No compression strategies available for share links')
+        throw new Error('No compression strategies available for Web share URLs')
       }
 
       const smallestEstimate = rankedStrategies[0]
@@ -400,7 +400,7 @@ export const useShareLink = (options?: UseShareLinkOptions) => {
         } catch (error) {
           lastFailure = error instanceof Error
             ? error
-            : new Error('Failed to encode share link')
+            : new Error('Failed to encode Web share URL')
         }
       }
 
@@ -419,7 +419,7 @@ export const useShareLink = (options?: UseShareLinkOptions) => {
           estimatedChars: candidateQueue[0]?.estimatedChars ?? smallestEstimate.estimatedChars,
           error: {
             code: 'oversize',
-            message: `Share link exceeds ${charLimit} characters`,
+            message: `Web share URL exceeds ${charLimit} characters`,
           },
           clipboardStatus: 'idle',
           showSlowGenerationNotice: false,
@@ -433,7 +433,7 @@ export const useShareLink = (options?: UseShareLinkOptions) => {
         throw lastFailure
       }
 
-      throw new Error('Share link generation failed unexpectedly')
+      throw new Error('Web share URL generation failed unexpectedly')
     } catch (error) {
       emitGenerationTelemetry({
         outcome: 'error',
@@ -445,7 +445,7 @@ export const useShareLink = (options?: UseShareLinkOptions) => {
         status: 'error',
         error: {
           code: 'generation-failed',
-          message: error instanceof Error ? error.message : 'Failed to generate share link',
+          message: error instanceof Error ? error.message : 'Failed to generate Web share URL',
         },
         clipboardStatus: 'idle',
         showSlowGenerationNotice: false,
@@ -541,7 +541,7 @@ const isStorageAvailable = (healthRef: MutableRefObject<'unknown' | 'ok' | 'fail
     healthRef.current = 'ok'
     return true
   } catch (error) {
-    console.warn('Share link storage unavailable:', error)
+    console.warn('Web share URL storage unavailable:', error)
     healthRef.current = 'failed'
     return false
   }

@@ -666,7 +666,7 @@ describe('ProjectControls layout', () => {
     expect(screen.getByRole('alertdialog', { name: /bekreft import/i })).toBeTruthy()
     expect(
       screen.getByText(
-        'Prosjektet du vil importere erstatter det du jobber på nå. Vil du fortsette?'
+        'Importing this Arcade project package replaces only this Web Arcade working copy. Continue?'
       )
     ).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Importer' })).toBeTruthy()
@@ -677,7 +677,7 @@ describe('ProjectControls layout', () => {
     await waitFor(() => {
       expect(
         screen.queryByText(
-          'Prosjektet du vil importere erstatter det du jobber på nå. Vil du fortsette?'
+          'Importing this Arcade project package replaces only this Web Arcade working copy. Continue?'
         )
       ).toBeNull()
     })

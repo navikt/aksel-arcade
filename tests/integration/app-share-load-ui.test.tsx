@@ -42,7 +42,7 @@ vi.mock('@/components/Layout/SplitPane', () => ({
 }))
 
 describe('App share-load warning', () => {
-  it('uses shared project wording without sender metadata', async () => {
+  it('uses Web share URL wording without sender metadata', async () => {
     const user = userEvent.setup()
     const project = createDefaultProject()
     const snapshot = createShareSnapshot(project)
@@ -82,14 +82,16 @@ describe('App share-load warning', () => {
       </SettingsProvider>
     )
 
-    expect(screen.getByText('Load shared project?')).toBeTruthy()
+    expect(screen.getByText('Load Web share URL?')).toBeTruthy()
     expect(
-      screen.getByText('Loading this shared project will replace your current work.')
+      screen.getByText(
+        'Loading this Web share URL will replace only this Web Arcade working copy.'
+      )
     ).toBeTruthy()
     expect(screen.queryByText(/shared snapshot/i)).toBeNull()
     expect(screen.queryByText(/last updated/i)).toBeNull()
 
-    await user.click(screen.getByRole('button', { name: 'Load shared project' }))
+    await user.click(screen.getByRole('button', { name: 'Load Web share URL' }))
     expect(applySharedSnapshot).toHaveBeenCalledTimes(1)
 
     await user.click(screen.getByRole('button', { name: 'Keep my work' }))

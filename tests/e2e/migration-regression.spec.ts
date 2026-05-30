@@ -165,7 +165,7 @@ test.describe('Aksel v8 migration regression hardening', () => {
     await expect(page.locator('.cm-content')).toContainText('<Button')
 
     await page.getByLabel('Share project').click()
-    const copyButton = page.getByRole('button', { name: /copy share link/i })
+    const copyButton = page.getByRole('button', { name: /copy web share url/i })
     await expect(copyButton).toBeEnabled({ timeout: 20000 })
     await copyButton.click()
     await expect

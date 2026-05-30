@@ -1,12 +1,20 @@
 import fs from 'node:fs/promises'
 import path from 'node:path'
-import { describe, expect, it, beforeEach } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
+import { describe, expect, it, beforeEach, vi } from 'vitest'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { AppProvider, useProject } from '@/hooks/useProject'
+import { useAutoSave } from '@/hooks/useAutoSave'
 import { SettingsProvider, useSettings } from '@/contexts/SettingsContext'
 import { createDefaultProject } from '@/utils/projectDefaults'
-import { createShareSnapshot, saveProject, SNAPSHOT_FILE_IDS } from '@/services/storage'
+import {
+  createShareSnapshot,
+  DEFAULT_WEB_ARCADE_WORKING_COPY_PREFERENCES,
+  saveProject,
+  SNAPSHOT_FILE_IDS,
+  WEB_ARCADE_WORKING_COPY_STORAGE_KEY,
+  type WebArcadeWorkingCopyPreferences,
+} from '@/services/storage'
 import {
   encodeSharePayload,
   createShareToken,
@@ -17,6 +25,7 @@ import { getCompressionStrategy } from '@/services/compressionStrategies'
 import type { Project, ProjectSnapshot } from '@/types/project'
 import { getViewportWidth } from '@/types/viewports'
 import { repairPackedSnapshotJson, unpackSnapshot } from '@/utils/snapshotPacking'
+import { setupSessionStorageMock, type MockSessionStorage } from '../helpers/mockLocalStorage'
 
 const Harness = () => {
   const {
@@ -24,6 +33,7 @@ const Harness = () => {
     editorState,
     previewState,
     updateEditorState,
+    resetToIntro,
     shareHydration,
     applySharedSnapshot,
     dismissShareHydration,
@@ -48,6 +58,7 @@ const Harness = () => {
       <div data-testid="settings-panel-order">{panelOrder}</div>
       <div data-testid="share-status">{shareHydration.status}</div>
       <button onClick={() => updateEditorState({ activeTab: 'Hooks' })}>Set local Hooks tab</button>
+      <button onClick={resetToIntro}>Reset editor</button>
       {shareHydration.status === 'ready' && (
         <div>
           <span>share-ready</span>
@@ -70,11 +81,39 @@ const Harness = () => {
   )
 }
 
+const PersistedHarness = () => {
+  const { project, shareHydration, applySharedSnapshot } = useProject()
+  const { theme, panelOrder } = useSettings()
+  useAutoSave(project, { theme, panelOrder })
+
+  return (
+    <div>
+      <div data-testid="project-name">{project.name}</div>
+      <div data-testid="jsx-code">{project.jsxCode}</div>
+      <div data-testid="settings-theme">{theme}</div>
+      <div data-testid="settings-panel-order">{panelOrder}</div>
+      {shareHydration.status === 'ready' && (
+        <button onClick={applySharedSnapshot}>Load Web share URL</button>
+      )}
+    </div>
+  )
+}
+
 const renderHarness = () => {
   return render(
     <SettingsProvider>
       <AppProvider>
         <Harness />
+      </AppProvider>
+    </SettingsProvider>
+  )
+}
+
+const renderPersistedHarness = () => {
+  return render(
+    <SettingsProvider>
+      <AppProvider>
+        <PersistedHarness />
       </AppProvider>
     </SettingsProvider>
   )
@@ -159,6 +198,60 @@ describe('share decode integration', () => {
     })
   })
 
+  it('resets only the current Web Arcade working copy to a fresh default project', async () => {
+    const previousProject: Project = {
+      id: '11111111-1111-4111-8111-111111111111',
+      name: 'Reset source working copy',
+      jsxCode: 'export default function App() { return <div>Reset source JSX</div> }',
+      hooksCode: 'export function useResetSourceHook() { return "Reset source Hooks" }',
+      viewportSize: 'XL',
+      panelLayout: 'editor-right',
+      version: '1.0.0',
+      createdAt: '2024-01-01T00:00:00.000Z',
+      lastModified: '2024-01-02T00:00:00.000Z',
+    }
+    saveProject(previousProject, {
+      preferences: {
+        theme: 'light',
+        panelOrder: 'preview-left',
+      },
+    })
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true)
+
+    try {
+      renderHarness()
+
+      await waitFor(() => {
+        expect(screen.getByTestId('settings-theme').textContent).toBe('light')
+        expect(screen.getByTestId('settings-panel-order').textContent).toBe('preview-left')
+      })
+      await user.click(screen.getByRole('button', { name: /set local hooks tab/i }))
+
+      await user.click(screen.getByRole('button', { name: /reset editor/i }))
+
+      expect(confirmSpy).toHaveBeenCalledWith(expect.stringContaining('Web Arcade working copy'))
+      expect(screen.getByTestId('project-id').textContent).not.toBe(previousProject.id)
+      expect(screen.getByTestId('project-name').textContent).toBe('Untitled Project')
+      expect(screen.getByTestId('jsx-code').textContent).toContain('Welcome to Aksel Arcade')
+      expect(screen.getByTestId('hooks-code').textContent).toContain('Define custom hooks here')
+      expect(screen.getByTestId('project-viewport').textContent).toBe('MD')
+      expect(screen.getByTestId('project-panel-layout').textContent).toBe('editor-left')
+      expect(screen.getByTestId('preview-current-viewport').textContent).toBe('MD')
+      expect(screen.getByTestId('preview-viewport-width').textContent).toBe(
+        String(getViewportWidth('MD'))
+      )
+      expect(screen.getByTestId('editor-active-tab').textContent).toBe('JSX')
+      expect(screen.getByTestId('settings-theme').textContent).toBe(
+        DEFAULT_WEB_ARCADE_WORKING_COPY_PREFERENCES.theme
+      )
+      expect(screen.getByTestId('settings-panel-order').textContent).toBe(
+        DEFAULT_WEB_ARCADE_WORKING_COPY_PREFERENCES.panelOrder
+      )
+    } finally {
+      confirmSpy.mockRestore()
+    }
+  })
+
   it('loads v3 Web share URLs as fresh local projects from shared source and preview preferences', async () => {
     const previousProject: Project = {
       id: '11111111-1111-4111-8111-111111111111',
@@ -233,8 +326,109 @@ describe('share decode integration', () => {
       String(getViewportWidth('LG'))
     )
     expect(screen.getByTestId('settings-theme').textContent).toBe('light')
+    expect(screen.getByTestId('settings-panel-order').textContent).toBe(
+      DEFAULT_WEB_ARCADE_WORKING_COPY_PREFERENCES.panelOrder
+    )
     expect(screen.getByTestId('editor-active-tab').textContent).toBe('JSX')
     expect(window.location.search).not.toContain('share=')
+  })
+
+  it('applies a Web share URL only to the current tab working copy', async () => {
+    const originalTabStorage = setupSessionStorageMock()
+    const originalTabProject: Project = {
+      id: '11111111-1111-4111-8111-111111111111',
+      name: 'Original tab working copy',
+      jsxCode: 'export default function App() { return <div>Original isolated JSX</div> }',
+      hooksCode: 'export function useOriginalIsolatedHook() { return "Original Hooks" }',
+      viewportSize: 'LG',
+      panelLayout: 'editor-right',
+      version: '1.0.0',
+      createdAt: '2024-01-01T00:00:00.000Z',
+      lastModified: '2024-01-02T00:00:00.000Z',
+    }
+    const originalTabPreferences: WebArcadeWorkingCopyPreferences = {
+      theme: 'light',
+      panelOrder: 'preview-left',
+    }
+    saveProject(originalTabProject, { preferences: originalTabPreferences })
+    const originalTab = renderHarness()
+
+    expect(within(originalTab.container).getByTestId('project-name').textContent).toBe(
+      'Original tab working copy'
+    )
+    await waitFor(() => {
+      expect(within(originalTab.container).getByTestId('settings-theme').textContent).toBe('light')
+      expect(within(originalTab.container).getByTestId('settings-panel-order').textContent).toBe(
+        'preview-left'
+      )
+    })
+
+    const currentTabStorage = setupSessionStorageMock()
+    const currentTabProject: Project = {
+      id: '22222222-2222-4222-8222-222222222222',
+      name: 'Current tab before Web share URL',
+      jsxCode: 'export default function App() { return <div>Current tab JSX</div> }',
+      hooksCode: 'export function useCurrentTabHook() { return "Current Hooks" }',
+      viewportSize: 'XS',
+      panelLayout: 'editor-left',
+      version: '1.0.0',
+      createdAt: '2024-02-01T00:00:00.000Z',
+      lastModified: '2024-02-02T00:00:00.000Z',
+    }
+    saveProject(currentTabProject)
+
+    const sharedProject = createDefaultProject()
+    sharedProject.jsxCode = 'export default function App() { return <div>Shared isolated JSX</div> }'
+    sharedProject.hooksCode = 'export function useSharedIsolatedHook() { return "Shared Hooks" }'
+    const token = await createShareTokenForSnapshot(
+      createShareSnapshot(sharedProject, {
+        preview: {
+          viewport: 'XL',
+          theme: 'light',
+        },
+      })
+    )
+    window.history.replaceState({}, '', `/?share=${encodeURIComponent(token)}`)
+
+    const currentTab = renderPersistedHarness()
+    const currentTabQueries = within(currentTab.container)
+    fireEvent.click(await currentTabQueries.findByRole('button', { name: /load web share url/i }))
+
+    await waitFor(() => {
+      expect(currentTabQueries.getByTestId('jsx-code').textContent).toContain('Shared isolated JSX')
+    })
+    await waitFor(
+      () => {
+        const stored = parseStoredWorkingCopy(currentTabStorage)
+        expect(stored.project.name).toBe('Untitled Project')
+        expect(stored.project.jsxCode).toContain('Shared isolated JSX')
+        expect(stored.project.viewportSize).toBe('XL')
+        expect(stored.preferences).toEqual({
+          ...DEFAULT_WEB_ARCADE_WORKING_COPY_PREFERENCES,
+          theme: 'light',
+        })
+      },
+      { timeout: 2500 }
+    )
+
+    const storedOriginalTab = parseStoredWorkingCopy(originalTabStorage)
+    expect(storedOriginalTab.project).toMatchObject({
+      name: 'Original tab working copy',
+      jsxCode: 'export default function App() { return <div>Original isolated JSX</div> }',
+      hooksCode: 'export function useOriginalIsolatedHook() { return "Original Hooks" }',
+      viewportSize: 'LG',
+      panelLayout: 'editor-right',
+    })
+    expect(storedOriginalTab.preferences).toEqual(originalTabPreferences)
+    expect(within(originalTab.container).getByTestId('project-name').textContent).toBe(
+      'Original tab working copy'
+    )
+    expect(within(originalTab.container).getByTestId('jsx-code').textContent).toContain(
+      'Original isolated JSX'
+    )
+    expect(within(originalTab.container).getByTestId('settings-panel-order').textContent).toBe(
+      'preview-left'
+    )
   })
 
   it('loads legacy v2 full-snapshot share URLs as fresh local projects', async () => {
@@ -307,6 +501,9 @@ describe('share decode integration', () => {
       String(getViewportWidth('MD'))
     )
     expect(screen.getByTestId('settings-theme').textContent).toBe('light')
+    expect(screen.getByTestId('settings-panel-order').textContent).toBe(
+      DEFAULT_WEB_ARCADE_WORKING_COPY_PREFERENCES.panelOrder
+    )
     expect(screen.getByTestId('editor-active-tab').textContent).toBe('JSX')
     expect(window.location.search).not.toContain('share=')
   })
@@ -504,6 +701,18 @@ const createLegacyPackedSnapshot = (label: string): ProjectSnapshot => {
       sandboxFlags: { outlines: true },
     },
   })
+}
+
+const parseStoredWorkingCopy = (storage: MockSessionStorage) => {
+  const stored = storage.getItem(WEB_ARCADE_WORKING_COPY_STORAGE_KEY)
+  if (!stored) {
+    throw new Error('Expected Web Arcade working copy to be stored')
+  }
+
+  return JSON.parse(stored) as {
+    project: Project
+    preferences: WebArcadeWorkingCopyPreferences
+  }
 }
 
 const tamperChecksum = (token: string): string => {

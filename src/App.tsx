@@ -75,10 +75,10 @@ function App({ shellCapabilities = WEB_ARCADE_CAPABILITIES }: AppProps) {
         {shareHydration.status === 'ready' && shareHydration.snapshot && (
           <WarningNotification
             variant="warning"
-            message="Load shared project?"
-            description="Loading this shared project will replace your current work."
+            message="Load Web share URL?"
+            description="Loading this Web share URL will replace only this Web Arcade working copy."
             actions={[
-              { label: 'Load shared project', variant: 'primary', onClick: applySharedSnapshot },
+              { label: 'Load Web share URL', variant: 'primary', onClick: applySharedSnapshot },
               { label: 'Keep my work', variant: 'secondary', onClick: dismissShareHydration },
             ]}
             onClose={dismissShareHydration}
@@ -88,7 +88,7 @@ function App({ shellCapabilities = WEB_ARCADE_CAPABILITIES }: AppProps) {
         {shareHydration.status === 'error' && (
           <WarningNotification
             variant="error"
-            message="Share link could not be opened"
+            message="Web share URL could not be opened"
             description={shareHydration.error?.message}
             onClose={dismissShareHydration}
           />
