@@ -38,7 +38,15 @@ describe("Desktop release workflow", () => {
     expect(workflow).toContain("-F draft=false");
     expect(workflow).toContain("-F prerelease=false");
     expect(workflow).toContain("-f make_latest=true");
-    expect(workflow).toContain("gh release delete \"$DESKTOP_TAG\"");
+    expect(workflow).toContain(
+      'gh release delete "$DESKTOP_TAG" --repo "$GITHUB_REPOSITORY"',
+    );
+    expect(workflow).toContain(
+      'gh release upload "$DESKTOP_TAG" --repo "$GITHUB_REPOSITORY"',
+    );
+    expect(workflow).toContain(
+      'gh release view "$DESKTOP_TAG" --repo "$GITHUB_REPOSITORY"',
+    );
     expect(workflow).toContain("releases/generate-notes");
     expect(workflow).toContain("## Download guide");
     expect(workflow).not.toMatch(/checksum|sha256/i);
