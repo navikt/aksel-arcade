@@ -10,9 +10,9 @@ The user wants to keep the existing editor panel, code preview panel, sandbox be
 
 Add Desktop Arcade as a desktop product surface around the shared Aksel Arcade workspace. Web Arcade and Desktop Arcade use the same shell-neutral Arcade project model, the same editor and preview experience, the same Arcade authoring contract, and compatible import/export behavior. Desktop Arcade adds Agent access; Web Arcade has no Agent UI, Agent runtime initialization, browser-global Agent bridge, or Web-facing Agent access affordances.
 
-Desktop Arcade starts a consent-gated Agent session from the existing lightweight ActionMenu pattern. While active, Desktop Arcade exposes the existing Agent bridge commands through a same-device Agent transport. The first Agent transport is a short-lived loopback HTTP JSON-RPC adapter bound to localhost with a random port and an Agent pairing credential sent only in an Authorization header. The transport is behind a swappable adapter boundary so it can be replaced later by a Unix socket, named pipe, MCP adapter, or helper process if security or product learning requires it.
+Desktop Arcade starts a consent-gated Agent session from the existing lightweight ActionMenu pattern. While active, Desktop Arcade exposes the existing Agent bridge commands through a same-device Agent transport. The first Agent transport is a short-lived loopback HTTP JSON-RPC adapter bound to localhost with a random port and an Agent pairing credential sent only in an Authorization header. The copied Agent pairing handoff is a short bootstrap command; after the External agent runs it, the Agent bridge returns Agent operating instructions for the active session. The transport is behind a swappable adapter boundary so it can be replaced later by a Unix socket, named pipe, MCP adapter, or helper process if security or product learning requires it.
 
-The user-facing mental model is still "Agent access to this Arcade project." The menu shows only simple active/inactive status, a copy action for hidden connection instructions, and copy success/failure feedback; it does not show Checkpoints, rollback, or Agent-specific history. The copied instructions include the endpoint, authorization header, supported command names, immediate apply-after-validation semantics, and provider-neutral examples, with GitHub Copilot app, Copilot CLI, and Copilot in VS Code as important Copilot agent surface examples. Desktop Arcade does not host in-app chat, store provider credentials, or integrate provider SDKs.
+The user-facing mental model is still "Agent access to this Arcade project." The menu shows only simple active/inactive status, a copy action for the hidden Agent pairing handoff, and copy success/failure feedback; it does not show Checkpoints, rollback, or Agent-specific history. The bridge-returned Agent operating instructions tell the External agent how to use the active Agent session: call `getProject` first, use import-free Arcade JSX and Hooks, rely on diagnostics and Preview evidence for feedback, apply immediate human-visible full-field replacements with `applyAgentChange`, and validate after changes. Desktop Arcade does not host in-app chat, store provider credentials, or integrate provider SDKs.
 
 Web Arcade keeps Share URL as a web-only feature. Desktop Arcade does not offer Share URL. The canonical cross-shell sharing artifact becomes the Arcade project package, normally exported with a `.akselarcade` extension. Both Web Arcade and Desktop Arcade can import `.akselarcade` packages and older `.json` exports. Packages contain only the portable Arcade project and optional copied-out production guidance, not Agent session state, pairing credentials, endpoint details, diagnostics, Preview evidence, or Agent-specific history.
 
@@ -42,17 +42,17 @@ Web Arcade keeps Share URL as a web-only feature. Desktop Arcade does not offer 
 22. As a Desktop Arcade user, I want to stop Agent access from the same ActionMenu, so that I can revoke access immediately.
 23. As a Desktop Arcade user, I want Agent access to be off by default, so that no external agent can inspect or change my Arcade project until I consent.
 24. As a Desktop Arcade user, I want the menu to show only `Status: inaktiv` or `Status: aktiv`, so that I do not have to understand transport internals.
-25. As a Desktop Arcade user, I want the connection instructions copied to the clipboard without showing the token, so that I can pair an external agent without exposing secrets in the UI.
-26. As a Desktop Arcade user, I want copy success or failure feedback, so that I know whether the hidden connection instructions were copied.
+25. As a Desktop Arcade user, I want the Agent pairing handoff copied to the clipboard without showing the token, so that I can pair an external agent without exposing secrets in the UI.
+26. As a Desktop Arcade user, I want copy success or failure feedback, so that I know whether the hidden Agent pairing handoff was copied.
 27. As a Desktop Arcade user, I want copy failure to offer retry rather than automatically revealing the prompt, so that credentials are not exposed by accident.
 28. As a Desktop Arcade user, I want no local endpoint or token wording in the main UI, but clear copy that the paired agent can read and change this Arcade project while Agent access is active, so that my consent is informed without exposing transport details.
-29. As a Desktop Arcade user, I want the copied instructions to work with GitHub Copilot app, so that I can test the workflow with the Copilot surface I use now.
-30. As a Desktop Arcade user, I want the copied instructions to work with Copilot CLI, so that terminal-based agent workflows can use the same Agent bridge.
-31. As a Desktop Arcade user, I want the copied instructions to work with Copilot in VS Code, so that editor-based agent workflows can use the same Agent bridge.
-32. As a Desktop Arcade user, I want the copied instructions to stay provider-neutral, so that other same-device external agents can use the protocol too.
+29. As a Desktop Arcade user, I want the Agent pairing handoff and Agent operating instructions to work with GitHub Copilot app, so that I can test the workflow with the Copilot surface I use now.
+30. As a Desktop Arcade user, I want the Agent pairing handoff and Agent operating instructions to work with Copilot CLI, so that terminal-based agent workflows can use the same Agent bridge.
+31. As a Desktop Arcade user, I want the Agent pairing handoff and Agent operating instructions to work with Copilot in VS Code, so that editor-based agent workflows can use the same Agent bridge.
+32. As a Desktop Arcade user, I want the Agent operating instructions to stay provider-neutral, so that other same-device external agents can use the protocol too.
 33. As a Desktop Arcade user, I want Desktop Arcade to avoid in-app provider chat, so that the product stays focused on the playground and not on becoming an LLM client.
 34. As a Desktop Arcade user, I want Desktop Arcade to avoid provider credential storage, so that I do not have to trust Arcade with LLM account secrets.
-35. As an External agent, I want a documented connection prompt, so that I know how to reach the active Agent session.
+35. As an External agent, I want Agent operating instructions returned by the bridge, so that I know how to work with the active Agent session without discovering the protocol elsewhere.
 36. As an External agent, I want a simple same-device endpoint, so that I can connect without browser automation, browser extensions, or Apple Events.
 37. As an External agent, I want to authenticate with an Agent pairing credential, so that only the user-approved session is accessible.
 38. As an External agent, I want the credential sent in an Authorization header, so that it is not leaked through URL history or query strings.
@@ -139,10 +139,14 @@ Web Arcade keeps Share URL as a web-only feature. Desktop Arcade does not offer 
 - Reject unauthenticated, expired, malformed, unsupported, or out-of-session transport requests with structured errors.
 - Do not expose file-system, shell, Share URL, export, import, package creation, project package opening, or desktop window commands through the Agent transport in v1.
 - Keep Preview evidence as the existing sanitized DOM/layout/frame evidence for v1. Do not add Electron screenshot capture as part of this PRD.
-- Keep the Agent menu as the user-facing Desktop Agent access surface. It contains start/stop access, simple active/inactive status, concise consent copy that the paired agent can read and change the active Arcade project while access is active, hidden copy instructions, and copy feedback; it does not contain Checkpoints, rollback, or Agent-specific history.
-- Keep the copied connection prompt hidden from the user during normal operation. Copying places the prompt on the clipboard; the menu does not render the endpoint or credential.
-- If copying the hidden prompt fails, show copy failure feedback and allow retry. Do not automatically reveal the prompt or token.
-- Make the visible UI provider-neutral by using Agent access language. Mention GitHub Copilot app, Copilot CLI, and Copilot in VS Code in copied examples and documentation.
+- Keep the Agent menu as the user-facing Desktop Agent access surface. It contains start/stop access, simple active/inactive status, concise consent copy that the paired agent can read and change the active Arcade project while access is active, a hidden Agent pairing handoff copy action, and copy feedback; it does not contain Checkpoints, rollback, or Agent-specific history.
+- Keep the copied Agent pairing handoff hidden from the user during normal operation. Copying places the handoff on the clipboard; the menu does not render the endpoint or credential.
+- If copying the hidden Agent pairing handoff fails, show copy failure feedback and allow retry. Do not automatically reveal the handoff or token.
+- Return compact Agent operating instructions through the bridge after the copied bootstrap request. The instructions are the authoritative Desktop Arcade operating guide for the active session: call `getProject` first, use import-free Arcade JSX and Hooks rather than file edits, use `getPreviewContext`, `getDiagnostics`, and `getPreviewEvidence` for feedback, send full-field replacements through `applyAgentChange({ summary, jsxCode?, hooksCode?, viewportSize?, theme?, name? })` that apply immediately to the human-visible Arcade project, and validate by polling diagnostics until the preview settles before using Preview evidence when permitted.
+- Keep Agent operating instructions content-free. They should not include active Arcade project source; External agents read project content through `getProject`.
+- Keep Agent operating instructions provider-neutral. Mention GitHub Copilot app, Copilot CLI, and Copilot in VS Code in validation notes and documentation, not as protocol-specific behavior.
+- Do not add a new machine-readable workflow field until an actual External agent or tool can consume it; use `instructionsMarkdown` plus the existing structured session, protocol, permission, command, and authoring-contract fields.
+- Remove obsolete long-form instruction helpers when implementing Agent operating instructions instead of keeping a parallel copied-prompt path.
 - Keep Copilot agent surfaces as key test targets but do not make the protocol Copilot-specific. Provider-neutral means any same-device External agent that can use the protocol can connect.
 - Do not add in-app LLM chat, provider SDK calls, provider credential storage, or backend LLM mediation.
 - Keep one active Agent session tied to one active window and one current Arcade project in v1.
@@ -164,7 +168,7 @@ Web Arcade keeps Share URL as a web-only feature. Desktop Arcade does not offer 
 - Unit-test the Agent transport interface with a fake adapter to prove command routing and authentication can be tested without loopback networking.
 - Unit-test the loopback HTTP JSON-RPC adapter for localhost binding, random-port lifecycle, Authorization header requirements, rejection of missing or invalid credentials, malformed JSON-RPC payloads, unsupported methods, and shutdown behavior.
 - Unit-test the Agent bridge command router for one-to-one command mapping, structured success and failure shapes, and rejection of non-bridge commands.
-- Unit-test the copied connection prompt builder for provider-neutral instructions, Copilot examples, Authorization header usage, no query-token examples, available command names, and hidden prompt contents.
+- Unit-test the copied Agent pairing handoff and bridge-returned Agent operating instructions with behavioral assertions rather than exact Markdown snapshots: provider-neutral behavior, Authorization header usage, no query-token examples, available command names, hidden handoff contents, content-free operating guidance, no long curl examples, and the `getProject`-first workflow.
 - Unit-test the Agent menu copy behavior for success, failure, retry, and no automatic prompt reveal.
 - Unit-test Arcade project package export for `.akselarcade` defaults and exclusion of Agent session state, credentials, endpoint information, Agent-specific history, diagnostics, Preview evidence, and transport metadata.
 - Unit-test Arcade project package import for `.akselarcade` and legacy `.json` compatibility.
@@ -242,7 +246,7 @@ These notes are historical implementation context. Entries before ADR-0005 may d
 
 ## Further Notes
 
-This PRD uses the domain language from the Aksel Arcade glossary: Web Arcade, Desktop Arcade, Arcade project, Arcade project package, Agent access, Agent session, Agent bridge, Agent transport, Agent pairing, Agent pairing credential, External agent, Copilot agent surface, Arcade-scoped state, Preview evidence, Arcade authoring contract, and Agent change.
+This PRD uses the domain language from the Aksel Arcade glossary: Web Arcade, Desktop Arcade, Arcade project, Arcade project package, Agent access, Agent session, Agent bridge, Agent transport, Agent pairing, Agent pairing handoff, Agent operating instructions, Agent pairing credential, External agent, Copilot agent surface, Arcade-scoped state, Preview evidence, Arcade authoring contract, and Agent change.
 
 The main architectural trade-off is that Desktop Arcade accepts a short-lived local loopback transport because the Electron shell can own local capabilities more safely than Web Arcade, while the renderer stays browser-like and the transport remains swappable. The main product trade-off is that Web Arcade and Desktop Arcade keep the same creation workspace, but Agent access becomes a Desktop Arcade differentiator instead of a browser feature.
 
