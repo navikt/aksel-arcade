@@ -92,6 +92,10 @@ _Avoid_: Installation, login, persistent trust, implicit local trust
 The human-mediated transfer that gives an **External agent** what it needs to complete **Agent pairing** for one active **Agent session**.
 _Avoid_: Agent discovery, provider push, persistent setup
 
+**Agent operating instructions**:
+Concise session-scoped guidance returned through the **Agent bridge** that tells an **External agent** how to work with Desktop Arcade during one active **Agent session**.
+_Avoid_: Agent pairing handoff, Aksel training, project content, repository documentation
+
 **Agent pairing credential**:
 A short-lived secret that authorizes one **External agent** to use the **Agent transport** for one active **Agent session**.
 _Avoid_: API key, installation token, persistent trust
