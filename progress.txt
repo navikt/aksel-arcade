@@ -1487,6 +1487,19 @@ Verification:
 - npm run lint (passes with existing hook dependency warnings in `InspectionPopover` and `PreviewPane`)
 - CI=true npm run test
 
+Desktop release workflow (#149) review follow-up:
+
+- Code review found that `workflow_dispatch` recovery accepted runs launched from non-`master` workflow refs as long as the requested recovery SHA was already on protected `master`.
+- Tightened Desktop release planning so manual recovery now requires both the workflow ref and the target commit to be on protected `master`.
+- Added regression coverage for rejecting non-`master` recovery workflow refs separately from rejecting recovery commits outside protected `master`.
+
+Verification:
+
+- CI=1 npm run test -- --run tests/unit/desktopReleasePlan.test.ts tests/unit/desktopReleaseWorkflowPlan.test.ts tests/unit/desktopReleaseWorkflow.test.ts
+- npm run typecheck
+- CI=1 npm run test
+- npm run lint (passes with existing hook dependency warnings in `InspectionPopover` and `PreviewPane`)
+
 Desktop release workflow (#149):
 
 - Selected #149 over #150 because #150 depends on the Desktop release workflow.

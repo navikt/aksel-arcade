@@ -147,6 +147,7 @@ function createVersionInjection(version) {
 
 function validateManualRecoveryDispatch({
   eventName = "push",
+  refName = PROTECTED_BRANCH,
   refOnProtectedMaster = false,
   protectedBranch = PROTECTED_BRANCH,
 } = {}) {
@@ -155,6 +156,14 @@ function validateManualRecoveryDispatch({
       accepted: true,
       manualRecovery: false,
       rejectionReason: null,
+    };
+  }
+
+  if (normalizeRefName(refName) !== protectedBranch) {
+    return {
+      accepted: false,
+      manualRecovery: true,
+      rejectionReason: `Manual Desktop release recovery must be dispatched from protected ${protectedBranch}.`,
     };
   }
 
@@ -186,6 +195,7 @@ function createDesktopReleasePlan({
   const desktopImpactingFiles = getDesktopImpactingFiles(changedFiles);
   const manualRecovery = validateManualRecoveryDispatch({
     eventName,
+    refName: normalizedRefName,
     refOnProtectedMaster,
     protectedBranch,
   });

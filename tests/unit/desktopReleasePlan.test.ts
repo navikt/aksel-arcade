@@ -198,7 +198,7 @@ describe("Desktop release planning", () => {
   it("accepts manual recovery dispatches only for refs already on protected master", () => {
     const accepted = releasePlan.createDesktopReleasePlan({
       eventName: "workflow_dispatch",
-      refName: "refs/heads/release-retry",
+      refName: "refs/heads/master",
       refOnProtectedMaster: true,
       changedFiles: [],
       releaseTags: ["desktop-v0.2.6"],
@@ -212,10 +212,31 @@ describe("Desktop release planning", () => {
     });
   });
 
-  it("rejects manual recovery dispatches for refs outside protected master", () => {
+  it("rejects manual recovery dispatches from workflow refs outside protected master", () => {
     const rejected = releasePlan.createDesktopReleasePlan({
       eventName: "workflow_dispatch",
       refName: "refs/heads/feature-branch",
+      refOnProtectedMaster: true,
+      changedFiles: ["desktop/main.cjs"],
+      releaseTags: ["desktop-v0.2.6"],
+    });
+
+    expect(rejected).toMatchObject({
+      releaseRequired: false,
+      rejected: true,
+      reason: "manual-recovery-ref-not-on-protected-master",
+      desktopImpacting: true,
+      desktopImpactingFiles: ["desktop/main.cjs"],
+      nextDesktopVersion: null,
+      versionInjection: null,
+    });
+    expect(rejected.rejectionReason).toContain("dispatched from protected master");
+  });
+
+  it("rejects manual recovery dispatches for commits outside protected master", () => {
+    const rejected = releasePlan.createDesktopReleasePlan({
+      eventName: "workflow_dispatch",
+      refName: "refs/heads/master",
       refOnProtectedMaster: false,
       changedFiles: ["desktop/main.cjs"],
       releaseTags: ["desktop-v0.2.6"],
