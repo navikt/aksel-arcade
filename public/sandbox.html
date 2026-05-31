@@ -148,6 +148,10 @@
       renderGapLayers,
       renderSpacingLayers,
     } from './inspect-overlays.js'
+    import {
+      isTrustedParentMessage,
+      postMessageToParent,
+    } from './sandbox-messaging.js'
 
     // React will be loaded from Vite via sandboxAksel.ts (same instance as Aksel components)
     let currentRoot = null;
@@ -374,7 +378,7 @@
         console.log('✅ React version:', React.version);
         console.log('✅ Theme component available:', !!ThemeComponent);
         console.log('✅ Aksel CSS imported via @navikt/ds-css');
-        window.parent.postMessage({ type: 'SANDBOX_READY' }, window.location.origin);
+        postMessageToParent(window.parent, { type: 'SANDBOX_READY' }, window.location);
       })
       .catch((err) => {
         console.error('❌❌❌ CRITICAL ERROR: Module loading failed completely!');
@@ -386,14 +390,14 @@
         
         // Send error to parent so it's visible in main app console
         try {
-          window.parent.postMessage({
+          postMessageToParent(window.parent, {
             type: 'RUNTIME_ERROR',
             payload: {
               message: `Sandbox initialization failed: ${err.message}`,
               componentStack: null,
               stack: err.stack || ''
             }
-          }, window.location.origin);
+          }, window.location);
         } catch (postErr) {
           console.error('❌ Could not even send error to parent:', postErr);
         }
@@ -413,8 +417,8 @@
 
     // Listen for messages from parent window
     window.addEventListener('message', (event) => {
-      // Security: Validate origin (same-origin only)
-      if (event.origin !== window.location.origin) {
+      // Security: validate the controlling parent, including Electron file:// null origins.
+      if (!isTrustedParentMessage(event, window.location, window.parent)) {
         console.warn('❌ Rejected message from unauthorized origin:', event.origin)
         return
       }
@@ -771,7 +775,7 @@
         }
       };
       
-      window.parent.postMessage(result, window.location.origin);
+      postMessageToParent(window.parent, result, window.location);
     }
 
     function updateViewport(payload) {
@@ -1086,11 +1090,11 @@
     }
 
     function sendMessage(type, payload) {
-      window.parent.postMessage({ type, payload }, window.location.origin);
+      postMessageToParent(window.parent, { type, payload }, window.location);
     }
 
     function sendError(type, payload) {
-      window.parent.postMessage({ type, payload }, window.location.origin);
+      postMessageToParent(window.parent, { type, payload }, window.location);
     }
 
     function extractLineNumber(error) {

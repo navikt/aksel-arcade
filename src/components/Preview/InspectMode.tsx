@@ -3,6 +3,7 @@ import { Button } from '@navikt/ds-react'
 import { FileSearchIcon } from '@navikt/aksel-icons'
 import { AppContext } from '@/hooks/useProject'
 import type { MainToSandboxMessage } from '@/types/messages'
+import { postMessageToSandbox } from '@/utils/sandboxMessaging'
 
 interface InspectModeProps {
   iframeRef: React.RefObject<HTMLIFrameElement | null>
@@ -25,7 +26,7 @@ export const InspectMode = ({ iframeRef, onInspectToggle }: InspectModeProps) =>
         type: 'TOGGLE_INSPECT',
         payload: { enabled: newMode },
       }
-      iframeRef.current.contentWindow.postMessage(message, window.location.origin)
+      postMessageToSandbox(iframeRef.current.contentWindow, message)
     }
 
     // Notify parent component
