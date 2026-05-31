@@ -209,7 +209,18 @@ export const LivePreview = ({
     if (!isInspectMode) {
       setInspectionData(null)
     }
-  }, [isInspectMode])
+
+    if (!iframeRef.current?.contentWindow || !sandboxReady) {
+      return
+    }
+
+    const message: MainToSandboxMessage = {
+      type: 'TOGGLE_INSPECT',
+      payload: { enabled: isInspectMode },
+    }
+
+    postMessageToSandbox(iframeRef.current.contentWindow, message)
+  }, [isInspectMode, sandboxReady, iframeRef])
 
   // Send code to sandbox when it changes
   useEffect(() => {

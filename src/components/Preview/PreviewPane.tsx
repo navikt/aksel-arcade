@@ -143,7 +143,7 @@ export const PreviewPane = () => {
         paddingBlock="space-8"
       >
         <HStack gap="space-12" justify="end" align="center">
-          <InspectMode iframeRef={previewIframeRef} onInspectToggle={handleInspectToggle} />
+          <InspectMode onInspectToggle={handleInspectToggle} />
           <ViewportToggle />
         </HStack>
       </Box>

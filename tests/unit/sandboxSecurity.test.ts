@@ -33,5 +33,7 @@ describe('sandbox security boundaries', () => {
     expect(livePreview).toContain('sandboxConnectedRef.current = false')
     expect(livePreview).toContain('sandboxRetiredRef.current')
     expect(livePreview).toContain('Ignored sandbox message after iframe navigation')
+    expect(livePreview).toContain("type: 'TOGGLE_INSPECT'")
+    expect(livePreview).toContain('[isInspectMode, sandboxReady, iframeRef]')
   })
 })
