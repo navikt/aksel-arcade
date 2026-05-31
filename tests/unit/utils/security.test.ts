@@ -7,6 +7,14 @@ import {
 
 describe('Security Utilities', () => {
   describe('validateMainToSandboxMessage', () => {
+    it('should accept valid CONNECT_SANDBOX message', () => {
+      const message = {
+        type: 'CONNECT_SANDBOX',
+      }
+
+      expect(validateMainToSandboxMessage(message)).toBe(true)
+    })
+
     it('should accept valid EXECUTE_CODE message', () => {
       const message = {
         type: 'EXECUTE_CODE',
@@ -73,7 +81,6 @@ describe('Security Utilities', () => {
     it('should accept valid RENDER_SUCCESS message', () => {
       const message = {
         type: 'RENDER_SUCCESS',
-        sandboxSessionToken: 'test-token',
         payload: {},
       }
 
@@ -83,7 +90,6 @@ describe('Security Utilities', () => {
     it('should accept valid COMPILE_ERROR message', () => {
       const message = {
         type: 'COMPILE_ERROR',
-        sandboxSessionToken: 'test-token',
         payload: {
           message: 'Syntax error',
           line: 5,
@@ -98,7 +104,6 @@ describe('Security Utilities', () => {
     it('should accept valid RUNTIME_ERROR message', () => {
       const message = {
         type: 'RUNTIME_ERROR',
-        sandboxSessionToken: 'test-token',
         payload: {
           message: 'Cannot read property of undefined',
           componentStack: null,
@@ -112,7 +117,6 @@ describe('Security Utilities', () => {
     it('should accept valid INSPECTION_DATA message', () => {
       const message = {
         type: 'INSPECTION_DATA',
-        sandboxSessionToken: 'test-token',
         payload: {
           componentName: 'Button',
           props: { variant: 'primary' },
@@ -126,7 +130,6 @@ describe('Security Utilities', () => {
     it('should accept valid CONSOLE_LOG message', () => {
       const message = {
         type: 'CONSOLE_LOG',
-        sandboxSessionToken: 'test-token',
         payload: {
           level: 'log',
           args: ['Hello', 'world'],
@@ -139,7 +142,6 @@ describe('Security Utilities', () => {
     it('should accept valid THEME_UPDATED message', () => {
       const message = {
         type: 'THEME_UPDATED',
-        sandboxSessionToken: 'test-token',
         payload: { theme: 'light' },
       }
 
@@ -155,13 +157,12 @@ describe('Security Utilities', () => {
       expect(validateSandboxToMainMessage(message)).toBe(false)
     })
 
-    it('should reject message without sandbox session token', () => {
+    it('should accept valid SANDBOX_CONNECTED message', () => {
       const message = {
-        type: 'RENDER_SUCCESS',
-        payload: {},
+        type: 'SANDBOX_CONNECTED',
       }
 
-      expect(validateSandboxToMainMessage(message)).toBe(false)
+      expect(validateSandboxToMainMessage(message)).toBe(true)
     })
 
     it('should reject message without type', () => {

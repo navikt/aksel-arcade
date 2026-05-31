@@ -21,13 +21,17 @@ describe('sandbox security boundaries', () => {
     expect(livePreview).not.toContain('allow-same-origin')
   })
 
-  it('requires the original sandbox session before parent messages resume', () => {
+  it('routes parent-to-sandbox messages through a private message channel', () => {
     const sandboxHtml = readProjectFile('public/sandbox.html')
     const livePreview = readProjectFile('src/components/Preview/LivePreview.tsx')
 
-    expect(sandboxHtml).toContain('sandboxSessionToken')
-    expect(livePreview).toContain('sandboxSessionTokenRef')
-    expect(livePreview).toContain('createSandboxSrc')
-    expect(livePreview).toContain("iframe.addEventListener('load', handleLoad)")
+    expect(sandboxHtml).toContain('CONNECT_SANDBOX')
+    expect(sandboxHtml).toContain('mainMessagePort')
+    expect(livePreview).toContain('new MessageChannel()')
+    expect(livePreview).toContain('registerSandboxMessagePort')
+    expect(livePreview).toContain("iframe?.addEventListener('load', handleLoad)")
+    expect(livePreview).toContain('sandboxConnectedRef.current = false')
+    expect(livePreview).toContain('sandboxRetiredRef.current')
+    expect(livePreview).toContain('Ignored sandbox message after iframe navigation')
   })
 })

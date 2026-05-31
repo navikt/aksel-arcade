@@ -487,8 +487,6 @@ function setupDesktopTransportPreload(
 const isPromiseLike = <TValue,>(value: TValue | Promise<TValue>): value is Promise<TValue> =>
   typeof (value as Promise<TValue>).then === 'function'
 
-let sandboxReadyDispatched = false
-
 const getPreviewIframe = () => {
   const iframe = screen.getByTestId('preview-iframe') as HTMLIFrameElement
   if (!iframe.contentWindow) {
@@ -498,18 +496,7 @@ const getPreviewIframe = () => {
   return iframe
 }
 
-const getSandboxSessionToken = () => {
-  const iframe = getPreviewIframe()
-  const sandboxUrl = new URL(iframe.src || iframe.getAttribute('src') || '', window.location.href)
-  const token = new URLSearchParams(sandboxUrl.hash.slice(1)).get('sandboxSessionToken')
-  if (!token) {
-    throw new Error('Expected preview iframe src to include a sandbox session token.')
-  }
-
-  return token
-}
-
-const dispatchMessageFromPreviewIframe = (data: unknown) => {
+const dispatchSandboxMessage = (data: unknown) => {
   const iframe = getPreviewIframe()
 
   act(() => {
@@ -520,25 +507,6 @@ const dispatchMessageFromPreviewIframe = (data: unknown) => {
         source: iframe.contentWindow,
       })
     )
-  })
-}
-
-const dispatchSandboxReady = () => {
-  dispatchMessageFromPreviewIframe({
-    type: 'SANDBOX_READY',
-    sandboxSessionToken: getSandboxSessionToken(),
-  })
-  sandboxReadyDispatched = true
-}
-
-const dispatchSandboxMessage = (data: Record<string, unknown>) => {
-  if (!sandboxReadyDispatched) {
-    dispatchSandboxReady()
-  }
-
-  dispatchMessageFromPreviewIframe({
-    ...data,
-    sandboxSessionToken: getSandboxSessionToken(),
   })
 }
 
@@ -651,7 +619,6 @@ describe('ProjectControls layout', () => {
     window.localStorage.clear()
     window.history.replaceState({}, '', '/')
     currentDesktopTransport = null
-    sandboxReadyDispatched = false
     clearLegacyAgentBridgeGlobal()
     delete window.__AKSEL_ARCADE_DESKTOP__
   })
@@ -659,7 +626,6 @@ describe('ProjectControls layout', () => {
   afterEach(() => {
     vi.restoreAllMocks()
     currentDesktopTransport = null
-    sandboxReadyDispatched = false
     clearLegacyAgentBridgeGlobal()
     delete window.__AKSEL_ARCADE_DESKTOP__
   })

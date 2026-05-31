@@ -160,7 +160,7 @@
     let akselLoaded = false;
     let ThemeComponent = null;
     let lastComponent = null;
-    const sandboxSessionToken = createSandboxSessionToken();
+    let mainMessagePort = null;
     const reactRuntimeGlobalNames = new Set([
       'Fragment',
       'useState',
@@ -331,25 +331,9 @@
     let failedRenderId = null;
     let currentExecutionId = 0;
 
-    function createSandboxSessionToken() {
-      const tokenFromUrl = new URLSearchParams(window.location.hash.slice(1)).get('sandboxSessionToken');
-      if (tokenFromUrl) {
-        return tokenFromUrl;
-      }
-
-      if (window.crypto?.getRandomValues) {
-        const bytes = new Uint32Array(4);
-        window.crypto.getRandomValues(bytes);
-        return Array.from(bytes, value => value.toString(36)).join('-');
-      }
-
-      return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
-    }
-
     function announceSandboxReady() {
       const sendReadyMessage = () => postMessageToParent(window.parent, {
-        type: 'SANDBOX_READY',
-        sandboxSessionToken
+        type: 'SANDBOX_READY'
       }, window.location);
 
       if (document.readyState === 'complete') {
@@ -368,10 +352,29 @@
         return
       }
       
+      if (event.data?.type === 'CONNECT_SANDBOX') {
+        connectSandboxPort(event.ports?.[0]);
+        return;
+      }
+
+      handleParentMessage(event.data);
+    });
+
+    function connectSandboxPort(port) {
+      if (!port || mainMessagePort) {
+        return;
+      }
+
+      mainMessagePort = port;
+      mainMessagePort.onmessage = (event) => handleParentMessage(event.data);
+      mainMessagePort.start?.();
+      sendMessage('SANDBOX_CONNECTED', {});
+    }
+
+    function handleParentMessage(message) {
       // Validate message structure
-      if (!event.data || typeof event.data !== 'object') return;
-      
-      const message = event.data;
+      if (!message || typeof message !== 'object') return;
+
       console.log('📥 Sandbox received message:', message.type);
 
       try {
@@ -406,7 +409,7 @@
           stack: error.stack || ''
         });
       }
-    });
+    }
 
     // T077: Handle TOGGLE_INSPECT message
     function toggleInspect(payload) {
@@ -1055,11 +1058,17 @@
     }
 
     function sendMessage(type, payload) {
-      postMessageToParent(window.parent, { type, payload, sandboxSessionToken }, window.location);
+      const message = { type, payload };
+      if (mainMessagePort) {
+        mainMessagePort.postMessage(message);
+        return;
+      }
+
+      postMessageToParent(window.parent, message, window.location);
     }
 
     function sendError(type, payload) {
-      postMessageToParent(window.parent, { type, payload, sandboxSessionToken }, window.location);
+      sendMessage(type, payload);
     }
 
     function extractLineNumber(error) {

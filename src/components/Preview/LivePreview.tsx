@@ -5,7 +5,11 @@ import type { InspectionData } from '@/types/inspection'
 import type { SandboxConsolePayload } from '@/services/previewDiagnostics'
 import { getViewportWidth } from '@/types/viewports'
 import { validateSandboxToMainMessage } from '@/utils/security'
-import { postMessageToSandbox } from '@/utils/sandboxMessaging'
+import {
+  postMessageToSandbox,
+  registerSandboxMessagePort,
+  unregisterSandboxMessagePort,
+} from '@/utils/sandboxMessaging'
 import { InspectionPopover } from './InspectionPopover'
 import './LivePreview.css'
 
@@ -21,23 +25,6 @@ interface LivePreviewProps {
   theme: 'light' | 'dark'
 }
 
-const createSandboxSessionToken = () => {
-  if (globalThis.crypto?.randomUUID) {
-    return globalThis.crypto.randomUUID()
-  }
-
-  if (globalThis.crypto?.getRandomValues) {
-    const bytes = new Uint32Array(4)
-    globalThis.crypto.getRandomValues(bytes)
-    return Array.from(bytes, (value) => value.toString(36)).join('-')
-  }
-
-  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`
-}
-
-const createSandboxSrc = (sandboxSessionToken: string) =>
-  `${import.meta.env.BASE_URL}sandbox.html#sandboxSessionToken=${encodeURIComponent(sandboxSessionToken)}`
-
 export const LivePreview = ({
   iframeRef,
   transpiledCode,
@@ -51,83 +38,84 @@ export const LivePreview = ({
 }: LivePreviewProps) => {
   const [sandboxReady, setSandboxReady] = useState(false)
   const pendingCodeRef = useRef<string | null>(null)
-  const sandboxSessionTokenRef = useRef(createSandboxSessionToken())
-  const sandboxSrcRef = useRef(createSandboxSrc(sandboxSessionTokenRef.current))
+  const latestTranspiledCodeRef = useRef(transpiledCode)
+  const sandboxPortRef = useRef<MessagePort | null>(null)
+  const sandboxConnectedRef = useRef(false)
+  const sandboxRetiredRef = useRef(false)
+  const handlersRef = useRef({
+    onRenderSuccess,
+    onCompileError,
+    onRuntimeError,
+    onConsoleMessage,
+  })
   
   // T082: Inspection state
   const [inspectionData, setInspectionData] = useState<InspectionData | null>(null)
 
+  useEffect(() => {
+    latestTranspiledCodeRef.current = transpiledCode
+  }, [transpiledCode])
+
+  useEffect(() => {
+    handlersRef.current = {
+      onRenderSuccess,
+      onCompileError,
+      onRuntimeError,
+      onConsoleMessage,
+    }
+  }, [onRenderSuccess, onCompileError, onRuntimeError, onConsoleMessage])
+
   // Listen for messages from sandbox
   useEffect(() => {
-    const getSandboxSessionToken = (data: unknown) => {
-      if (!data || typeof data !== 'object' || !('sandboxSessionToken' in data)) {
-        return null
+    let connectedWindow: Window | null = null
+
+    const sendPendingCode = () => {
+      if (!pendingCodeRef.current || !iframeRef.current?.contentWindow) {
+        return
       }
 
-      const token = (data as { sandboxSessionToken: unknown }).sandboxSessionToken
-      return typeof token === 'string' && token ? token : null
+      const message: MainToSandboxMessage = {
+        type: 'EXECUTE_CODE',
+        payload: { jsxCode: pendingCodeRef.current, hooksCode: '' },
+      }
+      postMessageToSandbox(iframeRef.current.contentWindow, message)
+      pendingCodeRef.current = null
     }
 
-    const isExpectedSandboxSession = (data: unknown) => {
-      const token = getSandboxSessionToken(data)
-      return Boolean(token && token === sandboxSessionTokenRef.current)
+    const disconnectSandbox = (resetReady: boolean) => {
+      if (connectedWindow) {
+        unregisterSandboxMessagePort(connectedWindow)
+        connectedWindow = null
+      }
+      sandboxPortRef.current?.close()
+      sandboxPortRef.current = null
+      sandboxConnectedRef.current = false
+      if (resetReady) {
+        setSandboxReady(false)
+      }
     }
 
-    const handleMessage = (event: MessageEvent) => {
-      // Validate source
-      if (event.source !== iframeRef.current?.contentWindow) {
+    const handleSandboxMessage = (data: unknown) => {
+      if (!validateSandboxToMainMessage(data)) {
+        console.warn('Invalid message from sandbox:', data)
         return
       }
 
-      // Check for SANDBOX_READY message (not in type-safe messages yet)
-      if (event.data?.type === 'SANDBOX_READY') {
-        const token = getSandboxSessionToken(event.data)
-        if (!token) {
-          console.warn('Sandbox ready message missing session token:', event.data)
-          return
-        }
-
-        if (sandboxSessionTokenRef.current !== token) {
-          console.warn('Rejected sandbox ready message for unexpected session:', event.data)
-          return
-        }
-
-        setSandboxReady(true)
-        
-        // Send pending code if any
-        if (pendingCodeRef.current && iframeRef.current?.contentWindow) {
-          const message: MainToSandboxMessage = {
-            type: 'EXECUTE_CODE',
-            payload: { jsxCode: pendingCodeRef.current, hooksCode: '' },
-          }
-          postMessageToSandbox(iframeRef.current.contentWindow, message)
-          pendingCodeRef.current = null
-        }
-        return
-      }
-
-      if (!isExpectedSandboxSession(event.data)) {
-        console.warn('Rejected message from stale sandbox session:', event.data)
-        return
-      }
-
-      // Validate message structure
-      if (!validateSandboxToMainMessage(event.data)) {
-        console.warn('Invalid message from sandbox:', event.data)
-        return
-      }
-
-      const message = event.data as SandboxToMainMessage
+      const message = data as SandboxToMainMessage
 
       switch (message.type) {
+        case 'SANDBOX_CONNECTED':
+          setSandboxReady(true)
+          sendPendingCode()
+          break
         case 'RENDER_SUCCESS':
-          onRenderSuccess()
+          handlersRef.current.onRenderSuccess()
           break
         case 'COMPILE_ERROR':
-          onCompileError(message.payload)
+          handlersRef.current.onCompileError(message.payload)
           break
         case 'RUNTIME_ERROR':
-          onRuntimeError(message.payload)
+          handlersRef.current.onRuntimeError(message.payload)
           break
         case 'INSPECTION_DATA':
           // T082: Update popover position and content
@@ -150,30 +138,71 @@ export const LivePreview = ({
           } else {
             console.log(...message.payload.args)
           }
-          onConsoleMessage(message.payload)
+          handlersRef.current.onConsoleMessage(message.payload)
           break
       }
     }
 
-    window.addEventListener('message', handleMessage)
-    return () => window.removeEventListener('message', handleMessage)
-  }, [onRenderSuccess, onCompileError, onRuntimeError, onConsoleMessage, iframeRef])
+    const handleMessage = (event: MessageEvent) => {
+      // Validate source
+      if (event.source !== iframeRef.current?.contentWindow) {
+        return
+      }
 
-  useEffect(() => {
-    const iframe = iframeRef.current
-    if (!iframe) return
+      if (sandboxRetiredRef.current) {
+        console.warn('Ignored sandbox message after iframe navigation')
+        return
+      }
 
-    const handleLoad = () => {
-      setSandboxReady(false)
-      setInspectionData(null)
-      if (transpiledCode) {
-        pendingCodeRef.current = transpiledCode
+      // Check for SANDBOX_READY message (not in type-safe messages yet)
+      if (event.data?.type === 'SANDBOX_READY') {
+        if (sandboxConnectedRef.current || !iframeRef.current?.contentWindow) {
+          return
+        }
+
+        const channel = new MessageChannel()
+        sandboxPortRef.current = channel.port1
+        sandboxPortRef.current.onmessage = (messageEvent) => handleSandboxMessage(messageEvent.data)
+        sandboxPortRef.current.start()
+        connectedWindow = iframeRef.current.contentWindow
+        registerSandboxMessagePort(connectedWindow, sandboxPortRef.current)
+
+        const connectMessage: MainToSandboxMessage = { type: 'CONNECT_SANDBOX' }
+        postMessageToSandbox(iframeRef.current.contentWindow, connectMessage, window.location, [
+          channel.port2,
+        ])
+
+        sandboxConnectedRef.current = true
+        return
+      }
+
+      if (!sandboxConnectedRef.current) {
+        handleSandboxMessage(event.data)
       }
     }
 
-    iframe.addEventListener('load', handleLoad)
-    return () => iframe.removeEventListener('load', handleLoad)
-  }, [iframeRef, transpiledCode])
+    const handleLoad = () => {
+      const hadActiveChannel = sandboxConnectedRef.current || sandboxPortRef.current
+      if (hadActiveChannel) {
+        sandboxRetiredRef.current = true
+      }
+
+      disconnectSandbox(true)
+      setInspectionData(null)
+      if (!sandboxRetiredRef.current && latestTranspiledCodeRef.current) {
+        pendingCodeRef.current = latestTranspiledCodeRef.current
+      }
+    }
+
+    const iframe = iframeRef.current
+    iframe?.addEventListener('load', handleLoad)
+    window.addEventListener('message', handleMessage)
+    return () => {
+      iframe?.removeEventListener('load', handleLoad)
+      window.removeEventListener('message', handleMessage)
+      disconnectSandbox(false)
+    }
+  }, [iframeRef])
 
   // T083: Clear inspection popover when inspect mode disabled
   useEffect(() => {
@@ -236,7 +265,7 @@ export const LivePreview = ({
       <iframe
         ref={iframeRef}
         className="live-preview__iframe"
-        src={sandboxSrcRef.current}
+        src={import.meta.env.BASE_URL + 'sandbox.html'}
         sandbox="allow-scripts"
         referrerPolicy="no-referrer"
         title="Live Preview Sandbox"

@@ -103,12 +103,12 @@ window.parent.postMessage(message, '*')  // ❌ Wildcard origin
 
 **After (Secure)**:
 ```typescript
-// Parent -> sandbox uses "*" because the iframe intentionally has an opaque origin.
-// Delivery is still scoped to the iframe's contentWindow reference.
-iframe.contentWindow.postMessage(message, '*')
+// Parent -> sandbox uses "*" once to transfer a private MessagePort into
+// the opaque sandbox runtime. User code never receives that port.
+iframe.contentWindow.postMessage({ type: 'CONNECT_SANDBOX' }, '*', [port])
 
 // Sandbox -> parent targets the known parent origin from sandbox.html's URL.
-window.parent.postMessage({ ...message, sandboxSessionToken }, window.location.origin)
+window.parent.postMessage(message, window.location.origin)
 ```
 
 **Validation on Receiving End**:
@@ -127,10 +127,10 @@ window.addEventListener('message', (event) => {
 })
 ```
 
-Parent-to-sandbox messages resume only after the current `sandbox.html` runtime echoes the
-unguessable session token that the parent embeds in the iframe URL fragment. If the iframe
-navigates away, the parent marks the sandbox as not ready and rejects messages from
-documents that do not know the original token.
+After the initial connection, parent-to-sandbox messages use the transferred `MessagePort`
+instead of wildcard `window.postMessage`. If the iframe navigates after the channel is
+active, the parent closes the old port, marks the sandbox as retired, and refuses to
+transfer a replacement port to the navigated document.
 
 **Files Updated**:
 - `src/utils/sandboxMessaging.ts`
