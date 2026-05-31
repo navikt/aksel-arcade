@@ -487,7 +487,10 @@ function setupDesktopTransportPreload(
 const isPromiseLike = <TValue,>(value: TValue | Promise<TValue>): value is Promise<TValue> =>
   typeof (value as Promise<TValue>).then === 'function'
 
-const dispatchSandboxMessage = (data: unknown) => {
+const TEST_SANDBOX_SESSION_TOKEN = 'test-sandbox-session-token'
+let sandboxReadyDispatched = false
+
+const dispatchMessageFromPreviewIframe = (data: unknown) => {
   const iframe = screen.getByTestId('preview-iframe') as HTMLIFrameElement
   if (!iframe.contentWindow) {
     throw new Error('Expected preview iframe to have a contentWindow.')
@@ -501,6 +504,25 @@ const dispatchSandboxMessage = (data: unknown) => {
         source: iframe.contentWindow,
       })
     )
+  })
+}
+
+const dispatchSandboxReady = () => {
+  dispatchMessageFromPreviewIframe({
+    type: 'SANDBOX_READY',
+    sandboxSessionToken: TEST_SANDBOX_SESSION_TOKEN,
+  })
+  sandboxReadyDispatched = true
+}
+
+const dispatchSandboxMessage = (data: Record<string, unknown>) => {
+  if (!sandboxReadyDispatched) {
+    dispatchSandboxReady()
+  }
+
+  dispatchMessageFromPreviewIframe({
+    ...data,
+    sandboxSessionToken: TEST_SANDBOX_SESSION_TOKEN,
   })
 }
 
@@ -613,6 +635,7 @@ describe('ProjectControls layout', () => {
     window.localStorage.clear()
     window.history.replaceState({}, '', '/')
     currentDesktopTransport = null
+    sandboxReadyDispatched = false
     clearLegacyAgentBridgeGlobal()
     delete window.__AKSEL_ARCADE_DESKTOP__
   })
@@ -620,6 +643,7 @@ describe('ProjectControls layout', () => {
   afterEach(() => {
     vi.restoreAllMocks()
     currentDesktopTransport = null
+    sandboxReadyDispatched = false
     clearLegacyAgentBridgeGlobal()
     delete window.__AKSEL_ARCADE_DESKTOP__
   })

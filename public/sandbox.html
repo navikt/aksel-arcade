@@ -160,6 +160,7 @@
     let akselLoaded = false;
     let ThemeComponent = null;
     let lastComponent = null;
+    const sandboxSessionToken = createSandboxSessionToken();
     const reactRuntimeGlobalNames = new Set([
       'Fragment',
       'useState',
@@ -295,7 +296,7 @@
         console.log('✅ React version:', React.version);
         console.log('✅ Theme component available:', !!ThemeComponent);
         console.log('✅ Aksel CSS imported via @navikt/ds-css');
-        postMessageToParent(window.parent, { type: 'SANDBOX_READY' }, window.location);
+        announceSandboxReady();
       })
       .catch((err) => {
         console.error('❌❌❌ CRITICAL ERROR: Module loading failed completely!');
@@ -307,14 +308,11 @@
         
         // Send error to parent so it's visible in main app console
         try {
-          postMessageToParent(window.parent, {
-            type: 'RUNTIME_ERROR',
-            payload: {
-              message: `Sandbox initialization failed: ${err.message}`,
-              componentStack: null,
-              stack: err.stack || ''
-            }
-          }, window.location);
+          sendError('RUNTIME_ERROR', {
+            message: `Sandbox initialization failed: ${err.message}`,
+            componentStack: null,
+            stack: err.stack || ''
+          });
         } catch (postErr) {
           console.error('❌ Could not even send error to parent:', postErr);
         }
@@ -332,6 +330,30 @@
     let currentRenderId = 0;
     let failedRenderId = null;
     let currentExecutionId = 0;
+
+    function createSandboxSessionToken() {
+      if (window.crypto?.getRandomValues) {
+        const bytes = new Uint32Array(4);
+        window.crypto.getRandomValues(bytes);
+        return Array.from(bytes, value => value.toString(36)).join('-');
+      }
+
+      return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+    }
+
+    function announceSandboxReady() {
+      const sendReadyMessage = () => postMessageToParent(window.parent, {
+        type: 'SANDBOX_READY',
+        sandboxSessionToken
+      }, window.location);
+
+      if (document.readyState === 'complete') {
+        window.setTimeout(sendReadyMessage, 0);
+        return;
+      }
+
+      window.addEventListener('load', () => window.setTimeout(sendReadyMessage, 0), { once: true });
+    }
 
     // Listen for messages from parent window
     window.addEventListener('message', (event) => {
@@ -1028,11 +1050,11 @@
     }
 
     function sendMessage(type, payload) {
-      postMessageToParent(window.parent, { type, payload }, window.location);
+      postMessageToParent(window.parent, { type, payload, sandboxSessionToken }, window.location);
     }
 
     function sendError(type, payload) {
-      postMessageToParent(window.parent, { type, payload }, window.location);
+      postMessageToParent(window.parent, { type, payload, sandboxSessionToken }, window.location);
     }
 
     function extractLineNumber(error) {

@@ -10,13 +10,19 @@ export type MainToSandboxMessage =
   | { type: 'UPDATE_THEME'; payload: { theme: 'light' | 'dark' } }
 
 // Sandbox → Main messages
-export type SandboxToMainMessage =
-  | { type: 'RENDER_SUCCESS' }
-  | { type: 'COMPILE_ERROR'; payload: CompileError }
-  | { type: 'RUNTIME_ERROR'; payload: RuntimeError }
-  | { type: 'INSPECTION_DATA'; payload: InspectionData | null }
-  | { type: 'THEME_UPDATED'; payload: { theme: 'light' | 'dark' } }
-  | { type: 'CONSOLE_LOG'; payload: { level: 'log' | 'warn' | 'error'; args: unknown[] } }
+export type SandboxSessionMessage = { sandboxSessionToken: string }
+
+export type SandboxReadyMessage = SandboxSessionMessage & { type: 'SANDBOX_READY' }
+
+export type SandboxToMainMessage = SandboxSessionMessage &
+  (
+    | { type: 'RENDER_SUCCESS' }
+    | { type: 'COMPILE_ERROR'; payload: CompileError }
+    | { type: 'RUNTIME_ERROR'; payload: RuntimeError }
+    | { type: 'INSPECTION_DATA'; payload: InspectionData | null }
+    | { type: 'THEME_UPDATED'; payload: { theme: 'light' | 'dark' } }
+    | { type: 'CONSOLE_LOG'; payload: { level: 'log' | 'warn' | 'error'; args: unknown[] } }
+  )
 
 // Type guards
 export const isMainToSandboxMessage = (msg: unknown): msg is MainToSandboxMessage => {

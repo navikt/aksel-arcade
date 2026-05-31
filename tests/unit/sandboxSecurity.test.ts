@@ -20,4 +20,13 @@ describe('sandbox security boundaries', () => {
     expect(livePreview).toContain('sandbox="allow-scripts"')
     expect(livePreview).not.toContain('allow-same-origin')
   })
+
+  it('requires the original sandbox session before parent messages resume', () => {
+    const sandboxHtml = readProjectFile('public/sandbox.html')
+    const livePreview = readProjectFile('src/components/Preview/LivePreview.tsx')
+
+    expect(sandboxHtml).toContain('sandboxSessionToken')
+    expect(livePreview).toContain('sandboxSessionTokenRef')
+    expect(livePreview).toContain("iframe.addEventListener('load', handleLoad)")
+  })
 })

@@ -108,7 +108,7 @@ window.parent.postMessage(message, '*')  // ❌ Wildcard origin
 iframe.contentWindow.postMessage(message, '*')
 
 // Sandbox -> parent targets the known parent origin from sandbox.html's URL.
-window.parent.postMessage(message, window.location.origin)
+window.parent.postMessage({ ...message, sandboxSessionToken }, window.location.origin)
 ```
 
 **Validation on Receiving End**:
@@ -126,6 +126,11 @@ window.addEventListener('message', (event) => {
   // Process message...
 })
 ```
+
+Parent-to-sandbox messages resume only after the current `sandbox.html` runtime sends a
+`SANDBOX_READY` message with its unguessable session token. If the iframe navigates away,
+the parent marks the sandbox as not ready and rejects messages from documents that do not
+know the original token.
 
 **Files Updated**:
 - `src/utils/sandboxMessaging.ts`

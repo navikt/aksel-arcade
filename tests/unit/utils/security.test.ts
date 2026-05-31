@@ -73,6 +73,7 @@ describe('Security Utilities', () => {
     it('should accept valid RENDER_SUCCESS message', () => {
       const message = {
         type: 'RENDER_SUCCESS',
+        sandboxSessionToken: 'test-token',
         payload: {},
       }
 
@@ -82,6 +83,7 @@ describe('Security Utilities', () => {
     it('should accept valid COMPILE_ERROR message', () => {
       const message = {
         type: 'COMPILE_ERROR',
+        sandboxSessionToken: 'test-token',
         payload: {
           message: 'Syntax error',
           line: 5,
@@ -96,6 +98,7 @@ describe('Security Utilities', () => {
     it('should accept valid RUNTIME_ERROR message', () => {
       const message = {
         type: 'RUNTIME_ERROR',
+        sandboxSessionToken: 'test-token',
         payload: {
           message: 'Cannot read property of undefined',
           componentStack: null,
@@ -109,6 +112,7 @@ describe('Security Utilities', () => {
     it('should accept valid INSPECTION_DATA message', () => {
       const message = {
         type: 'INSPECTION_DATA',
+        sandboxSessionToken: 'test-token',
         payload: {
           componentName: 'Button',
           props: { variant: 'primary' },
@@ -122,6 +126,7 @@ describe('Security Utilities', () => {
     it('should accept valid CONSOLE_LOG message', () => {
       const message = {
         type: 'CONSOLE_LOG',
+        sandboxSessionToken: 'test-token',
         payload: {
           level: 'log',
           args: ['Hello', 'world'],
@@ -134,6 +139,7 @@ describe('Security Utilities', () => {
     it('should accept valid THEME_UPDATED message', () => {
       const message = {
         type: 'THEME_UPDATED',
+        sandboxSessionToken: 'test-token',
         payload: { theme: 'light' },
       }
 
@@ -143,6 +149,15 @@ describe('Security Utilities', () => {
     it('should reject message with invalid type', () => {
       const message = {
         type: 'EXECUTE_CODE',
+        payload: {},
+      }
+
+      expect(validateSandboxToMainMessage(message)).toBe(false)
+    })
+
+    it('should reject message without sandbox session token', () => {
+      const message = {
+        type: 'RENDER_SUCCESS',
         payload: {},
       }
 

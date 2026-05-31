@@ -34,12 +34,27 @@ export const LivePreview = ({
 }: LivePreviewProps) => {
   const [sandboxReady, setSandboxReady] = useState(false)
   const pendingCodeRef = useRef<string | null>(null)
+  const sandboxSessionTokenRef = useRef<string | null>(null)
   
   // T082: Inspection state
   const [inspectionData, setInspectionData] = useState<InspectionData | null>(null)
 
   // Listen for messages from sandbox
   useEffect(() => {
+    const getSandboxSessionToken = (data: unknown) => {
+      if (!data || typeof data !== 'object' || !('sandboxSessionToken' in data)) {
+        return null
+      }
+
+      const token = (data as { sandboxSessionToken: unknown }).sandboxSessionToken
+      return typeof token === 'string' && token ? token : null
+    }
+
+    const isExpectedSandboxSession = (data: unknown) => {
+      const token = getSandboxSessionToken(data)
+      return Boolean(token && token === sandboxSessionTokenRef.current)
+    }
+
     const handleMessage = (event: MessageEvent) => {
       // Validate source
       if (event.source !== iframeRef.current?.contentWindow) {
@@ -48,6 +63,18 @@ export const LivePreview = ({
 
       // Check for SANDBOX_READY message (not in type-safe messages yet)
       if (event.data?.type === 'SANDBOX_READY') {
+        const token = getSandboxSessionToken(event.data)
+        if (!token) {
+          console.warn('Sandbox ready message missing session token:', event.data)
+          return
+        }
+
+        if (sandboxSessionTokenRef.current && sandboxSessionTokenRef.current !== token) {
+          console.warn('Rejected sandbox ready message for unexpected session:', event.data)
+          return
+        }
+
+        sandboxSessionTokenRef.current = token
         setSandboxReady(true)
         
         // Send pending code if any
@@ -60,6 +87,18 @@ export const LivePreview = ({
           pendingCodeRef.current = null
         }
         return
+      }
+
+      if (!isExpectedSandboxSession(event.data)) {
+        const token = getSandboxSessionToken(event.data)
+        if (sandboxSessionTokenRef.current || event.data?.type !== 'RUNTIME_ERROR' || !token) {
+          if (sandboxSessionTokenRef.current) {
+            console.warn('Rejected message from stale sandbox session:', event.data)
+          }
+          return
+        }
+
+        sandboxSessionTokenRef.current = token
       }
 
       // Validate message structure
@@ -109,6 +148,22 @@ export const LivePreview = ({
     window.addEventListener('message', handleMessage)
     return () => window.removeEventListener('message', handleMessage)
   }, [onRenderSuccess, onCompileError, onRuntimeError, onConsoleMessage, iframeRef])
+
+  useEffect(() => {
+    const iframe = iframeRef.current
+    if (!iframe) return
+
+    const handleLoad = () => {
+      setSandboxReady(false)
+      setInspectionData(null)
+      if (transpiledCode) {
+        pendingCodeRef.current = transpiledCode
+      }
+    }
+
+    iframe.addEventListener('load', handleLoad)
+    return () => iframe.removeEventListener('load', handleLoad)
+  }, [iframeRef, transpiledCode])
 
   // T083: Clear inspection popover when inspect mode disabled
   useEffect(() => {

@@ -33,6 +33,10 @@ export const validateMainToSandboxMessage = (data: unknown): data is MainToSandb
 export const validateSandboxToMainMessage = (data: unknown): data is SandboxToMainMessage => {
   if (!data || typeof data !== 'object') return false
   if (!('type' in data)) return false
+  if (!('sandboxSessionToken' in data)) return false
+  if (typeof (data as { sandboxSessionToken: unknown }).sandboxSessionToken !== 'string') {
+    return false
+  }
 
   const validTypes = [
     'RENDER_SUCCESS',
