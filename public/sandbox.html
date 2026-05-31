@@ -9,13 +9,12 @@
     // Detect if running in development (Vite dev server on port 5173) or production
     const isDev = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') && window.location.port === '5173'
     
-    // Development CSP: Allow localhost for Vite HMR
-    const devCSP = "default-src 'none'; script-src 'unsafe-inline' 'unsafe-eval' 'self' http://localhost:* http://127.0.0.1:* https://localhost:* https://127.0.0.1:*; style-src 'unsafe-inline' 'self' http://localhost:* http://127.0.0.1:* https://localhost:* https://127.0.0.1:* https://cdn.nav.no; font-src 'self' https://cdn.nav.no data:; connect-src 'self' http://localhost:* http://127.0.0.1:* https://localhost:* https://127.0.0.1:* ws://localhost:* ws://127.0.0.1:* wss://localhost:* wss://127.0.0.1:*; img-src data: https:;"
+    // Development CSP: Allow localhost resources for the pre-bundled sandbox runtime.
+    const devCSP = "default-src 'none'; script-src 'unsafe-inline' 'self' blob: http://localhost:* http://127.0.0.1:* https://localhost:* https://127.0.0.1:*; style-src 'unsafe-inline' 'self' http://localhost:* http://127.0.0.1:* https://localhost:* https://127.0.0.1:* https://cdn.nav.no; font-src 'self' https://cdn.nav.no data:; connect-src 'self' http://localhost:* http://127.0.0.1:* https://localhost:* https://127.0.0.1:* ws://localhost:* ws://127.0.0.1:* wss://localhost:* wss://127.0.0.1:*; img-src data: https:; form-action 'none'; base-uri 'none'; object-src 'none'; frame-src 'none';"
     
-    // Production CSP: Strict, only allow required CDN resources
-    // Note: 'unsafe-eval' is required for user code execution (playground feature)
-    // Allow 'self' for manifest.json and built assets
-    const prodCSP = "default-src 'none'; script-src 'unsafe-inline' 'unsafe-eval' 'self' https://esm.sh https://cdn.nav.no https://unpkg.com; style-src 'unsafe-inline' 'self' https://cdn.nav.no; font-src https://cdn.nav.no data:; connect-src 'self' https://esm.sh https://cdn.nav.no https://unpkg.com; img-src data: https:;"
+    // Production CSP: strict, with user code limited to blob-backed modules.
+    // Allow 'self' for the pre-bundled sandbox runtime and blob: for isolated user modules.
+    const prodCSP = "default-src 'none'; script-src 'unsafe-inline' 'self' blob:; style-src 'unsafe-inline' 'self' https://cdn.nav.no; font-src https://cdn.nav.no data:; connect-src 'self'; img-src data: https:; form-action 'none'; base-uri 'none'; object-src 'none'; frame-src 'none';"
     
     // Apply appropriate CSP
     const meta = document.createElement('meta')
@@ -138,8 +137,11 @@
   </script>
   <div id="root" class="aksel-theme dark" data-color="accent"></div>
   
-  <script type="module">
-    import {
+  <script src="./inspect-overlays-global.js"></script>
+  <script src="./sandbox-messaging-global.js"></script>
+  <script>
+  (() => {
+    const {
       computeGapRects,
       computeSpacingOverlayRects,
       createOverlayElements,
@@ -147,13 +149,13 @@
       parseSpacing,
       renderGapLayers,
       renderSpacingLayers,
-    } from './inspect-overlays.js'
-    import {
+    } = window.inspectOverlayUtils;
+    const {
       isTrustedParentMessage,
       postMessageToParent,
-    } from './sandbox-messaging.js'
+    } = window.sandboxMessaging;
 
-    // React will be loaded from Vite via sandboxAksel.ts (same instance as Aksel components)
+    // React and Aksel are loaded from the pre-bundled sandbox runtime.
     let currentRoot = null;
     let akselLoaded = false;
     let ThemeComponent = null;
@@ -205,92 +207,6 @@
     
     console.log(`🔧 Environment: ${isDev ? 'Development' : 'Production'}`);
     
-    // Function to load from production CDN
-    async function loadFromCDN() {
-      console.log('📦 Loading from ESM.sh CDN...');
-      
-      // Load Aksel CSS via fetch to avoid CORS issues with <link> tags
-      try {
-        console.log('📥 Fetching Aksel CSS from CDN...');
-        const cssResponse = await fetch('https://cdn.nav.no/aksel/@navikt/ds-css/8.11.0/index.css');
-        const cssText = await cssResponse.text();
-        const style = document.createElement('style');
-        style.dataset.akselCss = 'true';
-        style.textContent = cssText;
-        document.head.appendChild(style);
-        console.log('✅ Aksel CSS loaded from CDN');
-      } catch (err) {
-        console.error('❌ Failed to load Aksel CSS:', err);
-        // Continue anyway - components might still work without styles
-      }
-      
-      // Load React and ReactDOM as UMD (ensures single instance)
-      const reactScript = document.createElement('script');
-      reactScript.src = 'https://unpkg.com/react@18.3.1/umd/react.production.min.js';
-      document.head.appendChild(reactScript);
-      await new Promise((resolve, reject) => {
-        reactScript.onload = resolve;
-        reactScript.onerror = reject;
-      });
-      
-      const reactDomScript = document.createElement('script');
-      reactDomScript.src = 'https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js';
-      document.head.appendChild(reactDomScript);
-      await new Promise((resolve, reject) => {
-        reactDomScript.onload = resolve;
-        reactDomScript.onerror = reject;
-      });
-      
-      console.log('✅ React loaded from UNPKG (UMD)');
-      
-      // Now React and ReactDOM are in window.React and window.ReactDOM
-      const React = window.React;
-      const ReactDOM = window.ReactDOM;
-      
-      // Load Aksel via ESM.sh but with React as peer dependency
-      console.log('📥 Loading Aksel components from ESM.sh...');
-      let AkselReact;
-      try {
-        AkselReact = await import('https://esm.sh/@navikt/ds-react@8.11.0?external=react,react-dom&bundle');
-        console.log('✅ AkselReact loaded, keys:', Object.keys(AkselReact).slice(0, 5));
-        console.log('🔍 AkselReact.Theme:', !!AkselReact.Theme, 'AkselReact.default:', !!AkselReact.default);
-      } catch (err) {
-        console.error('❌ Failed to import AkselReact:', err);
-        throw new Error(`AkselReact import failed: ${err.message || err}`);
-      }
-      
-      console.log('📥 Loading Aksel icons from ESM.sh...');
-      let AkselIcons;
-      try {
-        AkselIcons = await import('https://esm.sh/@navikt/aksel-icons@8.11.0?external=react&bundle');
-        console.log('✅ AkselIcons loaded, icon count:', Object.keys(AkselIcons).length);
-      } catch (err) {
-        console.error('❌ Failed to import AkselIcons:', err);
-        throw new Error(`AkselIcons import failed: ${err.message || err}`);
-      }
-      
-      const components = AkselReact.default || AkselReact;
-      const icons = AkselIcons.default || AkselIcons;
-      const theme = AkselReact.Theme || AkselReact.default?.Theme;
-      
-      console.log('🔍 Final exports - Components:', typeof components, 'Icons:', typeof icons, 'Theme:', typeof theme);
-      
-      return {
-        React,
-        createRoot: ReactDOM.createRoot,
-        Theme: theme,
-        AkselComponents: components,
-        AkselIcons: icons,
-      };
-    }
-    
-    // Function to load from Vite dev server (uses module import)
-    async function loadFromVite() {
-      console.log('📦 Loading from Vite dev server...');
-      const module = await import('./src/sandboxAksel.ts');
-      return module.default || module;
-    }
-    
     // Function to load pre-bundled sandbox (production)
     // The sandbox bundle is pre-built with esbuild and loaded as IIFE
     async function loadFromBuild() {
@@ -331,11 +247,12 @@
       });
     }
     
-    // Load based on environment
+    // Load the pre-bundled sandbox runtime. It is a classic script so it can run
+    // inside an opaque sandbox origin without cross-origin module fetches.
     console.log('🚀 Starting module load, isDev:', isDev);
-    console.log('🚀 Will call:', isDev ? 'loadFromVite()' : 'loadFromBuild()');
+    console.log('🚀 Will call: loadFromBuild()');
     
-    (isDev ? loadFromVite() : loadFromBuild())
+    loadFromBuild()
       .then((module) => {
         console.log('✅ Module loaded successfully!');
         console.log('🔍 Module keys:', Object.keys(module || {}).slice(0, 15));
@@ -414,6 +331,7 @@
     let currentTheme = 'dark';
     let currentRenderId = 0;
     let failedRenderId = null;
+    let currentExecutionId = 0;
 
     // Listen for messages from parent window
     window.addEventListener('message', (event) => {
@@ -832,7 +750,7 @@
       }
     }
 
-    function executeCode(payload) {
+    async function executeCode(payload, executionId = ++currentExecutionId) {
       try {
         const { jsxCode } = payload;
         
@@ -847,14 +765,18 @@
         // Check if Aksel is loaded
         if (!akselLoaded) {
           console.warn('⏸️ Aksel not loaded yet, queuing code execution');
-          setTimeout(() => executeCode(payload), 100);
+          setTimeout(() => {
+            if (executionId === currentExecutionId) {
+              executeCode(payload, executionId);
+            }
+          }, 100);
           return;
         }
 
         console.log('🎨 Executing code with all Aksel components and icons from window');
 
         // Execute the transpiled code with all Aksel components and icons in scope
-        console.log('🔧 Evaluating transpiled code...');
+        console.log('🔧 Loading transpiled code module...');
         
         // Build component declarations safely
         const componentDeclarations = window.AkselDS 
@@ -879,8 +801,7 @@
         console.log('🔍 DEBUG: Component declarations count:', componentDeclarations.split('\n').length);
         console.log('🔍 DEBUG: Icon declarations count:', iconDeclarations.split('\n').length);
         
-        const wrappedCode = `
-          (function() {
+        const moduleCode = `
             const React = window.React;
             const AkselDS = window.AkselDS;
             const AkselIcons = window.AkselIcons;
@@ -913,21 +834,38 @@
               useOptimistic
             } = React;
 
-            // Debug log inside eval scope
-            console.log('🔍 Inside eval - Button type:', typeof Button);
-            console.log('🔍 Inside eval - Button is:', Button);
+            // Debug log inside the isolated user module scope
+            console.log('🔍 Inside sandbox module - Button type:', typeof Button);
+            console.log('🔍 Inside sandbox module - Button is:', Button);
             
             ${jsxCode}
             
             // Try to find the component
-            if (typeof App !== 'undefined') return App;
-            if (typeof exports !== 'undefined' && exports.default) return exports.default;
-            throw new Error('No component found. Please export default function App() { ... }');
-          })()
+            const __AkselArcadeComponent = (() => {
+              if (typeof App !== 'undefined') return App;
+              if (typeof exports !== 'undefined' && exports.default) return exports.default;
+              throw new Error('No component found. Please export default function App() { ... }');
+            })();
+
+            export default __AkselArcadeComponent;
         `;
-        
-        const Component = eval(wrappedCode);
-        console.log('✅ Component evaluated:', typeof Component);
+
+        const moduleUrl = URL.createObjectURL(new Blob([moduleCode], { type: 'text/javascript' }));
+        let Component;
+
+        try {
+          const module = await import(moduleUrl);
+          Component = module.default;
+        } finally {
+          URL.revokeObjectURL(moduleUrl);
+        }
+
+        if (executionId !== currentExecutionId) {
+          console.log('⏭️ Ignoring stale code execution');
+          return;
+        }
+
+        console.log('✅ Component loaded:', typeof Component);
 
         if (!Component || typeof Component !== 'function') {
           throw new Error('Invalid component. Make sure to export a React component.');
@@ -1141,6 +1079,7 @@
         });
       };
     });
+  })();
   </script>
 </body>
 </html>

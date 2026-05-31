@@ -172,7 +172,8 @@ export const LivePreview = ({
         ref={iframeRef}
         className="live-preview__iframe"
         src={import.meta.env.BASE_URL + 'sandbox.html'}
-        sandbox="allow-scripts allow-same-origin"
+        sandbox="allow-scripts"
+        referrerPolicy="no-referrer"
         title="Live Preview Sandbox"
         data-testid="preview-iframe"
       />

@@ -3,8 +3,8 @@ import type { MainToSandboxMessage } from '@/types/messages'
 type SandboxMessageLocation = Pick<Location, 'origin' | 'protocol'>
 
 export const getSandboxMessageTargetOrigin = (
-  location: SandboxMessageLocation = window.location
-): string => (location.protocol === 'file:' ? '*' : location.origin)
+  _location: SandboxMessageLocation = window.location
+): string => '*'
 
 export const postMessageToSandbox = (
   targetWindow: Window,

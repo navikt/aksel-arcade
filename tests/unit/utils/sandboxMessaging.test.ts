@@ -29,8 +29,16 @@ describe('sandbox messaging origins', () => {
     expect(getSandboxMessageTargetOrigin(createLocation('file:', 'file://'))).toBe('*')
   })
 
-  it('keeps exact target origins for browser URLs', () => {
+  it('uses a wildcard target origin for opaque sandbox iframes', () => {
     expect(getSandboxMessageTargetOrigin(createLocation('https:', 'https://aksel.nav.no'))).toBe(
+      '*'
+    )
+  })
+
+  it('keeps exact parent target origins for sandbox responses', async () => {
+    const { getMessageTargetOrigin } = await loadPublicSandboxMessaging()
+
+    expect(getMessageTargetOrigin(createLocation('https:', 'https://aksel.nav.no'))).toBe(
       'https://aksel.nav.no'
     )
   })
