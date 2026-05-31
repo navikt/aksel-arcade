@@ -1558,6 +1558,7 @@ Desktop release build failure follow-up:
 - Added the temporary signing keychain to the user keychain search list before importing/signing, persisted the previous search list in signing state, and restored it before deleting the temporary keychain. This matches electron-builder's own certificate-chain workaround and helps codesign resolve the Developer ID chain.
 - Release packaging command failures now include non-secret stdout/stderr so future CI failures expose the actual failing tool output.
 - Added regression coverage for release config notarization settings, keychain search-list parsing/update/restore, and surfaced packaging command output.
+- Review follow-up: hardened cleanup so a failed keychain search-list restore no longer skips temporary keychain deletion or temp directory removal.
 
 Verification:
 

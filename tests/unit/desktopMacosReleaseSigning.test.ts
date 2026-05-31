@@ -227,6 +227,53 @@ describe('Desktop macOS release signing', () => {
     expect(removed).toEqual([signingState.tempDir])
   })
 
+  it('still deletes the temporary keychain and files when restoring the search list fails', () => {
+    const commands: Array<{ command: string; args: string[] }> = []
+    const removed: string[] = []
+    const signingState = {
+      keychainPath: '/tmp/aksel-arcade-release-signing.keychain-db',
+      previousUserKeychains: ['/Users/runner/Library/Keychains/login.keychain-db'],
+      tempDir: '/tmp/aksel-arcade-macos-signing',
+    }
+
+    expect(() =>
+      signing.cleanupMacosReleaseSigning({
+        env: {},
+        remove: (path) => {
+          removed.push(path)
+        },
+        runCommand: (command, args) => {
+          commands.push({ command, args })
+
+          if (args.includes('-s')) {
+            return { status: 1 }
+          }
+
+          return { status: 0 }
+        },
+        state: signingState,
+      })
+    ).toThrow(/Update user keychain search list failed/)
+
+    expect(commands).toEqual([
+      {
+        command: 'security',
+        args: [
+          'list-keychains',
+          '-d',
+          'user',
+          '-s',
+          '/Users/runner/Library/Keychains/login.keychain-db',
+        ],
+      },
+      {
+        command: 'security',
+        args: ['delete-keychain', signingState.keychainPath],
+      },
+    ])
+    expect(removed).toEqual([signingState.tempDir])
+  })
+
   it('targets both Apple Silicon and Intel DMGs with the documented release names', () => {
     expect(
       signing.getExpectedMacosDmgArtifacts({

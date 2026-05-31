@@ -326,6 +326,15 @@ function readSigningState(env = process.env, readFile = require('node:fs').readF
   }
 }
 
+function rememberCleanupError(currentError, nextError) {
+  if (!currentError) {
+    return nextError
+  }
+
+  console.error(nextError.message)
+  return currentError
+}
+
 function cleanupMacosReleaseSigning(options = {}) {
   const {
     env = process.env,
@@ -333,20 +342,37 @@ function cleanupMacosReleaseSigning(options = {}) {
     runCommand = spawnSync,
     state = readSigningState(env),
   } = options
+  let cleanupError = null
 
   if (state.keychainPath) {
     if (Array.isArray(state.previousUserKeychains)) {
-      setUserKeychainSearchList(state.previousUserKeychains, { runCommand })
+      try {
+        setUserKeychainSearchList(state.previousUserKeychains, { runCommand })
+      } catch (error) {
+        cleanupError = rememberCleanupError(cleanupError, error)
+      }
     }
 
-    runRequiredCommand('security', ['delete-keychain', state.keychainPath], {
-      label: 'Delete temporary Desktop release keychain',
-      runCommand,
-    })
+    try {
+      runRequiredCommand('security', ['delete-keychain', state.keychainPath], {
+        label: 'Delete temporary Desktop release keychain',
+        runCommand,
+      })
+    } catch (error) {
+      cleanupError = rememberCleanupError(cleanupError, error)
+    }
   }
 
   if (state.tempDir) {
-    remove(state.tempDir, { force: true, recursive: true })
+    try {
+      remove(state.tempDir, { force: true, recursive: true })
+    } catch (error) {
+      cleanupError = rememberCleanupError(cleanupError, error)
+    }
+  }
+
+  if (cleanupError) {
+    throw cleanupError
   }
 }
 
