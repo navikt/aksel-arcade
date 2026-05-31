@@ -59,6 +59,12 @@ The local packaging command uses `electron-builder.config.cjs`, installs the app
 - `Aksel-Arcade-X.Y.Z-mac-arm64.dmg`
 - `Aksel-Arcade-X.Y.Z-mac-x64.dmg`
 
+## Pull request packaging checks
+
+Desktop-impacting pull requests run unsigned Desktop packaging checks without entering the `desktop-release` environment. The `desktop-pr-packaging` workflow collects the pull request changed-file list, runs `npm run desktop:pr-package-plan`, and skips packaging when the same Desktop-impacting rules used for release planning find no Desktop Arcade impact.
+
+When packaging is required, the workflow reuses the local unsigned package contract: macOS runners run `npm run desktop:package:mac`, Windows runners run `npm run desktop:package:win`, `AKSEL_ARCADE_DESKTOP_VERSION` is injected as CI workspace state, and the expected DMG/NSIS install artifacts must exist in `release/desktop`. Pull request packaging jobs do not request Desktop release credentials, do not sign or notarize artifacts, do not upload installers as workflow artifacts, and do not create GitHub Releases.
+
 ## Safety rules
 
 - Detect Desktop-impacting changes before entering the `desktop-release` environment.

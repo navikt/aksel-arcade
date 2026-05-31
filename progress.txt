@@ -1418,3 +1418,24 @@ Verification:
 - npm run lint (passes with existing hook dependency warnings in `InspectionPopover` and `PreviewPane`)
 - DESKTOP_RELEASE_CHANGED_FILES='vite.config.ts' DESKTOP_RELEASE_TAGS='desktop-v0.2.6' npm run desktop:release-plan
 - Browser smoke check at `http://127.0.0.1:5174/aksel-arcade/`
+
+### 2026-05-31 - Issue #147: Unsigned PR Desktop packaging checks
+
+Implemented:
+
+- Selected #147 as the single ready-for-agent feature from #143-#150 because #143/#144 local unsigned packaging and #145 release planning were already present, while #147 is the next unblocked release-safety check before signed publication work.
+- Added `npm run desktop:pr-package-plan` backed by `scripts/desktop-pr-packaging-plan.cjs` to reuse Desktop-impacting change detection for pull requests without reading Desktop release credentials or tags.
+- Added `.github/workflows/desktop-pr-packaging.yml` on `pull_request` only, with read-only permissions, concurrency cancellation, changed-file collection via the PR files API, and conditional packaging only when Desktop-impacting files changed.
+- Added unsigned macOS and Windows packaging matrix legs that inject `AKSEL_ARCADE_DESKTOP_VERSION`, disable code-signing discovery, avoid Desktop release secrets/environments, and assert the expected DMG/NSIS files exist in `release/desktop`.
+- Documented the PR packaging check contract in `docs/desktop-release.md`.
+- Added unit coverage for the PR packaging plan, skipped non-Desktop PRs, scalar GitHub outputs, workflow trigger safety, unsigned package commands, artifact assertions, and no publish/release behavior.
+
+Verification:
+
+- npm run typecheck
+- npm run lint (passes with existing hook dependency warnings in `InspectionPopover` and `PreviewPane`)
+- CI=1 npm run test
+- DESKTOP_RELEASE_CHANGED_FILES='src/App.tsx' npm --silent run desktop:pr-package-plan
+- Browser smoke check at `http://127.0.0.1:5173/aksel-arcade/`
+
+Next note: The PR packaging workflow intentionally does not upload the unsigned installers; it only verifies that electron-builder produced the expected local files. Later signed release issues should keep using the protected `desktop-release` environment instead of extending this PR workflow.
