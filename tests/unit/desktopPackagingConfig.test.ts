@@ -30,6 +30,7 @@ type DesktopBuilderConfig = {
     gatekeeperAssess?: boolean
     entitlements?: string
     entitlementsInherit?: string
+    notarize?: false
     target: DesktopBuilderTarget[]
     artifactName: string
   }
@@ -112,6 +113,7 @@ describe('Desktop Arcade packaging contract', () => {
     expect(config.mac.gatekeeperAssess).toBe(false)
     expect(config.mac.entitlements).toBe(MACOS_RELEASE_ENTITLEMENTS)
     expect(config.mac.entitlementsInherit).toBe(MACOS_RELEASE_ENTITLEMENTS)
+    expect(config.mac.notarize).toBe(false)
     expect(config.dmg).toEqual({ sign: true })
     expect(entitlements).toContain('com.apple.security.cs.allow-jit')
     expect(entitlements).toContain('com.apple.security.cs.allow-unsigned-executable-memory')
