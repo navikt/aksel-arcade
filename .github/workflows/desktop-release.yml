@@ -310,7 +310,7 @@ jobs:
           release_published=false
           cleanup_release() {
             if [[ "$release_published" != "true" ]]; then
-              gh release delete "$DESKTOP_TAG" --cleanup-tag --yes >/dev/null 2>&1 || true
+              gh release delete "$DESKTOP_TAG" --repo "$GITHUB_REPOSITORY" --cleanup-tag --yes >/dev/null 2>&1 || true
             fi
           }
           trap cleanup_release EXIT
@@ -326,12 +326,12 @@ jobs:
               --jq ".id"
           )"
 
-          gh release upload "$DESKTOP_TAG" \
+          gh release upload "$DESKTOP_TAG" --repo "$GITHUB_REPOSITORY" \
             "release/desktop/Aksel-Arcade-${DESKTOP_VERSION}-mac-arm64.dmg" \
             "release/desktop/Aksel-Arcade-${DESKTOP_VERSION}-mac-x64.dmg" \
             "release/desktop/Aksel-Arcade-${DESKTOP_VERSION}-windows-x64.exe"
 
-          gh release view "$DESKTOP_TAG" --json assets --jq ".assets[].name" | sort > release-assets.txt
+          gh release view "$DESKTOP_TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq ".assets[].name" | sort > release-assets.txt
           diff -u expected-assets.txt release-assets.txt
 
           gh api --method PATCH "repos/${GITHUB_REPOSITORY}/releases/${release_id}" \
@@ -345,4 +345,4 @@ jobs:
       - name: Delete draft Desktop release on failure
         if: failure() || cancelled()
         shell: bash
-        run: gh release delete "$DESKTOP_TAG" --cleanup-tag --yes >/dev/null 2>&1 || true
+        run: gh release delete "$DESKTOP_TAG" --repo "$GITHUB_REPOSITORY" --cleanup-tag --yes >/dev/null 2>&1 || true

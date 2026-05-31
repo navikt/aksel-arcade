@@ -1567,3 +1567,17 @@ Verification:
 - CI=1 npm run test
 - npm run lint (passes with existing hook dependency warnings in `InspectionPopover` and `PreviewPane`)
 - AKSEL_ARCADE_DESKTOP_VERSION=0.1.0 npm run desktop:package:mac
+
+Desktop release publish failure follow-up:
+
+- Follow-up run https://github.com/navikt/aksel-arcade/actions/runs/26718523535 confirmed the macOS signing/package fix worked: both signed macOS installers and the Windows installer built and uploaded successfully.
+- The publish job then failed because it intentionally has no repository checkout, but `gh release upload/view/delete` was called without `--repo`, causing `gh` to try and fail to infer a repo from `.git`.
+- Updated all `gh release` calls in the publish and failure-cleanup steps to pass `--repo "$GITHUB_REPOSITORY"` explicitly.
+- Added workflow regression coverage so future release publish commands keep an explicit repository context.
+
+Verification:
+
+- CI=1 npm run test -- --run tests/unit/desktopReleaseWorkflow.test.ts
+- npm run typecheck
+- npm run lint (passes with existing hook dependency warnings in `InspectionPopover` and `PreviewPane`)
+- CI=1 npm run test
