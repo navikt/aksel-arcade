@@ -102,6 +102,19 @@ describe("Desktop PR packaging plan", () => {
     });
   });
 
+  it("requires unsigned packaging when a renamed file previously had Desktop impact", () => {
+    const plan = prPackaging.createDesktopPrPackagingPlan({
+      changedFiles: ["archive/main.cjs", "desktop/main.cjs"],
+      eventName: "pull_request",
+    });
+
+    expect(plan).toMatchObject({
+      packageRequired: true,
+      desktopImpactingFiles: ["desktop/main.cjs"],
+      releasePlanReason: "desktop-impacting-change",
+    });
+  });
+
   it("writes only scalar GitHub step outputs", () => {
     const plan = prPackaging.createDesktopPrPackagingPlan({
       changedFiles: ["desktop/main.cjs"],
@@ -127,6 +140,10 @@ describe("Desktop PR packaging workflow", () => {
     expect(workflow).not.toContain("pull_request_target");
     expect(workflow).toContain("contents: read");
     expect(workflow).toContain("pull-requests: read");
+  });
+
+  it("collects both new and previous filenames for renamed files", () => {
+    expect(workflow).toContain(".previous_filename // empty");
   });
 
   it("runs unsigned packaging conditionally for the macOS and Windows targets", () => {
