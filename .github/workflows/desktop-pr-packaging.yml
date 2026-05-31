@@ -1,0 +1,110 @@
+name: Desktop PR packaging
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: desktop-pr-packaging-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  plan:
+    name: Plan Desktop packaging
+    runs-on: ubuntu-latest
+    outputs:
+      package-required: ${{ steps.desktop-plan.outputs.package-required }}
+      desktop-version: ${{ steps.desktop-plan.outputs.desktop-version }}
+      desktop-impacting-count: ${{ steps.desktop-plan.outputs.desktop-impacting-count }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Collect changed files
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: gh api --paginate "repos/${{ github.repository }}/pulls/${PR_NUMBER}/files" --jq '.[] | .filename, (.previous_filename // empty)' > changed-files.txt
+
+      - name: Plan unsigned Desktop packaging
+        id: desktop-plan
+        run: npm run desktop:pr-package-plan
+        env:
+          DESKTOP_RELEASE_CHANGED_FILES_FILE: changed-files.txt
+
+  package:
+    name: Package ${{ matrix.name }}
+    needs: plan
+    if: needs.plan.outputs.package-required == 'true'
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: macOS DMGs
+            os: macos-latest
+            platform: mac
+            package-command: npm run desktop:package:mac
+          - name: Windows NSIS
+            os: windows-latest
+            platform: windows
+            package-command: npm run desktop:package:win
+    env:
+      AKSEL_ARCADE_DESKTOP_VERSION: ${{ needs.plan.outputs.desktop-version }}
+      CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+      CSC_LINK: ''
+      CSC_KEY_PASSWORD: ''
+      MAC_CERTIFICATE_P12_BASE64: ''
+      MAC_CERTIFICATE_PASSWORD: ''
+      APPLE_API_KEY_BASE64: ''
+      APPLE_API_KEY_ID: ''
+      APPLE_API_ISSUER_ID: ''
+      APPLE_TEAM_ID: ''
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Package unsigned Desktop installers
+        run: ${{ matrix.package-command }}
+
+      - name: Validate Desktop install artifacts
+        shell: bash
+        env:
+          DESKTOP_PR_PACKAGE_PLATFORM: ${{ matrix.platform }}
+        run: |
+          case "$DESKTOP_PR_PACKAGE_PLATFORM" in
+            mac)
+              expected=(
+                "release/desktop/Aksel-Arcade-${AKSEL_ARCADE_DESKTOP_VERSION}-mac-arm64.dmg"
+                "release/desktop/Aksel-Arcade-${AKSEL_ARCADE_DESKTOP_VERSION}-mac-x64.dmg"
+              )
+              ;;
+            windows)
+              expected=(
+                "release/desktop/Aksel-Arcade-${AKSEL_ARCADE_DESKTOP_VERSION}-windows-x64.exe"
+              )
+              ;;
+            *)
+              echo "Unknown Desktop packaging platform: $DESKTOP_PR_PACKAGE_PLATFORM" >&2
+              exit 1
+              ;;
+          esac
+
+          for artifact in "${expected[@]}"; do
+            if [[ ! -f "$artifact" ]]; then
+              echo "Missing expected Desktop install artifact: $artifact" >&2
+              exit 1
+            fi
+          done
