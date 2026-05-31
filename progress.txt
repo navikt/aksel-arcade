@@ -1487,6 +1487,26 @@ Verification:
 - npm run lint (passes with existing hook dependency warnings in `InspectionPopover` and `PreviewPane`)
 - CI=true npm run test
 
+### 2026-05-31 - Issue #148: Signed and notarized macOS Desktop artifacts
+
+Implemented:
+
+- Selected #148 as the highest-priority `ready-for-agent` feature from #148-#150 because #149 depends on signed/notarized macOS artifacts and #150 depends on the release workflow after that.
+- Kept the work scoped to macOS signing/notarization only; did not add the public GitHub Release publishing workflow from #149.
+- Added release signing mode to the Electron Builder config while preserving unsigned local/PR packaging defaults.
+- Added minimal macOS hardened-runtime entitlements in `desktop/entitlements.mac.plist`.
+- Added `npm run desktop:package:mac:release`, which validates Desktop release credentials without printing values, imports the Developer ID Application certificate into a temporary keychain, builds both macOS DMGs, notarizes with the App Store Connect API key flow, staples, locally validates, and removes the temporary keychain/files before exit.
+- Added unit coverage for secret-safe credential validation, invalid base64 setup errors, release entitlements/config, expected arm64/x64 DMG names, API-key notarization arguments, validation failure propagation, and cleanup after packaging failure.
+- Documented the signed macOS release packaging contract in `docs/desktop-release.md`.
+
+Verification:
+
+- npm run typecheck
+- npm run lint (passes with existing hook dependency warnings in `InspectionPopover` and `PreviewPane`)
+- CI=1 npm run test
+
+Next note: #149 can now wire the full Desktop release workflow around `npm run desktop:package:mac:release` for macOS and the existing Windows packaging path. Keep GitHub Release creation, artifact upload, version tagging, and partial-release prevention in #149 rather than expanding this signing slice.
+
 Next note: The Desktop release credentials are now configured as GitHub environment secrets, but their values must remain maintainer-only. Future signed/notarized release workflow work should reference only the `desktop-release` environment and these secret names; do not copy values into source, logs, release assets, runtime state, or Arcade project data.
 
 Review follow-up:

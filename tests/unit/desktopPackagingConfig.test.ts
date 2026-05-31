@@ -25,9 +25,16 @@ type DesktopBuilderConfig = {
   }
   mac: {
     icon: string
-    identity: null
+    identity?: null
+    hardenedRuntime?: boolean
+    gatekeeperAssess?: boolean
+    entitlements?: string
+    entitlementsInherit?: string
     target: DesktopBuilderTarget[]
     artifactName: string
+  }
+  dmg?: {
+    sign: boolean
   }
   win: {
     icon: string
@@ -39,11 +46,18 @@ type DesktopBuilderConfig = {
 const require = createRequire(import.meta.url)
 const {
   DEFAULT_DESKTOP_VERSION,
+  MACOS_RELEASE_ENTITLEMENTS,
   createDesktopBuilderConfig,
+  resolveDesktopSigningMode,
   resolveDesktopVersion,
 } = require('../../scripts/desktop-builder-config.cjs') as {
   DEFAULT_DESKTOP_VERSION: string
-  createDesktopBuilderConfig: (options?: { desktopVersion?: string }) => DesktopBuilderConfig
+  MACOS_RELEASE_ENTITLEMENTS: string
+  createDesktopBuilderConfig: (options?: {
+    desktopVersion?: string
+    signingMode?: string
+  }) => DesktopBuilderConfig
+  resolveDesktopSigningMode: (signingMode?: string) => string
   resolveDesktopVersion: (desktopVersion?: string) => string
 }
 
@@ -70,6 +84,8 @@ describe('Desktop Arcade packaging contract', () => {
     expect(config.forceCodeSigning).toBe(false)
     expect(config.publish).toBeNull()
     expect(config.mac.identity).toBeNull()
+    expect(config.mac.hardenedRuntime).toBeUndefined()
+    expect(config.dmg).toBeUndefined()
     expect(config.directories).toEqual({
       output: 'release/desktop',
       buildResources: 'build/desktop',
@@ -86,12 +102,29 @@ describe('Desktop Arcade packaging contract', () => {
     expect(config.win.artifactName).toBe('Aksel-Arcade-${version}-windows-${arch}.${ext}')
   })
 
+  it('enables hardened runtime and minimal entitlements for signed macOS release packaging', () => {
+    const config = createDesktopBuilderConfig({ signingMode: 'release' })
+    const entitlements = readText(MACOS_RELEASE_ENTITLEMENTS)
+
+    expect(config.forceCodeSigning).toBe(true)
+    expect(config.mac.identity).toBeUndefined()
+    expect(config.mac.hardenedRuntime).toBe(true)
+    expect(config.mac.gatekeeperAssess).toBe(false)
+    expect(config.mac.entitlements).toBe(MACOS_RELEASE_ENTITLEMENTS)
+    expect(config.mac.entitlementsInherit).toBe(MACOS_RELEASE_ENTITLEMENTS)
+    expect(config.dmg).toEqual({ sign: true })
+    expect(entitlements).toContain('com.apple.security.cs.allow-jit')
+    expect(entitlements).toContain('com.apple.security.cs.allow-unsigned-executable-memory')
+    expect(entitlements).not.toContain('com.apple.security.cs.disable-library-validation')
+  })
+
   it('keeps Desktop Arcade version injection in workspace state', () => {
     expect(resolveDesktopVersion()).toBe('0.1.0')
     expect(resolveDesktopVersion('2.3.4')).toBe('2.3.4')
-    expect(() => resolveDesktopVersion('desktop-v2.3.4')).toThrow(
-      /AKSEL_ARCADE_DESKTOP_VERSION/
-    )
+    expect(() => resolveDesktopVersion('desktop-v2.3.4')).toThrow(/AKSEL_ARCADE_DESKTOP_VERSION/)
+    expect(resolveDesktopSigningMode()).toBe('unsigned')
+    expect(resolveDesktopSigningMode('release')).toBe('release')
+    expect(() => resolveDesktopSigningMode('signed')).toThrow(/AKSEL_ARCADE_DESKTOP_SIGNING_MODE/)
   })
 
   it('documents npm commands for Desktop build and local unsigned packaging', () => {
@@ -104,6 +137,9 @@ describe('Desktop Arcade packaging contract', () => {
     expect(packageJson.scripts['desktop:package']).toContain('--mac --win')
     expect(packageJson.scripts['desktop:package']).toContain('--publish never')
     expect(packageJson.scripts['desktop:package:mac']).toContain('--mac')
+    expect(packageJson.scripts['desktop:package:mac:release']).toBe(
+      'node scripts/desktop-macos-release-signing.cjs package'
+    )
     expect(packageJson.scripts['desktop:package:win']).toContain('--win')
   })
 
