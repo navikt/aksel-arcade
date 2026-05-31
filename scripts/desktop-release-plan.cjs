@@ -180,6 +180,7 @@ function createDesktopReleasePlan({
   refOnProtectedMaster = false,
   protectedBranch = PROTECTED_BRANCH,
   releaseTags = [],
+  currentRefReleaseTags = [],
 } = {}) {
   const normalizedRefName = normalizeRefName(refName);
   const desktopImpactingFiles = getDesktopImpactingFiles(changedFiles);
@@ -201,6 +202,7 @@ function createDesktopReleasePlan({
       desktopImpacting: desktopImpactingFiles.length > 0,
       desktopImpactingFiles,
       latestDesktopReleaseTag: null,
+      currentRefDesktopReleaseTag: null,
       nextDesktopVersion: null,
       versionInjection: null,
     };
@@ -218,12 +220,33 @@ function createDesktopReleasePlan({
       desktopImpacting: desktopImpactingFiles.length > 0,
       desktopImpactingFiles,
       latestDesktopReleaseTag: null,
+      currentRefDesktopReleaseTag: null,
       nextDesktopVersion: null,
       versionInjection: null,
     };
   }
 
   const latestDesktopReleaseTag = findLatestDesktopReleaseTag(releaseTags);
+  const currentRefDesktopReleaseTag =
+    findLatestDesktopReleaseTag(currentRefReleaseTags);
+  if (currentRefDesktopReleaseTag) {
+    return {
+      eventName,
+      protectedBranch,
+      refName: normalizedRefName,
+      releaseRequired: false,
+      rejected: false,
+      rejectionReason: null,
+      reason: "current-ref-already-released",
+      desktopImpacting: desktopImpactingFiles.length > 0,
+      desktopImpactingFiles,
+      latestDesktopReleaseTag: latestDesktopReleaseTag?.tag ?? null,
+      currentRefDesktopReleaseTag: currentRefDesktopReleaseTag.tag,
+      nextDesktopVersion: null,
+      versionInjection: null,
+    };
+  }
+
   const releaseRequired =
     manualRecovery.manualRecovery || desktopImpactingFiles.length > 0;
   const nextDesktopVersion = releaseRequired
@@ -245,6 +268,7 @@ function createDesktopReleasePlan({
     desktopImpacting: desktopImpactingFiles.length > 0,
     desktopImpactingFiles,
     latestDesktopReleaseTag: latestDesktopReleaseTag?.tag ?? null,
+    currentRefDesktopReleaseTag: null,
     nextDesktopVersion,
     versionInjection: nextDesktopVersion
       ? createVersionInjection(nextDesktopVersion)
@@ -281,6 +305,7 @@ function createDesktopReleasePlanFromEnv(env = process.env) {
     ),
     protectedBranch: env.DESKTOP_RELEASE_PROTECTED_BRANCH ?? PROTECTED_BRANCH,
     releaseTags: splitList(env.DESKTOP_RELEASE_TAGS),
+    currentRefReleaseTags: splitList(env.DESKTOP_RELEASE_CURRENT_REF_TAGS),
   });
 }
 

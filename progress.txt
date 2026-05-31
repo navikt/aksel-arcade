@@ -1487,6 +1487,20 @@ Verification:
 - npm run lint (passes with existing hook dependency warnings in `InspectionPopover` and `PreviewPane`)
 - CI=true npm run test
 
+Desktop release workflow (#149):
+
+- Selected #149 over #150 because #150 depends on the Desktop release workflow.
+- Added `.github/workflows/desktop-release.yml` for protected `master` pushes and guarded `workflow_dispatch` recovery releases from commits already reachable from protected `master`.
+- Release planning now prevents duplicate public Desktop releases for the same release commit, injects `AKSEL_ARCADE_DESKTOP_VERSION` without committing version bumps, and publishes only after signed macOS DMGs and the Windows x64 installer are built and validated.
+- The publish job creates a draft release, uploads exactly the three required installer assets, validates the asset set, then publishes as non-draft/non-prerelease/latest; cleanup removes draft/tag state before publication if a publish step fails.
+- Added workflow-plan and workflow regression tests for triggers, artifact aggregation, release-note/download-guide handling, duplicate-release prevention, and no-checksum publication.
+
+Verification:
+
+- npm run typecheck
+- CI=1 npm run test
+- npm run lint (passes with existing hook dependency warnings in `InspectionPopover` and `PreviewPane`)
+
 ### 2026-05-31 - Issue #148: Signed and notarized macOS Desktop artifacts
 
 Implemented:
