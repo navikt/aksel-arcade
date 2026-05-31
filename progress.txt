@@ -1487,6 +1487,33 @@ Verification:
 - npm run lint (passes with existing hook dependency warnings in `InspectionPopover` and `PreviewPane`)
 - CI=true npm run test
 
+Desktop release workflow (#149) review follow-up:
+
+- Code review found that `workflow_dispatch` recovery accepted runs launched from non-`master` workflow refs as long as the requested recovery SHA was already on protected `master`.
+- Tightened Desktop release planning so manual recovery now requires both the workflow ref and the target commit to be on protected `master`.
+- Added regression coverage for rejecting non-`master` recovery workflow refs separately from rejecting recovery commits outside protected `master`.
+
+Verification:
+
+- CI=1 npm run test -- --run tests/unit/desktopReleasePlan.test.ts tests/unit/desktopReleaseWorkflowPlan.test.ts tests/unit/desktopReleaseWorkflow.test.ts
+- npm run typecheck
+- CI=1 npm run test
+- npm run lint (passes with existing hook dependency warnings in `InspectionPopover` and `PreviewPane`)
+
+Desktop release workflow (#149):
+
+- Selected #149 over #150 because #150 depends on the Desktop release workflow.
+- Added `.github/workflows/desktop-release.yml` for protected `master` pushes and guarded `workflow_dispatch` recovery releases from commits already reachable from protected `master`.
+- Release planning now prevents duplicate public Desktop releases for the same release commit, injects `AKSEL_ARCADE_DESKTOP_VERSION` without committing version bumps, and publishes only after signed macOS DMGs and the Windows x64 installer are built and validated.
+- The publish job creates a draft release, uploads exactly the three required installer assets, validates the asset set, then publishes as non-draft/non-prerelease/latest; cleanup removes draft/tag state before publication if a publish step fails.
+- Added workflow-plan and workflow regression tests for triggers, artifact aggregation, release-note/download-guide handling, duplicate-release prevention, and no-checksum publication.
+
+Verification:
+
+- npm run typecheck
+- CI=1 npm run test
+- npm run lint (passes with existing hook dependency warnings in `InspectionPopover` and `PreviewPane`)
+
 ### 2026-05-31 - Issue #148: Signed and notarized macOS Desktop artifacts
 
 Implemented:
