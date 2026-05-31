@@ -315,6 +315,18 @@ jobs:
           }
           trap cleanup_release EXIT
 
+          stale_draft_release_ids="$(
+            gh api --paginate "repos/${GITHUB_REPOSITORY}/releases" \
+              --jq ".[] | select(.tag_name == \"${DESKTOP_TAG}\" and .draft == true) | .id"
+          )"
+          for stale_release_id in $stale_draft_release_ids; do
+            gh api --method DELETE "repos/${GITHUB_REPOSITORY}/releases/${stale_release_id}" >/dev/null
+          done
+          if [[ -n "$stale_draft_release_ids" ]]; then
+            gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${DESKTOP_TAG}" >/dev/null 2>&1 || \
+              gh api --method DELETE "repos/${GITHUB_REPOSITORY}/git/refs/tags/${DESKTOP_TAG}" >/dev/null 2>&1 || true
+          fi
+
           release_id="$(
             gh api --method POST "repos/${GITHUB_REPOSITORY}/releases" \
               -f tag_name="$DESKTOP_TAG" \

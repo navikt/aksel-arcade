@@ -47,6 +47,16 @@ describe("Desktop release workflow", () => {
     expect(workflow).toContain(
       'gh release view "$DESKTOP_TAG" --repo "$GITHUB_REPOSITORY"',
     );
+    expect(workflow).toContain("stale_draft_release_ids");
+    expect(workflow).toContain(
+      'select(.tag_name == \\"${DESKTOP_TAG}\\" and .draft == true)',
+    );
+    expect(workflow).toContain(
+      'repos/${GITHUB_REPOSITORY}/releases/${stale_release_id}',
+    );
+    expect(workflow).toContain(
+      'repos/${GITHUB_REPOSITORY}/git/refs/tags/${DESKTOP_TAG}',
+    );
     expect(workflow).toContain("releases/generate-notes");
     expect(workflow).toContain("## Download guide");
     expect(workflow).not.toMatch(/checksum|sha256/i);

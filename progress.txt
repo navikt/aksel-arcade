@@ -1282,6 +1282,7 @@ Verification:
 - npm run typecheck
 - npm run lint (passes with existing hook dependency warnings in `InspectionPopover` and `PreviewPane`)
 - CI=1 npm run test
+
 - Browser smoke check at http://127.0.0.1:5173/aksel-arcade/ confirmed sessionStorage reload restore, ordinary new-tab default behavior, and no runtime console errors.
 
 Next note: #129 can now scope explicit replacement flows (Web share URL, import, Reset editor) to the current Web Arcade working copy. Keep #130's UI copy cleanup separate; the Clear storage & reload affordance still exists pending that issue.
@@ -1574,6 +1575,21 @@ Desktop release publish failure follow-up:
 - The publish job then failed because it intentionally has no repository checkout, but `gh release upload/view/delete` was called without `--repo`, causing `gh` to try and fail to infer a repo from `.git`.
 - Updated all `gh release` calls in the publish and failure-cleanup steps to pass `--repo "$GITHUB_REPOSITORY"` explicitly.
 - Added workflow regression coverage so future release publish commands keep an explicit repository context.
+
+Verification:
+
+- CI=1 npm run test -- --run tests/unit/desktopReleaseWorkflow.test.ts
+- npm run typecheck
+- npm run lint (passes with existing hook dependency warnings in `InspectionPopover` and `PreviewPane`)
+- CI=1 npm run test
+
+Desktop release duplicate draft follow-up:
+
+- Replacement run https://github.com/navikt/aksel-arcade/actions/runs/26718889270 completed successfully, but GitHub release state showed two `desktop-v0.1.0` releases: a stale draft from the previous failed run containing the three installer assets, and a public release from the rerun with zero assets.
+- Root cause: `gh release upload/view "$DESKTOP_TAG"` can resolve a stale draft release when duplicate draft state exists for the same tag, while the workflow publishes the newly-created release by ID.
+- Removed the broken public release, stale draft release, and tag so the fixed workflow can republish `desktop-v0.1.0` cleanly.
+- Updated the publish step to delete stale draft releases for the target Desktop tag, and to remove the stale tag when no public release owns it, before creating a new draft release.
+- Added workflow regression coverage for stale draft cleanup before publish.
 
 Verification:
 
