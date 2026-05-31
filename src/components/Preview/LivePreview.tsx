@@ -5,6 +5,7 @@ import type { InspectionData } from '@/types/inspection'
 import type { SandboxConsolePayload } from '@/services/previewDiagnostics'
 import { getViewportWidth } from '@/types/viewports'
 import { validateSandboxToMainMessage } from '@/utils/security'
+import { postMessageToSandbox } from '@/utils/sandboxMessaging'
 import { InspectionPopover } from './InspectionPopover'
 import './LivePreview.css'
 
@@ -55,7 +56,7 @@ export const LivePreview = ({
             type: 'EXECUTE_CODE',
             payload: { jsxCode: pendingCodeRef.current, hooksCode: '' },
           }
-          iframeRef.current.contentWindow.postMessage(message, window.location.origin)
+          postMessageToSandbox(iframeRef.current.contentWindow, message)
           pendingCodeRef.current = null
         }
         return
@@ -133,7 +134,7 @@ export const LivePreview = ({
       payload: { jsxCode: transpiledCode, hooksCode: '' },
     }
 
-    iframeRef.current.contentWindow.postMessage(message, window.location.origin)
+    postMessageToSandbox(iframeRef.current.contentWindow, message)
   }, [transpiledCode, sandboxReady, iframeRef])
 
   // Send viewport update when viewport changes
@@ -148,7 +149,7 @@ export const LivePreview = ({
       payload: { width },
     }
 
-    iframeRef.current.contentWindow.postMessage(message, window.location.origin)
+    postMessageToSandbox(iframeRef.current.contentWindow, message)
   }, [viewportWidth, sandboxReady, iframeRef])
 
   // Send theme update when theme changes
@@ -162,7 +163,7 @@ export const LivePreview = ({
       payload: { theme },
     }
 
-    iframeRef.current.contentWindow.postMessage(message, window.location.origin)
+    postMessageToSandbox(iframeRef.current.contentWindow, message)
   }, [theme, sandboxReady, iframeRef])
 
   return (

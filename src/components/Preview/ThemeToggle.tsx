@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { Button } from '@navikt/ds-react'
 import { SunIcon, MoonIcon } from '@navikt/aksel-icons'
 import type { MainToSandboxMessage } from '@/types/messages'
+import { postMessageToSandbox } from '@/utils/sandboxMessaging'
 
 interface ThemeToggleProps {
   iframeRef: React.RefObject<HTMLIFrameElement | null>
@@ -20,7 +21,7 @@ export const ThemeToggle = ({ iframeRef, onThemeChange }: ThemeToggleProps) => {
           type: 'UPDATE_THEME',
           payload: { theme },
         }
-        iframeRef.current.contentWindow.postMessage(message, window.location.origin)
+        postMessageToSandbox(iframeRef.current.contentWindow, message)
         return true
       }
       return false
@@ -44,7 +45,7 @@ export const ThemeToggle = ({ iframeRef, onThemeChange }: ThemeToggleProps) => {
         type: 'UPDATE_THEME',
         payload: { theme: newTheme },
       }
-      iframeRef.current.contentWindow.postMessage(message, window.location.origin)
+      postMessageToSandbox(iframeRef.current.contentWindow, message)
     }
 
     // Notify parent component
