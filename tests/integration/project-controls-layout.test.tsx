@@ -487,11 +487,17 @@ function setupDesktopTransportPreload(
 const isPromiseLike = <TValue,>(value: TValue | Promise<TValue>): value is Promise<TValue> =>
   typeof (value as Promise<TValue>).then === 'function'
 
-const dispatchSandboxMessage = (data: unknown) => {
+const getPreviewIframe = () => {
   const iframe = screen.getByTestId('preview-iframe') as HTMLIFrameElement
   if (!iframe.contentWindow) {
     throw new Error('Expected preview iframe to have a contentWindow.')
   }
+
+  return iframe
+}
+
+const dispatchSandboxMessage = (data: unknown) => {
+  const iframe = getPreviewIframe()
 
   act(() => {
     window.dispatchEvent(

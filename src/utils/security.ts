@@ -18,6 +18,7 @@ export const validateMainToSandboxMessage = (data: unknown): data is MainToSandb
   if (!('type' in data)) return false
 
   const validTypes = [
+    'CONNECT_SANDBOX',
     'EXECUTE_CODE',
     'UPDATE_VIEWPORT',
     'TOGGLE_INSPECT',
@@ -35,6 +36,7 @@ export const validateSandboxToMainMessage = (data: unknown): data is SandboxToMa
   if (!('type' in data)) return false
 
   const validTypes = [
+    'SANDBOX_CONNECTED',
     'RENDER_SUCCESS',
     'COMPILE_ERROR',
     'RUNTIME_ERROR',

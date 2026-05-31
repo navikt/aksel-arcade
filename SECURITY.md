@@ -1,7 +1,7 @@
 # Security Documentation
 
-**Last Updated**: 2025-11-17  
-**Version**: 1.0.0
+**Last Updated**: 2026-05-31
+**Version**: 1.1.0
 
 ## Overview
 
@@ -33,13 +33,13 @@ User code executes in a sandboxed iframe with the following attributes:
 ```html
 <iframe
   src="/sandbox.html"
-  sandbox="allow-scripts allow-same-origin"
+  sandbox="allow-scripts"
 />
 ```
 
 **Sandbox Restrictions**:
 - ✅ `allow-scripts`: Allows JavaScript execution (required for playground)
-- ✅ `allow-same-origin`: Allows access to same-origin resources (required for Vite HMR in dev)
+- ❌ `allow-same-origin`: **Blocked** - gives user code an opaque origin so it cannot read parent DOM, cookies, or storage
 - ❌ `allow-forms`: **Blocked** - prevents form submissions
 - ❌ `allow-popups`: **Blocked** - prevents opening new windows
 - ❌ `allow-top-navigation`: **Blocked** - prevents navigating parent window
@@ -61,7 +61,7 @@ Dynamic CSP based on environment (development vs production):
 **Development CSP** (localhost):
 ```
 default-src 'none'; 
-script-src 'unsafe-inline' 'unsafe-eval' http://localhost:* https://localhost:*; 
+script-src 'unsafe-inline' 'self' blob: http://localhost:* https://localhost:*;
 style-src 'unsafe-inline' http://localhost:* https://localhost:* https://cdn.nav.no; 
 font-src https://cdn.nav.no data:; 
 connect-src http://localhost:* https://localhost:* ws://localhost:* wss://localhost:*; 
@@ -71,19 +71,18 @@ img-src data: https:;
 **Production CSP**:
 ```
 default-src 'none'; 
-script-src 'unsafe-inline' 'unsafe-eval'; 
+script-src 'unsafe-inline' 'self' blob:;
 style-src 'unsafe-inline' https://cdn.nav.no; 
 font-src https://cdn.nav.no data:; 
-connect-src https://cdn.nav.no; 
+connect-src 'self';
 img-src data: https:;
 ```
 
 **CSP Directives Explained**:
 - `default-src 'none'`: Block all resources by default (whitelist approach)
-- `script-src 'unsafe-eval'`: **Required** for user code execution via `eval()`
-  - ⚠️ Note: This is intentional for a code playground. User code must be evaluated dynamically.
+- `script-src blob:`: Allows user code to run as an isolated blob-backed ES module inside the sandbox iframe
 - `script-src 'unsafe-inline'`: Allows inline scripts (for sandbox runtime)
-- `connect-src`: In production, **only** allows connections to `cdn.nav.no` (Aksel CDN)
+- `connect-src`: In production, only allows same-origin requests for bundled assets
   - ❌ **Blocks** external API calls, preventing data exfiltration
 - `img-src data: https:`: Allows data URIs and HTTPS images only
 - `font-src https://cdn.nav.no data:`: Restricts fonts to Aksel CDN only
@@ -95,23 +94,28 @@ img-src data: https:;
 
 ### 3. PostMessage Origin Validation
 
-**Implementation**: All components using `postMessage` (fixed 2025-11-17)
+**Implementation**: All components using `postMessage` (updated 2026-05-31)
 
-**Before (Insecure)**:
+**Before (Insecure sandbox response)**:
 ```typescript
 window.parent.postMessage(message, '*')  // ❌ Wildcard origin
 ```
 
 **After (Secure)**:
 ```typescript
-window.parent.postMessage(message, window.location.origin)  // ✅ Same-origin only
+// Parent -> sandbox uses "*" once to transfer a private MessagePort into
+// the opaque sandbox runtime. User code never receives that port.
+iframe.contentWindow.postMessage({ type: 'CONNECT_SANDBOX' }, '*', [port])
+
+// Sandbox -> parent targets the known parent origin from sandbox.html's URL.
+window.parent.postMessage(message, window.location.origin)
 ```
 
 **Validation on Receiving End**:
 ```typescript
 window.addEventListener('message', (event) => {
-  // Security: Validate origin (same-origin only)
-  if (event.origin !== window.location.origin) {
+  // Security: validate the controlling parent window and its expected URL origin.
+  if (event.source !== window.parent || event.origin !== window.location.origin) {
     console.warn('❌ Rejected message from unauthorized origin:', event.origin)
     return
   }
@@ -123,11 +127,15 @@ window.addEventListener('message', (event) => {
 })
 ```
 
+After the initial connection, parent-to-sandbox messages use the transferred `MessagePort`
+instead of wildcard `window.postMessage`. If the iframe navigates after the channel is
+active, the parent closes the old port, marks the sandbox as retired, and refuses to
+transfer a replacement port to the navigated document.
+
 **Files Updated**:
-- `src/components/Preview/LivePreview.tsx` (4 instances)
-- `src/components/Preview/InspectMode.tsx` (1 instance)
-- `src/components/Preview/ThemeToggle.tsx` (2 instances)
-- `public/sandbox.html` (4 instances)
+- `src/utils/sandboxMessaging.ts`
+- `src/components/Preview/LivePreview.tsx`
+- `public/sandbox.html`
 
 **Security Benefit**:
 - Prevents malicious third-party pages from sending spoofed messages
@@ -219,20 +227,15 @@ We will respond within 48 hours and work with you to address the issue.
 | 2025-11-17 | Implemented dynamic CSP (dev vs prod)       | 1.0.0   |
 | 2025-11-17 | Disabled source maps in production          | 1.0.0   |
 | 2025-11-17 | Repository cleanup (removed debug files)    | 1.0.0   |
+| 2026-05-31 | Removed direct string evaluation and same-origin sandboxing | 1.1.0   |
 
 ## Known Limitations
 
 ### Intentional Security Trade-offs
 
-1. **`'unsafe-eval'` in CSP**: Required for dynamic code execution. This is the core feature of the playground and cannot be removed. User code is isolated in iframe to mitigate risks.
+1. **Dynamic user code execution**: Required for the playground. User code is loaded as a blob-backed ES module inside an opaque-origin iframe; direct string evaluation and `'unsafe-eval'` are not used.
 
-2. **`allow-same-origin` sandbox attribute**: Required for:
-   - Vite HMR (Hot Module Replacement) in development
-   - Loading Aksel components from same origin
-   
-   Without this, the sandbox cannot access resources from the Vite dev server. The CSP and postMessage validation provide additional layers of defense.
-
-3. **DoS Attacks**: No protection against intentional infinite loops or memory exhaustion in user code. Users can crash their own browser tab, but this does not affect other tabs or the server (browser-only architecture).
+2. **DoS Attacks**: No protection against intentional infinite loops or memory exhaustion in user code. Users can crash their own browser tab, but this does not affect other tabs or the server (browser-only architecture).
 
 ## References
 
@@ -244,4 +247,4 @@ We will respond within 48 hours and work with you to address the issue.
 ---
 
 **Maintained by**: AkselArcade Team  
-**Last Review**: 2025-11-17
+**Last Review**: 2026-05-31

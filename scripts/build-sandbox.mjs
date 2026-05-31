@@ -20,7 +20,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const rootDir = join(__dirname, '..');
 
-console.log('🔨 Building sandbox bundle with esbuild...');
+console.log('🔨 Building sandbox bundles with esbuild...');
 
 try {
   // Ensure public directory exists
@@ -29,26 +29,46 @@ try {
     fs.mkdirSync(publicDir, { recursive: true });
   }
 
-  // Build sandbox bundle as IIFE
-  await esbuild.build({
-    entryPoints: [join(rootDir, 'src/sandboxAksel.ts')],
+  const commonOptions = {
     bundle: true,
     format: 'iife',
-    globalName: 'sandboxBundle',
-    outfile: join(publicDir, 'sandbox-bundle.js'),
     platform: 'browser',
     target: 'es2020',
     minify: false, // Keep readable for debugging (production will minify)
+    external: [], // Bundle everything
+    logLevel: 'info',
+  };
+
+  // Build sandbox bundle as IIFE
+  await esbuild.build({
+    ...commonOptions,
+    entryPoints: [join(rootDir, 'src/sandboxAksel.ts')],
+    globalName: 'sandboxBundle',
+    outfile: join(publicDir, 'sandbox-bundle.js'),
     sourcemap: true,
     loader: {
       '.css': 'css',
     },
-    external: [], // Bundle everything
-    logLevel: 'info',
   });
 
-  console.log('✅ Sandbox bundle created: public/sandbox-bundle.js');
-  console.log('   This file will be copied as-is by Vite (no processing)');
+  await esbuild.build({
+    ...commonOptions,
+    entryPoints: [join(publicDir, 'inspect-overlays.js')],
+    globalName: 'inspectOverlayUtils',
+    outfile: join(publicDir, 'inspect-overlays-global.js'),
+    sourcemap: false,
+  });
+
+  await esbuild.build({
+    ...commonOptions,
+    entryPoints: [join(publicDir, 'sandbox-messaging.js')],
+    globalName: 'sandboxMessaging',
+    outfile: join(publicDir, 'sandbox-messaging-global.js'),
+    sourcemap: false,
+  });
+
+  console.log('✅ Sandbox bundles created in public/');
+  console.log('   These files will be copied as-is by Vite (no processing)');
 } catch (error) {
   console.error('❌ Failed to build sandbox bundle:', error);
   process.exit(1);

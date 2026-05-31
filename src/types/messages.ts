@@ -3,6 +3,7 @@ import type { InspectionData } from './inspection'
 
 // Main → Sandbox messages
 export type MainToSandboxMessage =
+  | { type: 'CONNECT_SANDBOX' }
   | { type: 'EXECUTE_CODE'; payload: { jsxCode: string; hooksCode: string } }
   | { type: 'UPDATE_VIEWPORT'; payload: { width: number } }
   | { type: 'TOGGLE_INSPECT'; payload: { enabled: boolean } }
@@ -11,6 +12,7 @@ export type MainToSandboxMessage =
 
 // Sandbox → Main messages
 export type SandboxToMainMessage =
+  | { type: 'SANDBOX_CONNECTED' }
   | { type: 'RENDER_SUCCESS' }
   | { type: 'COMPILE_ERROR'; payload: CompileError }
   | { type: 'RUNTIME_ERROR'; payload: RuntimeError }
@@ -20,7 +22,9 @@ export type SandboxToMainMessage =
 
 // Type guards
 export const isMainToSandboxMessage = (msg: unknown): msg is MainToSandboxMessage => {
-  return msg !== null && typeof msg === 'object' && 'type' in msg && 'payload' in msg
+  if (msg === null || typeof msg !== 'object' || !('type' in msg)) return false
+  if ((msg as { type: unknown }).type === 'CONNECT_SANDBOX') return true
+  return 'payload' in msg
 }
 
 export const isSandboxToMainMessage = (msg: unknown): msg is SandboxToMainMessage => {

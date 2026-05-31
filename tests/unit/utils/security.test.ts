@@ -7,6 +7,14 @@ import {
 
 describe('Security Utilities', () => {
   describe('validateMainToSandboxMessage', () => {
+    it('should accept valid CONNECT_SANDBOX message', () => {
+      const message = {
+        type: 'CONNECT_SANDBOX',
+      }
+
+      expect(validateMainToSandboxMessage(message)).toBe(true)
+    })
+
     it('should accept valid EXECUTE_CODE message', () => {
       const message = {
         type: 'EXECUTE_CODE',
@@ -147,6 +155,14 @@ describe('Security Utilities', () => {
       }
 
       expect(validateSandboxToMainMessage(message)).toBe(false)
+    })
+
+    it('should accept valid SANDBOX_CONNECTED message', () => {
+      const message = {
+        type: 'SANDBOX_CONNECTED',
+      }
+
+      expect(validateSandboxToMainMessage(message)).toBe(true)
     })
 
     it('should reject message without type', () => {

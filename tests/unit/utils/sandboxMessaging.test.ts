@@ -1,7 +1,12 @@
 import path from 'node:path'
 import { pathToFileURL } from 'node:url'
-import { describe, expect, it } from 'vitest'
-import { getSandboxMessageTargetOrigin } from '@/utils/sandboxMessaging'
+import { describe, expect, it, vi } from 'vitest'
+import {
+  getSandboxMessageTargetOrigin,
+  postMessageToSandbox,
+  registerSandboxMessagePort,
+  unregisterSandboxMessagePort,
+} from '@/utils/sandboxMessaging'
 
 type SandboxMessageLocation = Pick<Location, 'origin' | 'protocol'>
 
@@ -29,8 +34,16 @@ describe('sandbox messaging origins', () => {
     expect(getSandboxMessageTargetOrigin(createLocation('file:', 'file://'))).toBe('*')
   })
 
-  it('keeps exact target origins for browser URLs', () => {
+  it('uses a wildcard target origin for opaque sandbox iframes', () => {
     expect(getSandboxMessageTargetOrigin(createLocation('https:', 'https://aksel.nav.no'))).toBe(
+      '*'
+    )
+  })
+
+  it('keeps exact parent target origins for sandbox responses', async () => {
+    const { getMessageTargetOrigin } = await loadPublicSandboxMessaging()
+
+    expect(getMessageTargetOrigin(createLocation('https:', 'https://aksel.nav.no'))).toBe(
       'https://aksel.nav.no'
     )
   })
@@ -67,5 +80,34 @@ describe('sandbox messaging origins', () => {
     expect(
       isTrustedParentMessage({ origin: 'null', source: parentWindow }, webLocation, parentWindow)
     ).toBe(false)
+  })
+
+  it('uses the registered MessagePort for runtime messages', () => {
+    const targetWindow = { postMessage: vi.fn() } as unknown as Window
+    const port = { postMessage: vi.fn() } as unknown as MessagePort
+    const message = { type: 'UPDATE_THEME' as const, payload: { theme: 'dark' as const } }
+
+    registerSandboxMessagePort(targetWindow, port)
+    postMessageToSandbox(targetWindow, message)
+    unregisterSandboxMessagePort(targetWindow)
+
+    expect(port.postMessage).toHaveBeenCalledWith(message)
+    expect(targetWindow.postMessage).not.toHaveBeenCalled()
+  })
+
+  it('uses window postMessage only for MessagePort connection setup', () => {
+    const targetWindow = { postMessage: vi.fn() } as unknown as Window
+    const port = { postMessage: vi.fn() } as unknown as MessagePort
+    const transferPort = {} as MessagePort
+    const message = { type: 'CONNECT_SANDBOX' as const }
+
+    registerSandboxMessagePort(targetWindow, port)
+    postMessageToSandbox(targetWindow, message, createLocation('https:', 'https://aksel.nav.no'), [
+      transferPort,
+    ])
+    unregisterSandboxMessagePort(targetWindow)
+
+    expect(targetWindow.postMessage).toHaveBeenCalledWith(message, '*', [transferPort])
+    expect(port.postMessage).not.toHaveBeenCalled()
   })
 })
