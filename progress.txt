@@ -1549,3 +1549,20 @@ Verification:
 - npm run typecheck
 - npm run lint (passes with existing hook dependency warnings in `InspectionPopover` and `PreviewPane`)
 - CI=true npm run test
+
+Desktop release build failure follow-up:
+
+- Investigated failed run https://github.com/navikt/aksel-arcade/actions/runs/26716777751. The Desktop release planner and Windows package job passed; the signed macOS packaging job failed in `npm run desktop:package:mac:release`.
+- The macOS release wrapper previously captured child process output and only printed the failing command label/exit code, so the CI log hid the underlying electron-builder/codesign/notarytool error.
+- Tightened the signing path by disabling electron-builder's automatic app notarization in release signing mode; the documented release contract notarizes and staples the final DMGs in `desktop-macos-release-signing.cjs`.
+- Added the temporary signing keychain to the user keychain search list before importing/signing, persisted the previous search list in signing state, and restored it before deleting the temporary keychain. This matches electron-builder's own certificate-chain workaround and helps codesign resolve the Developer ID chain.
+- Release packaging command failures now include non-secret stdout/stderr so future CI failures expose the actual failing tool output.
+- Added regression coverage for release config notarization settings, keychain search-list parsing/update/restore, and surfaced packaging command output.
+
+Verification:
+
+- CI=1 npm run test -- --run tests/unit/desktopMacosReleaseSigning.test.ts tests/unit/desktopPackagingConfig.test.ts
+- npm run typecheck
+- CI=1 npm run test
+- npm run lint (passes with existing hook dependency warnings in `InspectionPopover` and `PreviewPane`)
+- AKSEL_ARCADE_DESKTOP_VERSION=0.1.0 npm run desktop:package:mac

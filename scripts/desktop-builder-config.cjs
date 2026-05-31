@@ -62,6 +62,7 @@ const createMacConfig = (releaseSigning) => {
     gatekeeperAssess: false,
     entitlements: MACOS_RELEASE_ENTITLEMENTS,
     entitlementsInherit: MACOS_RELEASE_ENTITLEMENTS,
+    notarize: false,
   }
 }
 

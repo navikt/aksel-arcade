@@ -94,6 +94,7 @@ function validateMacosReleaseCredentials(env = process.env) {
 function runRequiredCommand(command, args, options = {}) {
   const {
     env = process.env,
+    includeOutput = true,
     cwd = process.cwd(),
     label = command,
     runCommand = spawnSync,
@@ -110,7 +111,13 @@ function runRequiredCommand(command, args, options = {}) {
   }
 
   if (result.status !== 0) {
-    throw new Error(`${label} failed with exit code ${result.status ?? 1}.`)
+    const output = [result.stdout, result.stderr]
+      .filter((value) => typeof value === 'string' && value.trim() !== '')
+      .map((value) => value.trim())
+      .join('\n')
+    const outputSuffix = includeOutput && output ? `\n\n${output}` : ''
+
+    throw new Error(`${label} failed with exit code ${result.status ?? 1}.${outputSuffix}`)
   }
 
   return result
@@ -118,10 +125,33 @@ function runRequiredCommand(command, args, options = {}) {
 
 function runSetupCommand(command, args, options = {}) {
   try {
-    return runRequiredCommand(command, args, options)
+    return runRequiredCommand(command, args, { includeOutput: false, ...options })
   } catch (error) {
     throw createSafeSetupError(error)
   }
+}
+
+function parseSecurityKeychainList(output = '') {
+  return output
+    .split(/\r?\n/)
+    .map((line) => line.trim().replace(/^"|"$/g, ''))
+    .filter(Boolean)
+}
+
+function readUserKeychainSearchList(options = {}) {
+  const result = runSetupCommand('security', ['list-keychains', '-d', 'user'], {
+    label: 'Read user keychain search list',
+    ...options,
+  })
+
+  return parseSecurityKeychainList(result.stdout)
+}
+
+function setUserKeychainSearchList(keychains, options = {}) {
+  runSetupCommand('security', ['list-keychains', '-d', 'user', '-s', ...keychains], {
+    label: 'Update user keychain search list',
+    ...options,
+  })
 }
 
 function appendGitHubEnvValues(values, githubEnvPath = process.env.GITHUB_ENV) {
@@ -144,6 +174,7 @@ function createMacosReleaseSigningState(credentials, tempDir) {
     certificatePath,
     keychainPassword: randomUUID(),
     keychainPath,
+    previousUserKeychains: [],
     statePath,
     tempDir,
     exportedEnv: {
@@ -173,6 +204,7 @@ function prepareMacosReleaseSigning(options = {}) {
   let keychainCreated = false
 
   try {
+    state.previousUserKeychains = readUserKeychainSearchList({ runCommand })
     writeFile(state.certificatePath, credentials.certificateP12, { mode: 0o600 })
     writeFile(state.appleApiKeyPath, credentials.appleApiKey, { mode: 0o600 })
     writeFile(
@@ -180,6 +212,7 @@ function prepareMacosReleaseSigning(options = {}) {
       JSON.stringify(
         {
           keychainPath: state.keychainPath,
+          previousUserKeychains: state.previousUserKeychains,
           tempDir: state.tempDir,
         },
         null,
@@ -208,6 +241,13 @@ function prepareMacosReleaseSigning(options = {}) {
         label: 'Unlock temporary Desktop release keychain',
         runCommand,
       }
+    )
+    setUserKeychainSearchList(
+      [
+        state.keychainPath,
+        ...state.previousUserKeychains.filter((keychain) => keychain !== state.keychainPath),
+      ],
+      { runCommand }
     )
     runSetupCommand(
       'security',
@@ -250,6 +290,12 @@ function prepareMacosReleaseSigning(options = {}) {
   } catch (error) {
     if (keychainCreated) {
       try {
+        setUserKeychainSearchList(state.previousUserKeychains, { runCommand })
+      } catch (cleanupError) {
+        console.error(cleanupError.message)
+      }
+
+      try {
         runRequiredCommand('security', ['delete-keychain', state.keychainPath], {
           label: 'Delete temporary Desktop release keychain after setup failure',
           runCommand,
@@ -273,6 +319,9 @@ function readSigningState(env = process.env, readFile = require('node:fs').readF
 
   return {
     keychainPath: state.keychainPath,
+    previousUserKeychains: Array.isArray(state.previousUserKeychains)
+      ? state.previousUserKeychains
+      : [],
     tempDir: state.tempDir,
   }
 }
@@ -286,6 +335,10 @@ function cleanupMacosReleaseSigning(options = {}) {
   } = options
 
   if (state.keychainPath) {
+    if (Array.isArray(state.previousUserKeychains)) {
+      setUserKeychainSearchList(state.previousUserKeychains, { runCommand })
+    }
+
     runRequiredCommand('security', ['delete-keychain', state.keychainPath], {
       label: 'Delete temporary Desktop release keychain',
       runCommand,
@@ -501,8 +554,11 @@ module.exports = {
   createSafeSetupError,
   getExpectedMacosDmgArtifacts,
   notarizeAndStapleMacosDesktopArtifacts,
+  parseSecurityKeychainList,
   packageMacosRelease,
   prepareMacosReleaseSigning,
+  readUserKeychainSearchList,
+  setUserKeychainSearchList,
   validateMacosDesktopArtifacts,
   validateMacosReleaseCredentials,
 }

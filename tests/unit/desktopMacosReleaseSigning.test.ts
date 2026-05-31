@@ -5,6 +5,8 @@ import { describe, expect, it } from 'vitest'
 type SpawnResult = {
   error?: Error
   status: number | null
+  stderr?: string
+  stdout?: string
 }
 
 type RunCommand = (
@@ -15,6 +17,7 @@ type RunCommand = (
 
 type SigningState = {
   keychainPath: string
+  previousUserKeychains?: string[]
   tempDir: string
 }
 
@@ -30,12 +33,26 @@ type MacosReleaseSigningModule = {
     env: Record<string, string | undefined>
     runCommand: RunCommand
   }) => void
+  cleanupMacosReleaseSigning: (options: {
+    env: Record<string, string | undefined>
+    remove: (path: string, options: { force: boolean; recursive: boolean }) => void
+    runCommand: RunCommand
+    state: SigningState
+  }) => void
   packageMacosRelease: (options: {
     cleanup: (options: { state: SigningState }) => void
     env: Record<string, string | undefined>
     runCommand: RunCommand
     stateFactory: () => SigningState
   }) => void
+  parseSecurityKeychainList: (output: string) => string[]
+  prepareMacosReleaseSigning: (options: {
+    appendEnv: (values: Record<string, string>) => void
+    env: Record<string, string | undefined>
+    makeTempDir: (prefix: string) => string
+    runCommand: RunCommand
+    writeFile: (path: string, contents: string | Buffer, options: { mode: number }) => void
+  }) => SigningState
   validateMacosDesktopArtifacts: (options: {
     artifacts?: string[]
     desktopVersion?: string
@@ -111,6 +128,103 @@ describe('Desktop macOS release signing', () => {
     expect(credentials.appleApiKeyId).toBe('KEYID12345')
     expect(credentials.appleApiIssuerId).toBe('00000000-1111-2222-3333-444444444444')
     expect(credentials.appleTeamId).toBe('TEAMID1234')
+  })
+
+  it('parses the macOS user keychain search list from security output', () => {
+    expect(
+      signing.parseSecurityKeychainList(
+        '    "/Users/runner/Library/Keychains/login.keychain-db"\n' +
+          '    "/Library/Keychains/System.keychain"\n'
+      )
+    ).toEqual([
+      '/Users/runner/Library/Keychains/login.keychain-db',
+      '/Library/Keychains/System.keychain',
+    ])
+  })
+
+  it('adds the temporary release keychain to the user search list for codesign chain lookup', () => {
+    const commands: Array<{ command: string; args: string[] }> = []
+    const writes: string[] = []
+    const tempDir = '/tmp/aksel-arcade-macos-signing-test'
+    const previousUserKeychains = [
+      '/Users/runner/Library/Keychains/login.keychain-db',
+      '/Library/Keychains/System.keychain',
+    ]
+
+    const state = signing.prepareMacosReleaseSigning({
+      appendEnv: () => undefined,
+      env: { ...validCredentials },
+      makeTempDir: () => tempDir,
+      writeFile: (filePath) => {
+        writes.push(filePath)
+      },
+      runCommand: (command, args) => {
+        commands.push({ command, args })
+
+        if (args.join(' ') === 'list-keychains -d user') {
+          return {
+            status: 0,
+            stdout: previousUserKeychains.map((keychain) => `    "${keychain}"`).join('\n'),
+          }
+        }
+
+        return { status: 0 }
+      },
+    })
+
+    expect(state.previousUserKeychains).toEqual(previousUserKeychains)
+    expect(writes).toContain(`${tempDir}/state.json`)
+    expect(commands).toContainEqual({
+      command: 'security',
+      args: [
+        'list-keychains',
+        '-d',
+        'user',
+        '-s',
+        state.keychainPath,
+        ...previousUserKeychains,
+      ],
+    })
+  })
+
+  it('restores the previous user keychain search list before deleting the temporary keychain', () => {
+    const commands: Array<{ command: string; args: string[] }> = []
+    const removed: string[] = []
+    const signingState = {
+      keychainPath: '/tmp/aksel-arcade-release-signing.keychain-db',
+      previousUserKeychains: ['/Users/runner/Library/Keychains/login.keychain-db'],
+      tempDir: '/tmp/aksel-arcade-macos-signing',
+    }
+
+    signing.cleanupMacosReleaseSigning({
+      env: {},
+      remove: (path) => {
+        removed.push(path)
+      },
+      runCommand: (command, args) => {
+        commands.push({ command, args })
+        return { status: 0 }
+      },
+      state: signingState,
+    })
+
+    expect(commands).toEqual([
+      {
+        command: 'security',
+        args: [
+          'list-keychains',
+          '-d',
+          'user',
+          '-s',
+          '/Users/runner/Library/Keychains/login.keychain-db',
+        ],
+      },
+      {
+        command: 'security',
+        args: ['delete-keychain', signingState.keychainPath],
+      },
+    ])
+    expect(removed).toEqual([signingState.tempDir])
   })
 
   it('targets both Apple Silicon and Intel DMGs with the documented release names', () => {
@@ -241,5 +355,24 @@ describe('Desktop macOS release signing', () => {
       },
     ])
     expect(cleanedState).toBe(signingState)
+  })
+
+  it('surfaces release packaging command output when signed macOS packaging fails', () => {
+    const signingState = {
+      keychainPath: '/tmp/aksel-arcade-release-signing.keychain-db',
+      tempDir: '/tmp/aksel-arcade-macos-signing',
+    }
+
+    expect(() =>
+      signing.packageMacosRelease({
+        cleanup: () => undefined,
+        env: { ...preparedNotarizationEnv },
+        runCommand: (command) =>
+          command === 'electron-builder'
+            ? { status: 1, stderr: 'codesign could not build a certificate chain' }
+            : { status: 0 },
+        stateFactory: () => signingState,
+      })
+    ).toThrow(/codesign could not build a certificate chain/)
   })
 })
