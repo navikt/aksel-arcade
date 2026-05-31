@@ -1583,6 +1583,18 @@ Verification:
 - npm run lint (passes with existing hook dependency warnings in `InspectionPopover` and `PreviewPane`)
 - CI=1 npm run test
 
+Issue #150 documentation progress:
+
+- Kept the work scoped to documentation for "Document Desktop Arcade download and recovery flow"; did not change release scripts, workflows, packaging code, or unrelated features.
+- Read `CONTEXT.md`, `docs/desktop-release.md`, ADR `docs/adr/0009-desktop-arcade-release-pipeline.md`, and the implemented Desktop release workflows before editing.
+- Updated `README.md` with user-facing Desktop Arcade download guidance: GitHub Releases are the supported download channel, Web Arcade remains browser-hosted, and Windows x64, Mac Apple Silicon, and Mac Intel users are mapped to the expected install artifact names.
+- Expanded `docs/desktop-release.md` with the same download channel/artifact mapping plus maintainer recovery dispatch rules, failure expectations, the Desktop release credential security boundary, and explicit initial out-of-scope items: no Web Arcade download UI, no in-app updates, no package-manager distribution, no initial Windows signing, and no checksum artifacts.
+
+Verification:
+
+- npm run typecheck
+- CI=1 npm run test
+
 Desktop release duplicate draft follow-up:
 
 - Replacement run https://github.com/navikt/aksel-arcade/actions/runs/26718889270 completed successfully, but GitHub release state showed two `desktop-v0.1.0` releases: a stale draft from the previous failed run containing the three installer assets, and a public release from the rerun with zero assets.

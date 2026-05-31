@@ -1,8 +1,8 @@
 # 🎮 Aksel Arcade
 
-**A browser-based React playground for the Aksel v8 design system**
+**A React playground for the Aksel v8 design system, available as Web Arcade and Desktop Arcade**
 
-Build and experiment with UI components instantly—no setup, no installation, no backend. Just open your browser and start creating.
+Build and experiment with UI components instantly in Web Arcade, or download Desktop Arcade when you need the desktop product surface.
 
 🚀 **[Launch Aksel Arcade](https://navikt.github.io/aksel-arcade/)**
 
@@ -10,7 +10,7 @@ Build and experiment with UI components instantly—no setup, no installation, n
 
 ## What is Aksel Arcade?
 
-Aksel Arcade is an interactive coding environment that lets designers and developers prototype React UIs using the [Aksel design system](https://aksel.nav.no) directly in the browser. Write JSX, see results instantly, and share your prototypes with a simple JSON export.
+Aksel Arcade is an interactive coding environment that lets designers and developers prototype React UIs using the [Aksel design system](https://aksel.nav.no). Web Arcade is the browser-hosted product surface; Desktop Arcade is the downloadable desktop product surface published through GitHub Releases. Write JSX, see results instantly, and share your prototypes with a simple JSON export.
 
 Perfect for:
 - 🎨 **Designers** exploring component combinations
@@ -72,8 +72,19 @@ One of Aksel Arcade's most powerful features! Enable inspect mode to:
 
 ## 🚀 Getting Started
 
-### Use the Live App
-Just visit **[https://navikt.github.io/aksel-arcade/](https://navikt.github.io/aksel-arcade/)** and start coding!
+### Use Web Arcade
+Just visit **[https://navikt.github.io/aksel-arcade/](https://navikt.github.io/aksel-arcade/)** and start coding in the browser-hosted Web Arcade. No Desktop install artifact is needed for Web Arcade, and ordinary Web Arcade URLs do not install, update, or distribute Desktop Arcade.
+
+### Download Desktop Arcade
+Desktop Arcade is distributed from the repository's **[GitHub Releases](https://github.com/navikt/aksel-arcade/releases)** page. Open the latest published release tagged `desktop-vX.Y.Z`, then download the Desktop install artifact for your machine:
+
+| Machine | Desktop install artifact |
+| --- | --- |
+| Windows x64 | `Aksel-Arcade-X.Y.Z-windows-x64.exe` |
+| Mac with Apple Silicon | `Aksel-Arcade-X.Y.Z-mac-arm64.dmg` |
+| Mac with Intel processor | `Aksel-Arcade-X.Y.Z-mac-x64.dmg` |
+
+Replace `X.Y.Z` with the Desktop Arcade version shown in the release. The initial Desktop distribution path does not include a Web Arcade download UI, in-app updates, package-manager distribution, checksum artifacts, or signed Windows installers. macOS DMGs are signed and notarized; the Windows installer is unsigned initially.
 
 ---
 
