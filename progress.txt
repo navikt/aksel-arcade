@@ -1450,3 +1450,20 @@ Verification:
 - npm run typecheck
 - npm run lint (passes with existing hook dependency warnings in `InspectionPopover` and `PreviewPane`)
 - CI=1 npm run test
+
+### 2026-05-31 - Issue #143: Unsigned local Desktop install artifacts
+
+Verified:
+
+- Checked `CONTEXT.md` Desktop language and `docs/desktop-release.md` local unsigned packaging contract before touching the feature.
+- Confirmed the current branch already contains the #143 local packaging path: `npm run desktop:build` emits `dist-desktop` with relative asset URLs, Electron Builder targets Windows x64 NSIS plus macOS arm64/x64 DMGs without publishing, artifact names include product/version/OS/architecture, installed metadata uses `Aksel Arcade` and `no.nav.aksel.arcade`, and desktop icons are generated from `public/aksel-favicon.svg`.
+- Confirmed `tests/unit/desktopPackagingConfig.test.ts` covers the Desktop build profile, app metadata, target matrix, artifact naming, icon wiring, version injection, and local unsigned packaging commands.
+- No acceptance gap required a code change in this pass; kept the work scoped to the single #143 feature.
+
+Verification:
+
+- npm run typecheck
+- npm run lint
+- npm test -- --run
+
+Next note: #143 appears implemented by the existing Desktop packaging work on this branch. Later Desktop work should stay in separate signed-release or CI packaging slices rather than expanding this local unsigned installer feature.
