@@ -332,6 +332,11 @@
     let currentExecutionId = 0;
 
     function createSandboxSessionToken() {
+      const tokenFromUrl = new URLSearchParams(window.location.hash.slice(1)).get('sandboxSessionToken');
+      if (tokenFromUrl) {
+        return tokenFromUrl;
+      }
+
       if (window.crypto?.getRandomValues) {
         const bytes = new Uint32Array(4);
         window.crypto.getRandomValues(bytes);

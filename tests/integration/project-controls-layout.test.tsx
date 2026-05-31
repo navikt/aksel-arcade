@@ -487,14 +487,30 @@ function setupDesktopTransportPreload(
 const isPromiseLike = <TValue,>(value: TValue | Promise<TValue>): value is Promise<TValue> =>
   typeof (value as Promise<TValue>).then === 'function'
 
-const TEST_SANDBOX_SESSION_TOKEN = 'test-sandbox-session-token'
 let sandboxReadyDispatched = false
 
-const dispatchMessageFromPreviewIframe = (data: unknown) => {
+const getPreviewIframe = () => {
   const iframe = screen.getByTestId('preview-iframe') as HTMLIFrameElement
   if (!iframe.contentWindow) {
     throw new Error('Expected preview iframe to have a contentWindow.')
   }
+
+  return iframe
+}
+
+const getSandboxSessionToken = () => {
+  const iframe = getPreviewIframe()
+  const sandboxUrl = new URL(iframe.src || iframe.getAttribute('src') || '', window.location.href)
+  const token = new URLSearchParams(sandboxUrl.hash.slice(1)).get('sandboxSessionToken')
+  if (!token) {
+    throw new Error('Expected preview iframe src to include a sandbox session token.')
+  }
+
+  return token
+}
+
+const dispatchMessageFromPreviewIframe = (data: unknown) => {
+  const iframe = getPreviewIframe()
 
   act(() => {
     window.dispatchEvent(
@@ -510,7 +526,7 @@ const dispatchMessageFromPreviewIframe = (data: unknown) => {
 const dispatchSandboxReady = () => {
   dispatchMessageFromPreviewIframe({
     type: 'SANDBOX_READY',
-    sandboxSessionToken: TEST_SANDBOX_SESSION_TOKEN,
+    sandboxSessionToken: getSandboxSessionToken(),
   })
   sandboxReadyDispatched = true
 }
@@ -522,7 +538,7 @@ const dispatchSandboxMessage = (data: Record<string, unknown>) => {
 
   dispatchMessageFromPreviewIframe({
     ...data,
-    sandboxSessionToken: TEST_SANDBOX_SESSION_TOKEN,
+    sandboxSessionToken: getSandboxSessionToken(),
   })
 }
 

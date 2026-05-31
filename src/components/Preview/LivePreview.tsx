@@ -21,6 +21,23 @@ interface LivePreviewProps {
   theme: 'light' | 'dark'
 }
 
+const createSandboxSessionToken = () => {
+  if (globalThis.crypto?.randomUUID) {
+    return globalThis.crypto.randomUUID()
+  }
+
+  if (globalThis.crypto?.getRandomValues) {
+    const bytes = new Uint32Array(4)
+    globalThis.crypto.getRandomValues(bytes)
+    return Array.from(bytes, (value) => value.toString(36)).join('-')
+  }
+
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`
+}
+
+const createSandboxSrc = (sandboxSessionToken: string) =>
+  `${import.meta.env.BASE_URL}sandbox.html#sandboxSessionToken=${encodeURIComponent(sandboxSessionToken)}`
+
 export const LivePreview = ({
   iframeRef,
   transpiledCode,
@@ -34,7 +51,8 @@ export const LivePreview = ({
 }: LivePreviewProps) => {
   const [sandboxReady, setSandboxReady] = useState(false)
   const pendingCodeRef = useRef<string | null>(null)
-  const sandboxSessionTokenRef = useRef<string | null>(null)
+  const sandboxSessionTokenRef = useRef(createSandboxSessionToken())
+  const sandboxSrcRef = useRef(createSandboxSrc(sandboxSessionTokenRef.current))
   
   // T082: Inspection state
   const [inspectionData, setInspectionData] = useState<InspectionData | null>(null)
@@ -69,12 +87,11 @@ export const LivePreview = ({
           return
         }
 
-        if (sandboxSessionTokenRef.current && sandboxSessionTokenRef.current !== token) {
+        if (sandboxSessionTokenRef.current !== token) {
           console.warn('Rejected sandbox ready message for unexpected session:', event.data)
           return
         }
 
-        sandboxSessionTokenRef.current = token
         setSandboxReady(true)
         
         // Send pending code if any
@@ -90,15 +107,8 @@ export const LivePreview = ({
       }
 
       if (!isExpectedSandboxSession(event.data)) {
-        const token = getSandboxSessionToken(event.data)
-        if (sandboxSessionTokenRef.current || event.data?.type !== 'RUNTIME_ERROR' || !token) {
-          if (sandboxSessionTokenRef.current) {
-            console.warn('Rejected message from stale sandbox session:', event.data)
-          }
-          return
-        }
-
-        sandboxSessionTokenRef.current = token
+        console.warn('Rejected message from stale sandbox session:', event.data)
+        return
       }
 
       // Validate message structure
@@ -226,7 +236,7 @@ export const LivePreview = ({
       <iframe
         ref={iframeRef}
         className="live-preview__iframe"
-        src={import.meta.env.BASE_URL + 'sandbox.html'}
+        src={sandboxSrcRef.current}
         sandbox="allow-scripts"
         referrerPolicy="no-referrer"
         title="Live Preview Sandbox"

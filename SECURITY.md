@@ -127,10 +127,10 @@ window.addEventListener('message', (event) => {
 })
 ```
 
-Parent-to-sandbox messages resume only after the current `sandbox.html` runtime sends a
-`SANDBOX_READY` message with its unguessable session token. If the iframe navigates away,
-the parent marks the sandbox as not ready and rejects messages from documents that do not
-know the original token.
+Parent-to-sandbox messages resume only after the current `sandbox.html` runtime echoes the
+unguessable session token that the parent embeds in the iframe URL fragment. If the iframe
+navigates away, the parent marks the sandbox as not ready and rejects messages from
+documents that do not know the original token.
 
 **Files Updated**:
 - `src/utils/sandboxMessaging.ts`

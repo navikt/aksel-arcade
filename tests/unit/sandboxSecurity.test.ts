@@ -27,6 +27,7 @@ describe('sandbox security boundaries', () => {
 
     expect(sandboxHtml).toContain('sandboxSessionToken')
     expect(livePreview).toContain('sandboxSessionTokenRef')
+    expect(livePreview).toContain('createSandboxSrc')
     expect(livePreview).toContain("iframe.addEventListener('load', handleLoad)")
   })
 })
