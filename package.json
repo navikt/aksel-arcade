@@ -11,6 +11,7 @@
     "desktop:build": "npm run desktop:icons && node scripts/build-sandbox.mjs && vite build --config vite.desktop.config.ts",
     "desktop:package": "npm run desktop:build && electron-builder --config electron-builder.config.cjs --mac --win --publish never",
     "desktop:package:mac": "npm run desktop:build && electron-builder --config electron-builder.config.cjs --mac --publish never",
+    "desktop:package:mac:release": "node scripts/desktop-macos-release-signing.cjs package",
     "desktop:package:win": "npm run desktop:build && electron-builder --config electron-builder.config.cjs --win --publish never",
     "desktop:release-plan": "node scripts/desktop-release-plan.cjs",
     "desktop:release-env-check": "node scripts/desktop-release-environment-check.cjs",

@@ -105,11 +105,20 @@ Desktop-impacting pull requests run unsigned Desktop packaging checks without en
 
 When packaging is required, the workflow reuses the local unsigned package contract: macOS runners run `npm run desktop:package:mac`, Windows runners run `npm run desktop:package:win`, `AKSEL_ARCADE_DESKTOP_VERSION` is injected as CI workspace state, and the expected DMG/NSIS install artifacts must exist in `release/desktop`. Pull request packaging jobs do not request Desktop release credentials, do not sign or notarize artifacts, do not upload installers as workflow artifacts, and do not create GitHub Releases.
 
+## Signed macOS release packaging
+
+The signed macOS release path is CI-only and is prepared for the protected `desktop-release` environment. A macOS release job should call `npm run desktop:package:mac:release` after setting `AKSEL_ARCADE_DESKTOP_VERSION`. The command validates the required Desktop release credentials, imports the Developer ID Application certificate into a temporary keychain, builds the Desktop renderer, runs `electron-builder` in release signing mode, notarizes each expected DMG with the App Store Connect API key, staples the notarization ticket, validates the Developer ID signature, validates Gatekeeper assessment, and deletes the temporary keychain before exiting.
+
+The release signing mode keeps local unsigned packaging unchanged and enables macOS hardened runtime with the minimal entitlements in `desktop/entitlements.mac.plist`. The expected signed macOS artifacts remain:
+
+- `Aksel-Arcade-X.Y.Z-mac-arm64.dmg`
+- `Aksel-Arcade-X.Y.Z-mac-x64.dmg`
+
 ## Safety rules
 
 - Detect Desktop-impacting changes before entering the `desktop-release` environment.
 - Use a Desktop-specific Vite build with relative asset URLs and a separate build output from the Web Arcade GitHub Pages build.
-- Fail loudly with a setup error when a Desktop-impacting release is required but release secrets are missing.
+- Fail loudly with a setup error when a Desktop-impacting release is required but release secrets are missing or invalid, without printing secret values.
 - Build and validate all required installers before creating the public GitHub Release.
 - Publish no partial releases.
 - Keep Web Arcade GitHub Pages deployment independent from Desktop Arcade release success.
