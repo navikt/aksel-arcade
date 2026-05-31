@@ -1467,3 +1467,24 @@ Verification:
 - npm test -- --run
 
 Next note: #143 appears implemented by the existing Desktop packaging work on this branch. Later Desktop work should stay in separate signed-release or CI packaging slices rather than expanding this local unsigned installer feature.
+
+### 2026-05-31 - Issue #146: Protected Desktop release credentials
+
+Implemented:
+
+- Selected #146 as the single feature for this pass and kept the work scoped to Desktop release credential provisioning.
+- Created/configured the GitHub environment `desktop-release` with no required reviewers or wait timer.
+- Restricted `desktop-release` to the custom environment branch policy `master`; repository branch protection now reports `master` as protected.
+- Confirmed the six required environment secret names are present: `MAC_CERTIFICATE_P12_BASE64`, `MAC_CERTIFICATE_PASSWORD`, `APPLE_API_KEY_BASE64`, `APPLE_API_KEY_ID`, `APPLE_API_ISSUER_ID`, and `APPLE_TEAM_ID`.
+- Added `npm run desktop:release-env-check` backed by `scripts/desktop-release-environment-check.cjs` so maintainers can verify environment metadata and secret names without reading or printing secret values.
+- Documented maintainer-only environment setup, secret-name setup, and the no-secret-value handling rule in `docs/desktop-release.md`.
+- Added unit coverage for the readiness helper: missing environment, manual approval, broad branch policies, non-master policies, unprotected master, missing secret names, insufficient secret-name permissions, and the ready state.
+
+Verification:
+
+- npm run desktop:release-env-check
+- npm run typecheck
+- npm run lint (passes with existing hook dependency warnings in `InspectionPopover` and `PreviewPane`)
+- CI=true npm run test
+
+Next note: The Desktop release credentials are now configured as GitHub environment secrets, but their values must remain maintainer-only. Future signed/notarized release workflow work should reference only the `desktop-release` environment and these secret names; do not copy values into source, logs, release assets, runtime state, or Arcade project data.

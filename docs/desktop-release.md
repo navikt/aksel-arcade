@@ -10,6 +10,33 @@ Create a protected GitHub environment named `desktop-release` for signed Desktop
 - Restrict release credentials to this environment.
 - Signed/notarized release jobs must run only on `push` to `master` or maintainer-triggered recovery dispatches for commits already on `master`, never on pull requests or arbitrary refs.
 
+Maintainers can provision the environment metadata from a local terminal without handling any secret values in source or chat:
+
+```bash
+gh api \
+  --method PUT \
+  repos/navikt/aksel-arcade/environments/desktop-release \
+  --input - <<'JSON'
+{
+  "wait_timer": 0,
+  "reviewers": [],
+  "prevent_self_review": false,
+  "deployment_branch_policy": {
+    "protected_branches": false,
+    "custom_branch_policies": true
+  }
+}
+JSON
+
+gh api \
+  --method POST \
+  repos/navikt/aksel-arcade/environments/desktop-release/deployment-branch-policies \
+  -f name=master \
+  -f type=branch
+```
+
+This intentionally uses a custom branch policy for `master` plus the repository's branch protection on `master`, rather than allowing every protected branch to use Desktop release credentials.
+
 ## Required Apple credentials
 
 Store these as encrypted environment secrets in `desktop-release`:
@@ -22,6 +49,19 @@ Store these as encrypted environment secrets in `desktop-release`:
 - `APPLE_TEAM_ID`: Apple Developer team ID for the Developer ID certificate.
 
 The release workflow should import the certificate into a temporary keychain for the macOS jobs and remove that keychain before the job exits. The App Store Connect API key is used for notarization only.
+
+Set the environment secrets from a maintainer-controlled machine. Do not paste secret values into issues, pull requests, chat, docs, source files, release notes, workflow logs, or Arcade project data.
+
+```bash
+gh secret set MAC_CERTIFICATE_P12_BASE64 --env desktop-release --repo navikt/aksel-arcade
+gh secret set MAC_CERTIFICATE_PASSWORD --env desktop-release --repo navikt/aksel-arcade
+gh secret set APPLE_API_KEY_BASE64 --env desktop-release --repo navikt/aksel-arcade
+gh secret set APPLE_API_KEY_ID --env desktop-release --repo navikt/aksel-arcade
+gh secret set APPLE_API_ISSUER_ID --env desktop-release --repo navikt/aksel-arcade
+gh secret set APPLE_TEAM_ID --env desktop-release --repo navikt/aksel-arcade
+```
+
+Run `npm run desktop:release-env-check` as a repository maintainer to confirm the environment metadata and required secret names are ready. The check reads only GitHub environment metadata and secret names; it never reads or prints secret values.
 
 ## Release shape
 
