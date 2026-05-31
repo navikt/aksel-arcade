@@ -13,6 +13,7 @@
     "desktop:package:mac": "npm run desktop:build && electron-builder --config electron-builder.config.cjs --mac --publish never",
     "desktop:package:win": "npm run desktop:build && electron-builder --config electron-builder.config.cjs --win --publish never",
     "desktop:release-plan": "node scripts/desktop-release-plan.cjs",
+    "desktop:release-env-check": "node scripts/desktop-release-environment-check.cjs",
     "desktop:pr-package-plan": "node scripts/desktop-pr-packaging-plan.cjs",
     "build": "node scripts/build-sandbox.mjs && tsc -b && vite build",
     "build:sandbox": "node scripts/build-sandbox.mjs",
