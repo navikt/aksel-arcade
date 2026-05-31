@@ -1,3 +1,4 @@
+import { spawnSync } from "node:child_process";
 import { createRequire } from "node:module";
 import { describe, expect, it } from "vitest";
 
@@ -57,6 +58,7 @@ interface Readiness {
 }
 
 interface DesktopReleaseEnvironmentCheckModule {
+  INSUFFICIENT_PERMISSION_EXIT_CODE: number;
   REQUIRED_SECRET_NAMES: string[];
   createDesktopReleaseEnvironmentReadiness(input?: ReadinessInput): Readiness;
   formatDesktopReleaseEnvironmentReadiness(readiness: Readiness): string;
@@ -150,7 +152,10 @@ describe("Desktop release environment check", () => {
     });
 
     expect(readiness.ready).toBe(false);
-    expect(findCheck(readiness, "no-manual-approval").ok).toBe(false);
+    expect(findCheck(readiness, "no-manual-approval")).toMatchObject({
+      ok: false,
+      message: "Environment has a wait timer or required reviewers configured.",
+    });
   });
 
   it("rejects broad protected-branch policies because Desktop release credentials are master-only", () => {
@@ -165,7 +170,10 @@ describe("Desktop release environment check", () => {
     });
 
     expect(readiness.ready).toBe(false);
-    expect(findCheck(readiness, "master-only-branch-policy").ok).toBe(false);
+    expect(findCheck(readiness, "master-only-branch-policy")).toMatchObject({
+      ok: false,
+      message: "Environment branch policy must allow only the `master` branch.",
+    });
   });
 
   it("rejects non-master environment branch policies", () => {
@@ -179,7 +187,10 @@ describe("Desktop release environment check", () => {
     });
 
     expect(readiness.ready).toBe(false);
-    expect(findCheck(readiness, "master-only-branch-policy").ok).toBe(false);
+    expect(findCheck(readiness, "master-only-branch-policy")).toMatchObject({
+      ok: false,
+      message: "Environment branch policy must allow only the `master` branch.",
+    });
   });
 
   it("rejects the setup when master branch protection cannot be confirmed", () => {
@@ -191,7 +202,11 @@ describe("Desktop release environment check", () => {
     });
 
     expect(readiness.ready).toBe(false);
-    expect(findCheck(readiness, "master-branch-protected").ok).toBe(false);
+    expect(findCheck(readiness, "master-branch-protected")).toMatchObject({
+      ok: false,
+      message:
+        "`master` is not protected before Desktop release credentials can be used.",
+    });
   });
 
   it("reports missing Desktop release credential names without reading secret values", () => {
@@ -228,5 +243,27 @@ describe("Desktop release environment check", () => {
     expect(readiness.checks.map(({ id }) => id)).not.toContain(
       "required-secret-names",
     );
+    expect(environmentCheck.INSUFFICIENT_PERMISSION_EXIT_CODE).toBe(2);
+  });
+
+  it("does not report unexpected CLI failures as insufficient permissions", () => {
+    const result = spawnSync(
+      process.execPath,
+      ["scripts/desktop-release-environment-check.cjs"],
+      {
+        cwd: process.cwd(),
+        encoding: "utf8",
+        env: {
+          ...process.env,
+          PATH: "/nonexistent",
+        },
+      },
+    );
+
+    expect(result.status).toBe(1);
+    expect(result.status).not.toBe(
+      environmentCheck.INSUFFICIENT_PERMISSION_EXIT_CODE,
+    );
+    expect(result.stderr).toContain("spawnSync gh ENOENT");
   });
 });

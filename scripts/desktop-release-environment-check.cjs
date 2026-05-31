@@ -116,21 +116,34 @@ function createDesktopReleaseEnvironmentReadiness({
   ];
 
   if (environmentExists) {
+    const noManualApproval = hasNoManualApproval(environment);
+    const masterBranchProtected = masterBranch?.protected === true;
+    const masterOnlyBranchPolicy = hasMasterOnlyBranchPolicy(
+      environment,
+      branchPolicies,
+    );
+
     checks.push(
       createCheck(
         "no-manual-approval",
-        hasNoManualApproval(environment),
-        "Environment has no wait timer or required reviewers.",
+        noManualApproval,
+        noManualApproval
+          ? "Environment has no wait timer or required reviewers."
+          : "Environment has a wait timer or required reviewers configured.",
       ),
       createCheck(
         "master-branch-protected",
-        masterBranch?.protected === true,
-        "`master` is protected before Desktop release credentials can be used.",
+        masterBranchProtected,
+        masterBranchProtected
+          ? "`master` is protected before Desktop release credentials can be used."
+          : "`master` is not protected before Desktop release credentials can be used.",
       ),
       createCheck(
         "master-only-branch-policy",
-        hasMasterOnlyBranchPolicy(environment, branchPolicies),
-        "Environment branch policy allows only the `master` branch.",
+        masterOnlyBranchPolicy,
+        masterOnlyBranchPolicy
+          ? "Environment branch policy allows only the `master` branch."
+          : "Environment branch policy must allow only the `master` branch.",
       ),
       createCheck(
         "secret-names-readable",
@@ -300,7 +313,7 @@ if (require.main === module) {
     }
   } catch (error) {
     process.stderr.write(`${error.message}\n`);
-    process.exitCode = INSUFFICIENT_PERMISSION_EXIT_CODE;
+    process.exitCode = 1;
   }
 }
 

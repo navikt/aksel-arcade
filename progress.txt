@@ -1488,3 +1488,17 @@ Verification:
 - CI=true npm run test
 
 Next note: The Desktop release credentials are now configured as GitHub environment secrets, but their values must remain maintainer-only. Future signed/notarized release workflow work should reference only the `desktop-release` environment and these secret names; do not copy values into source, logs, release assets, runtime state, or Arcade project data.
+
+Review follow-up:
+
+- Fixed readiness output so failed manual-approval, unprotected-master, and branch-policy checks describe the actual misconfiguration instead of reusing pass-state wording.
+- Reserved exit code 2 for the explicit insufficient-permission readiness path; unexpected CLI/API failures now exit 1 instead of looking like permission failures.
+- Added regression coverage for the clearer failure messages and unexpected CLI failure exit behavior.
+
+Verification:
+
+- npm test -- --run tests/unit/desktopReleaseEnvironmentCheck.test.ts
+- npm run desktop:release-env-check
+- npm run typecheck
+- npm run lint (passes with existing hook dependency warnings in `InspectionPopover` and `PreviewPane`)
+- CI=true npm run test
