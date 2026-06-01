@@ -1646,3 +1646,21 @@ Verification:
 - npm run lint (passes with existing hook dependency warnings in `InspectionPopover` and `PreviewPane`)
 - CI=1 npm run test
 - Browser smoke check at `http://127.0.0.1:5173/aksel-arcade/` for app render, preview render, and no console warnings/errors.
+
+### 2026-06-01 - Issue #165 keep Agent operating instructions hidden and redacted
+
+Completed for #165:
+
+- Kept the work scoped to the Desktop Arcade Agent menu/redaction feature.
+- Split redaction terminology so copied Agent pairing handoffs and pairing credentials still redact as Agent pairing handoff data, while `instructionsMarkdown` content now redacts as Agent operating instructions.
+- Tightened the copied handoff redactor so it stops at the `getAgentInstructions` bootstrap `--data` argument instead of swallowing later log payloads on the same line.
+- Made `instructionsMarkdown` redaction quote-aware so commas, braces, and `applyAgentChange({ ... })` examples inside the Agent operating instructions cannot leak tail content.
+- Applied the same redaction behavior in renderer code, the Desktop loopback helper, and the sandboxed preload copy.
+- Strengthened tests for copy failure/retry feedback, hidden menu content, Web Arcade Agent absence, and redaction coverage for copied handoffs, endpoint/Auth data, pairing credentials, and Agent operating instructions.
+
+Verification:
+
+- npm run typecheck
+- npm run lint (passes with existing hook dependency warnings in `InspectionPopover` and `PreviewPane`)
+- CI=1 npm run test
+- Browser smoke check at `http://127.0.0.1:5173/aksel-arcade/` for app render, preview render, Web Arcade Agent absence, and no console warnings/errors.

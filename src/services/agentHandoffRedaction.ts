@@ -1,11 +1,13 @@
 import type { DesktopAgentTransportEndpoint } from './desktopAgentSessionCoordinator'
 
 const REDACTED_AGENT_PAIRING_DATA = '[redacted Agent pairing handoff]'
+const REDACTED_AGENT_OPERATING_INSTRUCTIONS = '[redacted Agent operating instructions]'
 const REDACTED_AGENT_ENDPOINT = '[redacted Agent endpoint]'
 const REDACTED_AGENT_AUTHORIZATION = 'Authorization: Bearer [redacted]'
 const REDACTED_AGENT_AUTHORIZATION_VALUE = 'Bearer [redacted]'
 
-const AGENT_PAIRING_COMMAND_PATTERN = /\bcurl\b(?=[^\r\n]*getAgentInstructions)[^\r\n]*/gi
+const AGENT_PAIRING_COMMAND_PATTERN =
+  /\bcurl\b(?=[^\r\n]*getAgentInstructions)[^\r\n]*?--data\s+(?:"(?:\\.|[^"\\])*getAgentInstructions(?:\\.|[^"\\])*"|'(?:'\\''|\\.|[^'\\])*getAgentInstructions(?:'\\''|\\.|[^'\\])*'|[^\s'"`]*getAgentInstructions[^\s'"`]*)/gi
 const LOOPBACK_ENDPOINT_PATTERN =
   /\bhttps?:\/\/(?:127\.0\.0\.1|localhost):\d+(?:\/[^\s'"`<>)\]]*)?/gi
 const AUTHORIZATION_HEADER_PATTERN = /\bAuthorization\s*:\s*Bearer\s+[^'",\s)}\]]+/gi
@@ -14,8 +16,10 @@ const AUTHORIZATION_HEADER_VALUE_PATTERN =
   /(\bauthorizationHeader["']?\s*[:=]\s*["']?)Bearer\s+[^'",}\]\s]+(["']?)/gi
 const PAIRING_CREDENTIAL_VALUE_PATTERN =
   /(\bpairingCredential["']?\s*[:=]\s*["']?)[^'",}\]\s]+(["']?)/gi
-const INSTRUCTIONS_MARKDOWN_VALUE_PATTERN =
-  /(\binstructionsMarkdown["']?\s*[:=]\s*["']?)[\s\S]*?(["']?\s*[,}])/gi
+const INSTRUCTIONS_MARKDOWN_QUOTED_VALUE_PATTERN =
+  /((?:"instructionsMarkdown"|'instructionsMarkdown'|\binstructionsMarkdown\b)\s*[:=]\s*)(["'])(?:\\[\s\S]|(?!\2)[\s\S])*?\2/gi
+const INSTRUCTIONS_MARKDOWN_BARE_VALUE_PATTERN =
+  /((?:"instructionsMarkdown"|'instructionsMarkdown'|\binstructionsMarkdown\b)\s*[:=]\s*)(?!["'])[^,\r\n}]*/gi
 
 export interface AgentHandoffLogContext {
   knownSecrets?: readonly (string | null | undefined)[]
@@ -24,26 +28,26 @@ export interface AgentHandoffLogContext {
 export const collectAgentHandoffLogSecrets = (session: {
   pairingCredential?: string
   transportEndpoint?: DesktopAgentTransportEndpoint
-}): string[] => [
-  session.pairingCredential,
-  session.transportEndpoint?.endpoint,
-  session.transportEndpoint?.authorizationHeader,
-].filter(isNonEmptyString)
+}): string[] =>
+  [
+    session.pairingCredential,
+    session.transportEndpoint?.endpoint,
+    session.transportEndpoint?.authorizationHeader,
+  ].filter(isNonEmptyString)
 
 export const redactAgentHandoffSecrets = (
   value: string,
   context: AgentHandoffLogContext = {}
 ): string => {
-  const withKnownSecretsRedacted = redactKnownSecrets(value, context.knownSecrets ?? [])
-
-  return withKnownSecretsRedacted
+  const withStructuredSecretsRedacted = redactAgentOperatingInstructions(value)
     .replace(AGENT_PAIRING_COMMAND_PATTERN, REDACTED_AGENT_PAIRING_DATA)
     .replace(AUTHORIZATION_HEADER_VALUE_PATTERN, `$1${REDACTED_AGENT_AUTHORIZATION_VALUE}$2`)
     .replace(PAIRING_CREDENTIAL_VALUE_PATTERN, `$1${REDACTED_AGENT_PAIRING_DATA}$2`)
-    .replace(INSTRUCTIONS_MARKDOWN_VALUE_PATTERN, `$1${REDACTED_AGENT_PAIRING_DATA}$2`)
     .replace(AUTHORIZATION_HEADER_PATTERN, REDACTED_AGENT_AUTHORIZATION)
     .replace(BEARER_TOKEN_PATTERN, REDACTED_AGENT_AUTHORIZATION_VALUE)
     .replace(LOOPBACK_ENDPOINT_PATTERN, REDACTED_AGENT_ENDPOINT)
+
+  return redactKnownSecrets(withStructuredSecretsRedacted, context.knownSecrets ?? [])
 }
 
 export const formatAgentErrorForLog = (
@@ -67,9 +71,20 @@ const redactKnownSecrets = (
 ): string =>
   knownSecrets.reduce<string>(
     (redacted, secret) =>
-      isNonEmptyString(secret) ? redacted.split(secret).join(REDACTED_AGENT_PAIRING_DATA) : redacted,
+      isNonEmptyString(secret)
+        ? redacted.split(secret).join(REDACTED_AGENT_PAIRING_DATA)
+        : redacted,
     value
   )
+
+const redactAgentOperatingInstructions = (value: string): string =>
+  value
+    .replace(
+      INSTRUCTIONS_MARKDOWN_QUOTED_VALUE_PATTERN,
+      (_match, prefix: string, quote: string) =>
+        `${prefix}${quote}${REDACTED_AGENT_OPERATING_INSTRUCTIONS}${quote}`
+    )
+    .replace(INSTRUCTIONS_MARKDOWN_BARE_VALUE_PATTERN, `$1${REDACTED_AGENT_OPERATING_INSTRUCTIONS}`)
 
 const stringifyUnknownError = (error: unknown): string => {
   try {
