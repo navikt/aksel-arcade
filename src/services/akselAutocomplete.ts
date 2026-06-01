@@ -24,6 +24,7 @@ type CompletionEntry =
 
 type CompletionProp = (AkselAutocompleteProp | AkselCatalogProp) & {
   values?: string[]
+  valueKind?: AkselCatalogProp['valueKind']
 }
 
 const catalogEntries = listCatalogEntries({
@@ -456,13 +457,42 @@ function propOption(componentName: string, prop: CompletionProp): Completion {
   }
 }
 
-function valueOption(prop: CompletionProp, value: string): Completion {
+function isBackgroundTokenProp(prop: CompletionProp): boolean {
+  return prop.valueKind === 'background-token'
+}
+
+function backgroundTokenName(value: string): string {
+  return `bg-${value}`
+}
+
+function matchesPropValue(prop: CompletionProp, value: string, partialValue: string): boolean {
+  return (
+    matchesPartial(value, partialValue) ||
+    (isBackgroundTokenProp(prop) && matchesPartial(backgroundTokenName(value), partialValue))
+  )
+}
+
+function valueOption(prop: CompletionProp, value: string, label = value): Completion {
   return {
-    label: value,
+    label,
     type: 'value',
     detail: prop.description || `${prop.name} value`,
     apply: value,
   }
+}
+
+function valueOptions(prop: CompletionProp, partialValue: string): Completion[] {
+  return (
+    prop.values
+      ?.filter((value) => matchesPropValue(prop, value, partialValue))
+      .map((value) => {
+        if (isBackgroundTokenProp(prop) && partialValue.toLowerCase().startsWith('bg-')) {
+          return valueOption(prop, value, backgroundTokenName(value))
+        }
+
+        return valueOption(prop, value)
+      }) ?? []
+  )
 }
 
 export function getAkselCompletionForSource(source: string, pos: number): CompletionResult | null {
@@ -475,10 +505,7 @@ export function getAkselCompletionForSource(source: string, pos: number): Comple
   if (propValueContext) {
     const { componentName, propName, partialValue } = propValueContext
     const prop = getPropDefinition(componentName, propName)
-    const options =
-      prop?.values
-        ?.filter((value) => matchesPartial(value, partialValue))
-        .map((value) => valueOption(prop, value)) ?? []
+    const options = prop ? valueOptions(prop, partialValue) : []
 
     if (options.length > 0) {
       return {

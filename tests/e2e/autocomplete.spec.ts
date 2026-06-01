@@ -64,6 +64,11 @@ test.describe('Aksel autocomplete', () => {
 
     await page.keyboard.press('Escape')
 
+    const defaultBackgroundAutocomplete = await openAutocompleteFor(page, '<Box background="bg-', 'd')
+    await expect(defaultBackgroundAutocomplete).toContainText('bg-default')
+
+    await page.keyboard.press('Escape')
+
     const dataColorAutocomplete = await openAutocompleteFor(page, '<Page data-color="brand-', 'm')
     await expect(dataColorAutocomplete).toContainText('brand-magenta')
   })

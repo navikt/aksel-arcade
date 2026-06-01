@@ -1716,3 +1716,24 @@ Verification:
 - npm test -- --run
 - npm run build
 - Browser smoke check at `http://127.0.0.1:5174/aksel-arcade/` for app render, preview render, and no console errors.
+
+### 2026-06-01 - `bg-default` background autocomplete
+
+Fixed a background-token autocomplete gap for Aksel primitives:
+
+- Reproduced that `default` existed as the valid Box background fragment, but typing the full Aksel token name prefix `bg-` did not surface `bg-default` in primitive background prop completions.
+- Added background-token alias matching in `src/services/akselAutocomplete.ts`, so `bg-*` queries show full token-name labels such as `bg-default` while still applying the valid primitive prop fragment (`default`) to avoid invalid `background="bg-default"` output.
+- Added unit coverage for empty background suggestions, `bg-default` visibility, and `bg-default` applying as `default`.
+- Added browser autocomplete coverage proving the real CodeMirror tooltip includes `bg-default`.
+
+Verification:
+
+- npm run typecheck
+- npm run lint (passes with existing hook dependency warnings in `InspectionPopover` and `PreviewPane`)
+- CI=1 npm run test
+- npx playwright test `tests/e2e/autocomplete.spec.ts` on an isolated local Vite port
+- Browser smoke check at `http://127.0.0.1:5175/aksel-arcade/` for app render, preview render, `bg-default` autocomplete visibility, and no console errors after resetting local/session storage.
+
+Next note:
+
+- Keep Aksel primitive background prop values as token fragments in source. If future users search by CSS variable/token names (`bg-*`), extend the alias-label path rather than changing emitted prop values to include the `bg-` prefix.

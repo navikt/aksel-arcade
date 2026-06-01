@@ -200,8 +200,11 @@ describe('Aksel-aware autocomplete contract', () => {
   })
 
   it('suggests Box styling values from the catalog', () => {
+    expect(labelsFor('<Box background="')).toContain('default')
     expect(labelsFor('<Box background="neutral-')).toContain('neutral-soft')
     expect(labelsFor('<Box background="brand-beige-')).toContain('brand-beige-soft')
+    expect(labelsFor('<Box background="bg-')).toContain('bg-default')
+    expect(applyFor('<Box background="bg-', 'bg-default')).toBe('default')
     expect(labelsFor('<Box borderColor="neutral-')).toContain('neutral-subtle')
     expect(labelsFor('<Box borderRadius="')).toContain('full')
     expect(labelsFor('<Box borderWidth="')).toContain('1')
