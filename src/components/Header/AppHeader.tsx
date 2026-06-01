@@ -1,4 +1,14 @@
-import { lazy, Suspense, useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
+import {
+  lazy,
+  Suspense,
+  useCallback,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+  type KeyboardEvent,
+} from 'react'
 import {
   Heading,
   Detail,
@@ -14,9 +24,11 @@ import {
   Alert,
   Tag,
   Dialog,
+  TextField,
 } from '@navikt/ds-react'
 import {
   PencilIcon,
+  CheckmarkIcon,
   FileExportIcon,
   FileImportIcon,
   CogIcon,
@@ -25,6 +37,7 @@ import {
   ArrowsSquarepathIcon,
   ArrowUndoIcon,
   LinkIcon,
+  XMarkIcon,
 } from '@navikt/aksel-icons'
 import { SaveStatusIndicator } from './SaveStatusIndicator'
 import { ProjectSizeIndicator } from './ProjectSizeIndicator'
@@ -94,8 +107,11 @@ export const AppHeader = ({
   const shareButtonRef = useRef<HTMLButtonElement>(null)
   const clipboardBufferRef = useRef<HTMLTextAreaElement>(null)
   const lastGeneratedShareFingerprintRef = useRef<string | null>(null)
+  const projectNameInputRef = useRef<HTMLInputElement>(null)
   const [shareOpen, setShareOpen] = useState(false)
   const [importConfirmOpen, setImportConfirmOpen] = useState(false)
+  const [isEditingProjectName, setIsEditingProjectName] = useState(false)
+  const [projectNameDraft, setProjectNameDraft] = useState(projectName)
   const loadingDescriptionId = useId()
   const importConfirmDialogId = useId()
   const slowDescriptionId = `${loadingDescriptionId}-delay`
@@ -160,9 +176,57 @@ export const AppHeader = ({
     setShareOpen(true)
   }
 
+  const handleStartProjectNameEdit = () => {
+    setProjectNameDraft(projectName)
+    setIsEditingProjectName(true)
+  }
+
+  const handleCancelProjectNameEdit = () => {
+    setProjectNameDraft(projectName)
+    setIsEditingProjectName(false)
+  }
+
+  const normalizedProjectName = projectNameDraft.trim()
+  const canSaveProjectName = normalizedProjectName.length > 0
+
+  const handleSaveProjectName = () => {
+    if (!canSaveProjectName) {
+      return
+    }
+
+    if (normalizedProjectName !== projectName) {
+      onProjectNameChange(normalizedProjectName)
+    }
+
+    setProjectNameDraft(normalizedProjectName)
+    setIsEditingProjectName(false)
+  }
+
+  const handleProjectNameKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === 'Enter') {
+      event.preventDefault()
+      handleSaveProjectName()
+    }
+
+    if (event.key === 'Escape') {
+      event.preventDefault()
+      handleCancelProjectNameEdit()
+    }
+  }
+
   const handleShareClose = useCallback(() => {
     setShareOpen(false)
   }, [])
+
+  useEffect(() => {
+    if (!isEditingProjectName) {
+      setProjectNameDraft(projectName)
+      return
+    }
+
+    projectNameInputRef.current?.focus()
+    projectNameInputRef.current?.select()
+  }, [isEditingProjectName, projectName])
 
   useEffect(() => {
     if (!canUseShareUrl) {
@@ -322,20 +386,59 @@ export const AppHeader = ({
             align="center"
             className="app-header__project-name-wrapper"
           >
-            <Detail className="app-header__project-name">
-              {projectName || 'My arcade file name'}
-            </Detail>
-            <Button
-              variant="tertiary"
-              data-color="neutral"
-              size="small"
-              icon={<PencilIcon title="Edit project name" />}
-              aria-label="Edit project name"
-              onClick={() => {
-                const newName = prompt('Project name:', projectName)
-                if (newName) onProjectNameChange(newName)
-              }}
-            />
+            {isEditingProjectName ? (
+              <HStack
+                gap="space-16"
+                align="center"
+                className="app-header__project-name-editor"
+              >
+                <TextField
+                  ref={projectNameInputRef}
+                  label="Prosjektnavn"
+                  hideLabel
+                  size="small"
+                  value={projectNameDraft}
+                  onChange={(event) => setProjectNameDraft(event.target.value)}
+                  onKeyDown={handleProjectNameKeyDown}
+                  className="app-header__project-name-input"
+                  maxLength={100}
+                />
+
+                <HStack gap="space-8" align="center" className="app-header__project-name-actions">
+                  <Button
+                    icon={<CheckmarkIcon title="Lagre" />}
+                    variant="secondary"
+                    data-color="success"
+                    size="xsmall"
+                    aria-label="Lagre prosjektnavn"
+                    onClick={handleSaveProjectName}
+                    disabled={!canSaveProjectName}
+                  />
+                  <Button
+                    icon={<XMarkIcon title="Avbryt" />}
+                    variant="secondary"
+                    data-color="danger"
+                    size="xsmall"
+                    aria-label="Avbryt redigering av prosjektnavn"
+                    onClick={handleCancelProjectNameEdit}
+                  />
+                </HStack>
+              </HStack>
+            ) : (
+              <>
+                <Detail className="app-header__project-name">
+                  {projectName || 'My arcade file name'}
+                </Detail>
+                <Button
+                  variant="tertiary"
+                  data-color="neutral"
+                  size="small"
+                  icon={<PencilIcon title="Rediger prosjektnavn" />}
+                  aria-label="Rediger prosjektnavn"
+                  onClick={handleStartProjectNameEdit}
+                />
+              </>
+            )}
           </HStack>
         </HStack>
         <HStack
