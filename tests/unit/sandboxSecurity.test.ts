@@ -36,4 +36,12 @@ describe('sandbox security boundaries', () => {
     expect(livePreview).toContain("type: 'TOGGLE_INSPECT'")
     expect(livePreview).toContain('[isInspectMode, sandboxReady, iframeRef]')
   })
+
+  it('checks parent message source and origin before handling sandbox messages', () => {
+    const sandboxHtml = readProjectFile('public/sandbox.html')
+
+    expect(sandboxHtml).toContain('event.source !== window.parent')
+    expect(sandboxHtml).toContain('event.origin === window.location.origin')
+    expect(sandboxHtml).toContain("window.location.protocol === 'file:' && event.origin === 'null'")
+  })
 })

@@ -17,6 +17,7 @@ describe("Desktop release workflow", () => {
     expect(workflow).toContain("recovery_sha:");
     expect(workflow).toContain("git merge-base --is-ancestor");
     expect(workflow).toContain("DESKTOP_RELEASE_REF_ON_PROTECTED_MASTER");
+    expect(workflow).toContain("release-source:");
   });
 
   it("builds required installers before publishing from one aggregation job", () => {
@@ -30,6 +31,12 @@ describe("Desktop release workflow", () => {
     expect(workflow).toContain("Aksel-Arcade-${DESKTOP_VERSION}-mac-x64.dmg");
     expect(workflow).toContain(
       "Aksel-Arcade-${DESKTOP_VERSION}-windows-x64.exe",
+    );
+    expect(workflow).toContain("Checkout trusted workflow ref");
+    expect(workflow).toContain("Checkout verified release source");
+    expect(workflow).toContain('git checkout --detach "$RELEASE_SOURCE"');
+    expect(workflow).not.toContain(
+      "ref: ${{ needs.plan.outputs.release-sha }}",
     );
   });
 
