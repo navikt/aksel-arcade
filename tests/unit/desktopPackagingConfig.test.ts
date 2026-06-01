@@ -155,6 +155,9 @@ describe('Desktop Arcade packaging contract', () => {
     expect(desktopViteConfig).toContain("base: './'")
     expect(desktopViteConfig).toContain("outDir: 'dist-desktop'")
     expect(desktopMain).toContain("'dist-desktop'")
+    expect(desktopMain).toContain("DESKTOP_RENDERER_PROTOCOL = 'aksel-arcade'")
+    expect(desktopMain).toContain('registerSchemesAsPrivileged')
+    expect(desktopMain).toContain('protocol.handle(DESKTOP_RENDERER_PROTOCOL')
     expect(indexHtml).toContain('%BASE_URL%aksel-favicon.svg')
   })
 
