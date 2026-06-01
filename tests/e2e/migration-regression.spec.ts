@@ -119,6 +119,43 @@ test.describe('Aksel v8 migration regression hardening', () => {
     expect(themeState.className).toContain('dark')
     expect(themeState.axBackground.trim()).not.toBe('')
 
+    const previewBackgrounds = await page.evaluate(() => {
+      const defaultProbe = document.createElement('div')
+      defaultProbe.style.background = 'var(--ax-bg-default)'
+      const previewSurface = document.querySelector<HTMLElement>('[data-name="Preview"]')
+      const livePreview = document.querySelector<HTMLElement>('[data-testid="live-preview"]')
+
+      if (!previewSurface || !livePreview) {
+        throw new Error('Preview shell elements were not rendered.')
+      }
+
+      previewSurface.append(defaultProbe)
+      const expected = getComputedStyle(defaultProbe).backgroundColor
+      defaultProbe.remove()
+
+      return {
+        expected,
+        surface: getComputedStyle(previewSurface).backgroundColor,
+        livePreview: getComputedStyle(livePreview).backgroundColor,
+      }
+    })
+    expect(previewBackgrounds.surface).toBe(previewBackgrounds.expected)
+    expect(previewBackgrounds.livePreview).toBe(previewBackgrounds.expected)
+
+    const sandboxBackground = await previewFrame.locator('html').evaluate((html) => {
+      const defaultProbe = document.createElement('div')
+      defaultProbe.style.background = 'var(--ax-bg-default)'
+      document.body.append(defaultProbe)
+      const expected = getComputedStyle(defaultProbe).backgroundColor
+      defaultProbe.remove()
+
+      return {
+        expected,
+        html: getComputedStyle(html).backgroundColor,
+      }
+    })
+    expect(sandboxBackground.html).toBe(sandboxBackground.expected)
+
     await page.getByTestId('project-controls-settings').click()
     await page.getByRole('menuitem', { name: /switch to light (theme|mode)/i }).click()
 

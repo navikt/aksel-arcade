@@ -51,6 +51,25 @@ test.describe('Aksel autocomplete', () => {
     await expect(enumAutocomplete).toContainText('secondary-neutral')
   })
 
+  test('filters prop value suggestions while typing after the list opens', async ({ page }) => {
+    const sizeAutocomplete = await openAutocompleteFor(page, '<Button size="', '')
+    await expect(sizeAutocomplete).toContainText('medium')
+
+    await page.keyboard.type('s', { delay: 20 })
+    await expect(sizeAutocomplete).toContainText('small')
+    await expect(sizeAutocomplete).not.toContainText('medium')
+    await expect(sizeAutocomplete).not.toContainText('xsmall')
+
+    await page.keyboard.press('Escape')
+
+    const backgroundAutocomplete = await openAutocompleteFor(page, '<Box background="', '')
+    await expect(backgroundAutocomplete).toContainText('default')
+
+    await page.keyboard.type('bg-d', { delay: 20 })
+    await expect(backgroundAutocomplete).toContainText('bg-default')
+    await expect(backgroundAutocomplete).not.toContainText('neutral-soft')
+  })
+
   test('suggests v8 token, data-color, and Box styling values', async ({ page }) => {
     const spacingAutocomplete = await openAutocompleteFor(page, '<HStack gap="space-', '1')
     await expect(spacingAutocomplete).toContainText('space-12')
@@ -61,6 +80,11 @@ test.describe('Aksel autocomplete', () => {
 
     const boxAutocomplete = await openAutocompleteFor(page, '<Box background="neutral-', 's')
     await expect(boxAutocomplete).toContainText('neutral-soft')
+
+    await page.keyboard.press('Escape')
+
+    const defaultBackgroundAutocomplete = await openAutocompleteFor(page, '<Box background="bg-', 'd')
+    await expect(defaultBackgroundAutocomplete).toContainText('bg-default')
 
     await page.keyboard.press('Escape')
 

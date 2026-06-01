@@ -3,7 +3,7 @@
   flex: 1;
   min-height: 0; /* Allow flex item to shrink below content size */
   position: relative;
-  background: var(--ax-bg-subtle);
+  background: var(--ax-bg-default);
   overflow: hidden; /* Container should not scroll - iframe handles internal scrolling */
   display: flex;
   flex-direction: column;

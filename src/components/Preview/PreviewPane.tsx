@@ -152,7 +152,7 @@ export const PreviewPane = () => {
         data-name="Preview"
         paddingBlock="space-16"
         paddingInline="space-16"
-        background="sunken"
+        background="default"
         className={`preview-pane__surface ${theme}`}
       >
         {(compileError || runtimeError) && (
