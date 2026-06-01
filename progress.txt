@@ -1682,3 +1682,19 @@ Verification:
 - npm run lint (passes with existing hook dependency warnings in `InspectionPopover` and `PreviewPane`)
 - npm run test -- --run
 - npx playwright test tests/e2e/agent-diagnostics.spec.ts
+
+### 2026-06-01 - PR #173 review follow-up
+
+Reviewed and fixed one PR-scoped build issue before merge:
+
+- Production build type-checking caught the new Agent diagnostics E2E helper narrowing JSON-RPC request IDs to `string`, even though Desktop transport IDs can be `string | number | null`.
+- Widened the test transport helper to the same JSON-RPC ID shape and fixed the typed `page.waitForFunction` call that passes a global-name argument.
+- Kept the change scoped to the issue #166 E2E test; no product behavior changed.
+
+Verification:
+
+- npm run build
+- npm run typecheck
+- npm run lint (passes with existing hook dependency warnings in `InspectionPopover` and `PreviewPane`)
+- npm run test -- --run
+- npx playwright test tests/e2e/agent-diagnostics.spec.ts

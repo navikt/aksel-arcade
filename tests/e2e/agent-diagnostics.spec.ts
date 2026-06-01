@@ -66,16 +66,18 @@ interface PreviewEvidence {
   tree: PreviewEvidenceElement
 }
 
+type AgentJsonRpcId = string | number | null
+
 interface AgentJsonRpcRequest {
   jsonrpc: '2.0'
-  id: string | number | null
+  id: AgentJsonRpcId
   method: string
   params?: unknown
 }
 
 interface AgentJsonRpcResponse {
   jsonrpc: '2.0'
-  id: string | number | null
+  id: AgentJsonRpcId
   result?: AgentBridgeCommandResult<unknown>
   error?: {
     code: number
@@ -92,15 +94,15 @@ interface ParsedAgentPairingHandoff {
 
 interface TestAgentTransport {
   hasHandler: () => boolean
-  route: (request: { id: string; method: string; params?: unknown; sessionId?: string }) =>
+  route: (request: { id: AgentJsonRpcId; method: string; params?: unknown; sessionId?: string }) =>
     | {
         jsonrpc?: '2.0'
-        id?: string | number | null
+        id?: AgentJsonRpcId
         result: AgentBridgeCommandResult<unknown>
       }
     | {
         jsonrpc?: '2.0'
-        id?: string | number | null
+        id?: AgentJsonRpcId
         error: unknown
       }
   routeJsonRpc: (request: {
@@ -115,7 +117,12 @@ const installDesktopAgentSurface = async (page: Page) => {
     const testTransportGlobal = '__AKSEL_ARCADE_TEST_AGENT_TRANSPORT__'
     const copiedAgentHandoffGlobal = '__AKSEL_ARCADE_COPIED_AGENT_HANDOFF__'
     let transportRequestHandler:
-      | ((request: { id: string; method: string; params?: unknown; sessionId: string }) => unknown)
+      | ((request: {
+          id: AgentJsonRpcId
+          method: string
+          params?: unknown
+          sessionId: string
+        }) => unknown)
       | null = null
     const endpointFixture = {
       endpoint: 'http://127.0.0.1:48123',
@@ -237,7 +244,7 @@ const copyAgentPairingHandoff = async (page: Page): Promise<string> => {
   await expect(copyItem).toBeVisible()
   await copyItem.click()
 
-  const copiedCommandHandle = await page.waitForFunction<string | null>(
+  const copiedCommandHandle = await page.waitForFunction<string | null, string>(
     (globalName) => (window as unknown as Record<string, string>)[globalName] || null,
     COPIED_AGENT_HANDOFF_GLOBAL
   )
