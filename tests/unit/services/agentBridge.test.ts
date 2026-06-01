@@ -135,7 +135,7 @@ const createController = (
       appliedRequests.push(request)
       return options.applyResult ?? createApplySuccess()
     },
-    getPreviewEvidence: () =>
+    getPreviewEvidence: async () =>
       options.previewEvidence ?? {
         ok: true,
         evidence: createPreviewEvidence(),
@@ -273,7 +273,7 @@ describe('agent bridge command router', () => {
     expect(context.diagnostics.sandboxConsoleMessages[0]?.args).toEqual(['ready'])
   })
 
-  it('routes Preview evidence with existing permission and unavailable failures', () => {
+  it('routes Preview evidence with existing permission and unavailable failures', async () => {
     const evidence = createPreviewEvidence()
     const { controller, recordedCommands } = createController({
       previewEvidence: {
@@ -283,14 +283,14 @@ describe('agent bridge command router', () => {
     })
 
     const router = createAgentBridgeCommandRouter(session, controller)
-    expect(expectBridgeSuccess(router.routeCommand('getPreviewEvidence'))).toEqual(evidence)
+    expect(expectBridgeSuccess(await router.routeCommand('getPreviewEvidence'))).toEqual(evidence)
     expect(recordedCommands).toEqual(['getPreviewEvidence'])
 
     const denied = createAgentBridgeCommandRouter(
       session,
       createController({ permissions: { previewEvidence: false } }).controller
     )
-    expect(denied.routeCommand('getPreviewEvidence')).toMatchObject({
+    await expect(denied.routeCommand('getPreviewEvidence')).resolves.toMatchObject({
       ok: false,
       command: 'getPreviewEvidence',
       error: {
@@ -310,7 +310,7 @@ describe('agent bridge command router', () => {
         },
       }).controller
     )
-    expect(unavailable.routeCommand('getPreviewEvidence')).toMatchObject({
+    await expect(unavailable.routeCommand('getPreviewEvidence')).resolves.toMatchObject({
       ok: false,
       command: 'getPreviewEvidence',
       error: {

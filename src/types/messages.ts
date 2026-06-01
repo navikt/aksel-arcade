@@ -1,5 +1,6 @@
 import type { CompileError, RuntimeError } from './preview'
 import type { InspectionData } from './inspection'
+import type { PreviewEvidenceCaptureResult } from '@/services/previewEvidence'
 
 // Main → Sandbox messages
 export type MainToSandboxMessage =
@@ -9,6 +10,7 @@ export type MainToSandboxMessage =
   | { type: 'TOGGLE_INSPECT'; payload: { enabled: boolean } }
   | { type: 'GET_INSPECTION_DATA'; payload: { x: number; y: number } }
   | { type: 'UPDATE_THEME'; payload: { theme: 'light' | 'dark' } }
+  | { type: 'CAPTURE_PREVIEW_EVIDENCE'; payload: { requestId: string } }
 
 // Sandbox → Main messages
 export type SandboxToMainMessage =
@@ -19,6 +21,10 @@ export type SandboxToMainMessage =
   | { type: 'INSPECTION_DATA'; payload: InspectionData | null }
   | { type: 'THEME_UPDATED'; payload: { theme: 'light' | 'dark' } }
   | { type: 'CONSOLE_LOG'; payload: { level: 'log' | 'warn' | 'error'; args: unknown[] } }
+  | {
+      type: 'PREVIEW_EVIDENCE_CAPTURED'
+      payload: { requestId: string; result: PreviewEvidenceCaptureResult }
+    }
 
 // Type guards
 export const isMainToSandboxMessage = (msg: unknown): msg is MainToSandboxMessage => {

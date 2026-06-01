@@ -1664,3 +1664,37 @@ Verification:
 - npm run lint (passes with existing hook dependency warnings in `InspectionPopover` and `PreviewPane`)
 - CI=1 npm run test
 - Browser smoke check at `http://127.0.0.1:5173/aksel-arcade/` for app render, preview render, Web Arcade Agent absence, and no console warnings/errors.
+
+### 2026-06-01 - Issue #166 validate Agent operating instructions happy path
+
+Completed for #166:
+
+- Kept the work scoped to the Desktop Arcade Agent pairing and bridge happy path.
+- Added an E2E scenario that starts Desktop Arcade Agent access, copies the hidden Agent pairing handoff, parses the one-line `getAgentInstructions` bootstrap request, follows the returned Agent operating instructions, calls `getProject` first, applies a full-field `applyAgentChange`, polls `getDiagnostics` until the preview settles, and reads Preview evidence when permission is available.
+- Fixed the real-browser Preview evidence path so Agent bridge reads capture evidence through the sandbox message channel instead of parent-side iframe document access, preserving the existing `sandbox="allow-scripts"` isolation.
+- Shared the existing `previewEvidence` serializer into the sandbox bundle as `preview-evidence-global.js` to avoid duplicated sanitization logic.
+- Kept non-evidence Agent bridge commands synchronous while allowing `getPreviewEvidence` and Desktop transport routing to await async evidence capture.
+- Updated affected unit and integration coverage for async Preview evidence routing and handler registration.
+
+Verification:
+
+- npm run typecheck
+- npm run lint (passes with existing hook dependency warnings in `InspectionPopover` and `PreviewPane`)
+- npm run test -- --run
+- npx playwright test tests/e2e/agent-diagnostics.spec.ts
+
+### 2026-06-01 - PR #173 review follow-up
+
+Reviewed and fixed one PR-scoped build issue before merge:
+
+- Production build type-checking caught the new Agent diagnostics E2E helper narrowing JSON-RPC request IDs to `string`, even though Desktop transport IDs can be `string | number | null`.
+- Widened the test transport helper to the same JSON-RPC ID shape and fixed the typed `page.waitForFunction` call that passes a global-name argument.
+- Kept the change scoped to the issue #166 E2E test; no product behavior changed.
+
+Verification:
+
+- npm run build
+- npm run typecheck
+- npm run lint (passes with existing hook dependency warnings in `InspectionPopover` and `PreviewPane`)
+- npm run test -- --run
+- npx playwright test tests/e2e/agent-diagnostics.spec.ts

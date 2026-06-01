@@ -141,6 +141,49 @@ export const collectPreviewEvidenceFromFrame = (
   }
 }
 
+export type PreviewEvidenceRequestHandler = () => Promise<PreviewEvidenceCaptureResult>
+
+const previewEvidenceRequestHandlers = new WeakMap<
+  HTMLIFrameElement,
+  PreviewEvidenceRequestHandler
+>()
+
+export const registerPreviewEvidenceRequestHandler = (
+  iframe: HTMLIFrameElement,
+  handler: PreviewEvidenceRequestHandler
+): (() => void) => {
+  previewEvidenceRequestHandlers.set(iframe, handler)
+
+  return () => {
+    if (previewEvidenceRequestHandlers.get(iframe) === handler) {
+      previewEvidenceRequestHandlers.delete(iframe)
+    }
+  }
+}
+
+export const requestPreviewEvidenceFromFrame = (
+  iframe: HTMLIFrameElement | null
+): Promise<PreviewEvidenceCaptureResult> => {
+  if (!iframe) {
+    return Promise.resolve(createPreviewUnavailableFailure('Preview iframe is not mounted yet.'))
+  }
+
+  const handler = previewEvidenceRequestHandlers.get(iframe)
+  if (!handler) {
+    return Promise.resolve(
+      createPreviewUnavailableFailure('Preview iframe is not connected to the sandbox yet.')
+    )
+  }
+
+  try {
+    return handler()
+  } catch (error) {
+    return Promise.resolve(
+      createPreviewUnavailableFailure(`Preview evidence request failed: ${getErrorMessage(error)}`)
+    )
+  }
+}
+
 export const serializePreviewEvidence = (
   root: Element,
   frameWindow: Window = root.ownerDocument.defaultView ?? window

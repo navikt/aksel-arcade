@@ -67,6 +67,14 @@ try {
     sourcemap: false,
   });
 
+  await esbuild.build({
+    ...commonOptions,
+    entryPoints: [join(rootDir, 'src/services/previewEvidence.ts')],
+    globalName: 'previewEvidenceUtils',
+    outfile: join(publicDir, 'preview-evidence-global.js'),
+    sourcemap: false,
+  });
+
   console.log('✅ Sandbox bundles created in public/');
   console.log('   These files will be copied as-is by Vite (no processing)');
 } catch (error) {

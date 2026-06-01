@@ -25,7 +25,12 @@ import type {
   DesktopAgentTransportRouteRequest,
   DesktopAgentTransportRouteResponse,
 } from '@/services/desktopAgentTransportProtocol'
-import type { PreviewEvidence, PreviewEvidenceElement } from '@/services/previewEvidence'
+import {
+  collectPreviewEvidenceFromFrame,
+  registerPreviewEvidenceRequestHandler,
+  type PreviewEvidence,
+  type PreviewEvidenceElement,
+} from '@/services/previewEvidence'
 import {
   DESKTOP_ARCADE_CAPABILITIES,
   WEB_ARCADE_CAPABILITIES,
@@ -286,7 +291,7 @@ type AgentTransportClient = {
   getProject: () => AgentBridgeCommandResult<AgentProjectReadState>
   getPreviewContext: () => AgentBridgeCommandResult<AgentPreviewReadState>
   getDiagnostics: () => AgentBridgeCommandResult<PreviewDiagnostics>
-  getPreviewEvidence: () => AgentBridgeCommandResult<PreviewEvidence>
+  getPreviewEvidence: () => Promise<AgentBridgeCommandResult<PreviewEvidence>>
   getSessionState: () => AgentBridgeCommandResult<AgentSessionReadState>
   applyAgentChange: (request: unknown) => AgentBridgeCommandResult<AgentChangeResult>
 }
@@ -294,16 +299,10 @@ type AgentTransportClient = {
 const createAgentTransportClient = (
   desktopTransport: ReturnType<typeof setupDesktopTransportPreload>
 ): AgentTransportClient => {
-  const route = <TData,>(
+  const normalizeResponse = <TData,>(
     method: AgentBridgeCommandName,
-    params?: unknown
+    response: DesktopAgentTransportRouteResponse
   ): AgentBridgeCommandResult<TData> => {
-    const response = desktopTransport.route({
-      id: `${method}-test`,
-      method,
-      params,
-    })
-
     if ('error' in response) {
       return {
         ok: false,
@@ -316,6 +315,32 @@ const createAgentTransportClient = (
     }
 
     return response.result as AgentBridgeCommandResult<TData>
+  }
+
+  const route = <TData,>(
+    method: AgentBridgeCommandName,
+    params?: unknown
+  ): AgentBridgeCommandResult<TData> => {
+    const response = desktopTransport.route({
+      id: `${method}-test`,
+      method,
+      params,
+    })
+
+    return normalizeResponse<TData>(method, response)
+  }
+
+  const routeAsync = async <TData,>(
+    method: AgentBridgeCommandName,
+    params?: unknown
+  ): Promise<AgentBridgeCommandResult<TData>> => {
+    const response = await desktopTransport.routeAsync({
+      id: `${method}-test`,
+      method,
+      params,
+    })
+
+    return normalizeResponse<TData>(method, response)
   }
 
   const readSession = () => {
@@ -339,7 +364,7 @@ const createAgentTransportClient = (
     getProject: () => route<AgentProjectReadState>('getProject'),
     getPreviewContext: () => route<AgentPreviewReadState>('getPreviewContext'),
     getDiagnostics: () => route<PreviewDiagnostics>('getDiagnostics'),
-    getPreviewEvidence: () => route<PreviewEvidence>('getPreviewEvidence'),
+    getPreviewEvidence: () => routeAsync<PreviewEvidence>('getPreviewEvidence'),
     getSessionState: () => route<AgentSessionReadState>('getSessionState'),
     applyAgentChange: (request) => route<AgentChangeResult>('applyAgentChange', request),
   }
@@ -478,6 +503,30 @@ function setupDesktopTransportPreload(
 
       return response
     },
+    routeAsync: async (
+      request: Omit<DesktopAgentTransportRouteRequest, 'sessionId'> & {
+        sessionId?: string
+      }
+    ): Promise<DesktopAgentTransportRouteResponse> => {
+      if (!transportRequestHandler) {
+        throw new Error('Expected Desktop transport request handler to be registered.')
+      }
+      const handler = transportRequestHandler
+
+      let response: DesktopAgentTransportRouteResponse | undefined
+      await act(async () => {
+        response = await handler({
+          ...request,
+          sessionId: request.sessionId ?? sessionId,
+        })
+      })
+
+      if (!response) {
+        throw new Error('Expected Desktop transport request handler to return a response.')
+      }
+
+      return response
+    },
   }
 
   currentDesktopTransport = fixture
@@ -572,6 +621,9 @@ const setupPreviewEvidenceFrame = () => {
   mockElementRect(root, { x: 10, y: 20, width: 300, height: 200 })
   mockElementRect(section, { x: 18, y: 28, width: 260, height: 140 })
   mockElementRect(button, { x: 24, y: 86, width: 96, height: 32 })
+  registerPreviewEvidenceRequestHandler(iframe, () =>
+    Promise.resolve(collectPreviewEvidenceFromFrame(iframe))
+  )
 
   return { button, root, section }
 }
@@ -1580,7 +1632,7 @@ describe('ProjectControls layout', () => {
 
     const bridge = await startAgentAccess()
     const { button } = setupPreviewEvidenceFrame()
-    const firstResult = callBridgeCommand(() => bridge.getPreviewEvidence())
+    const firstResult = await bridge.getPreviewEvidence()
 
     expect(firstResult).toMatchObject({
       ok: true,
@@ -1657,9 +1709,7 @@ describe('ProjectControls layout', () => {
 
     expect(screen.getByRole('status').textContent).toBe('Status: aktiv')
 
-    expect(expectBridgeSuccess(callBridgeCommand(() => bridge.getPreviewEvidence()))).toEqual(
-      evidence
-    )
+    expect(expectBridgeSuccess(await bridge.getPreviewEvidence())).toEqual(evidence)
   })
 
   it('unregisters the Desktop transport handler for Preview evidence after Agent access stops', async () => {
@@ -1668,7 +1718,7 @@ describe('ProjectControls layout', () => {
     const bridge = await startAgentAccess()
     setupPreviewEvidenceFrame()
 
-    expectBridgeSuccess(callBridgeCommand(() => bridge.getPreviewEvidence()))
+    expectBridgeSuccess(await bridge.getPreviewEvidence())
     expect(screen.getByRole('status').textContent).toBe('Status: aktiv')
 
     fireEvent.click(screen.getByRole('menuitemcheckbox', { name: /agent-tilgang/i }))
