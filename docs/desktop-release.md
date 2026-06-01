@@ -109,6 +109,7 @@ Recovery dispatch rules:
 
 - Dispatch the workflow from the `master` branch and provide a full 40-character commit SHA.
 - The plan job fetches `origin/master` and rejects the dispatch unless `recovery_sha` is an ancestor of protected `master`.
+- Packaging jobs first checkout the trusted workflow ref, then re-fetch `origin/master`, re-verify the resolved release source is reachable from protected `master`, and only then detach to that commit before package scripts run.
 - Recovery runs with an empty changed-file list and forces a Desktop release plan for the protected commit unless that same commit already has a published `desktop-vX.Y.Z` release tag.
 - Do not use recovery dispatches for pull requests, arbitrary branches, unmerged commits, or local rebuilds.
 - Recovery must reference only the `desktop-release` environment and configured secret names; never copy Desktop release credential values into issues, pull requests, chat, docs, source, logs, release assets, runtime state, or Arcade project data.

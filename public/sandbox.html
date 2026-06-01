@@ -151,7 +151,6 @@
       renderSpacingLayers,
     } = window.inspectOverlayUtils;
     const {
-      isTrustedParentMessage,
       postMessageToParent,
     } = window.sandboxMessaging;
 
@@ -347,9 +346,13 @@
     // Listen for messages from parent window
     window.addEventListener('message', (event) => {
       // Security: validate the controlling parent, including Electron file:// null origins.
-      if (!isTrustedParentMessage(event, window.location, window.parent)) {
-        console.warn('❌ Rejected message from unauthorized origin:', event.origin)
-        return
+      const hasTrustedParentOrigin =
+        event.origin === window.location.origin ||
+        (window.location.protocol === 'file:' && event.origin === 'null');
+
+      if (event.source !== window.parent || !hasTrustedParentOrigin) {
+        console.warn('❌ Rejected message from unauthorized origin:', event.origin);
+        return;
       }
       
       if (event.data?.type === 'CONNECT_SANDBOX') {

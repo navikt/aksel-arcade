@@ -32,7 +32,7 @@ jobs:
       reason: ${{ steps.desktop-plan.outputs.reason }}
       desktop-version: ${{ steps.desktop-plan.outputs.desktop-version }}
       desktop-tag: ${{ steps.desktop-plan.outputs.desktop-tag }}
-      release-sha: ${{ steps.release-ref.outputs.release-sha }}
+      release-source: ${{ steps.release-source.outputs.release-source }}
       desktop-impacting-count: ${{ steps.desktop-plan.outputs.desktop-impacting-count }}
     steps:
       - name: Checkout
@@ -40,8 +40,8 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Resolve release commit
-        id: release-ref
+      - name: Resolve release source
+        id: release-source
         env:
           RECOVERY_SHA: ${{ github.event.inputs.recovery_sha }}
         run: |
@@ -53,12 +53,12 @@ jobs:
               exit 1
             fi
 
-            release_sha="$RECOVERY_SHA"
+            release_source="$RECOVERY_SHA"
           else
-            release_sha="$GITHUB_SHA"
+            release_source="$GITHUB_SHA"
           fi
 
-          echo "release-sha=$release_sha" >> "$GITHUB_OUTPUT"
+          echo "release-source=$release_source" >> "$GITHUB_OUTPUT"
 
       - name: Fetch protected master and Desktop tags
         run: |
@@ -68,14 +68,14 @@ jobs:
       - name: Verify recovery commit is protected
         id: protected-ref
         env:
-          RELEASE_SHA: ${{ steps.release-ref.outputs.release-sha }}
+          RELEASE_SOURCE: ${{ steps.release-source.outputs.release-source }}
         run: |
           set -euo pipefail
 
           ref_on_protected_master=false
           if [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" ]] &&
-            git cat-file -e "${RELEASE_SHA}^{commit}" 2>/dev/null &&
-            git merge-base --is-ancestor "$RELEASE_SHA" "origin/${DESKTOP_RELEASE_PROTECTED_BRANCH}"; then
+            git cat-file -e "${RELEASE_SOURCE}^{commit}" 2>/dev/null &&
+            git merge-base --is-ancestor "$RELEASE_SOURCE" "origin/${DESKTOP_RELEASE_PROTECTED_BRANCH}"; then
             ref_on_protected_master=true
           fi
 
@@ -84,7 +84,7 @@ jobs:
       - name: Collect changed files
         env:
           BEFORE_SHA: ${{ github.event.before }}
-          RELEASE_SHA: ${{ steps.release-ref.outputs.release-sha }}
+          RELEASE_SOURCE: ${{ steps.release-source.outputs.release-source }}
         run: |
           set -euo pipefail
 
@@ -94,9 +94,9 @@ jobs:
           fi
 
           if [[ "$BEFORE_SHA" =~ ^0+$ ]]; then
-            diff_command=(git diff-tree --root --no-commit-id --name-status -r --find-renames --find-copies "$RELEASE_SHA")
+            diff_command=(git diff-tree --root --no-commit-id --name-status -r --find-renames --find-copies "$RELEASE_SOURCE")
           else
-            diff_command=(git diff --name-status --find-renames --find-copies "$BEFORE_SHA" "$RELEASE_SHA")
+            diff_command=(git diff --name-status --find-renames --find-copies "$BEFORE_SHA" "$RELEASE_SOURCE")
           fi
 
           if "${diff_command[@]}" > changed-file-status.txt; then
@@ -112,14 +112,14 @@ jobs:
       - name: Collect Desktop release tags
         env:
           GH_TOKEN: ${{ github.token }}
-          RELEASE_SHA: ${{ steps.release-ref.outputs.release-sha }}
+          RELEASE_SOURCE: ${{ steps.release-source.outputs.release-source }}
         run: |
           set -euo pipefail
 
           git tag --list "desktop-v*" | sort > desktop-tags.txt
 
-          if git cat-file -e "${RELEASE_SHA}^{commit}" 2>/dev/null; then
-            git tag --points-at "$RELEASE_SHA" --list "desktop-v*" | sort > current-ref-tags.txt
+          if git cat-file -e "${RELEASE_SOURCE}^{commit}" 2>/dev/null; then
+            git tag --points-at "$RELEASE_SOURCE" --list "desktop-v*" | sort > current-ref-tags.txt
           else
             : > current-ref-tags.txt
           fi
@@ -156,11 +156,32 @@ jobs:
       APPLE_API_ISSUER_ID: ${{ secrets.APPLE_API_ISSUER_ID }}
       APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
     steps:
-      - name: Checkout
+      - name: Checkout trusted workflow ref
         uses: actions/checkout@v4
         with:
-          ref: ${{ needs.plan.outputs.release-sha }}
           fetch-depth: 0
+
+      - name: Checkout verified release source
+        shell: bash
+        env:
+          RELEASE_SOURCE: ${{ needs.plan.outputs.release-source }}
+        run: |
+          set -euo pipefail
+
+          if [[ ! "$RELEASE_SOURCE" =~ ^[0-9a-fA-F]{40}$ ]]; then
+            echo "Desktop release source must be a full 40-character commit SHA." >&2
+            exit 1
+          fi
+
+          git fetch --force origin "refs/heads/${DESKTOP_RELEASE_PROTECTED_BRANCH}:refs/remotes/origin/${DESKTOP_RELEASE_PROTECTED_BRANCH}"
+
+          if ! git cat-file -e "${RELEASE_SOURCE}^{commit}" 2>/dev/null ||
+            ! git merge-base --is-ancestor "$RELEASE_SOURCE" "origin/${DESKTOP_RELEASE_PROTECTED_BRANCH}"; then
+            echo "Desktop release source is not reachable from protected ${DESKTOP_RELEASE_PROTECTED_BRANCH}." >&2
+            exit 1
+          fi
+
+          git checkout --detach "$RELEASE_SOURCE"
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -197,11 +218,32 @@ jobs:
       CSC_LINK: ''
       CSC_KEY_PASSWORD: ''
     steps:
-      - name: Checkout
+      - name: Checkout trusted workflow ref
         uses: actions/checkout@v4
         with:
-          ref: ${{ needs.plan.outputs.release-sha }}
           fetch-depth: 0
+
+      - name: Checkout verified release source
+        shell: bash
+        env:
+          RELEASE_SOURCE: ${{ needs.plan.outputs.release-source }}
+        run: |
+          set -euo pipefail
+
+          if [[ ! "$RELEASE_SOURCE" =~ ^[0-9a-fA-F]{40}$ ]]; then
+            echo "Desktop release source must be a full 40-character commit SHA." >&2
+            exit 1
+          fi
+
+          git fetch --force origin "refs/heads/${DESKTOP_RELEASE_PROTECTED_BRANCH}:refs/remotes/origin/${DESKTOP_RELEASE_PROTECTED_BRANCH}"
+
+          if ! git cat-file -e "${RELEASE_SOURCE}^{commit}" 2>/dev/null ||
+            ! git merge-base --is-ancestor "$RELEASE_SOURCE" "origin/${DESKTOP_RELEASE_PROTECTED_BRANCH}"; then
+            echo "Desktop release source is not reachable from protected ${DESKTOP_RELEASE_PROTECTED_BRANCH}." >&2
+            exit 1
+          fi
+
+          git checkout --detach "$RELEASE_SOURCE"
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -248,7 +290,7 @@ jobs:
       GH_TOKEN: ${{ github.token }}
       DESKTOP_VERSION: ${{ needs.plan.outputs.desktop-version }}
       DESKTOP_TAG: ${{ needs.plan.outputs.desktop-tag }}
-      RELEASE_SHA: ${{ needs.plan.outputs.release-sha }}
+      RELEASE_SOURCE: ${{ needs.plan.outputs.release-source }}
     steps:
       - name: Download Desktop installers
         uses: actions/download-artifact@v4
@@ -286,7 +328,7 @@ jobs:
 
           gh api --method POST "repos/${GITHUB_REPOSITORY}/releases/generate-notes" \
             -f tag_name="$DESKTOP_TAG" \
-            -f target_commitish="$RELEASE_SHA" \
+            -f target_commitish="$RELEASE_SOURCE" \
             --jq ".body" > generated-notes.md
 
           {
@@ -330,7 +372,7 @@ jobs:
           release_id="$(
             gh api --method POST "repos/${GITHUB_REPOSITORY}/releases" \
               -f tag_name="$DESKTOP_TAG" \
-              -f target_commitish="$RELEASE_SHA" \
+              -f target_commitish="$RELEASE_SOURCE" \
               -f name="Desktop Arcade ${DESKTOP_VERSION}" \
               -F body=@release-notes.md \
               -F draft=true \
