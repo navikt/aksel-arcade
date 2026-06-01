@@ -248,7 +248,7 @@ export const useAgentSession = ({
     setSession(null)
   }, [cleanupAgentSession])
 
-  const statusText = session ? 'Status: aktiv' : 'Status: inaktiv'
+  const statusText = session ? 'Status: active' : 'Status: inactive'
 
   const agentPairingHandoffCommand = useMemo(
     () =>

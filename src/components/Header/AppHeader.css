@@ -57,6 +57,10 @@
   color: var(--ax-text-warning);
 }
 
+.agent-menu__feedback--success {
+  color: var(--ax-text-success);
+}
+
 .share-popover__estimate-tag {
   text-transform: none;
 }
