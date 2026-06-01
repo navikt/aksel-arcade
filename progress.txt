@@ -1750,3 +1750,19 @@ Verification:
 
 - npm run typecheck
 - npx playwright test tests/e2e/desktop-packaged-preview.spec.ts --reporter=line
+
+### 2026-06-01 - Desktop dev stale renderer fix
+
+Fixed the Desktop dev launcher after testing showed it could open stale code:
+
+- Reproduced that `npm run desktop:dev` could launch Electron against an already-running Vite server on `127.0.0.1:5173` from another worktree before this worktree's Vite process failed on the occupied port.
+- Changed `scripts/desktop-dev.mjs` to choose the first available local renderer port from `5173`, pass that exact port to Vite with `--strictPort`, and pass the matching `AKSEL_ARCADE_RENDERER_URL` to Electron.
+- Updated README/PRD wording and `tests/unit/desktopDevScript.test.ts` so future agents do not assume Desktop dev is hardcoded to port `5173`.
+- Smoke-started `npm run desktop:dev` while stale 5173/5174 servers were still running; it selected `http://127.0.0.1:5175/aksel-arcade/`, rendered this worktree, showed `--ax-bg-default` preview backgrounds, and filtered prop-value autocomplete after typing.
+
+Verification:
+
+- npm test -- --run tests/unit/desktopDevScript.test.ts
+- npm run typecheck
+- npm run lint (passes with existing hook dependency warnings in `InspectionPopover` and `PreviewPane`)
+- CI=1 npm run test
