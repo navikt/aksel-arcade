@@ -643,6 +643,7 @@ describe('ProjectControls layout', () => {
     expect(importInput.accept).toBe(ARCADE_PROJECT_IMPORT_ACCEPT)
     expect(screen.queryByRole('button', { name: /koble til agent/i })).toBeNull()
     expectLegacyAgentBridgeAbsent()
+    expect(currentDesktopTransport).toBeNull()
     expect(
       importButton.compareDocumentPosition(shareButton) & Node.DOCUMENT_POSITION_FOLLOWING
     ).toBeTruthy()
@@ -1459,8 +1460,12 @@ describe('ProjectControls layout', () => {
     expect(serializedLog).not.toContain(endpoint.endpoint)
     expect(serializedLog).not.toContain(endpoint.authorizationHeader)
     expect(serializedLog).not.toContain('copied-agent-secret')
+    expect(serializedLog).not.toContain('getAgentInstructions')
     expect(screen.queryByText(endpoint.endpoint)).toBeNull()
     expect(screen.queryByText(endpoint.authorizationHeader)).toBeNull()
+    expect(screen.queryByText(/curl -sS/i)).toBeNull()
+    expect(screen.queryByText(/getAgentInstructions/i)).toBeNull()
+    expect(screen.queryByText(/Agent operating instructions/i)).toBeNull()
     expect(screen.queryByText(/transport/i)).toBeNull()
     expect(screen.queryByText(/local server/i)).toBeNull()
 
@@ -1470,6 +1475,8 @@ describe('ProjectControls layout', () => {
     expect(await screen.findByText(/agentkommando kopiert/i)).toBeTruthy()
     expect(screen.queryByText(endpoint.endpoint)).toBeNull()
     expect(screen.queryByText(endpoint.authorizationHeader)).toBeNull()
+    expect(screen.queryByText(/getAgentInstructions/i)).toBeNull()
+    expect(screen.queryByText(/Agent operating instructions/i)).toBeNull()
   })
 
   it('returns Arcade-scoped read state with simplified Agent status', async () => {

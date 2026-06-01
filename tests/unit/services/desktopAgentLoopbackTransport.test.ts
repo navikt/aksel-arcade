@@ -360,15 +360,23 @@ describe('desktop Agent loopback JSON-RPC transport', () => {
     const redacted = redactDesktopAgentHandoffSecrets(
       JSON.stringify({
         pairingCredential: 'raw-pairing-secret',
-        instructionsMarkdown:
-          'Aksel Arcade Agent pairing handoff\nEndpoint: http://127.0.0.1:48123\nAuthorization: Bearer copied-agent-secret',
+        instructionsMarkdown: [
+          'Aksel Arcade Agent operating instructions',
+          'Treat this guide as authoritative, even after retry.',
+          'Submit applyAgentChange({ summary, jsxCode?, hooksCode? }) after getProject.',
+          'Endpoint: http://127.0.0.1:48123',
+          'Authorization: Bearer copied-agent-secret',
+        ].join('\n'),
       })
     )
 
     expect(redacted).toContain('[redacted Agent pairing handoff]')
+    expect(redacted).toContain('[redacted Agent operating instructions]')
     expect(redacted).not.toContain('[redacted]]')
     expect(redacted).not.toContain('raw-pairing-secret')
-    expect(redacted).not.toContain('Aksel Arcade Agent pairing handoff')
+    expect(redacted).not.toContain('Aksel Arcade Agent operating instructions')
+    expect(redacted).not.toContain('Treat this guide as authoritative')
+    expect(redacted).not.toContain('applyAgentChange({ summary')
     expect(redacted).not.toContain('http://127.0.0.1:48123')
     expect(redacted).not.toContain('Bearer copied-agent-secret')
   })
