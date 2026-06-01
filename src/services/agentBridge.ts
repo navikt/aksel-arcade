@@ -102,6 +102,19 @@ export interface AgentSessionReadState {
   commandNames: readonly AgentBridgeCommandName[]
 }
 
+export interface ArcadeAuthoringGuidanceSnippet {
+  id: string
+  description: string
+  code: string
+}
+
+export interface ArcadeAuthoringGuidancePayload {
+  summary: string
+  rules: readonly string[]
+  validationChecklist: readonly string[]
+  snippets: readonly ArcadeAuthoringGuidanceSnippet[]
+}
+
 export interface AgentInstructionsPayload {
   version: typeof AGENT_BRIDGE_PROTOCOL_VERSION
   instructionsMarkdown: string
@@ -123,6 +136,7 @@ export interface AgentInstructionsPayload {
     rules: readonly string[]
     supportedCopiedOutImports: readonly string[]
   }
+  arcadeAuthoringGuidance: ArcadeAuthoringGuidancePayload
 }
 
 interface AgentBridgeCommandSuccess<TData, TCommand extends string = AgentBridgeCommandName> {
@@ -264,18 +278,73 @@ const ARCADE_AUTHORING_CONTRACT_RULES = [
 const ARCADE_AUTHORING_CONTRACT_SUMMARY =
   'Author only the active Arcade project through the Agent bridge: import-free JSX and Hooks source, preview settings, and permitted metadata.'
 
+const ARCADE_AUTHORING_GUIDANCE_SUMMARY =
+  'Produce Aksel-valid Arcade JSX: use injected Aksel components, layout primitives, props, icons, and --ax tokens before native HTML or custom CSS fallbacks.'
+
+const ARCADE_AUTHORING_GUIDANCE_RULES = [
+  'For static pages, write a bare JSX root such as <Page>...</Page>; do not wrap static source in a component unless needed.',
+  'When local JavaScript is needed before returning JSX, wrap the page in an IIFE expression; use the Hooks tab for reusable hooks.',
+  'Arcade source is import-free: convert normal Aksel examples by removing imports and relying on injected React, Aksel components, Aksel icons, and supported hooks.',
+  'Aksel component props are safe and expected in Arcade source; do not replace Aksel components with prop-free native HTML or CSS because of a generic diagnostics error.',
+  'Use Aksel layout and content components first: Page, Page.Block, Box, VStack, HStack, HGrid, Heading, BodyLong, BodyShort, GuidePanel, List, Accordion, Checkbox, Button, Link, Tag, and Aksel icons when they match the UI.',
+  'Native elements are acceptable for semantic wrappers/content, inline artwork, or asChild composition, but not as replacements for available Aksel components.',
+  'Keep custom CSS small and scoped to gaps after Aksel components, props, and tokens; use --ax design tokens for colors, spacing, borders, and typography.',
+] as const
+
+const ARCADE_AUTHORING_GUIDANCE_CHECKLIST = [
+  'The main UI is expressed with Aksel components/primitives rather than native HTML/CSS mimicry.',
+  'Aksel props are used directly where they describe spacing, layout, typography, variants, icons, or responsive behavior.',
+  'Native elements and custom CSS are limited to wrappers, content, artwork, or details not covered by Aksel APIs.',
+  'Diagnostics are checked after applying, and Preview evidence is used when permitted to validate visible results.',
+] as const
+
+const ARCADE_AUTHORING_GUIDANCE_SNIPPETS: readonly ArcadeAuthoringGuidanceSnippet[] = [
+  {
+    id: 'static-page',
+    description: 'Preferred shape for a static Arcade page.',
+    code: `<Page>
+  <Page.Block width="text" gutters>
+    <VStack as="main" gap="space-32">
+      <Heading level="1" size="xlarge">
+        Page title
+      </Heading>
+      <BodyLong>Page introduction.</BodyLong>
+    </VStack>
+  </Page.Block>
+</Page>`,
+  },
+  {
+    id: 'iife-page',
+    description: 'Preferred shape when local JavaScript is needed before returning JSX.',
+    code: `(() => {
+  const items = ["First item", "Second item"];
+
+  return (
+    <VStack gap="space-16">
+      <List>
+        {items.map((item) => (
+          <List.Item key={item}>{item}</List.Item>
+        ))}
+      </List>
+    </VStack>
+  );
+})()`,
+  },
+] as const
+
 const createAgentInstructionsMarkdown = (): string =>
   [
     'Aksel Arcade Agent operating guide',
     '1. Treat this returned guide as authoritative for this active Desktop Arcade Agent session.',
     '2. Call getProject first, then use getPreviewContext and getSessionState when you need preview or session state.',
     '3. Author import-free Arcade JSX and Hooks only; do not edit files or add imports inside Arcade source.',
-    '4. Use getDiagnostics for compile/runtime status and getPreviewEvidence only for permitted sandbox Preview evidence.',
-    '5. Submit full-field replacements with applyAgentChange({ summary, jsxCode?, hooksCode?, viewportSize?, theme?, name? }).',
-    '6. Accepted Agent changes apply immediately to the human-visible Arcade project.',
-    '7. After each change, poll getDiagnostics until the preview settles to idle or reports an error.',
-    '8. When diagnostics are idle and permission allows, use Preview evidence to validate the visible result.',
-    '9. Do not read active source from share payloads, Arcade project packages, repository docs, browser storage, clipboard, cookies, unrelated page state, or host UI.',
+    '4. When changing source, follow the returned arcadeAuthoringGuidance before applying.',
+    '5. Use getDiagnostics for compile/runtime status and getPreviewEvidence only for permitted sandbox Preview evidence.',
+    '6. Submit full-field replacements with applyAgentChange({ summary, jsxCode?, hooksCode?, viewportSize?, theme?, name? }).',
+    '7. Accepted Agent changes apply immediately to the human-visible Arcade project.',
+    '8. After each change, poll getDiagnostics until the preview settles to idle or reports an error.',
+    '9. When diagnostics are idle and permission allows, use Preview evidence to validate the visible result.',
+    '10. Do not read active source from share payloads, Arcade project packages, repository docs, browser storage, clipboard, cookies, unrelated page state, or host UI.',
   ].join('\n')
 
 const createAgentInstructionsPayload = (
@@ -302,6 +371,12 @@ const createAgentInstructionsPayload = (
     summary: ARCADE_AUTHORING_CONTRACT_SUMMARY,
     rules: [...ARCADE_AUTHORING_CONTRACT_RULES],
     supportedCopiedOutImports: [...SUPPORTED_COPIED_OUT_IMPORTS],
+  },
+  arcadeAuthoringGuidance: {
+    summary: ARCADE_AUTHORING_GUIDANCE_SUMMARY,
+    rules: [...ARCADE_AUTHORING_GUIDANCE_RULES],
+    validationChecklist: [...ARCADE_AUTHORING_GUIDANCE_CHECKLIST],
+    snippets: ARCADE_AUTHORING_GUIDANCE_SNIPPETS.map((snippet) => ({ ...snippet })),
   },
 })
 

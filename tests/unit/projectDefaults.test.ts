@@ -21,6 +21,14 @@ describe('built-in project templates', () => {
     expect(combinedTemplates).toContain('borderRadius="8"')
   })
 
+  it('teaches the preferred import-free Arcade source shapes', () => {
+    expect(INTRO_JSX_CODE.trim()).toMatch(/^<Box/)
+    expect(INTRO_JSX_CODE).not.toContain('export default function App')
+    expect(HOOKS_DEMO_JSX_CODE.trim()).toMatch(/^\(\(\) => \{/)
+    expect(HOOKS_DEMO_JSX_CODE).not.toContain("from './hooks'")
+    expect(HOOKS_DEMO_HOOKS_CODE).not.toContain("from 'react'")
+  })
+
   it('transpiles every built-in example for the sandbox runtime', async () => {
     await expect(transpileCode(INTRO_JSX_CODE, '')).resolves.toMatchObject({ success: true })
     await expect(transpileCode(HOOKS_DEMO_JSX_CODE, HOOKS_DEMO_HOOKS_CODE)).resolves.toMatchObject({

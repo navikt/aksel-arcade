@@ -217,6 +217,7 @@ describe('agent bridge command router', () => {
     expect(instructions.instructionsMarkdown).toMatch(/getDiagnostics/i)
     expect(instructions.instructionsMarkdown).toMatch(/getPreviewEvidence/i)
     expect(instructions.instructionsMarkdown).toMatch(/import-free Arcade JSX and Hooks/i)
+    expect(instructions.instructionsMarkdown).toMatch(/arcadeAuthoringGuidance/i)
     expect(instructions.instructionsMarkdown).toMatch(/full-field replacements/i)
     expect(instructions.instructionsMarkdown).toContain(
       'applyAgentChange({ summary, jsxCode?, hooksCode?, viewportSize?, theme?, name? })'
@@ -224,7 +225,9 @@ describe('agent bridge command router', () => {
     expect(instructions.instructionsMarkdown).toMatch(
       /apply immediately to the human-visible Arcade project/i
     )
-    expect(instructions.instructionsMarkdown).toMatch(/poll getDiagnostics until the preview settles/i)
+    expect(instructions.instructionsMarkdown).toMatch(
+      /poll getDiagnostics until the preview settles/i
+    )
     expect(instructions.instructionsMarkdown).toMatch(/Preview evidence to validate/i)
     expect(instructions.instructionsMarkdown).not.toContain(
       `Endpoint: ${desktopSession.transportEndpoint.endpoint}`
@@ -232,8 +235,38 @@ describe('agent bridge command router', () => {
     expect(instructions.instructionsMarkdown).not.toContain(
       `Authorization: ${desktopSession.transportEndpoint.authorizationHeader}`
     )
-    expect(instructions.instructionsMarkdown).not.toMatch(/Copilot|provider-specific|Aksel Design System/i)
+    expect(instructions.instructionsMarkdown).not.toMatch(
+      /Copilot|provider-specific|Aksel Design System/i
+    )
     expect(instructions.arcadeAuthoringContract.summary).toMatch(/active Arcade project/i)
+    expect(instructions.arcadeAuthoringGuidance.summary).toMatch(/Aksel-valid Arcade JSX/i)
+    expect(instructions.arcadeAuthoringGuidance.rules).toContainEqual(
+      expect.stringMatching(/Aksel component props are safe and expected/i)
+    )
+    expect(instructions.arcadeAuthoringGuidance.rules).toContainEqual(
+      expect.stringMatching(/bare JSX root/i)
+    )
+    expect(instructions.arcadeAuthoringGuidance.rules).toContainEqual(
+      expect.stringMatching(/IIFE expression/i)
+    )
+    expect(instructions.arcadeAuthoringGuidance.rules).toContainEqual(
+      expect.stringMatching(/import-free/i)
+    )
+    expect(instructions.arcadeAuthoringGuidance.validationChecklist).toContainEqual(
+      expect.stringMatching(/native HTML\/CSS mimicry/i)
+    )
+    expect(instructions.arcadeAuthoringGuidance.snippets).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: 'static-page',
+          code: expect.stringContaining('<Page>'),
+        }),
+        expect.objectContaining({
+          id: 'iife-page',
+          code: expect.stringContaining('(() =>'),
+        }),
+      ])
+    )
     expect(instructions.commandNames).toContain('applyAgentChange')
     expect(instructions.commandNames).not.toContain('applySourceChange')
     expect(instructions).not.toHaveProperty('workflow')
@@ -413,7 +446,6 @@ describe('agent bridge command router', () => {
     expect(appliedRequests).toEqual([])
     expect(recordedCommands).toEqual([])
   })
-
 })
 
 describe('agent pairing handoff', () => {

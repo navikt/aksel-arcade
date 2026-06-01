@@ -1,0 +1,3 @@
+# Separate Arcade authoring guidance in Agent instructions payload
+
+Aksel Arcade will keep bridge-returned **Agent operating instructions** compact and focused on session/protocol use, while `getAgentInstructions` also returns separate compact **Arcade authoring guidance** for producing **Aksel-valid Arcade JSX**. This preserves ADR-0004's boundary against bundling broad Aksel Design System training into the operating guide, but gives **External agents** an explicit source-authoring checklist instead of forcing them to infer valid Arcade JSX from screenshots, repository docs, or trial-and-error diagnostics.

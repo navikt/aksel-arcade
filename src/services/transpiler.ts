@@ -34,6 +34,8 @@ const STATIC_IMPORT_PATTERN =
   /^[ \t]*import(\s+type\b)?(?:\s+['"]([^'"]+)['"]|\s+([\s\S]*?)\s+from\s+['"]([^'"]+)['"])\s*;?[ \t]*(?:(?:\/\/[^\r\n]*)|(?:\/\*[\s\S]*?\*\/[ \t]*))?(?:\r?\n|$)/gm
 const LOCAL_HOOKS_IMPORT_PATTERN = /^\.{1,2}\/hooks(?:\/[\w.-]+)?(?:\.(?:[cm]?[jt]sx?))?$/
 const IDENTIFIER_PATTERN = /^[A-Za-z_$][\w$]*$/
+const DEFAULT_EXPORT_DECLARATION_PATTERN =
+  /export\s+default\s+(function|class)\s+([A-Za-z_$][\w$]*)/
 
 const getSupportedImportModule = (source: string): SupportedImportModule | null => {
   if (source === 'react') return 'react'
@@ -252,6 +254,24 @@ const removeDuplicateRuntimePreludeStatements = (
     .join('\n')
 }
 
+const createDeveloperModeComponent = (sourceCode: string): string => {
+  const defaultDeclarationMatch = sourceCode.match(DEFAULT_EXPORT_DECLARATION_PATTERN)
+
+  if (defaultDeclarationMatch) {
+    const [, declarationKind, componentName] = defaultDeclarationMatch
+    const processedSource = sourceCode.replace(
+      DEFAULT_EXPORT_DECLARATION_PATTERN,
+      `${declarationKind} ${componentName}`
+    )
+
+    return componentName === 'App'
+      ? processedSource
+      : `${processedSource}\nconst App = ${componentName};`
+  }
+
+  return sourceCode.replace(/export\s+default\s+/g, 'const App = ')
+}
+
 export const transpileCode = async (
   jsxCode: string,
   hooksCode: string
@@ -296,13 +316,13 @@ export const transpileCode = async (
 
     if (hasExportDefault) {
       // Developer mode: user provided full component, just clean up exports
-      processedJsxCode = cleanJsxCode.replace(/export\s+default\s+function\s+(\w+)/g, 'function $1')
-      processedJsxCode = processedJsxCode.replace(/export\s+default\s+/g, 'const App = ')
+      processedJsxCode = createDeveloperModeComponent(cleanJsxCode)
     } else {
       // Designer mode: auto-wrap bare JSX in component structure
       // Check if there are multiple root JSX elements by counting lines starting with <
       const rootElementMatches = trimmedJsx.match(/^\s*</gm) // Lines starting with <
-      const hasMultipleRoots = rootElementMatches && rootElementMatches.length > 1
+      const hasMultipleRoots =
+        trimmedJsx.startsWith('<') && rootElementMatches && rootElementMatches.length > 1
 
       if (hasMultipleRoots) {
         // Wrap in fragment if multiple root elements (Fragment is invisible to user but needed for execution)
@@ -368,18 +388,6 @@ ${processedJsxCode}
     // Handle: exports.default = App; -> var App = App;
     // But we need to keep the original function, so just remove the export assignment
     finalCode = finalCode.replace(/exports\.default\s*=\s*(\w+);\s*/g, '')
-
-    // If we have a function definition without App being assigned, ensure App points to it
-    // Look for: function ComponentName() { ... } and add App = ComponentName after
-    const functionMatch = finalCode.match(/function\s+(\w+)\s*\([^)]*\)\s*\{/)
-    if (functionMatch && functionMatch[1] !== 'App') {
-      const componentName = functionMatch[1]
-      // Add App assignment after the function definition
-      finalCode = finalCode.replace(
-        new RegExp(`(function\\s+${componentName}\\s*\\([^)]*\\)\\s*\\{[^}]*\\})`),
-        `$1\nvar App = ${componentName};`
-      )
-    }
 
     return {
       success: true,

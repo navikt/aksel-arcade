@@ -124,6 +124,14 @@ _Avoid_: Full-page snapshot, browser screenshot, Arcade UI snapshot
 The shared rules for source that can run in Aksel Arcade, whether written by a human or changed by an agent.
 _Avoid_: Agent-only rules, human-only rules
 
+**Arcade authoring guidance**:
+Actionable guidance that helps a human or **External agent** produce valid **Arcade project source** under the **Arcade authoring contract**.
+_Avoid_: Agent operating instructions, Aksel training
+
+**Aksel-valid Arcade JSX**:
+**Arcade project source** that represents a UI with current Aksel React components, layout primitives, icons, and `--ax` design tokens before using native HTML or custom CSS fallbacks.
+_Avoid_: Visual mimic, prop-free HTML, screenshot-only JSX
+
 **Agent change**:
 An agent-authored replacement set applied to one or more parts of the active **Arcade project** during an **Agent session**.
 _Avoid_: Proposed change, patch, command, cursor edit
@@ -137,6 +145,10 @@ Domain expert: "Good. That pairs the agent with this active Arcade project only;
 Developer: "The agent session applied an agent change to the Arcade project."
 
 Domain expert: "Show it in the live preview. If the user does not want more agent changes, stop Agent access."
+
+Developer: "The external agent needs help writing the source for a screenshot recreation."
+
+Domain expert: "Keep the Agent operating instructions focused on the active session and use Arcade authoring guidance to steer the agent toward Aksel-valid Arcade JSX."
 
 Developer: "The user exported an Arcade project package to send a prototype to a colleague."
 
