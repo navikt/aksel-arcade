@@ -5,71 +5,65 @@ import { generateSecureUUID } from '@/utils/crypto'
 import { getViewportWidth } from '@/types/viewports'
 
 // Intro content that showcases features
-export const INTRO_JSX_CODE = `export default function App() {
-  return (
-    <Box
-      padding="space-16"
-      background="raised"
-      borderRadius="12"
-      borderWidth="1"
-      borderColor="neutral-subtleA"
-    >
-      <VStack gap="space-8">
-        <Heading size="large" level="1">
-          👋 Welcome to Aksel Arcade!
-        </Heading>
-        <BodyLong>
-          A browser-based React playground for Aksel v8 components.
-        </BodyLong>
+export const INTRO_JSX_CODE = `<Box
+  padding="space-16"
+  background="raised"
+  borderRadius="12"
+  borderWidth="1"
+  borderColor="neutral-subtleA"
+>
+  <VStack gap="space-8">
+    <Heading size="large" level="1">
+      👋 Welcome to Aksel Arcade!
+    </Heading>
+    <BodyLong>
+      A browser-based React playground for Aksel v8 components.
+    </BodyLong>
 
-        <VStack gap="space-4" paddingBlock="space-12">
-          <Heading size="small" level="2">
-            ✨ Features:
-          </Heading>
-          <List as="ul">
-            <List.Item>
-              <strong>Two tabs:</strong> JSX for components, Hooks for custom logic
-            </List.Item>
-            <List.Item>
-              <strong>Live preview:</strong> See changes instantly
-            </List.Item>
-            <List.Item>
-              <strong>Component palette:</strong> Click "Add" to insert components
-            </List.Item>
-            <List.Item>
-              <strong>Format code:</strong> Prettier integration
-            </List.Item>
-            <List.Item>
-              <strong>Responsive testing:</strong> Toggle viewports
-            </List.Item>
-            <List.Item>
-              <strong>Auto-save:</strong> Your work is saved automatically
-            </List.Item>
-          </List>
-        </VStack>
+    <VStack gap="space-4" paddingBlock="space-12">
+      <Heading size="small" level="2">
+        ✨ Features:
+      </Heading>
+      <List as="ul">
+        <List.Item>
+          <strong>Two tabs:</strong> JSX for components, Hooks for custom logic
+        </List.Item>
+        <List.Item>
+          <strong>Live preview:</strong> See changes instantly
+        </List.Item>
+        <List.Item>
+          <strong>Component palette:</strong> Click "Add" to insert components
+        </List.Item>
+        <List.Item>
+          <strong>Format code:</strong> Prettier integration
+        </List.Item>
+        <List.Item>
+          <strong>Responsive testing:</strong> Toggle viewports
+        </List.Item>
+        <List.Item>
+          <strong>Auto-save:</strong> Your work is saved automatically
+        </List.Item>
+      </List>
+    </VStack>
 
-        <Alert variant="info">
-          <strong>Quick tip:</strong> Delete this intro and start coding! You can always reset via
-          Settings → Reset editor.
-        </Alert>
-      </VStack>
-    </Box>
-  )
-}`
+    <Alert variant="info">
+      <strong>Quick tip:</strong> Delete this intro and start coding! You can always reset via
+      Settings → Reset editor.
+    </Alert>
+  </VStack>
+</Box>`
 
 export const INTRO_HOOKS_CODE = `// Define custom hooks here
 // Example:
-// import { useState } from 'react';
-//
 // export const useToggle = (initial = false) => {
 //   const [value, setValue] = useState(initial);
 //   const toggle = () => setValue(v => !v);
 //   return [value, toggle];
-// };`
+// };
+//
+// React hooks like useState are available without imports.`
 
-export const HOOKS_DEMO_HOOKS_CODE = `import { useState } from 'react';
-
-// Custom hook for form state management
+export const HOOKS_DEMO_HOOKS_CODE = `// Custom hook for form state management
 export const useForm = (initialValues = {}) => {
   const [values, setValues] = useState(initialValues);
   const [errors, setErrors] = useState({});
@@ -132,9 +126,7 @@ export const useCounter = (initialValue = 0, min = 0, max = 100) => {
   return { count, increment, decrement, reset, setValue };
 };`
 
-export const HOOKS_DEMO_JSX_CODE = `import { useForm, useToggle, useCounter } from './hooks';
-
-export default function App() {
+export const HOOKS_DEMO_JSX_CODE = `(() => {
   const form = useForm({ name: '', email: '', message: '' });
   const details = useToggle(false);
   const likes = useCounter(0, 0, 999);
@@ -291,7 +283,7 @@ export default function App() {
       </VStack>
     </Box>
   );
-}`
+})()`
 
 export const FORM_SUMMARY_JSX_CODE = `<Box asChild background="default" paddingBlock="space-12">
       <Page>

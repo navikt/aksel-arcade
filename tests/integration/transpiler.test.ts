@@ -116,7 +116,44 @@ export default function MyComponent() {
     expect(result.success).toBe(true)
     expect(result.code).toBeTruthy()
     expect(result.code).toContain('MyComponent')
-    expect(result.code).toContain('App')
+    expect(result.code).toContain('const App = MyComponent')
+  })
+
+  it('should preserve the exported component as App when helper functions appear first', async () => {
+    const jsxCode = `function HelperText() {
+  return <BodyLong>Helper</BodyLong>;
+}
+
+export default function ApplicationIntroPage() {
+  return (
+    <Box padding="space-16">
+      <HelperText />
+    </Box>
+  );
+}`
+
+    const result = await transpileCode(jsxCode, '')
+
+    expect(result.success).toBe(true)
+    expect(result.code).toBeTruthy()
+    expect(result.code).toContain('function HelperText')
+    expect(result.code).toContain('function ApplicationIntroPage')
+    expect(result.code).toContain('const App = ApplicationIntroPage')
+    expect(result.code).not.toContain('var App = HelperText')
+  })
+
+  it('should keep named default components with props syntactically valid', async () => {
+    const jsxCode = `export default function ApplicationIntroPage() {
+  return <Box padding="space-16">OK</Box>;
+}`
+
+    const result = await transpileCode(jsxCode, '')
+
+    expect(result.success).toBe(true)
+    expect(result.code).toBeTruthy()
+    expect(result.code).toContain('padding: "space-16"')
+    expect(result.code).toContain('const App = ApplicationIntroPage')
+    expect(result.code).not.toContain('var App = ApplicationIntroPage')
   })
 
   it('should handle arrow function components', async () => {
@@ -184,6 +221,51 @@ export default function App() {
     expect(result.success).toBe(true)
     expect(result.code).toBeTruthy()
     expect(result.code).toContain('React.createElement')
+  })
+
+  it('should wrap bare static JSX roots as Arcade pages', async () => {
+    const jsxCode = `<Page>
+  <Page.Block width="text" gutters>
+    <VStack as="main" gap="space-32">
+      <Heading level="1" size="xlarge">
+        Page title
+      </Heading>
+      <BodyLong>Intro text.</BodyLong>
+    </VStack>
+  </Page.Block>
+</Page>`
+
+    const result = await transpileCode(jsxCode, '')
+
+    expect(result.success).toBe(true)
+    expect(result.code).toBeTruthy()
+    expect(result.code).toContain('function App()')
+    expect(result.code).toContain('React.createElement(Page')
+    expect(result.code).toContain('React.createElement(Page.Block')
+  })
+
+  it('should wrap IIFE expressions that return JSX', async () => {
+    const jsxCode = `(() => {
+  const items = ["First item", "Second item"];
+
+  return (
+    <VStack gap="space-16">
+      <List>
+        {items.map((item) => (
+          <List.Item key={item}>{item}</List.Item>
+        ))}
+      </List>
+    </VStack>
+  );
+})()`
+
+    const result = await transpileCode(jsxCode, '')
+
+    expect(result.success).toBe(true)
+    expect(result.code).toBeTruthy()
+    expect(result.code).toContain('function App()')
+    expect(result.code).toContain('const items =')
+    expect(result.code).toContain('React.createElement(VStack')
   })
 
   it('should handle empty code without errors', async () => {
