@@ -260,39 +260,19 @@ const ARCADE_AUTHORING_CONTRACT_RULES = [
 const ARCADE_AUTHORING_CONTRACT_SUMMARY =
   'Author only the active Arcade project through the Agent bridge: import-free JSX and Hooks source, preview settings, and permitted metadata.'
 
-const createAgentInstructionsMarkdown = (
-  session: AgentBridgeSession,
-  transportEndpoint: DesktopAgentTransportEndpoint,
-  permissions: AgentPermissions
-): string => {
-  const permissionLines = Object.entries(permissions).map(
-    ([key, value]) => `- ${key}: ${value ? 'true' : 'false'}`
-  )
-
-  return [
-    'Aksel Arcade Agent pairing handoff',
-    '',
-    `Session id: ${session.id}`,
-    `Started at: ${session.startedAt}`,
-    '',
-    'Use this active Desktop Arcade Agent session only. Send JSON-RPC 2.0 POST requests to the endpoint with Content-Type: application/json and the Authorization header below.',
-    `Endpoint: ${transportEndpoint.endpoint}`,
-    `Authorization: ${transportEndpoint.authorizationHeader}`,
-    `Supported command names: ${AGENT_BRIDGE_COMMAND_NAMES.join(', ')}`,
-    '',
-    'Read Arcade-scoped state with getProject, getPreviewContext, getDiagnostics, getPreviewEvidence, and getSessionState. Submit allowed changes with applyAgentChange({ summary, jsxCode?, hooksCode?, viewportSize?, theme?, name? }). Accepted changes apply immediately after validation.',
-    'After changes, poll getDiagnostics until the preview is idle or reports an error, then use Preview evidence for visual validation when permitted.',
-    '',
-    'Active permission state:',
-    ...permissionLines,
-    '',
-    'Read scope: arcade-session. Do not read project packages, share payloads, browser storage, clipboard data, cookies, unrelated page state, or host application UI state.',
-    '',
-    'Arcade authoring contract summary:',
-    ARCADE_AUTHORING_CONTRACT_SUMMARY,
-    ...ARCADE_AUTHORING_CONTRACT_RULES.map((rule) => `- ${rule}`),
+const createAgentInstructionsMarkdown = (): string =>
+  [
+    'Aksel Arcade Agent operating guide',
+    '1. Treat this returned guide as authoritative for this active Desktop Arcade Agent session.',
+    '2. Call getProject first, then use getPreviewContext and getSessionState when you need preview or session state.',
+    '3. Author import-free Arcade JSX and Hooks only; do not edit files or add imports inside Arcade source.',
+    '4. Use getDiagnostics for compile/runtime status and getPreviewEvidence only for permitted sandbox Preview evidence.',
+    '5. Submit full-field replacements with applyAgentChange({ summary, jsxCode?, hooksCode?, viewportSize?, theme?, name? }).',
+    '6. Accepted Agent changes apply immediately to the human-visible Arcade project.',
+    '7. After each change, poll getDiagnostics until the preview settles to idle or reports an error.',
+    '8. When diagnostics are idle and permission allows, use Preview evidence to validate the visible result.',
+    '9. Do not read active source from share payloads, Arcade project packages, repository docs, browser storage, clipboard, cookies, unrelated page state, or host UI.',
   ].join('\n')
-}
 
 const createAgentInstructionsPayload = (
   session: AgentBridgeSession,
@@ -300,7 +280,7 @@ const createAgentInstructionsPayload = (
   permissions: AgentPermissions
 ): AgentInstructionsPayload => ({
   version: AGENT_BRIDGE_PROTOCOL_VERSION,
-  instructionsMarkdown: createAgentInstructionsMarkdown(session, transportEndpoint, permissions),
+  instructionsMarkdown: createAgentInstructionsMarkdown(),
   sessionId: session.id,
   startedAt: session.startedAt,
   endpoint: transportEndpoint.endpoint,
