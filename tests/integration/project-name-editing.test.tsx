@@ -9,6 +9,7 @@ import {
   WEB_ARCADE_CAPABILITIES,
   type ShellCapabilities,
 } from '@/services/shellCapabilities'
+import { createDefaultProject } from '@/utils/projectDefaults'
 
 interface HeaderHarnessProps {
   shellCapabilities: ShellCapabilities
@@ -39,6 +40,16 @@ const HeaderHarness = ({ shellCapabilities }: HeaderHarnessProps) => {
         shellCapabilities={shellCapabilities}
       />
       <div data-testid="current-project-name">{project.name}</div>
+      <button
+        type="button"
+        onClick={() => {
+          const replacementProject = createDefaultProject()
+          replacementProject.name = 'Replaced project'
+          replaceProject(replacementProject)
+        }}
+      >
+        Replace project
+      </button>
     </>
   )
 }
@@ -100,6 +111,23 @@ describe('AppHeader project name editing', () => {
 
       expect(screen.queryByRole('textbox', { name: /prosjektnavn/i })).toBeNull()
       expect(screen.getByTestId('current-project-name').textContent).toBe('Untitled Project')
+    })
+
+    it('closes the inline editor when the current project is replaced', async () => {
+      const user = userEvent.setup()
+      renderHeader(shellCapabilities)
+
+      await user.click(screen.getByRole('button', { name: /rediger prosjektnavn/i }))
+
+      const input = screen.getByRole('textbox', { name: /prosjektnavn/i })
+      await user.clear(input)
+      await user.type(input, 'Stale draft')
+
+      await user.click(screen.getByRole('button', { name: /replace project/i }))
+
+      expect(screen.queryByRole('textbox', { name: /prosjektnavn/i })).toBeNull()
+      expect(screen.getByTestId('current-project-name').textContent).toBe('Replaced project')
+      expect(screen.getByRole('button', { name: /rediger prosjektnavn/i })).toBeTruthy()
     })
   })
 })

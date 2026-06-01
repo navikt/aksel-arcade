@@ -229,6 +229,11 @@ export const AppHeader = ({
   }, [isEditingProjectName, projectName])
 
   useEffect(() => {
+    setProjectNameDraft(projectName)
+    setIsEditingProjectName(false)
+  }, [currentProject.id, projectName])
+
+  useEffect(() => {
     if (!canUseShareUrl) {
       return
     }
