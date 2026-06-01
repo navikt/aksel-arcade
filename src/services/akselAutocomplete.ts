@@ -16,7 +16,6 @@ const COMPONENT_NAME_PATTERN = /^[A-Z][\w.]*$/
 const TAG_NAME_PATTERN = /^[A-Za-z][\w.]*$/
 const TAG_NAME_VALID_FOR = /^[\w.]*$/
 const PROP_NAME_VALID_FOR = /^[\w-]*$/
-const PROP_VALUE_VALID_FOR = /^[\w\s./%-]*$/
 
 type CompletionEntry =
   | (AkselAutocompleteEntry & { source: 'docs' })
@@ -511,8 +510,6 @@ export function getAkselCompletionForSource(source: string, pos: number): Comple
       return {
         from: pos - partialValue.length,
         options,
-        filter: false,
-        validFor: PROP_VALUE_VALID_FOR,
       }
     }
   }
