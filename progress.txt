@@ -1698,3 +1698,21 @@ Verification:
 - npm run lint (passes with existing hook dependency warnings in `InspectionPopover` and `PreviewPane`)
 - npm run test -- --run
 - npx playwright test tests/e2e/agent-diagnostics.spec.ts
+
+### 2026-06-01 - PR #174 review follow-up
+
+Reviewed and fixed one PR-scoped test coverage issue before merge:
+
+- The Desktop renderer protocol smoke test verified preview rendering through `aksel-arcade://app/index.html`, but it launched Electron in unpackaged mode and therefore did not prove the packaged `app.isPackaged` startup branch selects that protocol.
+- Added a focused Desktop main-process unit harness that runs `desktop/main.cjs` with `app.isPackaged = true` and verifies the packaged startup path loads `aksel-arcade://app/index.html`, registers the privileged protocol, and installs the protocol handler.
+- Renamed the Electron smoke test wording to describe the Desktop renderer protocol coverage it actually provides while keeping the real preview-rendering assertion.
+
+Verification:
+
+- npx vitest run tests/unit/desktopMain.test.ts tests/unit/desktopPackagingConfig.test.ts
+- npx playwright test tests/e2e/desktop-packaged-preview.spec.ts --reporter=line
+- npm run type-check
+- npm run lint (passes with existing hook dependency warnings in `InspectionPopover` and `PreviewPane`)
+- npm test -- --run
+- npm run build
+- Browser smoke check at `http://127.0.0.1:5174/aksel-arcade/` for app render, preview render, and no console errors.

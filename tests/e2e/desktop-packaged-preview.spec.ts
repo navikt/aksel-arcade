@@ -5,12 +5,12 @@ import { _electron as electron, type ElectronApplication } from 'playwright'
 const npmCommand = process.platform === 'win32' ? 'npm.cmd' : 'npm'
 const desktopRendererUrl = 'aksel-arcade://app/index.html'
 
-test.describe('Desktop packaged preview', () => {
+test.describe('Desktop renderer protocol preview', () => {
   test.beforeAll(() => {
     execFileSync(npmCommand, ['run', 'desktop:build'], { stdio: 'inherit' })
   })
 
-  test('renders the default Arcade project preview from the packaged renderer protocol', async () => {
+  test('renders the default Arcade project preview from the Desktop renderer protocol', async () => {
     let app: ElectronApplication | null = null
     const consoleMessages: string[] = []
 
