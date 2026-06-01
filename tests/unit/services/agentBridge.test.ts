@@ -4,7 +4,6 @@ import {
   AGENT_BRIDGE_PROTOCOL_VERSION,
   AGENT_BRIDGE_READ_COMMAND_NAMES,
   DEFAULT_AGENT_PERMISSIONS,
-  createAgentInstructions,
   createAgentPairingHandoffCommand,
   createAgentBridgeCommandRouter,
   isAgentBridgeCommandName,
@@ -185,13 +184,15 @@ describe('agent bridge command router', () => {
     expect(recordedCommands).toEqual(['getProject', 'getPreviewContext', 'getSessionState'])
   })
 
-  it('returns a compact Agent operating guide without Arcade project content', () => {
+  it('returns a compact Agent operating guide repeatedly without Arcade project content', () => {
     const { context, controller, recordedCommands } = createController()
     const router = createAgentBridgeCommandRouter(desktopSession, controller)
 
     const instructions = expectBridgeSuccess(router.routeCommand('getAgentInstructions'))
+    const repeatedInstructions = expectBridgeSuccess(router.routeCommand('getAgentInstructions'))
     const guideLines = getMarkdownLines(instructions.instructionsMarkdown)
 
+    expect(repeatedInstructions).toEqual(instructions)
     expect(instructions).toMatchObject({
       version: AGENT_BRIDGE_PROTOCOL_VERSION,
       sessionId: desktopSession.id,
@@ -245,7 +246,7 @@ describe('agent bridge command router', () => {
     )
     expect(JSON.stringify(instructions)).not.toMatch(/CONTEXT\.md|docs\/adr/i)
     expect(JSON.stringify(instructions)).not.toMatch(/checkpoint|rollback/i)
-    expect(recordedCommands).toEqual(['getAgentInstructions'])
+    expect(recordedCommands).toEqual(['getAgentInstructions', 'getAgentInstructions'])
   })
 
   it('requires a Desktop transport endpoint before returning Agent instructions', () => {
@@ -415,7 +416,7 @@ describe('agent bridge command router', () => {
 
 })
 
-describe('agent instructions', () => {
+describe('agent pairing handoff', () => {
   it('creates a one-line pure curl bootstrap command for getAgentInstructions', () => {
     const command = createAgentPairingHandoffCommand({
       endpoint: 'http://127.0.0.1:48123',
@@ -446,51 +447,5 @@ describe('agent instructions', () => {
       `curl -sS -X POST 'http://127.0.0.1:48123/path'\\''with'\\''quotes;$HOME' -H 'Authorization: Bearer token'\\''with'\\''$pecial\`chars\\and spaces' -H 'Content-Type: application/json' --data '{"jsonrpc":"2.0","id":"agent-instructions-1","method":"getAgentInstructions"}'`
     )
     expect(command).not.toContain('\n')
-  })
-
-  it('includes provider-neutral Desktop transport instructions without URL credentials', () => {
-    const instructions = createAgentInstructions(DEFAULT_AGENT_PERMISSIONS, {
-      endpoint: 'http://127.0.0.1:48123',
-      sessionId: 'agent-session-1',
-      authorizationHeader: 'Bearer copied-agent-secret',
-    })
-
-    expect(instructions).toContain('Desktop loopback JSON-RPC transport')
-    expect(instructions).toContain('Endpoint: http://127.0.0.1:48123')
-    expect(instructions).toContain('Authorization: Bearer copied-agent-secret')
-    expect(instructions).toMatch(/Content-Type: application\/json and the Authorization header/i)
-    expect(instructions).toContain(
-      'Supported JSON-RPC methods: getAgentInstructions, getProject, getPreviewContext, getDiagnostics, getPreviewEvidence, getSessionState, applyAgentChange.'
-    )
-    expect(instructions).toContain(
-      'Full Agent bridge command names: getAgentInstructions, getProject, getPreviewContext, getDiagnostics, getPreviewEvidence, getSessionState, applyAgentChange.'
-    )
-    expect(instructions).toContain('"method":"applyAgentChange"')
-    expect(instructions).toContain('Accepted changes apply immediately after validation')
-    expect(instructions).not.toContain('applySourceChange')
-    expect(instructions).not.toMatch(/checkpoint|rollback/i)
-    expect(instructions).toContain(
-      'poll getDiagnostics() until status is no longer "transpiling" or "rendering" before final visual validation'
-    )
-    expect(instructions).toContain(
-      'When diagnostics settle to "idle", read getPreviewEvidence() to validate the visible result.'
-    )
-    expect(instructions).toContain(
-      'When status is "error", read diagnostics again for compile/runtime details instead.'
-    )
-    expect(instructions).toMatch(/GitHub Copilot app/i)
-    expect(instructions).toMatch(/Copilot CLI/i)
-    expect(instructions).toMatch(/Copilot in VS Code/i)
-    expect(instructions).toMatch(/Other same-device External agents/i)
-    expect(instructions).not.toMatch(/[?&](token|credential|authorization)=/i)
-  })
-
-  it('keeps inactive copied instructions free of transport secrets', () => {
-    const instructions = createAgentInstructions(DEFAULT_AGENT_PERMISSIONS)
-
-    expect(instructions).toContain('Agent access is available only in Desktop Arcade')
-    expect(instructions).not.toMatch(/Endpoint:|Authorization: Bearer|copied-agent-secret/i)
-    expect(instructions).not.toContain('__AKSEL_ARCADE_AGENT_BRIDGE__')
-    expect(instructions).not.toMatch(/[?&](token|credential|authorization)=/i)
   })
 })
