@@ -1737,3 +1737,16 @@ Verification:
 Next note:
 
 - Keep Aksel primitive background prop values as token fragments in source. If future users search by CSS variable/token names (`bg-*`), extend the alias-label path rather than changing emitted prop values to include the `bg-` prefix.
+
+### 2026-06-01 - Desktop follow-up for preview/autocomplete fixes
+
+Extended the same fixes to the Desktop Arcade packaged renderer path:
+
+- Confirmed the Desktop app builds from the shared React/Codemirror source, so the `bg-default` alias and general prop-value filtering fixes are included in Desktop builds.
+- Added Desktop renderer protocol coverage in `tests/e2e/desktop-packaged-preview.spec.ts` for the packaged `aksel-arcade://app/index.html` path.
+- The Desktop test now verifies the preview surface, live preview wrapper, and sandbox iframe all use `--ax-bg-default`, and that prop-value autocomplete filters after opening a value list (`size=""` -> typing `s` leaves `small` without stale `medium`/`xsmall` entries).
+
+Verification:
+
+- npm run typecheck
+- npx playwright test tests/e2e/desktop-packaged-preview.spec.ts --reporter=line
