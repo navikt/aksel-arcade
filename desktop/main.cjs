@@ -1,6 +1,6 @@
-const { app, BrowserWindow, ipcMain } = require('electron')
+const { app, BrowserWindow, ipcMain, net, protocol } = require('electron')
 const path = require('node:path')
-const { fileURLToPath } = require('node:url')
+const { pathToFileURL } = require('node:url')
 const { createAgentLoopbackJsonRpcTransport } = require('./agentLoopbackTransport.cjs')
 
 const SHELL_CAPABILITIES_CHANNEL = 'aksel-arcade:get-shell-capabilities'
@@ -10,6 +10,10 @@ const ROUTE_AGENT_TRANSPORT_REQUEST_CHANNEL = 'aksel-arcade:route-agent-transpor
 const ROUTE_AGENT_TRANSPORT_RESPONSE_CHANNEL = 'aksel-arcade:route-agent-transport-response'
 const DEFAULT_RENDERER_URL = 'http://127.0.0.1:5173/aksel-arcade/'
 const DIST_DIR = path.resolve(__dirname, '..', 'dist-desktop')
+const DESKTOP_RENDERER_PROTOCOL = 'aksel-arcade'
+const DESKTOP_RENDERER_HOST = 'app'
+const DESKTOP_RENDERER_ORIGIN = `${DESKTOP_RENDERER_PROTOCOL}://${DESKTOP_RENDERER_HOST}`
+const DESKTOP_RENDERER_URL = `${DESKTOP_RENDERER_ORIGIN}/index.html`
 const AGENT_TRANSPORT_ROUTE_TIMEOUT_MS = 5000
 const agentLoopbackTransport = createAgentLoopbackJsonRpcTransport({
   routeRequest: routeAgentTransportRequest,
@@ -17,6 +21,7 @@ const agentLoopbackTransport = createAgentLoopbackJsonRpcTransport({
 let activeMainWindow = null
 let nextAgentTransportRouteRequestId = 0
 const pendingAgentTransportRouteRequests = new Map()
+let desktopRendererProtocolRegistered = false
 const DESKTOP_ARCADE_CAPABILITIES = Object.freeze({
   surface: 'desktop',
   shareUrl: Object.freeze({ enabled: false }),
@@ -28,9 +33,23 @@ const DESKTOP_ARCADE_CAPABILITIES = Object.freeze({
   }),
 })
 
+protocol.registerSchemesAsPrivileged([
+  {
+    scheme: DESKTOP_RENDERER_PROTOCOL,
+    privileges: {
+      standard: true,
+      secure: true,
+      supportFetchAPI: true,
+      corsEnabled: true,
+    },
+  },
+])
+
 app.setName('Aksel Arcade')
 
 const getRendererUrl = () => process.env.AKSEL_ARCADE_RENDERER_URL || DEFAULT_RENDERER_URL
+
+const getDesktopRendererUrl = () => DESKTOP_RENDERER_URL
 
 const cloneDesktopCapabilities = () => ({
   surface: DESKTOP_ARCADE_CAPABILITIES.surface,
@@ -56,6 +75,27 @@ const removeDesktopIpc = () => {
   ipcMain.removeHandler(START_AGENT_TRANSPORT_CHANNEL)
   ipcMain.removeHandler(STOP_AGENT_TRANSPORT_CHANNEL)
   ipcMain.off(ROUTE_AGENT_TRANSPORT_RESPONSE_CHANNEL, handleAgentTransportRouteResponse)
+}
+
+const registerDesktopRendererProtocol = () => {
+  if (desktopRendererProtocolRegistered) {
+    return
+  }
+
+  protocol.handle(DESKTOP_RENDERER_PROTOCOL, (request) => {
+    const filePath = getDesktopRendererProtocolFilePath(request.url)
+
+    if (!filePath) {
+      return new Response('Desktop Arcade resource not found.', {
+        status: 404,
+        headers: { 'content-type': 'text/plain; charset=utf-8' },
+      })
+    }
+
+    return net.fetch(pathToFileURL(filePath).toString())
+  })
+
+  desktopRendererProtocolRegistered = true
 }
 
 function routeAgentTransportRequest({ id, method, params, session }) {
@@ -202,6 +242,46 @@ const parseStopTransportPayload = (payload) => {
 
 const isRecord = (value) => typeof value === 'object' && value !== null && !Array.isArray(value)
 
+const getDesktopRendererProtocolFilePath = (requestUrl) => {
+  let url
+  try {
+    url = new URL(requestUrl)
+  } catch {
+    return null
+  }
+
+  if (
+    url.protocol !== `${DESKTOP_RENDERER_PROTOCOL}:` ||
+    url.hostname !== DESKTOP_RENDERER_HOST
+  ) {
+    return null
+  }
+
+  let resourcePath
+  try {
+    resourcePath = decodeURIComponent(url.pathname === '/' ? '/index.html' : url.pathname)
+  } catch {
+    return null
+  }
+
+  const filePath = path.normalize(path.join(DIST_DIR, `.${resourcePath}`))
+
+  if (filePath !== DIST_DIR && !filePath.startsWith(`${DIST_DIR}${path.sep}`)) {
+    return null
+  }
+
+  return filePath
+}
+
+const isDesktopRendererProtocolUrl = (targetUrl) => {
+  try {
+    const url = new URL(targetUrl)
+    return url.protocol === `${DESKTOP_RENDERER_PROTOCOL}:` && url.hostname === DESKTOP_RENDERER_HOST
+  } catch {
+    return false
+  }
+}
+
 const isAgentPermissions = (value) =>
   isRecord(value) &&
   typeof value.sourceChanges === 'boolean' &&
@@ -210,16 +290,12 @@ const isAgentPermissions = (value) =>
   typeof value.projectMetadata === 'boolean'
 
 const isAllowedNavigation = (targetUrl) => {
+  if (isDesktopRendererProtocolUrl(targetUrl)) {
+    return true
+  }
+
   if (app.isPackaged) {
-    try {
-      const targetPath = fileURLToPath(targetUrl)
-      return (
-        targetPath === path.join(DIST_DIR, 'index.html') ||
-        targetPath.startsWith(`${DIST_DIR}${path.sep}`)
-      )
-    } catch {
-      return false
-    }
+    return false
   }
 
   try {
@@ -268,7 +344,7 @@ const createWindow = async () => {
   })
 
   if (app.isPackaged) {
-    await mainWindow.loadFile(path.join(DIST_DIR, 'index.html'))
+    await mainWindow.loadURL(getDesktopRendererUrl())
     return
   }
 
@@ -279,6 +355,7 @@ app
   .whenReady()
   .then(async () => {
     registerDesktopIpc()
+    registerDesktopRendererProtocol()
     await createWindow()
 
     app.on('activate', () => {
