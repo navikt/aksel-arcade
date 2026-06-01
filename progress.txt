@@ -1353,6 +1353,7 @@ Verification:
 - npm run typecheck
 - npm run lint (passes with existing hook dependency warnings in `InspectionPopover` and `PreviewPane`)
 - CI=1 npm run test
+
 - CI=1 npm run test:e2e -- web-working-copy-tabs.spec.ts
 
 Next note: #131 is implemented as regression coverage only. The Playwright config reuses any existing dev server locally, so if a stale server is already listening on port 5173, stop that specific process or run in CI mode before re-running this spec.
@@ -1609,3 +1610,21 @@ Verification:
 - npm run typecheck
 - npm run lint (passes with existing hook dependency warnings in `InspectionPopover` and `PreviewPane`)
 - CI=1 npm run test
+
+### 2026-06-01 - Issue #163 compact Agent operating instructions
+
+Completed for #163:
+
+- Kept the work scoped to `getAgentInstructions` and the Desktop Arcade Agent pairing flow.
+- Replaced the fetched `instructionsMarkdown` body with a compact 10-line Agent operating guide; the copied pairing handoff remains only the short `curl` bootstrap command.
+- The guide tells external agents to treat the returned guidance as authoritative for the active Agent session, call `getProject` first, use import-free Arcade JSX and Hooks, use preview context/diagnostics/Preview evidence for feedback, submit full-field `applyAgentChange({ summary, jsxCode?, hooksCode?, viewportSize?, theme?, name? })` replacements, and validate after diagnostics settle.
+- Kept existing structured session, endpoint, Authorization, permission, protocol, command-name, and Arcade authoring contract fields available without adding a new machine-readable workflow field.
+- Kept the response content-free: no active Arcade project source, diagnostics content, share/package data, repository documentation content, provider-specific behavior, or Aksel Design System training is included in the fetched guide.
+- Updated `tests/unit/services/agentBridge.test.ts` with behavioral assertions for the operating-guide requirements instead of an exact full Markdown snapshot.
+
+Verification:
+
+- npm run typecheck
+- CI=1 npm run test
+- npm run lint (passes with existing hook dependency warnings in `InspectionPopover` and `PreviewPane`)
+- Browser smoke check at `http://127.0.0.1:5173/aksel-arcade/` for app render, preview render, and no console warnings/errors.

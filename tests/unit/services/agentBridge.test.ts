@@ -160,6 +160,9 @@ const expectBridgeSuccess = <TData>(result: AgentBridgeCommandResult<TData>): TD
   return result.data
 }
 
+const getMarkdownLines = (markdown: string): string[] =>
+  markdown.split('\n').filter((line) => line.trim().length > 0)
+
 describe('agent bridge command router', () => {
   it('routes supported read commands without a browser global', () => {
     const { context, controller, recordedCommands } = createController()
@@ -182,11 +185,12 @@ describe('agent bridge command router', () => {
     expect(recordedCommands).toEqual(['getProject', 'getPreviewContext', 'getSessionState'])
   })
 
-  it('returns versioned Agent instructions without Arcade project content', () => {
+  it('returns a compact Agent operating guide without Arcade project content', () => {
     const { context, controller, recordedCommands } = createController()
     const router = createAgentBridgeCommandRouter(desktopSession, controller)
 
     const instructions = expectBridgeSuccess(router.routeCommand('getAgentInstructions'))
+    const guideLines = getMarkdownLines(instructions.instructionsMarkdown)
 
     expect(instructions).toMatchObject({
       version: AGENT_BRIDGE_PROTOCOL_VERSION,
@@ -204,25 +208,42 @@ describe('agent bridge command router', () => {
         authorizationHeaderName: 'Authorization',
       },
     })
-    expect(instructions.instructionsMarkdown).toContain('Aksel Arcade Agent pairing handoff')
+    expect(guideLines.length).toBeGreaterThanOrEqual(8)
+    expect(guideLines.length).toBeLessThanOrEqual(12)
+    expect(instructions.instructionsMarkdown).toMatch(/authoritative/i)
+    expect(instructions.instructionsMarkdown).toMatch(/call getProject first/i)
+    expect(instructions.instructionsMarkdown).toMatch(/getPreviewContext/i)
+    expect(instructions.instructionsMarkdown).toMatch(/getDiagnostics/i)
+    expect(instructions.instructionsMarkdown).toMatch(/getPreviewEvidence/i)
+    expect(instructions.instructionsMarkdown).toMatch(/import-free Arcade JSX and Hooks/i)
+    expect(instructions.instructionsMarkdown).toMatch(/full-field replacements/i)
     expect(instructions.instructionsMarkdown).toContain(
+      'applyAgentChange({ summary, jsxCode?, hooksCode?, viewportSize?, theme?, name? })'
+    )
+    expect(instructions.instructionsMarkdown).toMatch(
+      /apply immediately to the human-visible Arcade project/i
+    )
+    expect(instructions.instructionsMarkdown).toMatch(/poll getDiagnostics until the preview settles/i)
+    expect(instructions.instructionsMarkdown).toMatch(/Preview evidence to validate/i)
+    expect(instructions.instructionsMarkdown).not.toContain(
       `Endpoint: ${desktopSession.transportEndpoint.endpoint}`
     )
-    expect(instructions.instructionsMarkdown).toContain(
+    expect(instructions.instructionsMarkdown).not.toContain(
       `Authorization: ${desktopSession.transportEndpoint.authorizationHeader}`
     )
+    expect(instructions.instructionsMarkdown).not.toMatch(/Copilot|provider-specific|Aksel Design System/i)
     expect(instructions.arcadeAuthoringContract.summary).toMatch(/active Arcade project/i)
     expect(instructions.commandNames).toContain('applyAgentChange')
     expect(instructions.commandNames).not.toContain('applySourceChange')
-    expect(instructions.instructionsMarkdown).toContain(
-      'Accepted changes apply immediately after validation.'
-    )
+    expect(instructions).not.toHaveProperty('workflow')
+    expect(instructions).not.toHaveProperty('workflowGuide')
     expect(JSON.stringify(instructions)).not.toContain(context.project.name)
     expect(JSON.stringify(instructions)).not.toContain(context.project.jsxCode)
     expect(JSON.stringify(instructions)).not.toContain(context.project.hooksCode)
     expect(JSON.stringify(instructions)).not.toContain(
       context.diagnostics.sandboxConsoleMessages[0]!.message
     )
+    expect(JSON.stringify(instructions)).not.toMatch(/CONTEXT\.md|docs\/adr/i)
     expect(JSON.stringify(instructions)).not.toMatch(/checkpoint|rollback/i)
     expect(recordedCommands).toEqual(['getAgentInstructions'])
   })
