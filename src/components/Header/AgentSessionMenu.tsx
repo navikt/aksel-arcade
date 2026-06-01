@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { ActionMenu, Box, Button, Detail, VStack } from '@navikt/ds-react'
 import { FilesIcon, RobotIcon } from '@navikt/aksel-icons'
 import { useAgentSession } from '@/hooks/useAgentSession'
@@ -73,10 +73,16 @@ export const AgentSessionMenu = () => {
 
   const copyFeedbackText =
     copyStatus === 'success'
-      ? 'Agentkommando kopiert.'
+      ? 'Command copied!'
       : copyStatus === 'error'
-        ? 'Kunne ikke kopiere agentkommando. Prøv igjen.'
+        ? 'Could not copy command. Try again.'
         : null
+
+  useEffect(() => {
+    if (copyStatus !== 'success') return
+    const timer = setTimeout(() => setCopyStatus('idle'), 3000)
+    return () => clearTimeout(timer)
+  }, [copyStatus])
 
   return (
     <ActionMenu>
@@ -86,14 +92,14 @@ export const AgentSessionMenu = () => {
           data-color="neutral"
           size="small"
           icon={<RobotIcon title="Agent" />}
-          aria-label="Koble til agent"
+          aria-label="Connect an agent"
           data-testid="agent-session-menu"
         />
       </ActionMenu.Trigger>
       <ActionMenu.Content className="agent-menu">
-        <ActionMenu.Label>Koble til agent</ActionMenu.Label>
+        <ActionMenu.Label>Connect an agent</ActionMenu.Label>
         <ActionMenu.CheckboxItem checked={isActive} onCheckedChange={handleAccessChange}>
-          Agent-tilgang
+          Agent bridge
         </ActionMenu.CheckboxItem>
         <Box paddingInline="space-12" paddingBlock="space-8" role="none">
           <Detail role="status" aria-live="polite" className="agent-menu__status">
@@ -102,20 +108,22 @@ export const AgentSessionMenu = () => {
         </Box>
         {isActive && (
           <>
+            <ActionMenu.Label>Connect command</ActionMenu.Label>
             <Box paddingInline="space-12" paddingBlock="space-8" role="none">
               <VStack gap="space-6">
                 <Detail className="agent-menu__context">
-                  Start Agent-tilgang, kopier kommandoen og del den med agenten du vil koble til.
-                  Kommandoen gir agenten tilgang til dette aktive Arcade-prosjektet mens
-                  Agent-tilgang er aktiv.
-                </Detail>
-                <Detail className="agent-menu__warning">
-                  Del bare med agenten du vil gi tilgang.
+                  Click the button below to copy a command, and share that with your agent. The
+                  command will give the agent access to this project while the Agent bridge is
+                  active.
                 </Detail>
                 {copyFeedbackText && (
                   <Detail
                     aria-live="polite"
-                    className="agent-menu__context"
+                    className={
+                      copyStatus === 'success'
+                        ? 'agent-menu__feedback--success'
+                        : 'agent-menu__context'
+                    }
                     role={copyStatus === 'error' ? 'alert' : undefined}
                   >
                     {copyFeedbackText}
@@ -130,7 +138,7 @@ export const AgentSessionMenu = () => {
                 void copyAgentCommand()
               }}
             >
-              {copyStatus === 'error' ? 'Prøv igjen' : 'Kopier agentkommando'}
+              {copyStatus === 'error' ? 'Try again' : 'Copy command'}
             </ActionMenu.Item>
           </>
         )}
