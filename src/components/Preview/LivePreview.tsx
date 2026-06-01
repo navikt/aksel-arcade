@@ -3,6 +3,10 @@ import type { MainToSandboxMessage, SandboxToMainMessage } from '@/types/message
 import type { ViewportSize } from '@/types/project'
 import type { InspectionData } from '@/types/inspection'
 import type { SandboxConsolePayload } from '@/services/previewDiagnostics'
+import {
+  registerPreviewEvidenceRequestHandler,
+  type PreviewEvidenceCaptureResult,
+} from '@/services/previewEvidence'
 import { getViewportWidth } from '@/types/viewports'
 import { validateSandboxToMainMessage } from '@/utils/security'
 import {
@@ -12,6 +16,8 @@ import {
 } from '@/utils/sandboxMessaging'
 import { InspectionPopover } from './InspectionPopover'
 import './LivePreview.css'
+
+const PREVIEW_EVIDENCE_REQUEST_TIMEOUT_MS = 5_000
 
 interface LivePreviewProps {
   iframeRef: React.RefObject<HTMLIFrameElement | null>
@@ -23,6 +29,11 @@ interface LivePreviewProps {
   viewportWidth: ViewportSize
   isInspectMode: boolean
   theme: 'light' | 'dark'
+}
+
+interface PendingPreviewEvidenceRequest {
+  resolve: (result: PreviewEvidenceCaptureResult) => void
+  timeoutId: number
 }
 
 export const LivePreview = ({
@@ -40,6 +51,9 @@ export const LivePreview = ({
   const pendingCodeRef = useRef<string | null>(null)
   const latestTranspiledCodeRef = useRef(transpiledCode)
   const sandboxPortRef = useRef<MessagePort | null>(null)
+  const previewEvidenceRequestIdRef = useRef(0)
+  const previewEvidenceRequestsRef = useRef(new Map<string, PendingPreviewEvidenceRequest>())
+  const previewEvidenceUnregisterRef = useRef<(() => void) | null>(null)
   const sandboxConnectedRef = useRef(false)
   const sandboxRetiredRef = useRef(false)
   const handlersRef = useRef({
@@ -82,11 +96,73 @@ export const LivePreview = ({
       pendingCodeRef.current = null
     }
 
+    const createPreviewUnavailableResult = (message: string): PreviewEvidenceCaptureResult => ({
+      ok: false,
+      error: {
+        code: 'preview-unavailable',
+        message,
+      },
+    })
+
+    const resolvePendingPreviewEvidenceRequest = (
+      requestId: string,
+      result: PreviewEvidenceCaptureResult
+    ) => {
+      const pendingRequest = previewEvidenceRequestsRef.current.get(requestId)
+      if (!pendingRequest) {
+        return
+      }
+
+      clearTimeout(pendingRequest.timeoutId)
+      previewEvidenceRequestsRef.current.delete(requestId)
+      pendingRequest.resolve(result)
+    }
+
+    const resolveAllPendingPreviewEvidenceRequests = (message: string) => {
+      const result = createPreviewUnavailableResult(message)
+      for (const [requestId, pendingRequest] of previewEvidenceRequestsRef.current) {
+        clearTimeout(pendingRequest.timeoutId)
+        pendingRequest.resolve(result)
+        previewEvidenceRequestsRef.current.delete(requestId)
+      }
+    }
+
+    const requestPreviewEvidence = (): Promise<PreviewEvidenceCaptureResult> => {
+      const port = sandboxPortRef.current
+      if (!port) {
+        return Promise.resolve(
+          createPreviewUnavailableResult('Preview iframe is not connected to the sandbox yet.')
+        )
+      }
+
+      const requestId = `preview-evidence-${++previewEvidenceRequestIdRef.current}`
+      return new Promise((resolve) => {
+        const timeoutId = window.setTimeout(() => {
+          resolvePendingPreviewEvidenceRequest(
+            requestId,
+            createPreviewUnavailableResult('Preview evidence request timed out.')
+          )
+        }, PREVIEW_EVIDENCE_REQUEST_TIMEOUT_MS)
+
+        previewEvidenceRequestsRef.current.set(requestId, {
+          resolve,
+          timeoutId,
+        })
+        port.postMessage({
+          type: 'CAPTURE_PREVIEW_EVIDENCE',
+          payload: { requestId },
+        } satisfies MainToSandboxMessage)
+      })
+    }
+
     const disconnectSandbox = (resetReady: boolean) => {
       if (connectedWindow) {
         unregisterSandboxMessagePort(connectedWindow)
         connectedWindow = null
       }
+      previewEvidenceUnregisterRef.current?.()
+      previewEvidenceUnregisterRef.current = null
+      resolveAllPendingPreviewEvidenceRequests('Preview iframe disconnected before evidence settled.')
       sandboxPortRef.current?.close()
       sandboxPortRef.current = null
       sandboxConnectedRef.current = false
@@ -127,6 +203,12 @@ export const LivePreview = ({
             setInspectionData(null)
           }
           break
+        case 'PREVIEW_EVIDENCE_CAPTURED':
+          resolvePendingPreviewEvidenceRequest(
+            message.payload.requestId,
+            message.payload.result
+          )
+          break
         case 'THEME_UPDATED':
           break
         case 'CONSOLE_LOG':
@@ -166,6 +248,11 @@ export const LivePreview = ({
         sandboxPortRef.current.start()
         connectedWindow = iframeRef.current.contentWindow
         registerSandboxMessagePort(connectedWindow, sandboxPortRef.current)
+        previewEvidenceUnregisterRef.current?.()
+        previewEvidenceUnregisterRef.current = registerPreviewEvidenceRequestHandler(
+          iframeRef.current,
+          requestPreviewEvidence
+        )
 
         const connectMessage: MainToSandboxMessage = { type: 'CONNECT_SANDBOX' }
         postMessageToSandbox(iframeRef.current.contentWindow, connectMessage, window.location, [

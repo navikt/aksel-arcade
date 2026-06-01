@@ -2,7 +2,7 @@ import { useCallback, useState } from 'react'
 import { ActionMenu, Box, Button, Detail, VStack } from '@navikt/ds-react'
 import { FilesIcon, RobotIcon } from '@navikt/aksel-icons'
 import { useAgentSession } from '@/hooks/useAgentSession'
-import { collectPreviewEvidenceFromFrame } from '@/services/previewEvidence'
+import { requestPreviewEvidenceFromFrame } from '@/services/previewEvidence'
 import { useSettings } from '@/contexts/SettingsContext'
 import { useProject } from '@/hooks/useProject'
 import { formatAgentErrorForLog } from '@/services/agentHandoffRedaction'
@@ -12,7 +12,7 @@ export const AgentSessionMenu = () => {
   const { theme, setTheme } = useSettings()
   const [copyStatus, setCopyStatus] = useState<'idle' | 'success' | 'error'>('idle')
   const getPreviewEvidence = useCallback(
-    () => collectPreviewEvidenceFromFrame(previewIframeRef.current),
+    () => requestPreviewEvidenceFromFrame(previewIframeRef.current),
     [previewIframeRef]
   )
   const {

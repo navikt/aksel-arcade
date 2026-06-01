@@ -69,7 +69,7 @@ const createController = (
       appliedRequests.push(request)
       return applyResult
     },
-    getPreviewEvidence: () => ({
+    getPreviewEvidence: async () => ({
       ok: true,
       evidence: {
         frame: {

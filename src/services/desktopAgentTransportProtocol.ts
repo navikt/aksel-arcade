@@ -1,6 +1,7 @@
 import {
   isAgentBridgeCommandName,
   type AgentBridgeCommandRouter,
+  type AgentBridgeMaybeAsyncRoutedCommandResult,
   type AgentBridgeErrorCode,
   type AgentBridgeRoutedCommandResult,
 } from './agentBridge'
@@ -44,7 +45,9 @@ export type DesktopAgentTransportRouteResponse =
 
 export type DesktopAgentTransportRequestHandler = (
   request: DesktopAgentTransportRouteRequest
-) => DesktopAgentTransportRouteResponse | Promise<DesktopAgentTransportRouteResponse>
+) => MaybePromise<DesktopAgentTransportRouteResponse>
+
+type MaybePromise<T> = T | Promise<T>
 
 export const createDesktopAgentTransportErrorResponse = (
   id: DesktopAgentTransportJsonRpcId,
@@ -83,7 +86,7 @@ export const routeDesktopAgentTransportRequest = (
     router: AgentBridgeCommandRouter
     session: AgentBridgeSession
   }
-): DesktopAgentTransportRouteResponse => {
+): MaybePromise<DesktopAgentTransportRouteResponse> => {
   if (request.sessionId !== session.id) {
     return createDesktopAgentTransportErrorResponse(
       request.id,
@@ -109,9 +112,21 @@ export const routeDesktopAgentTransportRequest = (
     method === 'applyAgentChange'
       ? router.routeCommand(method, request.params)
       : router.routeCommand(method)
+
+  if (isPromiseLike(result)) {
+    return result.then((resolvedResult) => toTransportResponse(request.id, resolvedResult))
+  }
+
+  return toTransportResponse(request.id, result)
+}
+
+const toTransportResponse = (
+  id: DesktopAgentTransportJsonRpcId,
+  result: AgentBridgeRoutedCommandResult
+): DesktopAgentTransportRouteResponse => {
   if (!result.ok) {
     return createDesktopAgentTransportErrorResponse(
-      request.id,
+      id,
       -32002,
       result.error.code,
       result.error.message,
@@ -122,5 +137,10 @@ export const routeDesktopAgentTransportRequest = (
     )
   }
 
-  return createDesktopAgentTransportSuccessResponse(request.id, result)
+  return createDesktopAgentTransportSuccessResponse(id, result)
 }
+
+const isPromiseLike = (
+  value: AgentBridgeMaybeAsyncRoutedCommandResult
+): value is Promise<AgentBridgeRoutedCommandResult> =>
+  typeof value === 'object' && value !== null && 'then' in value && typeof value.then === 'function'

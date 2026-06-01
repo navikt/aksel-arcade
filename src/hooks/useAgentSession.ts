@@ -40,7 +40,7 @@ interface UseAgentSessionOptions {
   theme: ThemeMode
   onProjectChange: (updates: AgentProjectUpdates) => void
   onThemeChange: (theme: ThemeMode) => void
-  getPreviewEvidence: () => PreviewEvidenceCaptureResult
+  getPreviewEvidence: () => Promise<PreviewEvidenceCaptureResult>
 }
 
 export const useAgentSession = ({

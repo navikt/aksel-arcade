@@ -139,6 +139,7 @@
   
   <script src="./inspect-overlays-global.js"></script>
   <script src="./sandbox-messaging-global.js"></script>
+  <script src="./preview-evidence-global.js"></script>
   <script>
   (() => {
     const {
@@ -153,6 +154,10 @@
     const {
       postMessageToParent,
     } = window.sandboxMessaging;
+    const {
+      PREVIEW_EVIDENCE_ROOT_SELECTOR,
+      serializePreviewEvidence,
+    } = window.previewEvidenceUtils;
 
     // React and Aksel are loaded from the pre-bundled sandbox runtime.
     let currentRoot = null;
@@ -398,6 +403,10 @@
             console.log('🎨 Updating theme...');
             updateTheme(message.payload);
             break;
+          case 'CAPTURE_PREVIEW_EVIDENCE':
+            console.log('📸 Capturing Preview evidence...');
+            capturePreviewEvidence(message.payload);
+            break;
           case 'CHECK_CSS_VARS':
             checkCSSVariables(message.id);
             break;
@@ -412,6 +421,48 @@
           stack: error.stack || ''
         });
       }
+    }
+
+    function capturePreviewEvidence(payload) {
+      const requestId = payload?.requestId;
+      if (typeof requestId !== 'string' || requestId.length === 0) {
+        console.warn('Invalid Preview evidence request payload:', payload);
+        return;
+      }
+
+      try {
+        const root = document.querySelector(PREVIEW_EVIDENCE_ROOT_SELECTOR);
+        if (!root) {
+          sendPreviewEvidenceResult(requestId, {
+            ok: false,
+            error: {
+              code: 'preview-unavailable',
+              message: 'Preview root element was not found in the sandbox.',
+            },
+          });
+          return;
+        }
+
+        sendPreviewEvidenceResult(requestId, {
+          ok: true,
+          evidence: serializePreviewEvidence(root, window),
+        });
+      } catch (error) {
+        sendPreviewEvidenceResult(requestId, {
+          ok: false,
+          error: {
+            code: 'preview-unavailable',
+            message: `Preview evidence could not be captured: ${getErrorMessage(error)}`,
+          },
+        });
+      }
+    }
+
+    function sendPreviewEvidenceResult(requestId, result) {
+      sendMessage('PREVIEW_EVIDENCE_CAPTURED', {
+        requestId,
+        result,
+      });
     }
 
     // T077: Handle TOGGLE_INSPECT message

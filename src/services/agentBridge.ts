@@ -154,13 +154,17 @@ export type AgentBridgeRoutedCommandResult =
   | AgentBridgeCommandResult<AgentChangeResult>
   | AgentBridgeCommandFailure<string>
 
+export type AgentBridgeMaybeAsyncRoutedCommandResult =
+  | AgentBridgeRoutedCommandResult
+  | Promise<AgentBridgeRoutedCommandResult>
+
 export interface AgentBridgeController {
   getReadContext: () => AgentBridgeReadContext
   getPermissions: () => AgentPermissions
   isSessionActive: () => boolean
   recordActivity: (command: AgentBridgeCommandName) => void
   applyAgentChange: (request: unknown) => AgentBridgeCommandResult<AgentChangeResult>
-  getPreviewEvidence: () => PreviewEvidenceCaptureResult
+  getPreviewEvidence: () => Promise<PreviewEvidenceCaptureResult>
 }
 
 export interface AgentBridgeCommandRouter {
@@ -175,13 +179,13 @@ export interface AgentBridgeCommandRouter {
   routeCommand(command: 'getProject'): AgentBridgeCommandResult<AgentProjectReadState>
   routeCommand(command: 'getPreviewContext'): AgentBridgeCommandResult<AgentPreviewReadState>
   routeCommand(command: 'getDiagnostics'): AgentBridgeCommandResult<PreviewDiagnostics>
-  routeCommand(command: 'getPreviewEvidence'): AgentBridgeCommandResult<PreviewEvidence>
+  routeCommand(command: 'getPreviewEvidence'): Promise<AgentBridgeCommandResult<PreviewEvidence>>
   routeCommand(command: 'getSessionState'): AgentBridgeCommandResult<AgentSessionReadState>
   routeCommand(
     command: 'applyAgentChange',
     request: unknown
   ): AgentBridgeCommandResult<AgentChangeResult>
-  routeCommand(command: string, request?: unknown): AgentBridgeRoutedCommandResult
+  routeCommand(command: string, request?: unknown): AgentBridgeMaybeAsyncRoutedCommandResult
 }
 
 export const DEFAULT_AGENT_PERMISSIONS: AgentPermissions = {
@@ -319,6 +323,32 @@ export const createAgentBridgeCommandRouter = (
     return createCommandSuccess(command, data)
   }
 
+  const routePreviewEvidenceCommand = async (): Promise<
+    AgentBridgeCommandResult<PreviewEvidence>
+  > => {
+    const command = 'getPreviewEvidence'
+    if (!controller.isSessionActive()) {
+      return createSessionRevokedFailure(command)
+    }
+
+    if (!controller.getPermissions().previewEvidence) {
+      return createCommandFailure(
+        command,
+        'permission-denied',
+        'Preview evidence reads require the Preview evidence permission.'
+      )
+    }
+
+    const result = await controller.getPreviewEvidence()
+    if (!result.ok) {
+      return createCommandFailure(command, result.error.code, result.error.message)
+    }
+
+    controller.recordActivity(command)
+
+    return createCommandSuccess(command, result.evidence)
+  }
+
   function routeCommand(
     command: 'getAgentInstructions'
   ): AgentBridgeCommandResult<AgentInstructionsPayload>
@@ -327,13 +357,18 @@ export const createAgentBridgeCommandRouter = (
     command: 'getPreviewContext'
   ): AgentBridgeCommandResult<AgentPreviewReadState>
   function routeCommand(command: 'getDiagnostics'): AgentBridgeCommandResult<PreviewDiagnostics>
-  function routeCommand(command: 'getPreviewEvidence'): AgentBridgeCommandResult<PreviewEvidence>
+  function routeCommand(
+    command: 'getPreviewEvidence'
+  ): Promise<AgentBridgeCommandResult<PreviewEvidence>>
   function routeCommand(command: 'getSessionState'): AgentBridgeCommandResult<AgentSessionReadState>
   function routeCommand(
     command: 'applyAgentChange',
     request: unknown
   ): AgentBridgeCommandResult<AgentChangeResult>
-  function routeCommand(command: string, request?: unknown): AgentBridgeRoutedCommandResult {
+  function routeCommand(
+    command: string,
+    request?: unknown
+  ): AgentBridgeMaybeAsyncRoutedCommandResult {
     if (!isAgentBridgeCommandName(command)) {
       return createUnsupportedCommandFailure(command)
     }
@@ -374,28 +409,7 @@ export const createAgentBridgeCommandRouter = (
           clonePreviewDiagnostics(controller.getReadContext().diagnostics)
         )
       case 'getPreviewEvidence':
-        if (!controller.isSessionActive()) {
-          return createSessionRevokedFailure(command)
-        }
-
-        if (!controller.getPermissions().previewEvidence) {
-          return createCommandFailure(
-            command,
-            'permission-denied',
-            'Preview evidence reads require the Preview evidence permission.'
-          )
-        }
-
-        {
-          const result = controller.getPreviewEvidence()
-          if (!result.ok) {
-            return createCommandFailure(command, result.error.code, result.error.message)
-          }
-
-          controller.recordActivity(command)
-
-          return createCommandSuccess(command, result.evidence)
-        }
+        return routePreviewEvidenceCommand()
       case 'getSessionState':
         return readCommand(
           'getSessionState',
