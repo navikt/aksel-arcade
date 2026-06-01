@@ -1628,3 +1628,21 @@ Verification:
 - CI=1 npm run test
 - npm run lint (passes with existing hook dependency warnings in `InspectionPopover` and `PreviewPane`)
 - Browser smoke check at `http://127.0.0.1:5173/aksel-arcade/` for app render, preview render, and no console warnings/errors.
+
+### 2026-06-01 - Issue #164 remove obsolete long-form Agent instruction helpers
+
+Completed for #164:
+
+- Kept the work scoped to the Desktop Arcade Agent pairing flow and did not add or change unrelated features.
+- Removed the obsolete exported `createAgentInstructions` helper that built the old long copied prompt with duplicated transport prose, inline read/change curl examples, and provider-specific Copilot usage examples.
+- Kept the canonical copied Agent pairing handoff as the short one-line authenticated `curl` bootstrap request for `getAgentInstructions`.
+- Updated `tests/unit/services/agentBridge.test.ts` so it no longer asserts old long copied examples or provider-specific prompt content.
+- Strengthened the `getAgentInstructions` test to verify the compact Agent operating guide can be fetched repeatedly during an active Agent session without including Arcade project content.
+- Preserved the supported Agent bridge command list and structured protocol/session fields on the bridge-returned instructions payload.
+
+Verification:
+
+- npm run typecheck
+- npm run lint (passes with existing hook dependency warnings in `InspectionPopover` and `PreviewPane`)
+- CI=1 npm run test
+- Browser smoke check at `http://127.0.0.1:5173/aksel-arcade/` for app render, preview render, and no console warnings/errors.
