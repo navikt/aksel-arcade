@@ -1,3 +1,4 @@
+import { version as appVersion } from '../../../package.json'
 import {
   lazy,
   Suspense,
@@ -644,15 +645,6 @@ export const AppHeader = ({
                 </ActionMenu.Item>
               </ActionMenu.Group>
               <ActionMenu.Divider />
-              <ActionMenu.Group label="Layout">
-                <ActionMenu.Item
-                  icon={<ArrowsSquarepathIcon aria-hidden />}
-                  onSelect={togglePanelOrder}
-                >
-                  Swap panel order
-                </ActionMenu.Item>
-              </ActionMenu.Group>
-              <ActionMenu.Divider />
               <ActionMenu.Group label="Templates">
                 <ActionMenu.Item onSelect={onLoadFormSummaryTemplate}>
                   Oppsummeringsside for søknadsdialoger
@@ -661,6 +653,15 @@ export const AppHeader = ({
               </ActionMenu.Group>
               <ActionMenu.Divider />
               <ActionMenu.Group label="Editor">
+                <Detail as="p" style={{ padding: '0.25rem 0.75rem', opacity: 0.6 }}>
+                  Aksel Arcade v{appVersion}
+                </Detail>
+                <ActionMenu.Item
+                  icon={<ArrowsSquarepathIcon aria-hidden />}
+                  onSelect={togglePanelOrder}
+                >
+                  Swap panel order
+                </ActionMenu.Item>
                 <ActionMenu.Item icon={<ArrowUndoIcon aria-hidden />} onSelect={onResetToIntro}>
                   Reset editor
                 </ActionMenu.Item>
