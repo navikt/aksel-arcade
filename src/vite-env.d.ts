@@ -3,9 +3,9 @@
 import type { TelemetryEvent } from './services/telemetry'
 import type { DesktopArcadePreloadApi } from './services/shellCapabilities'
 
-declare const __APP_VERSION__: string
-
 declare global {
+  const __APP_VERSION__: string
+
   interface Window {
     __AKSEL_TELEMETRY_LOG__?: TelemetryEvent[]
     __AKSEL_TELEMETRY_HOOK__?: (event: TelemetryEvent) => void
