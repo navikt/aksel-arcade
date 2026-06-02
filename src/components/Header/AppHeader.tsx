@@ -1,4 +1,3 @@
-import { version as appVersion } from '../../../package.json'
 import {
   lazy,
   Suspense,
@@ -654,7 +653,7 @@ export const AppHeader = ({
               <ActionMenu.Divider />
               <ActionMenu.Group label="Editor">
                 <Detail as="p" style={{ padding: '0.25rem 0.75rem', opacity: 0.6 }}>
-                  Aksel Arcade v{appVersion}
+                  Aksel Arcade v{__APP_VERSION__}
                 </Detail>
                 <ActionMenu.Item
                   icon={<ArrowsSquarepathIcon aria-hidden />}

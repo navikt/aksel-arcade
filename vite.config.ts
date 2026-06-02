@@ -1,10 +1,32 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import path from 'path'
+import { execSync } from 'child_process'
+
+function resolveAppVersion(): string {
+  if (process.env.AKSEL_ARCADE_DESKTOP_VERSION) {
+    return process.env.AKSEL_ARCADE_DESKTOP_VERSION
+  }
+  try {
+    const tag = execSync('git tag --list "desktop-v*" --sort=-version:refname', {
+      encoding: 'utf-8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+    })
+      .trim()
+      .split('\n')[0]
+    if (tag) return tag.replace('desktop-v', '')
+  } catch {
+    // no git or no tags
+  }
+  return 'dev'
+}
 
 // https://vite.dev/config/
 export default defineConfig({
   base: '/aksel-arcade/', // GitHub Pages base path
+  define: {
+    __APP_VERSION__: JSON.stringify(resolveAppVersion()),
+  },
   plugins: [react()],
   resolve: {
     alias: {

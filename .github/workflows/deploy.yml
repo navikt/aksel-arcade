@@ -19,6 +19,13 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Determine app version
+        run: |
+          VERSION=$(git tag --list "desktop-v*" --sort=-version:refname | head -1 | sed 's/desktop-v//')
+          echo "AKSEL_ARCADE_DESKTOP_VERSION=${VERSION:-dev}" >> "$GITHUB_ENV"
 
       - name: Setup Node
         uses: actions/setup-node@v4
