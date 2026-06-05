@@ -240,6 +240,17 @@ function dedupeValues(values: Array<string | undefined>): string[] {
   )
 }
 
+function mergeCatalogPropValues(
+  existingProp: CompletionProp | undefined,
+  catalogProp: AkselCatalogProp
+): string[] {
+  if (catalogProp.valueKind === 'spacing-token') {
+    return catalogProp.values ? [...catalogProp.values] : []
+  }
+
+  return dedupeValues([...(existingProp?.values ?? []), ...(catalogProp.values ?? [])])
+}
+
 function normalizeComponentName(componentName: string): string {
   if (componentName === 'UNSAFE_Combobox') {
     return 'Combobox'
@@ -331,7 +342,7 @@ function getComponentProps(componentName: string): CompletionProp[] {
     propsByName.set(prop.name, {
       ...prop,
       ...existingProp,
-      values: dedupeValues([...(existingProp?.values ?? []), ...(prop.values ?? [])]),
+      values: mergeCatalogPropValues(existingProp, prop),
       description: existingProp?.description || prop.description,
     })
   }
@@ -471,25 +482,28 @@ function matchesPropValue(prop: CompletionProp, value: string, partialValue: str
   )
 }
 
-function valueOption(prop: CompletionProp, value: string, label = value): Completion {
+function valueOption(prop: CompletionProp, value: string, label = value, boost = 0): Completion {
   return {
     label,
     type: 'value',
     detail: prop.description || `${prop.name} value`,
     apply: value,
+    boost,
   }
 }
 
 function valueOptions(prop: CompletionProp, partialValue: string): Completion[] {
   return (
     prop.values
-      ?.filter((value) => matchesPropValue(prop, value, partialValue))
-      .map((value) => {
+      ?.map((value, index, values) => ({ value, index, values }))
+      .filter(({ value }) => matchesPropValue(prop, value, partialValue))
+      .map(({ value, index, values }) => {
+        const boost = values.length - index
         if (isBackgroundTokenProp(prop) && partialValue.toLowerCase().startsWith('bg-')) {
-          return valueOption(prop, value, backgroundTokenName(value))
+          return valueOption(prop, value, backgroundTokenName(value), boost)
         }
 
-        return valueOption(prop, value)
+        return valueOption(prop, value, value, boost)
       }) ?? []
   )
 }
