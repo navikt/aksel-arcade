@@ -5,6 +5,30 @@ const nestedIconSnippetStart = `<Page>
  <Box padding="space-16" background="neutral-softA" borderRadius="8">
   `
 const autocompleteOption = '.cm-tooltip-autocomplete [role="option"]'
+const spacingTokenLabels = [
+  'space-0',
+  'space-1',
+  'space-2',
+  'space-4',
+  'space-6',
+  'space-8',
+  'space-12',
+  'space-16',
+  'space-20',
+  'space-24',
+  'space-28',
+  'space-32',
+  'space-36',
+  'space-40',
+  'space-44',
+  'space-48',
+  'space-56',
+  'space-64',
+  'space-72',
+  'space-80',
+  'space-96',
+  'space-128',
+]
 
 async function replaceEditorText(page: Page, text: string) {
   const editor = page.locator('.cm-content').first()
@@ -22,6 +46,15 @@ async function openAutocompleteFor(page: Page, seed: string, typed: string) {
   const autocomplete = page.locator('.cm-tooltip-autocomplete')
   await expect(autocomplete).toBeVisible({ timeout: 5000 })
   return autocomplete
+}
+
+async function autocompleteOptionLabels(page: Page) {
+  return page.locator(autocompleteOption).evaluateAll((options) =>
+    options.map((option) => {
+      const label = option.querySelector('.cm-completionLabel')
+      return (label?.textContent ?? option.textContent ?? '').trim()
+    })
+  )
 }
 
 test.describe('Aksel autocomplete', () => {
@@ -90,6 +123,11 @@ test.describe('Aksel autocomplete', () => {
 
     const dataColorAutocomplete = await openAutocompleteFor(page, '<Page data-color="brand-', 'm')
     await expect(dataColorAutocomplete).toContainText('brand-magenta')
+  })
+
+  test('shows primitive spacing values in chronological order without compound duplicates', async ({ page }) => {
+    await openAutocompleteFor(page, '<HStack gap="', '')
+    await expect.poll(() => autocompleteOptionLabels(page)).toEqual(spacingTokenLabels)
   })
 
   test('suggests icons only in icon-aware browser contexts', async ({ page }) => {
