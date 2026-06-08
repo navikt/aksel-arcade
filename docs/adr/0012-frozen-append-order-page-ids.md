@@ -1,0 +1,5 @@
+# Frozen append-order page ids
+
+Each **Arcade page** has a stable id of the form `pageNN`, assigned from a monotonic counter at creation (so it matches the panel position for the common append case) and then **never renumbered or reused**. Deleting a page leaves a gap in the sequence; reordering, if ever added, does not change ids. **Page references** in code (`goToPage('pageNN')` and Aksel anchor `href="pageNN"`) target this id, so renaming a page's display name can never break navigation, and a reference to a missing id is unambiguously a **stale page reference** to be highlighted.
+
+The obvious-but-wrong alternative is to renumber ids to match panel position so the numbering stays "tidy." That silently repoints or breaks every reference to the pages after a deleted one, and makes stale-reference detection ambiguous. We deliberately accept visible gaps (e.g. `page01`, `page03`) in exchange for references that are stable by construction. A future change that "cleans up" numbering by renumbering would reintroduce exactly the breakage this decision prevents.
