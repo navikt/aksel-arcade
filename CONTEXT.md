@@ -9,15 +9,43 @@ A shell-neutral user-owned prototype in Aksel Arcade, including its editable sou
 _Avoid_: File, document, artifact
 
 **Arcade project source**:
-The two editable code parts of an **Arcade project**: JSX and Hooks.
+The editable code of an **Arcade project**, composed of the **Global config** and one or more ordered **Arcade pages**, each with its own JSX and Hooks. The default experience presents a single page; multi-page authoring is an experimental, locally enabled capability.
 _Avoid_: Files, filesystem, project code
+
+**Arcade page**:
+A named, independently rendered screen within an **Arcade project source**, identified by a stable page id that is never renumbered or reused. Each page holds its own JSX and Hooks.
+_Avoid_: File, route, tab, document, screen mock
+
+**Global config**:
+The permanent, non-navigable part of an **Arcade project source** whose JSX (shared component definitions) and Hooks (shared logic) are in scope for every **Arcade page**. It is never renamed, deleted, or used as a **start page**.
+_Avoid_: Page, layout, shell, global theme, settings
+
+**Page reference**:
+A use of an **Arcade page**'s stable id within **Arcade project source** that targets that page for **page navigation**. It survives renaming the page's display name and becomes a **stale page reference** when its target no longer exists.
+_Avoid_: Link, route, page name, href
+
+**Stale page reference**:
+A **page reference** whose target **Arcade page** has been deleted; Arcade highlights it across every page that still uses it.
+_Avoid_: Broken link, dangling pointer, error
+
+**Page navigation**:
+The in-prototype act of moving the preview from the **active page** to another **Arcade page**, as opposed to ordinary browser navigation. It is expressed through standard Aksel components.
+_Avoid_: Browser navigation, routing, redirect, share navigation
+
+**Active page**:
+The single **Arcade page** currently shown in the preview, selected in the page panel, and open in the JSX and Hooks tabs. Preview **page navigation** and panel selection keep these in sync.
+_Avoid_: Start page, current file, selected tab, open page
+
+**Start page**:
+The **Arcade page** where the preview begins on a fresh render. There is one per **Arcade project**, defaulting to the first page and changeable to any page.
+_Avoid_: Active page, home route, landing page, default tab
 
 **Preview preference**:
 A review-facing display preference of an **Arcade project**, such as the viewport or theme used to open its preview.
 _Avoid_: Workspace preference, editor layout
 
 **Workspace preference**:
-A local product-surface preference for arranging Arcade itself around an **Arcade project**, such as editor panel placement. In **Web Arcade**, workspace preferences belong to the current **Web Arcade working copy**.
+A local product-surface preference for arranging Arcade itself around an **Arcade project**, such as editor panel placement or whether experimental multi-page authoring is enabled. In **Web Arcade**, workspace preferences belong to the current **Web Arcade working copy**.
 _Avoid_: Preview preference, project content
 
 **Arcade project package**:
@@ -113,7 +141,7 @@ A human-controlled capability that limits what an external agent may change or c
 _Avoid_: Role, scope, feature flag
 
 **Arcade-scoped state**:
-The parts of Aksel Arcade that describe the active **Arcade project**, its preview, its **Preview evidence**, and its Arcade-specific diagnostics.
+The parts of Aksel Arcade that describe the active **Arcade project** — including its **Global config**, its ordered **Arcade pages** (with their stable ids and display names), its **Start page**, and its **Active page** — together with its preview, its **Preview evidence**, and its Arcade-specific diagnostics.
 _Avoid_: Browser state, page state, local storage
 
 **Preview evidence**:
@@ -133,7 +161,7 @@ _Avoid_: Agent operating instructions, Aksel training
 _Avoid_: Visual mimic, prop-free HTML, screenshot-only JSX
 
 **Agent change**:
-An agent-authored replacement set applied to one or more parts of the active **Arcade project** during an **Agent session**.
+An agent-authored change applied to one or more parts of the active **Arcade project** during an **Agent session** — the **Global config** code, an individual **Arcade page**'s code, or the project's page set itself (adding, renaming, or removing an **Arcade page**, or changing the **Start page**). The app assigns page ids; an agent never chooses them.
 _Avoid_: Proposed change, patch, command, cursor edit
 
 ## Example dialogue
@@ -197,3 +225,35 @@ Domain expert: "Replace only that tab's Web Arcade working copy with the importe
 Developer: "The user needs to keep a Web Arcade prototype after closing the tab."
 
 Domain expert: "Use Share or Export. A closed Web Arcade working copy is not a durable project library entry."
+
+Developer: "The user enabled multi-page authoring and added a second page."
+
+Domain expert: "Now the Arcade project source has the Global config plus two Arcade pages. The flag that enabled this is a Workspace preference; it does not travel with the project."
+
+Developer: "The user renamed 'Home' to 'Landing'."
+
+Domain expert: "Page references point at the page's stable id, not its name, so navigation keeps working. Only the display name changed."
+
+Developer: "The user deleted a page that other pages still link to."
+
+Domain expert: "Those become stale page references. Highlight them on every page that still uses them."
+
+Developer: "Which page should the preview show first?"
+
+Domain expert: "The start page. By default that is the first page, but the user can set any page as the start page. Whatever page the preview is currently on is the active page, and the panel and code tabs follow it."
+
+Developer: "The user wants a header shared across every page."
+
+Domain expert: "Define it in the Global config JSX as a shared component and use it from each page. The Global config never renders on its own."
+
+Developer: "The user shared a multi-page prototype as a Web share URL."
+
+Domain expert: "While multi-page is experimental, the portable artifact carries only the start page. Warn the user that other pages are not included."
+
+Developer: "An agent wants to add a page, but the user never enabled multi-page authoring."
+
+Domain expert: "Then the agent works single-page on the first page, just like the human. Agent multi-page is gated by the same Workspace preference; the Agent operating instructions should tell the agent to ask the human to enable it."
+
+Developer: "Multi-page is enabled and the agent needs to add a page and link to it."
+
+Domain expert: "The agent submits an agent change to add the page; the app gives it back a stable id. The agent then references that id in its page references — both navigation methods point at the id, never the name. The Arcade authoring guidance documents those rules for humans and agents alike."
