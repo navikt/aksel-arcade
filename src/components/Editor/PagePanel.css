@@ -86,6 +86,10 @@
   color: var(--ax-text-danger);
 }
 
+.page-panel__status--warning {
+  color: var(--ax-text-warning);
+}
+
 .page-panel__actions-trigger {
   flex-shrink: 0;
   min-width: 2rem;

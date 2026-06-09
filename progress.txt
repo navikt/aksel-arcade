@@ -1956,3 +1956,39 @@ Verification:
 - npm run build
 - npm run typecheck
 - npm test -- --run
+
+### 2026-06-09 - Issue #191: Multi-page stale page reference diagnostics
+
+Implemented:
+
+- Selected #191 as the highest-priority `ready-for-agent` feature from #185-#191 because it closes the safety loop around multi-page authoring after #189 page lifecycle actions and #190 active-page sync, and it is more blocking to real authoring than export, autocomplete, or Agent-bridge follow-ups.
+- Read issue #181, issue #191, `docs/prd/0030-multi-page-support.md`, and the existing `progress.txt` notes before changing code.
+- Added a pure page-reference analyzer in `src/services/pageReferences.ts` that finds `goToPage(...)` and page-id `href`/`to` references with source positions, classifies them as valid vs stale, and computes delete-impact counts across surviving pages plus `Global config`.
+- Wired `src/components/Editor/CodeEditor.tsx` to surface stale references as warning diagnostics during multi-page authoring, using the analyzer so the current page or `Global config` shows clear missing-page warnings while typing.
+- Updated `src/components/Editor/EditorPane.tsx`, `src/components/Editor/PagePanel.tsx`, and `src/components/Editor/PagePanel.css` so the page panel now shows a broken-navigation indicator, keeps preview errors higher-priority than stale references, and shows delete-confirmation impact counts before a page is removed.
+- Added regression coverage in `tests/unit/services/pageReferences.test.ts`, `tests/integration/multi-page-page-panel.test.tsx`, and `tests/integration/multi-page-preview-sync.test.tsx` for source-position detection, delete-impact counting, live broken-navigation indicator updates from page and `Global config` edits, and the error-over-stale priority rule.
+
+Verification:
+
+- npm run typecheck
+- npm run lint (existing `InspectionPopover` hook dependency warning only)
+- CI=1 npm run test
+- npm run build
+- Browser check at `http://127.0.0.1:4176/aksel-arcade/` for enabling experimental multi-page authoring, deleting a referenced Page 2 and seeing the stale-reference impact count in the confirmation dialog, seeing Page 1 switch to the broken-navigation state after delete, and reloading into a cleaned-up Page 1 state that rendered `Recovered` in the preview without runtime console errors.
+
+Next note:
+
+- If later work wants a dedicated `Global config` broken-navigation badge, `analyzeProjectPageReferences()` already exposes `globalConfigStaleReferences`; the current UI intentionally fans those shared stale refs out to all page rows instead, because the broken navigation is reachable from every page that renders shared config code.
+
+### 2026-06-09 - PR #197 review follow-up
+
+Fixed one PR-scoped review issue before merge:
+
+- The page panel only rendered its status container for rows with errors or lifecycle labels, so an inactive, non-start page with stale references never showed the broken-navigation badge even though `hasBrokenNavigation` was already computed.
+- Expanded the `PagePanel` render guard to include `hasBrokenNavigation`, then added an integration regression proving the badge still appears when the affected page is neither active nor start page.
+
+Verification:
+
+- npm run typecheck
+- npm run lint (existing `InspectionPopover` hook dependency warning only)
+- CI=1 npm run test

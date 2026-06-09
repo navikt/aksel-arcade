@@ -10,13 +10,37 @@ import {
   VStack,
 } from '@navikt/ds-react'
 import { CheckmarkIcon, PlusIcon, XMarkIcon } from '@navikt/aksel-icons'
+import type { DeletePageImpact } from '@/services/pageReferences'
 import type { ArcadePage, ArcadePageId, SelectedEditTarget } from '@/types/project'
 import './PagePanel.css'
+
+const EMPTY_DELETE_PAGE_IMPACT: DeletePageImpact = {
+  referenceCount: 0,
+  pageCount: 0,
+  globalConfigReferenceCount: 0,
+}
+
+const formatDeleteImpactLocations = ({
+  pageCount,
+  globalConfigReferenceCount,
+}: DeletePageImpact): string => {
+  const locations: string[] = []
+  if (pageCount > 0) {
+    locations.push(`${pageCount} page${pageCount === 1 ? '' : 's'}`)
+  }
+  if (globalConfigReferenceCount > 0) {
+    locations.push('Global config')
+  }
+
+  return locations.join(' and ')
+}
 
 interface PagePanelProps {
   activePageId: ArcadePageId
   startPageId: ArcadePageId
   pages: ArcadePage[]
+  brokenNavigationPageIds: ArcadePageId[]
+  deletePageImpacts: Partial<Record<ArcadePageId, DeletePageImpact>>
   errorPageIds: ArcadePageId[]
   selectedEditTarget: SelectedEditTarget
   onAddPage: () => void
@@ -31,6 +55,8 @@ export const PagePanel = ({
   activePageId,
   startPageId,
   pages,
+  brokenNavigationPageIds,
+  deletePageImpacts,
   errorPageIds,
   selectedEditTarget,
   onAddPage,
@@ -50,6 +76,9 @@ export const PagePanel = ({
   const deletePageCandidate = deletePageId
     ? pages.find((page) => page.id === deletePageId) ?? null
     : null
+  const deletePageImpact = deletePageCandidate
+    ? deletePageImpacts[deletePageCandidate.id] ?? EMPTY_DELETE_PAGE_IMPACT
+    : EMPTY_DELETE_PAGE_IMPACT
 
   useEffect(() => {
     if (renamingPageId && !pages.some((page) => page.id === renamingPageId)) {
@@ -182,6 +211,7 @@ export const PagePanel = ({
                 const isEditing = selectedEditTarget === 'page' && isActivePage
                 const isStartPage = page.id === startPageId
                 const hasError = errorPageIds.includes(page.id)
+                const hasBrokenNavigation = brokenNavigationPageIds.includes(page.id)
                 const lifecycleLabels = [
                   ...(isActivePage ? ['Active page'] : []),
                   ...(isStartPage ? ['Start page'] : []),
@@ -249,13 +279,13 @@ export const PagePanel = ({
                         >
                           <div className="page-panel__row-header">
                             <BodyShort weight="semibold">{page.name}</BodyShort>
-                            {(hasError || lifecycleLabels.length > 0) && (
+                            {(hasError || hasBrokenNavigation || lifecycleLabels.length > 0) && (
                               <HStack
                                 gap="space-4"
                                 align="center"
                                 className="page-panel__status-group"
                               >
-                                {hasError && (
+                                {hasError ? (
                                   <Detail
                                     size="small"
                                     className="page-panel__status page-panel__status--error"
@@ -263,7 +293,15 @@ export const PagePanel = ({
                                   >
                                     Error
                                   </Detail>
-                                )}
+                                ) : hasBrokenNavigation ? (
+                                  <Detail
+                                    size="small"
+                                    className="page-panel__status page-panel__status--warning"
+                                    aria-label="Broken page navigation"
+                                  >
+                                    Broken nav
+                                  </Detail>
+                                ) : null}
                                 {lifecycleLabels.length > 0 && (
                                   <Detail size="small" className="page-panel__status">
                                     {lifecycleLabels.join(' · ')}
@@ -338,6 +376,20 @@ export const PagePanel = ({
                 <BodyShort size="small">
                   This page is currently the Start page. The first remaining page will become the
                   new Start page.
+                </BodyShort>
+              )}
+              {deletePageImpact.referenceCount > 0 ? (
+                <BodyShort size="small">
+                  Deleting this page will leave{' '}
+                  <strong>
+                    {deletePageImpact.referenceCount} stale page reference
+                    {deletePageImpact.referenceCount === 1 ? '' : 's'}
+                  </strong>{' '}
+                  across <strong>{formatDeleteImpactLocations(deletePageImpact)}</strong>.
+                </BodyShort>
+              ) : (
+                <BodyShort size="small">
+                  No existing page navigation references currently point to this page.
                 </BodyShort>
               )}
             </VStack>

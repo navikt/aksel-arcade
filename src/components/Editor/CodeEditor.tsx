@@ -14,6 +14,8 @@ import {
   getAkselCompletionForContext,
   isAkselPropValueCompletionContext,
 } from '@/services/akselAutocomplete'
+import { getStalePageReferenceMessage, getStalePageReferences } from '@/services/pageReferences'
+import type { ArcadePageId } from '@/types/project'
 import * as Babel from '@babel/standalone'
 import './CodeEditor.css'
 
@@ -55,6 +57,7 @@ interface CodeEditorProps {
   onFocusChange?: (focused: boolean) => void
   onFormat?: () => void | Promise<void>
   language?: 'jsx' | 'typescript'
+  validPageIds?: ArcadePageId[]
   readOnly?: boolean
 }
 
@@ -179,6 +182,7 @@ export const CodeEditor = forwardRef<CodeEditorRef, CodeEditorProps>(({
   onFocusChange,
   onFormat,
   language = 'jsx',
+  validPageIds,
   readOnly = false,
 }, ref) => {
   const editorRef = useRef<ReactCodeMirrorRef>(null)
@@ -229,6 +233,19 @@ export const CodeEditor = forwardRef<CodeEditorRef, CodeEditorProps>(({
       },
     ])
 
+    const pageReferenceLinter = linter((view) => {
+      if (!validPageIds || validPageIds.length === 0) {
+        return []
+      }
+
+      return getStalePageReferences(view.state.doc.toString(), validPageIds).map((reference) => ({
+        from: reference.from,
+        to: reference.to,
+        severity: 'warning',
+        message: getStalePageReferenceMessage(reference),
+      } satisfies Diagnostic))
+    })
+
     // Return the extensions array
     return [
       javascript({ jsx: language === 'jsx', typescript: true }),
@@ -242,8 +259,9 @@ export const CodeEditor = forwardRef<CodeEditorRef, CodeEditorProps>(({
       cursorInQuotesPlugin,
       customKeymap,
       jsxLinter,
+      pageReferenceLinter,
     ]
-  }, [language, onFormat]) // Memoize based on language and onFormat
+  }, [language, onFormat, validPageIds]) // Memoize based on language and onFormat
 
   return (
     <div className="code-editor">
