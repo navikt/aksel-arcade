@@ -1,12 +1,16 @@
 import { useCallback, useEffect } from 'react'
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor, act, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { AppProvider, useProject } from '@/hooks/useProject'
-import { SettingsProvider } from '@/contexts/SettingsContext'
+import { SettingsProvider, useSettings } from '@/contexts/SettingsContext'
 import { AppHeader } from '@/components/Header/AppHeader'
 import type { UseShareLinkOptions } from '@/hooks/useShareLink'
-import { getActiveSource } from '@/services/projectSource'
+import {
+  createArcadePage,
+  createArcadeSourceFile,
+  getActiveSource,
+} from '@/services/projectSource'
 import type {
   AgentBridgeCommandResult,
   AgentBridgeCommandName,
@@ -22,6 +26,7 @@ import type {
 } from '@/services/desktopAgentTransportProtocol'
 import * as shareEncoding from '@/utils/shareEncoding'
 import * as storage from '@/services/storage'
+import { MULTI_PAGE_PORTABLE_ARTIFACT_WARNING } from '@/services/storage'
 import type { CompressionStrategy } from '@/services/compressionStrategies'
 import * as compressionStrategies from '@/services/compressionStrategies'
 import {
@@ -30,6 +35,7 @@ import {
   type DesktopArcadePreloadApi,
   type ShellCapabilities,
 } from '@/services/shellCapabilities'
+import { createDefaultProject } from '@/utils/projectDefaults'
 
 const TEST_ALERT_SNIPPET = Array.from({ length: 30 })
   .map((_, index) => `
@@ -59,6 +65,39 @@ interface HarnessProps {
   shellCapabilities?: ShellCapabilities
 }
 
+const createLossyMultiPageProject = () => {
+  const project = createDefaultProject()
+  project.name = 'Lossy Multi-page Project'
+  project.source = {
+    globalConfig: createArcadeSourceFile(
+      'const SharedChrome = () => <Box>Shared chrome</Box>',
+      'export const sharedConfig = "shared"'
+    ),
+    pages: [
+      createArcadePage(
+        'page01',
+        'Page 1',
+        createArcadeSourceFile(
+          '<Box>Non-start page</Box>',
+          'export const useFirstPage = () => "first"'
+        )
+      ),
+      createArcadePage(
+        'page02',
+        'Page 2',
+        createArcadeSourceFile(
+          '<Box>Portable start page</Box>',
+          'export const usePortableStartPage = () => "start"'
+        )
+      ),
+    ],
+    startPageId: 'page02',
+    nextPageNumber: 3,
+  }
+  project.activePageId = 'page02'
+  return project
+}
+
 const Harness = ({
   shareOptions,
   shellCapabilities = WEB_ARCADE_CAPABILITIES,
@@ -71,10 +110,16 @@ const Harness = ({
     loadFormSummaryTemplate,
     loadHooksDemo,
   } = useProject()
+  const { setMultiPageEnabled } = useSettings()
 
   const appendAlertSnippet = useCallback(() => {
     updateProject({ jsxCode: `${getActiveSource(project).jsx}${TEST_ALERT_SNIPPET}` })
   }, [project, updateProject])
+
+  const loadLossyMultiPageProject = useCallback((enabled = true) => {
+    replaceProject(createLossyMultiPageProject())
+    setMultiPageEnabled(enabled)
+  }, [replaceProject, setMultiPageEnabled])
 
   useEffect(() => {
     const handleAppend = () => appendAlertSnippet()
@@ -83,6 +128,20 @@ const Harness = ({
       document.removeEventListener('test:append-alert-snippet', handleAppend)
     }
   }, [appendAlertSnippet])
+
+  useEffect(() => {
+    const handleLoad = (event: Event) => {
+      const multiPageEnabled =
+        event instanceof CustomEvent && typeof event.detail?.multiPageEnabled === 'boolean'
+          ? event.detail.multiPageEnabled
+          : true
+      loadLossyMultiPageProject(multiPageEnabled)
+    }
+    document.addEventListener('test:load-lossy-multi-page-project', handleLoad)
+    return () => {
+      document.removeEventListener('test:load-lossy-multi-page-project', handleLoad)
+    }
+  }, [loadLossyMultiPageProject])
 
   return (
     <>
@@ -447,6 +506,78 @@ describe('Share popover integration', () => {
     expect(serialized).not.toContain('charLimit')
   })
 
+  it('warns that multi-page sharing includes only the Start page', async () => {
+    renderHeader()
+    act(() => {
+      document.dispatchEvent(new Event('test:load-lossy-multi-page-project'))
+    })
+
+    fireEvent.click(screen.getByLabelText(/share project/i))
+
+    expect(await screen.findByText(MULTI_PAGE_PORTABLE_ARTIFACT_WARNING)).toBeTruthy()
+    await waitFor(() => expect(encodeSpy).toHaveBeenCalled())
+
+    const serialized = encodeSpy.mock.calls.at(-1)?.[1]?.serialized
+    if (!serialized) {
+      throw new Error('Expected share generation to pass a serialized payload.')
+    }
+
+    const payload = JSON.parse(serialized)
+    expect(payload.source).toEqual({
+      jsx: '<Box>Portable start page</Box>',
+      hooks: 'export const usePortableStartPage = () => "start"',
+    })
+    expect(serialized).not.toContain('Non-start page')
+    expect(serialized).not.toContain('Shared chrome')
+    expect(serialized).not.toContain('sharedConfig')
+  })
+
+  it('warns before exporting a multi-page project and waits for confirmation', async () => {
+    const exportSpy = vi.spyOn(storage, 'exportProject').mockImplementation(() => undefined)
+
+    try {
+      renderHeader()
+      act(() => {
+        document.dispatchEvent(new Event('test:load-lossy-multi-page-project'))
+      })
+
+      fireEvent.click(screen.getByRole('button', { name: /^Export$/i }))
+
+      const exportDialog = await screen.findByRole('alertdialog', { name: /confirm export/i })
+      expect(within(exportDialog).getByText(MULTI_PAGE_PORTABLE_ARTIFACT_WARNING)).toBeTruthy()
+      expect(exportSpy).not.toHaveBeenCalled()
+
+      fireEvent.click(within(exportDialog).getByRole('button', { name: /export start page only/i }))
+
+      expect(exportSpy).toHaveBeenCalledTimes(1)
+    } finally {
+      exportSpy.mockRestore()
+    }
+  })
+
+  it('still warns before exporting a multi-page project when the experiment is disabled', async () => {
+    const exportSpy = vi.spyOn(storage, 'exportProject').mockImplementation(() => undefined)
+
+    try {
+      renderHeader()
+      act(() => {
+        document.dispatchEvent(
+          new CustomEvent('test:load-lossy-multi-page-project', {
+            detail: { multiPageEnabled: false },
+          })
+        )
+      })
+
+      fireEvent.click(screen.getByRole('button', { name: /^Export$/i }))
+
+      const exportDialog = await screen.findByRole('alertdialog', { name: /confirm export/i })
+      expect(within(exportDialog).getByText(MULTI_PAGE_PORTABLE_ARTIFACT_WARNING)).toBeTruthy()
+      expect(exportSpy).not.toHaveBeenCalled()
+    } finally {
+      exportSpy.mockRestore()
+    }
+  })
+
   it('keeps Agent session artifacts out of Desktop export fallback payloads', async () => {
     const nextJsx = 'export default function App() { return <Heading>Fallback source</Heading> }'
     const nextHooks = 'export const useFallbackFixture = () => "current hooks"'
@@ -738,7 +869,9 @@ describe('Share popover integration', () => {
     await findShareLengthLabelForPayload(payloadLength)
 
     payloadLength = 640
-    document.dispatchEvent(new Event('test:append-alert-snippet'))
+    act(() => {
+      document.dispatchEvent(new Event('test:append-alert-snippet'))
+    })
 
     await findShareLengthLabelForPayload(payloadLength)
   })

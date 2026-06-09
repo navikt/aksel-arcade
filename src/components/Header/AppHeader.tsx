@@ -44,7 +44,12 @@ import { ProjectSizeIndicator } from './ProjectSizeIndicator'
 import { useSettings } from '@/contexts/SettingsContext'
 import type { Project } from '@/types/project'
 import type { SaveStatus } from '@/hooks/useAutoSave'
-import { ARCADE_PROJECT_IMPORT_ACCEPT, exportProject, importProject } from '@/services/storage'
+import {
+  ARCADE_PROJECT_IMPORT_ACCEPT,
+  exportProject,
+  getPortableArtifactWarning,
+  importProject,
+} from '@/services/storage'
 import {
   useShareLink,
   type ShareLinkErrorCode,
@@ -110,10 +115,12 @@ export const AppHeader = ({
   const lastGeneratedShareFingerprintRef = useRef<string | null>(null)
   const projectNameInputRef = useRef<HTMLInputElement>(null)
   const [shareOpen, setShareOpen] = useState(false)
+  const [exportConfirmOpen, setExportConfirmOpen] = useState(false)
   const [importConfirmOpen, setImportConfirmOpen] = useState(false)
   const [isEditingProjectName, setIsEditingProjectName] = useState(false)
   const [projectNameDraft, setProjectNameDraft] = useState(projectName)
   const loadingDescriptionId = useId()
+  const exportConfirmDialogId = useId()
   const importConfirmDialogId = useId()
   const slowDescriptionId = `${loadingDescriptionId}-delay`
   const { theme, toggleTheme, togglePanelOrder, multiPageEnabled, toggleMultiPageEnabled } =
@@ -128,8 +135,19 @@ export const AppHeader = ({
   } = useShareLink(shareOptions)
   const canUseShareUrl = shellCapabilities.shareUrl.enabled
   const canUseAgentSessions = shellCapabilities.agentSessions.enabled
+  const portableArtifactWarning = getPortableArtifactWarning(currentProject)
 
   const handleExport = () => {
+    setShareOpen(false)
+    if (portableArtifactWarning) {
+      setExportConfirmOpen(true)
+      return
+    }
+    exportProject(currentProject)
+  }
+
+  const handleConfirmExport = () => {
+    setExportConfirmOpen(false)
     exportProject(currentProject)
   }
 
@@ -463,6 +481,8 @@ export const AppHeader = ({
             size="small"
             icon={<FileExportIcon aria-hidden />}
             onClick={handleExport}
+            aria-haspopup={portableArtifactWarning ? 'dialog' : undefined}
+            aria-controls={exportConfirmOpen ? exportConfirmDialogId : undefined}
           >
             Export
           </Button>
@@ -500,6 +520,11 @@ export const AppHeader = ({
                     <Heading size="small" level="2">
                       Share this prototype
                     </Heading>
+                    {portableArtifactWarning && (
+                      <Alert variant="warning" size="small">
+                        <BodyLong size="small">{portableArtifactWarning}</BodyLong>
+                      </Alert>
+                    )}
                     {isGeneratingShare ? (
                       <HStack gap="space-8" align="center" role="status" aria-live="polite">
                         <Loader size="xsmall" title="Generating Web share URL" />
@@ -688,6 +713,31 @@ export const AppHeader = ({
           style={{ display: 'none' }}
           aria-label="Import .akselarcade Arcade project package"
         />
+        <Dialog open={exportConfirmOpen} onOpenChange={(open) => setExportConfirmOpen(open)}>
+          <Dialog.Popup
+            id={exportConfirmDialogId}
+            role="alertdialog"
+            aria-label="Confirm export"
+            closeOnOutsideClick={false}
+          >
+            <Dialog.Body>
+              <VStack gap="space-12">
+                <BodyLong>{portableArtifactWarning}</BodyLong>
+                <Detail size="small">Continue with a Start-page-only export?</Detail>
+              </VStack>
+            </Dialog.Body>
+            <Dialog.Footer>
+              <Dialog.CloseTrigger>
+                <Button type="button" variant="secondary" data-color="neutral">
+                  Cancel
+                </Button>
+              </Dialog.CloseTrigger>
+              <Button type="button" onClick={handleConfirmExport}>
+                Export Start page only
+              </Button>
+            </Dialog.Footer>
+          </Dialog.Popup>
+        </Dialog>
         <Dialog open={importConfirmOpen} onOpenChange={(open) => setImportConfirmOpen(open)}>
           <Dialog.Popup
             id={importConfirmDialogId}

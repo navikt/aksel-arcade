@@ -23,7 +23,13 @@ import {
 import { decodeShareToken } from '@/utils/shareDecoding'
 import { getCompressionStrategy } from '@/services/compressionStrategies'
 import { CURRENT_PROJECT_VERSION, type Project, type ProjectSnapshot } from '@/types/project'
-import { FIRST_PAGE_ID, createSinglePageProjectSource, getStartPageSource } from '@/services/projectSource'
+import {
+  FIRST_PAGE_ID,
+  createArcadePage,
+  createArcadeSourceFile,
+  createSinglePageProjectSource,
+  getStartPageSource,
+} from '@/services/projectSource'
 import { getViewportWidth } from '@/types/viewports'
 import { repairPackedSnapshotJson, unpackSnapshot } from '@/utils/snapshotPacking'
 import { setupSessionStorageMock, type MockSessionStorage } from '../helpers/mockLocalStorage'
@@ -159,6 +165,38 @@ const createWorkingCopyProject = (
 const setPrimarySource = (project: Project, jsxCode: string, hooksCode = '') => {
   project.source = createSinglePageProjectSource(jsxCode, hooksCode)
 }
+
+const createLossyMultiPageShareProject = (): Project =>
+  createWorkingCopyProject({
+    name: 'Lossy shared multi-page project',
+    source: {
+      globalConfig: createArcadeSourceFile(
+        'const SharedChrome = () => <Box>Shared chrome</Box>',
+        'export const sharedConfig = "shared"'
+      ),
+      pages: [
+        createArcadePage(
+          FIRST_PAGE_ID,
+          'Page 1',
+          createArcadeSourceFile(
+            '<Box>Non-start shared page</Box>',
+            'export const useFirstSharedPage = () => "shared-first"'
+          )
+        ),
+        createArcadePage(
+          'page02',
+          'Page 2',
+          createArcadeSourceFile(
+            '<Box>Portable shared start page</Box>',
+            'export const usePortableSharedStartPage = () => "shared-start"'
+          )
+        ),
+      ],
+      startPageId: 'page02',
+      nextPageNumber: 3,
+    },
+    activePageId: 'page02',
+  })
 
 const loadCorruptedPackedFixture = async (): Promise<{
   corruptedPacked: string
@@ -364,6 +402,33 @@ describe('share decode integration', () => {
     )
     expect(screen.getByTestId('editor-active-tab').textContent).toBe('JSX')
     expect(window.location.search).not.toContain('share=')
+  })
+
+  it('loads multi-page Web share URLs as single-page local projects using only the Start page', async () => {
+    const senderProject = createLossyMultiPageShareProject()
+    const token = await createShareTokenForSnapshot(
+      createShareSnapshot(senderProject, {
+        preview: {
+          viewport: 'LG',
+          theme: 'light',
+        },
+      })
+    )
+    window.history.replaceState({}, '', `/?share=${encodeURIComponent(token)}`)
+
+    renderHarness()
+
+    await screen.findByText('share-ready')
+    await user.click(screen.getByRole('button', { name: /load shared project/i }))
+
+    await waitFor(() => {
+      expect(screen.getByTestId('share-status').textContent).toBe('idle')
+    })
+
+    expect(screen.getByTestId('jsx-code').textContent).toContain('Portable shared start page')
+    expect(screen.getByTestId('hooks-code').textContent).toContain('usePortableSharedStartPage')
+    expect(screen.getByTestId('jsx-code').textContent).not.toContain('Non-start shared page')
+    expect(screen.getByTestId('jsx-code').textContent).not.toContain('Shared chrome')
   })
 
   it('applies a Web share URL only to the current tab working copy', async () => {

@@ -84,6 +84,9 @@ export interface ExportProjectOptions {
   exportedAt?: string
 }
 
+export const MULTI_PAGE_PORTABLE_ARTIFACT_WARNING =
+  'While multi-page is experimental, Web share URLs and .akselarcade exports include only the Start page. Additional pages and Global config are not included.'
+
 export interface ArcadeProjectPackage {
   format: typeof ARCADE_PROJECT_PACKAGE_FORMAT
   formatVersion: typeof ARCADE_PROJECT_PACKAGE_FORMAT_VERSION
@@ -113,6 +116,9 @@ export const DEFAULT_WEB_ARCADE_WORKING_COPY_PREFERENCES: WebArcadeWorkingCopyPr
   pagePanelOpen: true,
   selectedEditTarget: 'page',
 }
+
+export const getPortableArtifactWarning = (project: Pick<Project, 'source'>): string | null =>
+  isPortableArtifactLossy(project) ? MULTI_PAGE_PORTABLE_ARTIFACT_WARNING : null
 
 export const SNAPSHOT_FILE_IDS = {
   jsx: 'file-jsx',
@@ -568,6 +574,12 @@ const buildDefaultSnapshotFiles = (project: Project): ProjectFileSnapshot[] => {
     },
   ]
 }
+
+const isPortableArtifactLossy = (project: Pick<Project, 'source'>): boolean =>
+  project.source.pages.length > 1 || hasSourceContent(project.source.globalConfig)
+
+const hasSourceContent = (source: ArcadeSourceFile): boolean =>
+  source.jsx.trim().length > 0 || source.hooks.trim().length > 0
 
 const restoreStoredWorkingCopy = (
   stored: unknown
