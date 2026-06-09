@@ -480,6 +480,7 @@ export const createDefaultProject = (): Project => ({
 
 export const createDefaultEditorState = (): EditorState => ({
   activeTab: 'JSX',
+  isCodeEditorFocused: false,
   jsxCursor: { line: 0, column: 0 },
   hooksCursor: { line: 0, column: 0 },
   jsxSelection: null,

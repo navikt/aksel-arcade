@@ -17,7 +17,7 @@ interface PagePanelProps {
   activePageId: ArcadePageId
   startPageId: ArcadePageId
   pages: ArcadePage[]
-  errorPageId: ArcadePageId | null
+  errorPageIds: ArcadePageId[]
   selectedEditTarget: SelectedEditTarget
   onAddPage: () => void
   onSelectGlobalConfig: () => void
@@ -31,7 +31,7 @@ export const PagePanel = ({
   activePageId,
   startPageId,
   pages,
-  errorPageId,
+  errorPageIds,
   selectedEditTarget,
   onAddPage,
   onSelectGlobalConfig,
@@ -181,7 +181,7 @@ export const PagePanel = ({
                 const isActivePage = page.id === activePageId
                 const isEditing = selectedEditTarget === 'page' && isActivePage
                 const isStartPage = page.id === startPageId
-                const hasError = page.id === errorPageId
+                const hasError = errorPageIds.includes(page.id)
                 const lifecycleLabels = [
                   ...(isActivePage ? ['Active page'] : []),
                   ...(isStartPage ? ['Start page'] : []),

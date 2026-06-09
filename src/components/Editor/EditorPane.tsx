@@ -44,7 +44,13 @@ export const EditorPane = () => {
   const effectiveEditTarget = resolveSelectedEditTarget(multiPageEnabled, selectedEditTarget)
   const activeSource = getSourceForEditTarget(project, effectiveEditTarget)
   const currentContent = currentTab === 'JSX' ? activeSource.jsx : activeSource.hooks
-  const errorPageId = previewState.compileError?.pageId ?? previewState.runtimeError?.pageId ?? null
+  const errorPageIds = Array.from(
+    new Set(
+      [previewState.compileError?.pageId, previewState.runtimeError?.pageId].filter(
+        (pageId): pageId is (typeof project.source.pages)[number]['id'] => typeof pageId === 'string'
+      )
+    )
+  )
 
   const handleCodeChange = (newContent: string) => {
     if (currentTab === 'JSX') {
@@ -174,7 +180,7 @@ export const EditorPane = () => {
             activePageId={project.activePageId}
             startPageId={project.source.startPageId}
             pages={project.source.pages}
-            errorPageId={errorPageId}
+            errorPageIds={errorPageIds}
             selectedEditTarget={effectiveEditTarget}
             onAddPage={handleAddPage}
             onSelectGlobalConfig={handleGlobalConfigSelect}
@@ -197,6 +203,7 @@ export const EditorPane = () => {
             value={currentContent}
             onChange={handleCodeChange}
             onCursorChange={handleCursorChange}
+            onFocusChange={(isCodeEditorFocused) => updateEditorState({ isCodeEditorFocused })}
             onFormat={handleFormat}
           />
         </Box>

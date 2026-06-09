@@ -1899,6 +1899,7 @@ Verification:
 
 - npm run typecheck
 - CI=1 npm run test -- --run
+
 - Browser check at `http://127.0.0.1:43183/aksel-arcade/` on an isolated local Vite port for app render, preview render, Settings menu visibility of `Enable experimental multi-page authoring`, successful toggle to `Disable experimental multi-page authoring`, and no console warnings/errors
 
 Next note:
@@ -1917,3 +1918,29 @@ Verification:
 
 - npm run typecheck
 - CI=1 npm run test -- --run
+
+### 2026-06-09 - PR #196 follow-up: Multi-page preview bug fixes after Issue #190
+
+Implemented:
+
+- Fixed page-scoped preview errors leaking into unrelated pages by keeping the underlying `compileError` / `runtimeError` attached to their originating `pageId`, while only rendering the visible preview overlay when the active view is that page or the error is bundle-wide (`pageId: null`).
+- Kept the multi-page iframe mounted when `Global config` is selected and turned the no-preview message into an overlay instead of unmounting `LivePreview`, which preserves the running sandbox page and prevents the start-page reload/flicker on the way back to a non-start page.
+- Added explicit editor-focus tracking through `EditorState`, `EditorPane`, and `CodeEditor`, then used it in `PreviewPane` to suppress visible compile errors while the author is actively typing. Pending compile errors are now surfaced only after focus leaves the editor instead of interrupting the writing flow.
+- Expanded page error badges from a single page id to a distinct set of page ids so the page panel can keep the right row marked even when compile/runtime errors overlap.
+- Added focused regressions in `tests/integration/multi-page-preview-sync.test.tsx` covering the kept-mounted Global config placeholder, hidden cross-page error overlays, and no visible compile error during the first edit step.
+
+Verification:
+
+- npm run typecheck
+- npm run lint (existing `InspectionPopover` hook dependency warning only)
+- npm test -- --run
+- Browser check at `http://127.0.0.1:4179/aksel-arcade/` for:
+  - enabling experimental multi-page authoring
+  - adding Page 2 and keeping Page 2 active through the Global config placeholder round-trip
+  - typing a lone `<` on Page 2 without showing a visible compile error while the editor stayed focused
+  - clicking back to Page 1 and seeing the Page 2 error stay scoped to the Page 2 row instead of taking over Page 1
+  - no browser console errors/warnings during the clean verification path
+
+Next note:
+
+- The preview now distinguishes between page-scoped and bundle-wide failures in the overlay layer, but diagnostics/agent surfaces still only expose the latest compile/runtime payloads. If later work needs a full per-page error history, build it on top of the new editor-focus suppression and `errorPageIds` wiring instead of reintroducing a single global page-error flag.

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { act, cleanup, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { forwardRef, useImperativeHandle } from 'react'
 import { SettingsProvider, useSettings } from '@/contexts/SettingsContext'
@@ -42,8 +42,8 @@ vi.mock('@/components/ComponentPalette', () => ({
 vi.mock('@/components/Editor/CodeEditor', () => ({
   CodeEditor: forwardRef<
     { undo: () => void; redo: () => void },
-    { value: string; onChange: (value: string) => void }
-  >(({ value, onChange }, ref) => {
+    { value: string; onChange: (value: string) => void; onFocusChange?: (focused: boolean) => void }
+  >(({ value, onChange, onFocusChange }, ref) => {
     useImperativeHandle(ref, () => ({
       undo: () => undefined,
       redo: () => undefined,
@@ -54,6 +54,8 @@ vi.mock('@/components/Editor/CodeEditor', () => ({
         aria-label="Code editor"
         value={value}
         onChange={(event) => onChange(event.currentTarget.value)}
+        onFocus={() => onFocusChange?.(true)}
+        onBlur={() => onFocusChange?.(false)}
       />
     )
   }),
@@ -138,10 +140,11 @@ describe('Multi-page preview sync', () => {
   })
 
   afterEach(() => {
+    vi.useRealTimers()
     cleanup()
   })
 
-  it('syncs host selection with preview navigation and shows the Global config placeholder', async () => {
+  it('syncs host selection with preview navigation and keeps the preview mounted under the Global config placeholder', async () => {
     const user = userEvent.setup()
     const project = createStoredMultiPageProject()
     saveProject(project, {
@@ -155,7 +158,7 @@ describe('Multi-page preview sync', () => {
 
     renderHarness()
 
-    await screen.findByTestId('preview-iframe')
+    const previewIframe = await screen.findByTestId('preview-iframe')
     dispatchSandboxMessage({ type: 'SANDBOX_CONNECTED' })
     dispatchSandboxMessage({ type: 'RENDER_SUCCESS' })
 
@@ -187,7 +190,7 @@ describe('Multi-page preview sync', () => {
     await waitFor(() => {
       expect(screen.getByText('Global config has no preview')).toBeTruthy()
       expect(screen.getByTestId('selected-edit-target').textContent).toBe('global-config')
-      expect(screen.queryByTestId('preview-iframe')).toBeNull()
+      expect(screen.getByTestId('preview-iframe')).toBe(previewIframe)
     })
   })
 
@@ -204,7 +207,7 @@ describe('Multi-page preview sync', () => {
 
     renderHarness()
 
-    await screen.findByTestId('preview-iframe')
+    screen.getByTestId('preview-iframe')
     dispatchSandboxMessage({ type: 'SANDBOX_CONNECTED' })
     dispatchSandboxMessage({ type: 'RENDER_SUCCESS' })
     dispatchSandboxMessage({
@@ -222,5 +225,78 @@ describe('Multi-page preview sync', () => {
     await waitFor(() => {
       expect(detailsRow.querySelector('[aria-label="Page error"]')).toBeTruthy()
     })
+  })
+
+  it('hides a page-scoped runtime error overlay when a different page becomes active', async () => {
+    const user = userEvent.setup()
+    const project = createStoredMultiPageProject()
+    saveProject(project, {
+      preferences: {
+        ...DEFAULT_WEB_ARCADE_WORKING_COPY_PREFERENCES,
+        multiPageEnabled: true,
+        pagePanelOpen: true,
+        selectedEditTarget: 'page',
+      },
+    })
+
+    renderHarness()
+
+    await screen.findByTestId('preview-iframe')
+    dispatchSandboxMessage({ type: 'SANDBOX_CONNECTED' })
+    dispatchSandboxMessage({ type: 'RENDER_SUCCESS' })
+
+    await user.click(screen.getByRole('button', { name: /^Details/i }))
+
+    dispatchSandboxMessage({
+      type: 'RUNTIME_ERROR',
+      payload: {
+        message: 'Details page exploded',
+        componentStack: '\n    at DetailsPage',
+        stack: 'Error: Details page exploded',
+        pageId: 'page02',
+      },
+    })
+
+    await screen.findByText('Runtime Error')
+
+    await user.click(screen.getByRole('button', { name: /^Page 1/i }))
+
+    await waitFor(() => {
+      expect(screen.getByTestId('active-page-id').textContent).toBe('page01')
+      expect(screen.queryByText('Runtime Error')).toBeNull()
+      expect(
+        screen.getByRole('button', { name: /^Details/i }).querySelector('[aria-label="Page error"]')
+      ).toBeTruthy()
+    })
+  })
+
+  it('does not surface a visible compile error while the user is still in the first edit step', async () => {
+    const project = createStoredMultiPageProject()
+    saveProject(project, {
+      preferences: {
+        ...DEFAULT_WEB_ARCADE_WORKING_COPY_PREFERENCES,
+        multiPageEnabled: true,
+        pagePanelOpen: true,
+        selectedEditTarget: 'page',
+      },
+    })
+    renderHarness()
+
+    await act(async () => {
+      await new Promise((resolve) => window.setTimeout(resolve, 600))
+    })
+    const editor = screen.getAllByRole('textbox', { name: 'Code editor' }).at(-1)
+    if (!editor) {
+      throw new Error('Expected a code editor to be rendered.')
+    }
+
+    fireEvent.focus(editor)
+    fireEvent.change(editor, { target: { value: '<' } })
+
+    await act(async () => {
+      await new Promise((resolve) => window.setTimeout(resolve, 1_000))
+    })
+
+    expect(screen.queryByText('Compile Error')).toBeNull()
   })
 })
