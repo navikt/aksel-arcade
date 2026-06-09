@@ -1,7 +1,7 @@
 import { useContext, useEffect, useState, useRef } from 'react'
 import { Alert, Box, HStack } from '@navikt/ds-react'
 import { AppContext } from '@/hooks/useProject'
-import { transpileCode } from '@/services/transpiler'
+import { transpileCode, transpileProjectSource } from '@/services/transpiler'
 import { getActiveSource } from '@/services/projectSource'
 import { useSettings } from '@/contexts/SettingsContext'
 import { LivePreview } from './LivePreview'
@@ -19,8 +19,11 @@ export const PreviewPane = () => {
   if (!context) throw new Error('PreviewPane must be used within AppProvider')
 
   const { project, previewIframeRef, updatePreviewState, recordSandboxConsoleMessage } = context
-  const { theme } = useSettings() // Use centralized theme from Settings
+  const { multiPageEnabled, theme } = useSettings() // Use centralized theme from Settings
   const activeSource = getActiveSource(project)
+  const singlePagePreviewJsx = multiPageEnabled ? null : activeSource.jsx
+  const singlePagePreviewHooks = multiPageEnabled ? null : activeSource.hooks
+  const multiPagePreviewSource = multiPageEnabled ? project.source : null
   const [transpiledCode, setTranspiledCode] = useState<string | null>(null)
   const [compileError, setCompileError] = useState<CompileError | null>(null)
   const [runtimeError, setRuntimeError] = useState<RuntimeError | null>(null)
@@ -45,7 +48,11 @@ export const PreviewPane = () => {
 
     // Debounce transpilation by 500ms to avoid showing errors while typing
     debounceTimerRef.current = window.setTimeout(() => {
-      transpileCode(activeSource.jsx, activeSource.hooks)
+      const transpilePromise = multiPagePreviewSource
+        ? transpileProjectSource(multiPagePreviewSource, { previewSessionKey: project.id })
+        : transpileCode(singlePagePreviewJsx ?? '', singlePagePreviewHooks ?? '')
+
+      transpilePromise
         .then((result) => {
           if (isCancelled) return
 
@@ -97,7 +104,14 @@ export const PreviewPane = () => {
         clearTimeout(debounceTimerRef.current)
       }
     }
-  }, [activeSource.hooks, activeSource.jsx, updatePreviewState])
+  }, [
+    project.id,
+    multiPagePreviewSource,
+    multiPageEnabled,
+    singlePagePreviewHooks,
+    singlePagePreviewJsx,
+    updatePreviewState,
+  ])
 
   const handleRenderSuccess = () => {
     setRuntimeError(null)
