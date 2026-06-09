@@ -1791,3 +1791,16 @@ Verification:
 Next note:
 
 - Later multi-page issues should build on `src/services/projectSource.ts` and the canonical `project.source` model rather than reintroducing flat `jsxCode` / `hooksCode` storage. Keep `multiPageEnabled` local to working-copy preferences and keep portable share/export artifacts free of workspace-only flags.
+
+### 2026-06-09 - PR #192 review follow-up
+
+Fixed one PR-scoped review issue before merge:
+
+- `useAutoSave` had started depending on the whole `preferences` object, while `App` passed a fresh inline object on every render. Because the hook also updates `saveStatus`, that could retrigger the effect and schedule repeated autosaves even without project changes.
+- Narrowed the autosave effect dependencies to the primitive preference fields (`theme`, `panelOrder`, `multiPageEnabled`) so rerenders from save-status updates do not reschedule saves.
+- Added `tests/unit/useAutoSave.test.tsx` to prove inline preference-object identity churn does not cause repeated saves.
+
+Verification:
+
+- npm run typecheck
+- CI=1 npm run test -- --run
