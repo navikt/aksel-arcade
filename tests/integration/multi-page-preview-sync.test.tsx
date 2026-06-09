@@ -285,7 +285,8 @@ describe('Multi-page preview sync', () => {
     await act(async () => {
       await new Promise((resolve) => window.setTimeout(resolve, 600))
     })
-    const editor = screen.getAllByRole('textbox', { name: 'Code editor' }).at(-1)
+    const editors = screen.getAllByRole('textbox', { name: 'Code editor' })
+    const editor = editors[editors.length - 1]
     if (!editor) {
       throw new Error('Expected a code editor to be rendered.')
     }

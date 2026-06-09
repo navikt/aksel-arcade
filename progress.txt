@@ -1944,3 +1944,15 @@ Verification:
 Next note:
 
 - The preview now distinguishes between page-scoped and bundle-wide failures in the overlay layer, but diagnostics/agent surfaces still only expose the latest compile/runtime payloads. If later work needs a full per-page error history, build it on top of the new editor-focus suppression and `errorPageIds` wiring instead of reintroducing a single global page-error flag.
+
+### 2026-06-09 - PR #196 review follow-up
+
+Fixed one PR-scoped review issue before merge:
+
+- Replaced `Array.prototype.at(-1)` in `tests/integration/multi-page-preview-sync.test.tsx` with ES2020-compatible indexing so the new regression test still works under the repo's current TypeScript/lib target and `npm run build` no longer fails during `tsc -b`.
+
+Verification:
+
+- npm run build
+- npm run typecheck
+- npm test -- --run
