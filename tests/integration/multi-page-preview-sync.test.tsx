@@ -130,6 +130,14 @@ const getLastPostedMessage = (type: string) => {
   return lastCall?.[1] as { type: string; payload?: Record<string, string> } | undefined
 }
 
+const openPageActions = async (user: ReturnType<typeof userEvent.setup>, pageName: string) => {
+  await user.click(
+    screen.getByRole('button', {
+      name: new RegExp(`page actions for ${pageName}`, 'i'),
+    })
+  )
+}
+
 describe('Multi-page preview sync', () => {
   beforeEach(() => {
     setupLocalStorageMock()
@@ -224,6 +232,56 @@ describe('Multi-page preview sync', () => {
 
     await waitFor(() => {
       expect(detailsRow.querySelector('[aria-label="Page error"]')).toBeTruthy()
+    })
+  })
+
+  it('keeps the page error indicator visible when a page also has broken navigation', async () => {
+    const user = userEvent.setup()
+    let project = createStoredMultiPageProject()
+    project = updatePageSource(project, 'page01', {
+      jsx: "<Button onClick={() => goToPage('page02')}>Open details</Button>",
+    })
+    saveProject(project, {
+      preferences: {
+        ...DEFAULT_WEB_ARCADE_WORKING_COPY_PREFERENCES,
+        multiPageEnabled: true,
+        pagePanelOpen: true,
+        selectedEditTarget: 'page',
+      },
+    })
+
+    renderHarness()
+
+    await screen.findByTestId('preview-iframe')
+    dispatchSandboxMessage({ type: 'SANDBOX_CONNECTED' })
+    dispatchSandboxMessage({ type: 'RENDER_SUCCESS' })
+
+    await openPageActions(user, 'Details')
+    await user.click(await screen.findByRole('menuitem', { name: /delete page/i }))
+    await user.click(await screen.findByRole('button', { name: /delete page/i }))
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole('button', { name: /^Page 1/i }).querySelector(
+          '[aria-label="Broken page navigation"]'
+        )
+      ).toBeTruthy()
+    })
+
+    dispatchSandboxMessage({
+      type: 'RUNTIME_ERROR',
+      payload: {
+        message: 'Start page exploded',
+        componentStack: '\n    at StartPage',
+        stack: 'Error: Start page exploded',
+        pageId: 'page01',
+      },
+    })
+
+    await waitFor(() => {
+      const pageOneRow = screen.getByRole('button', { name: /^Page 1/i })
+      expect(pageOneRow.querySelector('[aria-label="Page error"]')).toBeTruthy()
+      expect(pageOneRow.querySelector('[aria-label="Broken page navigation"]')).toBeNull()
     })
   })
 

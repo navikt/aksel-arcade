@@ -1,4 +1,4 @@
-import { useContext, useRef } from 'react'
+import { useContext, useMemo, useRef } from 'react'
 import { Box, Button, HStack } from '@navikt/ds-react'
 import { AppContext } from '@/hooks/useProject'
 import { useSettings } from '@/contexts/SettingsContext'
@@ -8,7 +8,13 @@ import { EditorToolbar } from './EditorToolbar'
 import { PagePanel } from './PagePanel'
 import { ComponentPalette } from '@/components/ComponentPalette'
 import { formatCode } from '@/services/formatter'
+import {
+  analyzeProjectPageReferences,
+  getDeletePageImpact,
+  type DeletePageImpact,
+} from '@/services/pageReferences'
 import { getSourceForEditTarget, resolveSelectedEditTarget } from '@/services/projectSource'
+import type { ArcadePageId } from '@/types/project'
 import './EditorPane.css'
 
 export const EditorPane = () => {
@@ -44,12 +50,37 @@ export const EditorPane = () => {
   const effectiveEditTarget = resolveSelectedEditTarget(multiPageEnabled, selectedEditTarget)
   const activeSource = getSourceForEditTarget(project, effectiveEditTarget)
   const currentContent = currentTab === 'JSX' ? activeSource.jsx : activeSource.hooks
+  const validPageIds = useMemo(() => project.source.pages.map((page) => page.id), [project.source.pages])
   const errorPageIds = Array.from(
     new Set(
       [previewState.compileError?.pageId, previewState.runtimeError?.pageId].filter(
         (pageId): pageId is (typeof project.source.pages)[number]['id'] => typeof pageId === 'string'
       )
     )
+  )
+  const pageReferenceAnalysis = useMemo(
+    () =>
+      multiPageEnabled
+        ? analyzeProjectPageReferences(project.source)
+        : {
+            brokenNavigationPageIds: [],
+            globalConfigStaleReferences: [],
+            staleReferencesByPageId: {},
+          },
+    [multiPageEnabled, project.source]
+  )
+  const deletePageImpacts = useMemo(
+    () =>
+      multiPageEnabled
+        ? project.source.pages.reduce<Partial<Record<ArcadePageId, DeletePageImpact>>>(
+            (result, page) => {
+              result[page.id] = getDeletePageImpact(project.source, page.id)
+              return result
+            },
+            {}
+          )
+        : {},
+    [multiPageEnabled, project.source]
   )
 
   const handleCodeChange = (newContent: string) => {
@@ -180,6 +211,8 @@ export const EditorPane = () => {
             activePageId={project.activePageId}
             startPageId={project.source.startPageId}
             pages={project.source.pages}
+            brokenNavigationPageIds={pageReferenceAnalysis.brokenNavigationPageIds}
+            deletePageImpacts={deletePageImpacts}
             errorPageIds={errorPageIds}
             selectedEditTarget={effectiveEditTarget}
             onAddPage={handleAddPage}
@@ -205,6 +238,7 @@ export const EditorPane = () => {
             onCursorChange={handleCursorChange}
             onFocusChange={(isCodeEditorFocused) => updateEditorState({ isCodeEditorFocused })}
             onFormat={handleFormat}
+            validPageIds={multiPageEnabled ? validPageIds : undefined}
           />
         </Box>
       </Box>

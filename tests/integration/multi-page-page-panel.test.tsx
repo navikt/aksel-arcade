@@ -107,6 +107,9 @@ const openPageActions = async (user: ReturnType<typeof userEvent.setup>, pageNam
   )
 }
 
+const getCodeEditor = () =>
+  screen.getByRole('textbox', { name: 'Code editor' }) as HTMLTextAreaElement
+
 describe('Multi-page page panel', () => {
   beforeEach(() => {
     setupLocalStorageMock()
@@ -136,9 +139,6 @@ describe('Multi-page page panel', () => {
     await waitFor(() => {
       expect(screen.getByRole('button', { name: /hide pages/i })).toBeTruthy()
     })
-
-    const getCodeEditor = () =>
-      screen.getByRole('textbox', { name: 'Code editor' }) as HTMLTextAreaElement
 
     expect(screen.getByTestId('selected-edit-target').textContent).toBe('global-config')
     expect(screen.getByTestId('active-page-id').textContent).toBe('page02')
@@ -257,5 +257,91 @@ describe('Multi-page page panel', () => {
     expect(
       deleteAction.getAttribute('aria-disabled') === 'true' || deleteAction.hasAttribute('data-disabled')
     ).toBe(true)
+  })
+
+  it('shows delete impact counts and page-level broken-navigation indicators for stale references', async () => {
+    const user = userEvent.setup()
+    let project = createStoredMultiPageProject()
+    project = updatePageSource(project, 'page01', {
+      jsx: "<Button onClick={() => goToPage('page02')}>Open details</Button>",
+    })
+    saveProject(project, {
+      preferences: {
+        ...DEFAULT_WEB_ARCADE_WORKING_COPY_PREFERENCES,
+        multiPageEnabled: true,
+        pagePanelOpen: true,
+        selectedEditTarget: 'page',
+      },
+    })
+
+    renderHarness()
+
+    await openPageActions(user, 'Details')
+    await user.click(await screen.findByRole('menuitem', { name: /delete page/i }))
+
+    const deleteDialog = await screen.findByRole('alertdialog', { name: /delete page/i })
+    expect(deleteDialog.textContent).toMatch(/1 stale page reference/i)
+    expect(deleteDialog.textContent).toMatch(/across 1 page/i)
+
+    await user.click(screen.getByRole('button', { name: /delete page/i }))
+
+    await waitFor(() => {
+      expect(screen.getByTestId('page-summary').textContent).toBe('page01:Page 1')
+      expect(
+        screen.getByRole('button', { name: /^Page 1/i }).querySelector(
+          '[aria-label="Broken page navigation"]'
+        )
+      ).toBeTruthy()
+    })
+
+    fireEvent.change(getCodeEditor(), { target: { value: '<Box>Page 1 recovered</Box>' } })
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole('button', { name: /^Page 1/i }).querySelector(
+          '[aria-label="Broken page navigation"]'
+        )
+      ).toBeNull()
+    })
+  })
+
+  it('updates broken-navigation indicators live when Global config stale references are fixed', async () => {
+    const user = userEvent.setup()
+    const project = updateGlobalConfigSource(createStoredMultiPageProject(), {
+      jsx: '<Link href="page02">Shared details</Link>',
+    })
+    saveProject(project, {
+      preferences: {
+        ...DEFAULT_WEB_ARCADE_WORKING_COPY_PREFERENCES,
+        multiPageEnabled: true,
+        pagePanelOpen: true,
+        selectedEditTarget: 'page',
+      },
+    })
+
+    renderHarness()
+
+    await openPageActions(user, 'Details')
+    await user.click(await screen.findByRole('menuitem', { name: /delete page/i }))
+    await user.click(await screen.findByRole('button', { name: /delete page/i }))
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole('button', { name: /^Page 1/i }).querySelector(
+          '[aria-label="Broken page navigation"]'
+        )
+      ).toBeTruthy()
+    })
+
+    await user.click(screen.getByRole('button', { name: /global config/i }))
+    fireEvent.change(getCodeEditor(), { target: { value: '<Box>Shared chrome fixed</Box>' } })
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole('button', { name: /^Page 1/i }).querySelector(
+          '[aria-label="Broken page navigation"]'
+        )
+      ).toBeNull()
+    })
   })
 })
