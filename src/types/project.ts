@@ -5,6 +5,7 @@ export type ThemeMode = 'light' | 'dark'
 export type PanelOrder = 'code-left' | 'preview-left'
 export type ArcadePageId = `page${string}`
 export type SelectedEditTarget = 'page' | 'global-config'
+export type ProjectSourceTarget = { type: 'page'; pageId: ArcadePageId } | { type: 'global-config' }
 
 export interface ArcadeSourceFile {
   jsx: string

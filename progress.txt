@@ -2056,3 +2056,30 @@ Next note:
 
 - #187 can stay focused on protocol v3, page lifecycle bridge commands, and targeted page/global-config edits; the page-navigation suggestion source now lives in `EditorPane` → `CodeEditor` → `akselAutocomplete` and does not need to be duplicated in the Agent bridge layer.
 - For browser verification, prefer a fresh Vite port if a reused port appears to serve stale source from another worktree; `4191` was the clean port used for this branch’s verification.
+
+### 2026-06-09 - Issue #187: Multi-page pages-aware Agent bridge
+
+Implemented:
+
+- Selected #187 as the single requested feature and kept the work scoped to the Desktop Arcade Agent bridge follow-up from #181/#186.
+- Read issue #181, issue #187, `docs/prd/0030-multi-page-support.md`, `docs/adr/0014-pages-aware-agent-bridge.md`, and the existing `progress.txt` notes before changing code.
+- Bumped the Agent bridge contract to protocol v3 in `src/services/agentBridge.ts`, expanded `getProject` to return page-aware project state (`pageMode`, `pages`, `globalConfig`, `startPageId`, `activePageId`), deep-cloned nested read state, and made the session command list/instructions dynamic between single-page and multi-page authoring.
+- Added explicit lifecycle commands (`createPage`, `renamePage`, `deletePage`, `setStartPage`, `selectActivePage`) and wired their routing/gating so multi-page-disabled sessions surface `unsupported-command` guidance instead of silently accepting unsupported mutations.
+- Added reusable source targeting in `src/types/project.ts`, `src/services/projectSource.ts`, and `src/hooks/useProject.tsx` so Agent edits can safely target either `{ type: 'page', pageId }` or `{ type: 'global-config' }` without mutating the human editor selection first.
+- Updated `src/hooks/useAgentSession.ts` and `src/components/Header/AgentSessionMenu.tsx` so the live Desktop Agent session reads current multi-page state, validates `applyAgentChange.target`, applies lifecycle mutations through the canonical project helpers, and preserves the single-page compatibility path when experimental multi-page authoring is off.
+- Fixed `src/services/desktopAgentTransportProtocol.ts` so Desktop transport forwards `params` for every non-read command, not just `applyAgentChange`; without that fix, lifecycle commands reached the bridge with `undefined` params.
+- Refreshed regression coverage in `tests/unit/services/agentBridge.test.ts`, `tests/unit/services/desktopAgentTransportProtocol.test.ts`, `tests/integration/project-controls-layout.test.tsx`, and `tests/integration/share-popover.test.tsx` for protocol v3, dynamic command exposure, single-page gating, lifecycle routing, and targeted page/global-config edits.
+
+Verification:
+
+- npm install
+- npm run typecheck
+- npm run lint (existing `.eslintignore` deprecation notice and existing `InspectionPopover` hook dependency warning only)
+- npm run build
+- npm run test -- --run
+- Browser check at `http://127.0.0.1:5176/aksel-arcade/` with a Desktop preload shim: verified single-page Agent sessions expose only `applyAgentChange` plus read commands and reject `createPage` / other-page / global-config edits with the expected guidance; then enabled experimental multi-page authoring and verified `createPage`, `renamePage`, `setStartPage`, `selectActivePage`, `deletePage`, page-targeted edits, and global-config-targeted edits all updated the human-visible page panel + preview with no console errors or warnings.
+
+Next note:
+
+- The single-page bridge path intentionally exposes the current active page plus empty `globalConfig`, matching the human-visible editor/preview surface and the earlier #183 compatibility behavior. If product wants strict "always expose page01/first page" semantics instead, clarify that before changing the bridge again.
+- Local Vite ports may already be occupied by other worktrees; `5173` in this environment was serving stale source from another session, and `5176` was the clean port used for the verified browser flow on this branch.

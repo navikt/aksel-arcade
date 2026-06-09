@@ -603,6 +603,7 @@ describe('Share popover integration', () => {
         callBridgeCommand(() =>
           bridge.applyAgentChange({
             summary: AGENT_CHANGE_SUMMARY,
+            target: { type: 'page', pageId: 'page01' },
             jsxCode: nextJsx,
             hooksCode: nextHooks,
             viewportSize: 'XS',

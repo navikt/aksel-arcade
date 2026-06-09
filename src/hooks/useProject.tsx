@@ -16,6 +16,7 @@ import {
   CURRENT_PROJECT_VERSION,
   type ArcadePageId,
   type Project,
+  type ProjectSourceTarget,
   type ProjectSnapshot,
   type SelectedEditTarget,
   type ShareUrlMetadata,
@@ -43,6 +44,7 @@ import {
   setStartPage as setProjectStartPage,
   updateActivePageSource,
   updateSourceForEditTarget,
+  updateSourceForTarget,
 } from '@/services/projectSource'
 import {
   DEFAULT_WEB_ARCADE_WORKING_COPY_PREFERENCES,
@@ -73,6 +75,7 @@ type ProjectUpdate = Partial<Pick<Project, 'name' | 'viewportSize' | 'panelLayou
   jsxCode?: string
   hooksCode?: string
   editTarget?: SelectedEditTarget
+  sourceTarget?: ProjectSourceTarget
 }
 
 interface AppState {
@@ -254,14 +257,21 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       }
 
       if (updates.jsxCode !== undefined || updates.hooksCode !== undefined) {
-        const editTarget = resolveSelectedEditTarget(
-          multiPageEnabled,
-          updates.editTarget ?? selectedEditTarget
-        )
-        nextProject = updateSourceForEditTarget(nextProject, editTarget, {
-          jsx: updates.jsxCode,
-          hooks: updates.hooksCode,
-        })
+        if (updates.sourceTarget) {
+          nextProject = updateSourceForTarget(nextProject, updates.sourceTarget, {
+            jsx: updates.jsxCode,
+            hooks: updates.hooksCode,
+          })
+        } else {
+          const editTarget = resolveSelectedEditTarget(
+            multiPageEnabled,
+            updates.editTarget ?? selectedEditTarget
+          )
+          nextProject = updateSourceForEditTarget(nextProject, editTarget, {
+            jsx: updates.jsxCode,
+            hooks: updates.hooksCode,
+          })
+        }
       }
 
       return normalizeProjectSelection(nextProject)

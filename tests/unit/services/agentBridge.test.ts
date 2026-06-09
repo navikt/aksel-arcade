@@ -1,20 +1,24 @@
 import { describe, expect, it } from 'vitest'
 import {
-  AGENT_BRIDGE_COMMAND_NAMES,
   AGENT_BRIDGE_PROTOCOL_VERSION,
   AGENT_BRIDGE_READ_COMMAND_NAMES,
   DEFAULT_AGENT_PERMISSIONS,
   createAgentPairingHandoffCommand,
   createAgentBridgeCommandRouter,
+  getAgentBridgeSessionCommandNames,
   isAgentBridgeCommandName,
   isAgentBridgeReadCommandName,
   type AgentBridgeCommandName,
   type AgentBridgeCommandResult,
   type AgentBridgeController,
+  type AgentCreatePageResult,
   type AgentBridgeReadContext,
   type AgentChangeField,
   type AgentPermissions,
   type AgentChangeResult,
+  type AgentPageLifecycleResult,
+  type AgentProjectReadState,
+  type AgentProjectPageMode,
 } from '@/services/agentBridge'
 import {
   PREVIEW_EVIDENCE_ROOT_SELECTOR,
@@ -51,12 +55,59 @@ const createDiagnostics = (): PreviewDiagnostics => ({
   ],
 })
 
-const createReadContext = (): AgentBridgeReadContext => ({
-  project: {
-    name: 'Router test',
-    jsxCode: '<Button>Test</Button>',
-    hooksCode: 'const value = "test"',
-  },
+const createProjectReadState = (
+  pageMode: AgentProjectPageMode = 'single-page'
+): AgentProjectReadState =>
+  pageMode === 'multi-page'
+    ? {
+        name: 'Router test',
+        pageMode,
+        jsxCode: '<Button>Details</Button>',
+        hooksCode: 'const details = true',
+        globalConfig: {
+          jsxCode: '<PageChrome />',
+          hooksCode: 'const sharedValue = "shared"',
+        },
+        pages: [
+          {
+            id: 'page01',
+            name: 'Start',
+            jsxCode: '<Button>Start</Button>',
+            hooksCode: 'const start = true',
+          },
+          {
+            id: 'page02',
+            name: 'Details',
+            jsxCode: '<Button>Details</Button>',
+            hooksCode: 'const details = true',
+          },
+        ],
+        startPageId: 'page01',
+        activePageId: 'page02',
+      }
+    : {
+        name: 'Router test',
+        pageMode,
+        jsxCode: '<Button>Test</Button>',
+        hooksCode: 'const value = "test"',
+        globalConfig: {
+          jsxCode: '',
+          hooksCode: '',
+        },
+        pages: [
+          {
+            id: 'page01',
+            name: 'Page 1',
+            jsxCode: '<Button>Test</Button>',
+            hooksCode: 'const value = "test"',
+          },
+        ],
+        startPageId: 'page01',
+        activePageId: 'page01',
+      }
+
+const createReadContext = (pageMode: AgentProjectPageMode = 'single-page'): AgentBridgeReadContext => ({
+  project: createProjectReadState(pageMode),
   preview: {
     theme: 'light',
     viewportSize: 'MD',
@@ -108,17 +159,45 @@ const createApplySuccess = (
   },
 })
 
+const createPageSuccess = (
+  pageId: `page${string}` = 'page03'
+): AgentBridgeCommandResult<AgentCreatePageResult> => ({
+  ok: true,
+  command: 'createPage',
+  data: {
+    pageId,
+  },
+})
+
+const createPageLifecycleSuccess = (
+  command: 'renamePage' | 'deletePage' | 'setStartPage' | 'selectActivePage',
+  pageId: `page${string}` = 'page02'
+): AgentBridgeCommandResult<AgentPageLifecycleResult> => ({
+  ok: true,
+  command,
+  data: {
+    pageId,
+  },
+})
+
 const createController = (
   options: {
     active?: boolean
+    pageMode?: AgentProjectPageMode
     permissions?: Partial<AgentPermissions>
     previewEvidence?: PreviewEvidenceCaptureResult
     applyResult?: AgentBridgeCommandResult<AgentChangeResult>
+    createPageResult?: AgentBridgeCommandResult<AgentCreatePageResult>
+    renamePageResult?: AgentBridgeCommandResult<AgentPageLifecycleResult>
+    deletePageResult?: AgentBridgeCommandResult<AgentPageLifecycleResult>
+    setStartPageResult?: AgentBridgeCommandResult<AgentPageLifecycleResult>
+    selectActivePageResult?: AgentBridgeCommandResult<AgentPageLifecycleResult>
   } = {}
 ) => {
-  const context = createReadContext()
+  const context = createReadContext(options.pageMode)
   const recordedCommands: AgentBridgeCommandName[] = []
   const appliedRequests: unknown[] = []
+  const pageRequests: Array<{ command: string; request: unknown }> = []
   const permissions = {
     ...DEFAULT_AGENT_PERMISSIONS,
     ...options.permissions,
@@ -135,6 +214,26 @@ const createController = (
       appliedRequests.push(request)
       return options.applyResult ?? createApplySuccess()
     },
+    createPage: (request) => {
+      pageRequests.push({ command: 'createPage', request })
+      return options.createPageResult ?? createPageSuccess()
+    },
+    renamePage: (request) => {
+      pageRequests.push({ command: 'renamePage', request })
+      return options.renamePageResult ?? createPageLifecycleSuccess('renamePage')
+    },
+    deletePage: (request) => {
+      pageRequests.push({ command: 'deletePage', request })
+      return options.deletePageResult ?? createPageLifecycleSuccess('deletePage')
+    },
+    setStartPage: (request) => {
+      pageRequests.push({ command: 'setStartPage', request })
+      return options.setStartPageResult ?? createPageLifecycleSuccess('setStartPage')
+    },
+    selectActivePage: (request) => {
+      pageRequests.push({ command: 'selectActivePage', request })
+      return options.selectActivePageResult ?? createPageLifecycleSuccess('selectActivePage')
+    },
     getPreviewEvidence: async () =>
       options.previewEvidence ?? {
         ok: true,
@@ -146,6 +245,7 @@ const createController = (
     appliedRequests,
     context,
     controller,
+    pageRequests,
     recordedCommands,
   }
 }
@@ -167,7 +267,7 @@ describe('agent bridge command router', () => {
     const { context, controller, recordedCommands } = createController()
     const router = createAgentBridgeCommandRouter(session, controller)
 
-    expect(router.commandNames).toEqual(AGENT_BRIDGE_COMMAND_NAMES)
+    expect(router.commandNames).toEqual(getAgentBridgeSessionCommandNames(context.project.pageMode))
     expect(AGENT_BRIDGE_READ_COMMAND_NAMES).toContain('getAgentInstructions')
     expect(isAgentBridgeReadCommandName('getAgentInstructions')).toBe(true)
     expect(expectBridgeSuccess(router.routeCommand('getProject'))).toEqual(context.project)
@@ -179,12 +279,12 @@ describe('agent bridge command router', () => {
       startedAt: session.startedAt,
       permissions: DEFAULT_AGENT_PERMISSIONS,
       readScope: 'arcade-session',
-      commandNames: AGENT_BRIDGE_COMMAND_NAMES,
+      commandNames: getAgentBridgeSessionCommandNames(context.project.pageMode),
     })
     expect(recordedCommands).toEqual(['getProject', 'getPreviewContext', 'getSessionState'])
   })
 
-  it('returns a compact Agent operating guide repeatedly without Arcade project content', () => {
+  it('returns a compact single-page Agent operating guide repeatedly without Arcade project content', () => {
     const { context, controller, recordedCommands } = createController()
     const router = createAgentBridgeCommandRouter(desktopSession, controller)
 
@@ -201,7 +301,7 @@ describe('agent bridge command router', () => {
       authorizationHeader: desktopSession.transportEndpoint.authorizationHeader,
       permissions: DEFAULT_AGENT_PERMISSIONS,
       readScope: 'arcade-session',
-      commandNames: AGENT_BRIDGE_COMMAND_NAMES,
+      commandNames: getAgentBridgeSessionCommandNames(context.project.pageMode),
       protocol: {
         transport: 'desktop-loopback-http',
         format: 'json-rpc-2.0',
@@ -216,11 +316,12 @@ describe('agent bridge command router', () => {
     expect(instructions.instructionsMarkdown).toMatch(/getPreviewContext/i)
     expect(instructions.instructionsMarkdown).toMatch(/getDiagnostics/i)
     expect(instructions.instructionsMarkdown).toMatch(/getPreviewEvidence/i)
+    expect(instructions.instructionsMarkdown).toMatch(/single-page authoring/i)
+    expect(instructions.instructionsMarkdown).toMatch(/ask the human to enable experimental multi-page authoring/i)
     expect(instructions.instructionsMarkdown).toMatch(/import-free Arcade JSX and Hooks/i)
     expect(instructions.instructionsMarkdown).toMatch(/arcadeAuthoringGuidance/i)
-    expect(instructions.instructionsMarkdown).toMatch(/full-field replacements/i)
     expect(instructions.instructionsMarkdown).toContain(
-      'applyAgentChange({ summary, jsxCode?, hooksCode?, viewportSize?, theme?, name? })'
+      'applyAgentChange({ summary, target, jsxCode?, hooksCode?, viewportSize?, theme?, name? })'
     )
     expect(instructions.instructionsMarkdown).toMatch(
       /apply immediately to the human-visible Arcade project/i
@@ -252,6 +353,15 @@ describe('agent bridge command router', () => {
     expect(instructions.arcadeAuthoringGuidance.rules).toContainEqual(
       expect.stringMatching(/import-free/i)
     )
+    expect(instructions.arcadeAuthoringGuidance.rules).toContainEqual(
+      expect.stringMatching(/goToPage\("pageNN"\)/i)
+    )
+    expect(instructions.arcadeAuthoringGuidance.rules).toContainEqual(
+      expect.stringMatching(/currentPageId/i)
+    )
+    expect(instructions.arcadeAuthoringGuidance.rules).toContainEqual(
+      expect.stringMatching(/Global config is shared code only/i)
+    )
     expect(instructions.arcadeAuthoringGuidance.validationChecklist).toContainEqual(
       expect.stringMatching(/native HTML\/CSS mimicry/i)
     )
@@ -268,6 +378,7 @@ describe('agent bridge command router', () => {
       ])
     )
     expect(instructions.commandNames).toContain('applyAgentChange')
+    expect(instructions.commandNames).not.toContain('createPage')
     expect(instructions.commandNames).not.toContain('applySourceChange')
     expect(instructions).not.toHaveProperty('workflow')
     expect(instructions).not.toHaveProperty('workflowGuide')
@@ -304,6 +415,20 @@ describe('agent bridge command router', () => {
     diagnostics.sandboxConsoleMessages[0]?.args.push('mutated')
 
     expect(context.diagnostics.sandboxConsoleMessages[0]?.args).toEqual(['ready'])
+  })
+
+  it('clones the pages-aware project read state before returning it', () => {
+    const { context, controller } = createController({ pageMode: 'multi-page' })
+    const router = createAgentBridgeCommandRouter(session, controller)
+
+    const project = expectBridgeSuccess(router.routeCommand('getProject'))
+    project.globalConfig.jsxCode = '<Mutated />'
+    project.pages[0]!.name = 'Mutated'
+    project.pages[1]!.jsxCode = '<Broken />'
+
+    expect(context.project.globalConfig.jsxCode).toBe('<PageChrome />')
+    expect(context.project.pages[0]!.name).toBe('Start')
+    expect(context.project.pages[1]!.jsxCode).toBe('<Button>Details</Button>')
   })
 
   it('routes Preview evidence with existing permission and unavailable failures', async () => {
@@ -388,12 +513,86 @@ describe('agent bridge command router', () => {
     expect(rejected.recordedCommands).toEqual([])
   })
 
+  it('exposes lifecycle commands only in multi-page sessions and routes them through the controller', () => {
+    const { controller, pageRequests, recordedCommands } = createController({ pageMode: 'multi-page' })
+    const router = createAgentBridgeCommandRouter(desktopSession, controller)
+
+    expect(router.commandNames).toEqual(getAgentBridgeSessionCommandNames('multi-page'))
+    expect(expectBridgeSuccess(router.routeCommand('getSessionState')).commandNames).toEqual(
+      getAgentBridgeSessionCommandNames('multi-page')
+    )
+
+    expect(expectBridgeSuccess(router.routeCommand('createPage', {}))).toEqual({
+      pageId: 'page03',
+    })
+    expect(expectBridgeSuccess(router.routeCommand('renamePage', { pageId: 'page02', name: 'Details' }))).toEqual({
+      pageId: 'page02',
+    })
+    expect(expectBridgeSuccess(router.routeCommand('deletePage', { pageId: 'page02' }))).toEqual({
+      pageId: 'page02',
+    })
+    expect(expectBridgeSuccess(router.routeCommand('setStartPage', { pageId: 'page02' }))).toEqual({
+      pageId: 'page02',
+    })
+    expect(expectBridgeSuccess(router.routeCommand('selectActivePage', { pageId: 'page02' }))).toEqual({
+      pageId: 'page02',
+    })
+
+    expect(pageRequests).toEqual([
+      { command: 'createPage', request: {} },
+      { command: 'renamePage', request: { pageId: 'page02', name: 'Details' } },
+      { command: 'deletePage', request: { pageId: 'page02' } },
+      { command: 'setStartPage', request: { pageId: 'page02' } },
+      { command: 'selectActivePage', request: { pageId: 'page02' } },
+    ])
+
+    const instructions = expectBridgeSuccess(router.routeCommand('getAgentInstructions'))
+    expect(recordedCommands).toEqual([
+      'getSessionState',
+      'createPage',
+      'renamePage',
+      'deletePage',
+      'setStartPage',
+      'selectActivePage',
+      'getAgentInstructions',
+    ])
+
+    expect(instructions.commandNames).toEqual(getAgentBridgeSessionCommandNames('multi-page'))
+    expect(instructions.instructionsMarkdown).toMatch(
+      /createPage, renamePage, deletePage, setStartPage, and selectActivePage/i
+    )
+  })
+
+  it('rejects lifecycle commands when multi-page authoring is disabled', () => {
+    const { controller, pageRequests, recordedCommands } = createController()
+    const router = createAgentBridgeCommandRouter(session, controller)
+
+    expect(router.routeCommand('createPage', {})).toMatchObject({
+      ok: false,
+      command: 'createPage',
+      error: {
+        code: 'unsupported-command',
+        message: expect.stringMatching(/ask the human to enable experimental multi-page authoring/i),
+      },
+    })
+    expect(router.routeCommand('renamePage', { pageId: 'page02', name: 'Details' })).toMatchObject({
+      ok: false,
+      command: 'renamePage',
+      error: {
+        code: 'unsupported-command',
+      },
+    })
+    expect(pageRequests).toEqual([])
+    expect(recordedCommands).toEqual([])
+  })
+
   it('rejects unsupported commands with a structured router error', () => {
     const { appliedRequests, controller, recordedCommands } = createController()
     const router = createAgentBridgeCommandRouter(session, controller)
 
     expect(isAgentBridgeCommandName('getProject')).toBe(true)
     expect(isAgentBridgeCommandName('applyAgentChange')).toBe(true)
+    expect(isAgentBridgeCommandName('createPage')).toBe(true)
     expect(isAgentBridgeCommandName('applySourceChange')).toBe(false)
     expect(isAgentBridgeCommandName('openShell')).toBe(false)
     expect(router.routeCommand('openShell')).toEqual({
@@ -402,7 +601,7 @@ describe('agent bridge command router', () => {
       error: {
         code: 'unsupported-command',
         message:
-          'Unsupported Agent bridge command "openShell". Supported commands: getAgentInstructions, getProject, getPreviewContext, getDiagnostics, getPreviewEvidence, getSessionState, applyAgentChange.',
+          'Unsupported Agent bridge command "openShell". Supported commands: getAgentInstructions, getProject, getPreviewContext, getDiagnostics, getPreviewEvidence, getSessionState, applyAgentChange, createPage, renamePage, deletePage, setStartPage, selectActivePage.',
       },
     })
     expect(router.routeCommand('applySourceChange', { summary: 'Stale command' })).toEqual({
@@ -411,7 +610,7 @@ describe('agent bridge command router', () => {
       error: {
         code: 'unsupported-command',
         message:
-          'Unsupported Agent bridge command "applySourceChange". Supported commands: getAgentInstructions, getProject, getPreviewContext, getDiagnostics, getPreviewEvidence, getSessionState, applyAgentChange.',
+          'Unsupported Agent bridge command "applySourceChange". Supported commands: getAgentInstructions, getProject, getPreviewContext, getDiagnostics, getPreviewEvidence, getSessionState, applyAgentChange, createPage, renamePage, deletePage, setStartPage, selectActivePage.',
       },
     })
     expect(appliedRequests).toEqual([])

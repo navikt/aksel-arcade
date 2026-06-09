@@ -3,6 +3,7 @@ import type {
   ArcadePageId,
   ArcadeSourceFile,
   Project,
+  ProjectSourceTarget,
   ProjectSource,
   SelectedEditTarget,
 } from '@/types/project'
@@ -142,6 +143,15 @@ export const updateGlobalConfigSource = (
     },
   },
 })
+
+export const updateSourceForTarget = (
+  project: Project,
+  target: ProjectSourceTarget,
+  updates: Partial<ArcadeSourceFile>
+): Project =>
+  target.type === 'global-config'
+    ? updateGlobalConfigSource(project, updates)
+    : updatePageSource(project, target.pageId, updates)
 
 export const updateSourceForEditTarget = (
   project: Project,

@@ -1,5 +1,6 @@
 import {
   isAgentBridgeCommandName,
+  isAgentBridgeReadCommandName,
   type AgentBridgeCommandRouter,
   type AgentBridgeMaybeAsyncRoutedCommandResult,
   type AgentBridgeErrorCode,
@@ -108,10 +109,9 @@ export const routeDesktopAgentTransportRequest = (
     )
   }
 
-  const result =
-    method === 'applyAgentChange'
-      ? router.routeCommand(method, request.params)
-      : router.routeCommand(method)
+  const result = isAgentBridgeReadCommandName(method)
+    ? router.routeCommand(method)
+    : router.routeCommand(method, request.params)
 
   if (isPromiseLike(result)) {
     return result.then((resolvedResult) => toTransportResponse(request.id, resolvedResult))
