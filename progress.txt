@@ -1992,3 +1992,26 @@ Verification:
 - npm run typecheck
 - npm run lint (existing `InspectionPopover` hook dependency warning only)
 - CI=1 npm run test
+
+### 2026-06-09 - Issue #185: Multi-page experimental single-page sharing and export
+
+Implemented:
+
+- Selected #185 as the highest-priority `ready-for-agent` feature from #185-#187 because it closes the experimental multi-page safety gap: sharing/export were already start-page-only under the hood, but without clear warnings they could silently drop extra pages and `Global config`, which is a more urgent product risk than autocomplete polish (#186) or the Agent bridge extension (#187).
+- Read issue #181, issue #185, `docs/prd/0030-multi-page-support.md`, and the existing `progress.txt` notes before changing code.
+- Added a portable-artifact warning helper in `src/services/storage.ts` so Web share URLs and `.akselarcade` exports reuse one warning message whenever a multi-page project would be reduced to the Start page.
+- Updated `src/components/Header/AppHeader.tsx` so the share popover shows that warning for experimental multi-page projects, the Export button advertises dialog behavior in that state, and exporting now requires a confirmation dialog before proceeding with a Start-page-only package.
+- Kept the portable artifact payloads themselves backward-compatible: Web share serialization still carries only the Start page source, and `.akselarcade` packages still export/import as clean single-page projects.
+- Added regression coverage in `tests/integration/share-popover.test.tsx`, `tests/integration/share-decode.test.tsx`, and `tests/unit/services/storage.test.ts` for share warning UI, export confirmation, start-page-only multi-page share payloads, and multi-page package import collapsing back to a valid single-page project.
+
+Verification:
+
+- npm run typecheck
+- npm run lint (existing `.eslintignore` deprecation notice and existing `InspectionPopover` hook dependency warning only)
+- npm test -- --run
+- npm run build
+- Browser check at `http://127.0.0.1:4317/aksel-arcade/` with a multi-page working copy injected through `sessionStorage`: the page panel rendered, the share popover showed the lossy-warning copy, Export opened the confirmation dialog, and there were no runtime console errors during the checked flow.
+
+Next note:
+
+- #186 can build on the existing `validPageIds` plumbing in `EditorPane` / `CodeEditor`, while #187 can stay focused on protocol v3 and targeted page/global-config edits; neither needs to revisit the portable artifact contract unless the experiment stops being Start-page-only.

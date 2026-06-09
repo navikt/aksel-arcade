@@ -16,7 +16,13 @@ import {
   type WebArcadeWorkingCopyPreferences,
 } from '@/services/storage'
 import { CURRENT_PROJECT_VERSION, type Project } from '@/types/project'
-import { FIRST_PAGE_ID, createSinglePageProjectSource, getStartPageSource } from '@/services/projectSource'
+import {
+  FIRST_PAGE_ID,
+  createArcadePage,
+  createArcadeSourceFile,
+  createSinglePageProjectSource,
+  getStartPageSource,
+} from '@/services/projectSource'
 import {
   setupLocalStorageMock,
   setupSessionStorageMock,
@@ -68,6 +74,41 @@ const createLegacyPortableProject = (project: Project) => ({
 })
 
 const getPrimarySource = (project: Project) => getStartPageSource(project)
+
+const createLossyMultiPageProject = (
+  overrides: Partial<Project> = {}
+): Project =>
+  createTestProject({
+    name: 'Lossy Multi-page Project',
+    source: {
+      globalConfig: createArcadeSourceFile(
+        'const SharedChrome = () => <Box>Shared chrome</Box>',
+        'export const sharedConfig = "shared"'
+      ),
+      pages: [
+        createArcadePage(
+          FIRST_PAGE_ID,
+          'Page 1',
+          createArcadeSourceFile(
+            '<Box>Non-start page</Box>',
+            'export const useFirstPage = () => "first"'
+          )
+        ),
+        createArcadePage(
+          'page02',
+          'Page 2',
+          createArcadeSourceFile(
+            '<Box>Portable start page</Box>',
+            'export const usePortableStartPage = () => "start"'
+          )
+        ),
+      ],
+      startPageId: 'page02',
+      nextPageNumber: 3,
+    },
+    activePageId: 'page02',
+    ...overrides,
+  })
 
 const createLegacyStoredProject = (project: Project) => ({
   version: '1.0.0',
@@ -624,6 +665,30 @@ describe('Storage Service', () => {
       )
     })
 
+    it('exports only the Start page when a project contains multiple pages and Global config', () => {
+      const project = createLossyMultiPageProject({
+        name: 'Portable Multi-page Package',
+      })
+
+      const packageData = createArcadeProjectPackage(project)
+      const serialized = JSON.stringify(packageData)
+
+      expect(packageData.project).toEqual({
+        name: 'Portable Multi-page Package',
+        source: {
+          jsx: '<Box>Portable start page</Box>',
+          hooks: 'export const usePortableStartPage = () => "start"',
+        },
+        preview: {
+          viewport: 'MD',
+        },
+      })
+      expect(serialized).not.toContain('Non-start page')
+      expect(serialized).not.toContain('Shared chrome')
+      expect(serialized).not.toContain('sharedConfig')
+      expect(serialized).not.toContain('useFirstPage')
+    })
+
     it('exports the clean package shape without metadata', async () => {
       const mockUrl = 'blob:mock-url'
       let capturedBlob: Blob | null = null
@@ -776,6 +841,40 @@ describe('Storage Service', () => {
       expect(getPrimarySource(result.project!).jsx).toBe('<Box>Case-insensitive package</Box>')
       expect(getPrimarySource(result.project!).hooks).toBe(
         'export const useCaseInsensitivePackage = () => "ok"'
+      )
+    })
+
+    it('imports a multi-page export as a valid single-page Arcade project', async () => {
+      const sourceProject = createLossyMultiPageProject({
+        name: 'Portable Multi-page Import',
+        viewportSize: 'XL',
+      })
+      const packageData = createArcadeProjectPackage(sourceProject)
+
+      const file = createMockFile(
+        JSON.stringify(packageData),
+        'portable-multi-page.akselarcade',
+        ARCADE_PROJECT_PACKAGE_MIME_TYPE
+      )
+
+      const result = await importProject(file)
+
+      expect(result.success).toBe(true)
+      expect(result.error).toBeUndefined()
+      expect(result.project).toMatchObject({
+        name: 'Portable Multi-page Import',
+        viewportSize: 'XL',
+        activePageId: FIRST_PAGE_ID,
+      })
+      expect(result.project?.source.globalConfig).toEqual({
+        jsx: '',
+        hooks: '',
+      })
+      expect(result.project?.source.pages).toHaveLength(1)
+      expect(result.project?.source.startPageId).toBe(FIRST_PAGE_ID)
+      expect(getPrimarySource(result.project!).jsx).toBe('<Box>Portable start page</Box>')
+      expect(getPrimarySource(result.project!).hooks).toBe(
+        'export const usePortableStartPage = () => "start"'
       )
     })
 
