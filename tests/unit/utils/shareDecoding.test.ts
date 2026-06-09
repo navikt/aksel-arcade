@@ -5,12 +5,15 @@ import { getCompressionStrategy } from '@/services/compressionStrategies'
 import type { ProjectSnapshot } from '@/types/project'
 import { createDefaultProject } from '@/utils/projectDefaults'
 import { createShareSnapshot, SNAPSHOT_FILE_IDS } from '@/services/storage'
+import { createSinglePageProjectSource, getStartPageSource } from '@/services/projectSource'
 
 describe('shareDecoding v3 payloads', () => {
   it('decodes v3 Web share URL payloads into shared source and preview preferences', async () => {
     const project = createDefaultProject()
-    project.jsxCode = 'export default function App() { return <div>Shared JSX</div> }'
-    project.hooksCode = 'export function useSharedHook() { return "Shared Hooks" }'
+    project.source = createSinglePageProjectSource(
+      'export default function App() { return <div>Shared JSX</div> }',
+      'export function useSharedHook() { return "Shared Hooks" }'
+    )
     const snapshot = createShareSnapshot(project, {
       preview: {
         viewport: 'LG',
@@ -167,22 +170,25 @@ describe('shareDecoding temporary legacy v2 packed strategy', () => {
 const createLegacyFullSnapshot = (): ProjectSnapshot => {
   const project = createDefaultProject()
   project.version = '9.9.9'
-  project.jsxCode = 'export default function App() { return <div>Legacy JSX</div> }'
-  project.hooksCode = 'export function useLegacyHook() { return "Legacy Hooks" }'
+  project.source = createSinglePageProjectSource(
+    'export default function App() { return <div>Legacy JSX</div> }',
+    'export function useLegacyHook() { return "Legacy Hooks" }'
+  )
+  const source = getStartPageSource(project)
   const snapshot = createShareSnapshot(project, {
     files: [
       {
         id: SNAPSHOT_FILE_IDS.jsx,
         name: 'SenderApp.tsx',
         language: 'tsx',
-        content: project.jsxCode,
+        content: source.jsx,
         order: 10,
       },
       {
         id: SNAPSHOT_FILE_IDS.hooks,
         name: 'sender-hooks.ts',
         language: 'tsx',
-        content: project.hooksCode,
+        content: source.hooks,
         order: 20,
       },
       {

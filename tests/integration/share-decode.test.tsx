@@ -22,7 +22,8 @@ import {
 } from '@/utils/shareEncoding'
 import { decodeShareToken } from '@/utils/shareDecoding'
 import { getCompressionStrategy } from '@/services/compressionStrategies'
-import type { Project, ProjectSnapshot } from '@/types/project'
+import { CURRENT_PROJECT_VERSION, type Project, type ProjectSnapshot } from '@/types/project'
+import { FIRST_PAGE_ID, createSinglePageProjectSource, getStartPageSource } from '@/services/projectSource'
 import { getViewportWidth } from '@/types/viewports'
 import { repairPackedSnapshotJson, unpackSnapshot } from '@/utils/snapshotPacking'
 import { setupSessionStorageMock, type MockSessionStorage } from '../helpers/mockLocalStorage'
@@ -39,6 +40,7 @@ const Harness = () => {
     dismissShareHydration,
   } = useProject()
   const { theme, panelOrder } = useSettings()
+  const source = getStartPageSource(project)
 
   return (
     <div>
@@ -49,8 +51,8 @@ const Harness = () => {
       <div data-testid="project-last-modified">{project.lastModified}</div>
       <div data-testid="project-panel-layout">{project.panelLayout}</div>
       <div data-testid="project-viewport">{project.viewportSize}</div>
-      <div data-testid="jsx-code">{project.jsxCode}</div>
-      <div data-testid="hooks-code">{project.hooksCode}</div>
+      <div data-testid="jsx-code">{source.jsx}</div>
+      <div data-testid="hooks-code">{source.hooks}</div>
       <div data-testid="editor-active-tab">{editorState.activeTab}</div>
       <div data-testid="preview-current-viewport">{previewState.currentViewport}</div>
       <div data-testid="preview-viewport-width">{previewState.viewportWidth}</div>
@@ -83,13 +85,14 @@ const Harness = () => {
 
 const PersistedHarness = () => {
   const { project, shareHydration, applySharedSnapshot } = useProject()
-  const { theme, panelOrder } = useSettings()
-  useAutoSave(project, { theme, panelOrder })
+  const { theme, panelOrder, multiPageEnabled } = useSettings()
+  const source = getStartPageSource(project)
+  useAutoSave(project, { theme, panelOrder, multiPageEnabled })
 
   return (
     <div>
       <div data-testid="project-name">{project.name}</div>
-      <div data-testid="jsx-code">{project.jsxCode}</div>
+      <div data-testid="jsx-code">{source.jsx}</div>
       <div data-testid="settings-theme">{theme}</div>
       <div data-testid="settings-panel-order">{panelOrder}</div>
       {shareHydration.status === 'ready' && (
@@ -120,6 +123,36 @@ const renderPersistedHarness = () => {
 }
 
 const fixturesDir = path.resolve(process.cwd(), 'tests/fixtures/share')
+
+const createWorkingCopyProject = (
+  overrides: Partial<Project> & { jsxCode?: string; hooksCode?: string }
+): Project => {
+  const {
+    jsxCode = 'export default function App() { return <div>Default JSX</div> }',
+    hooksCode = '',
+    source,
+    activePageId = FIRST_PAGE_ID,
+    version = CURRENT_PROJECT_VERSION,
+    ...projectOverrides
+  } = overrides
+
+  return {
+    id: '11111111-1111-4111-8111-111111111111',
+    name: 'Working copy project',
+    source: source ?? createSinglePageProjectSource(jsxCode, hooksCode),
+    activePageId,
+    viewportSize: 'MD',
+    panelLayout: 'editor-left',
+    version,
+    createdAt: '2024-01-01T00:00:00.000Z',
+    lastModified: '2024-01-02T00:00:00.000Z',
+    ...projectOverrides,
+  }
+}
+
+const setPrimarySource = (project: Project, jsxCode: string, hooksCode = '') => {
+  project.source = createSinglePageProjectSource(jsxCode, hooksCode)
+}
 
 const loadCorruptedPackedFixture = async (): Promise<{
   corruptedPacked: string
@@ -163,21 +196,18 @@ describe('share decode integration', () => {
   })
 
   it('restores a tab-scoped Web Arcade working copy across reload', async () => {
-    const workingCopyProject: Project = {
-      id: '11111111-1111-4111-8111-111111111111',
+    const workingCopyProject = createWorkingCopyProject({
       name: 'Reloaded working copy',
       jsxCode: 'export default function App() { return <div>Reloaded JSX</div> }',
       hooksCode: 'export function useReloadedHook() { return "Reloaded Hooks" }',
       viewportSize: 'LG',
       panelLayout: 'editor-right',
-      version: '1.0.0',
-      createdAt: '2024-01-01T00:00:00.000Z',
-      lastModified: '2024-01-02T00:00:00.000Z',
-    }
+    })
     saveProject(workingCopyProject, {
       preferences: {
         theme: 'light',
         panelOrder: 'preview-left',
+        multiPageEnabled: false,
       },
     })
 
@@ -199,21 +229,18 @@ describe('share decode integration', () => {
   })
 
   it('resets only the current Web Arcade working copy to a fresh default project', async () => {
-    const previousProject: Project = {
-      id: '11111111-1111-4111-8111-111111111111',
+    const previousProject = createWorkingCopyProject({
       name: 'Reset source working copy',
       jsxCode: 'export default function App() { return <div>Reset source JSX</div> }',
       hooksCode: 'export function useResetSourceHook() { return "Reset source Hooks" }',
       viewportSize: 'XL',
       panelLayout: 'editor-right',
-      version: '1.0.0',
-      createdAt: '2024-01-01T00:00:00.000Z',
-      lastModified: '2024-01-02T00:00:00.000Z',
-    }
+    })
     saveProject(previousProject, {
       preferences: {
         theme: 'light',
         panelOrder: 'preview-left',
+        multiPageEnabled: false,
       },
     })
     const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true)
@@ -253,25 +280,23 @@ describe('share decode integration', () => {
   })
 
   it('loads v3 Web share URLs as fresh local projects from shared source and preview preferences', async () => {
-    const previousProject: Project = {
-      id: '11111111-1111-4111-8111-111111111111',
+    const previousProject = createWorkingCopyProject({
       name: 'Previous local project',
       jsxCode: 'export default function App() { return <div>Previous JSX</div> }',
       hooksCode: 'export function usePreviousHook() { return "Previous Hooks" }',
       viewportSize: 'XS',
       panelLayout: 'editor-right',
-      version: '1.0.0',
-      createdAt: '2024-01-01T00:00:00.000Z',
-      lastModified: '2024-01-02T00:00:00.000Z',
-    }
+    })
     saveProject(previousProject)
 
     const senderProject = createDefaultProject()
     senderProject.name = 'Sender project name'
-    senderProject.version = '2.0.0'
-    senderProject.jsxCode =
-      'export default function App() { return <Heading>Shared v3 JSX</Heading> }'
-    senderProject.hooksCode = 'export function useSharedHook() { return "Shared v3 Hooks" }'
+    senderProject.version = CURRENT_PROJECT_VERSION
+    setPrimarySource(
+      senderProject,
+      'export default function App() { return <Heading>Shared v3 JSX</Heading> }',
+      'export function useSharedHook() { return "Shared v3 Hooks" }'
+    )
 
     const token = await createShareTokenForSnapshot(
       createShareSnapshot(senderProject, {
@@ -316,7 +341,7 @@ describe('share decode integration', () => {
     expect(screen.getByTestId('project-last-modified').textContent).not.toBe(
       previousProject.lastModified
     )
-    expect(screen.getByTestId('project-version').textContent).toBe('1.0.0')
+    expect(screen.getByTestId('project-version').textContent).toBe(CURRENT_PROJECT_VERSION)
     expect(screen.getByTestId('project-panel-layout').textContent).toBe('editor-left')
     expect(screen.getByTestId('jsx-code').textContent).toContain('Shared v3 JSX')
     expect(screen.getByTestId('hooks-code').textContent).toContain('Shared v3 Hooks')
@@ -335,20 +360,17 @@ describe('share decode integration', () => {
 
   it('applies a Web share URL only to the current tab working copy', async () => {
     const originalTabStorage = setupSessionStorageMock()
-    const originalTabProject: Project = {
-      id: '11111111-1111-4111-8111-111111111111',
+    const originalTabProject = createWorkingCopyProject({
       name: 'Original tab working copy',
       jsxCode: 'export default function App() { return <div>Original isolated JSX</div> }',
       hooksCode: 'export function useOriginalIsolatedHook() { return "Original Hooks" }',
       viewportSize: 'LG',
       panelLayout: 'editor-right',
-      version: '1.0.0',
-      createdAt: '2024-01-01T00:00:00.000Z',
-      lastModified: '2024-01-02T00:00:00.000Z',
-    }
+    })
     const originalTabPreferences: WebArcadeWorkingCopyPreferences = {
       theme: 'light',
       panelOrder: 'preview-left',
+      multiPageEnabled: false,
     }
     saveProject(originalTabProject, { preferences: originalTabPreferences })
     const originalTab = renderHarness()
@@ -364,22 +386,24 @@ describe('share decode integration', () => {
     })
 
     const currentTabStorage = setupSessionStorageMock()
-    const currentTabProject: Project = {
+    const currentTabProject = createWorkingCopyProject({
       id: '22222222-2222-4222-8222-222222222222',
       name: 'Current tab before Web share URL',
       jsxCode: 'export default function App() { return <div>Current tab JSX</div> }',
       hooksCode: 'export function useCurrentTabHook() { return "Current Hooks" }',
       viewportSize: 'XS',
       panelLayout: 'editor-left',
-      version: '1.0.0',
       createdAt: '2024-02-01T00:00:00.000Z',
       lastModified: '2024-02-02T00:00:00.000Z',
-    }
+    })
     saveProject(currentTabProject)
 
     const sharedProject = createDefaultProject()
-    sharedProject.jsxCode = 'export default function App() { return <div>Shared isolated JSX</div> }'
-    sharedProject.hooksCode = 'export function useSharedIsolatedHook() { return "Shared Hooks" }'
+    setPrimarySource(
+      sharedProject,
+      'export default function App() { return <div>Shared isolated JSX</div> }',
+      'export function useSharedIsolatedHook() { return "Shared Hooks" }'
+    )
     const token = await createShareTokenForSnapshot(
       createShareSnapshot(sharedProject, {
         preview: {
@@ -401,7 +425,7 @@ describe('share decode integration', () => {
       () => {
         const stored = parseStoredWorkingCopy(currentTabStorage)
         expect(stored.project.name).toBe('Untitled Project')
-        expect(stored.project.jsxCode).toContain('Shared isolated JSX')
+        expect(getStartPageSource(stored.project).jsx).toContain('Shared isolated JSX')
         expect(stored.project.viewportSize).toBe('XL')
         expect(stored.preferences).toEqual({
           ...DEFAULT_WEB_ARCADE_WORKING_COPY_PREFERENCES,
@@ -414,11 +438,15 @@ describe('share decode integration', () => {
     const storedOriginalTab = parseStoredWorkingCopy(originalTabStorage)
     expect(storedOriginalTab.project).toMatchObject({
       name: 'Original tab working copy',
-      jsxCode: 'export default function App() { return <div>Original isolated JSX</div> }',
-      hooksCode: 'export function useOriginalIsolatedHook() { return "Original Hooks" }',
       viewportSize: 'LG',
       panelLayout: 'editor-right',
     })
+    expect(getStartPageSource(storedOriginalTab.project).jsx).toBe(
+      'export default function App() { return <div>Original isolated JSX</div> }'
+    )
+    expect(getStartPageSource(storedOriginalTab.project).hooks).toBe(
+      'export function useOriginalIsolatedHook() { return "Original Hooks" }'
+    )
     expect(storedOriginalTab.preferences).toEqual(originalTabPreferences)
     expect(within(originalTab.container).getByTestId('project-name').textContent).toBe(
       'Original tab working copy'
@@ -432,25 +460,23 @@ describe('share decode integration', () => {
   })
 
   it('loads legacy v2 full-snapshot share URLs as fresh local projects', async () => {
-    const previousProject: Project = {
-      id: '11111111-1111-4111-8111-111111111111',
+    const previousProject = createWorkingCopyProject({
       name: 'Previous local project',
       jsxCode: 'export default function App() { return <div>Previous JSX</div> }',
       hooksCode: 'export function usePreviousHook() { return "Previous Hooks" }',
       viewportSize: 'XS',
       panelLayout: 'editor-right',
-      version: '1.0.0',
-      createdAt: '2024-01-01T00:00:00.000Z',
-      lastModified: '2024-01-02T00:00:00.000Z',
-    }
+    })
     saveProject(previousProject)
 
     const senderProject = createDefaultProject()
     senderProject.name = 'Sender legacy project name'
     senderProject.version = '9.9.9'
-    senderProject.jsxCode =
-      'export default function App() { return <Heading>Shared legacy JSX</Heading> }'
-    senderProject.hooksCode = 'export function useSharedHook() { return "Shared legacy Hooks" }'
+    setPrimarySource(
+      senderProject,
+      'export default function App() { return <Heading>Shared legacy JSX</Heading> }',
+      'export function useSharedHook() { return "Shared legacy Hooks" }'
+    )
 
     const legacySnapshot = createShareSnapshot(senderProject, {
       activeFileId: SNAPSHOT_FILE_IDS.hooks,
@@ -491,7 +517,7 @@ describe('share decode integration', () => {
     expect(screen.getByTestId('project-last-modified').textContent).not.toBe(
       previousProject.lastModified
     )
-    expect(screen.getByTestId('project-version').textContent).toBe('1.0.0')
+    expect(screen.getByTestId('project-version').textContent).toBe(CURRENT_PROJECT_VERSION)
     expect(screen.getByTestId('project-panel-layout').textContent).toBe('editor-left')
     expect(screen.getByTestId('jsx-code').textContent).toContain('Shared legacy JSX')
     expect(screen.getByTestId('hooks-code').textContent).toContain('Shared legacy Hooks')
@@ -671,7 +697,7 @@ describe('share decode integration', () => {
 
 const createShareTokenForCode = async (code: string): Promise<string> => {
   const project = createDefaultProject()
-  project.jsxCode = code
+  setPrimarySource(project, code)
 
   const snapshot = createShareSnapshot(project)
   return createShareTokenForSnapshot(snapshot)
@@ -691,8 +717,11 @@ const createLegacyV2ShareTokenForSnapshot = async (snapshot: ProjectSnapshot): P
 
 const createLegacyPackedSnapshot = (label: string): ProjectSnapshot => {
   const project = createDefaultProject()
-  project.jsxCode = `export default function App() { return <div>${label}</div> }`
-  project.hooksCode = `export function usePackedLegacyHook() { return "${label}" }`
+  setPrimarySource(
+    project,
+    `export default function App() { return <div>${label}</div> }`,
+    `export function usePackedLegacyHook() { return "${label}" }`
+  )
   return createShareSnapshot(project, {
     preview: {
       viewport: 'LG',

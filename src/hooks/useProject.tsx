@@ -1,4 +1,5 @@
 import {
+  useCallback,
   createContext,
   useContext,
   useEffect,
@@ -11,7 +12,7 @@ import {
 /* eslint-disable react-refresh/only-export-components */
 // Context providers intentionally export both context and hooks
 
-import type { Project, ProjectSnapshot, ShareUrlMetadata } from '@/types/project'
+import { CURRENT_PROJECT_VERSION, type Project, type ProjectSnapshot, type ShareUrlMetadata } from '@/types/project'
 import type { EditorState } from '@/types/editor'
 import type { PreviewState, SandboxConsoleMessage } from '@/types/preview'
 import {
@@ -22,6 +23,14 @@ import {
   HOOKS_DEMO_JSX_CODE,
   HOOKS_DEMO_HOOKS_CODE,
 } from '@/utils/projectDefaults'
+import {
+  FIRST_PAGE_ID,
+  createSinglePageProjectSource,
+  getActiveSource,
+  normalizeProjectSelection,
+  setActivePage,
+  updateActivePageSource,
+} from '@/services/projectSource'
 import {
   DEFAULT_WEB_ARCADE_WORKING_COPY_PREFERENCES,
   loadProject,
@@ -47,6 +56,11 @@ interface ShareHydrationState {
   error?: ShareDecodeError
 }
 
+type ProjectUpdate = Partial<Pick<Project, 'name' | 'viewportSize' | 'panelLayout' | 'activePageId'>> & {
+  jsxCode?: string
+  hooksCode?: string
+}
+
 interface AppState {
   // Persisted state
   project: Project
@@ -61,7 +75,7 @@ interface AppState {
   isSettingsOpen: boolean
 
   // Actions
-  updateProject: (updates: Partial<Project>) => void
+  updateProject: (updates: ProjectUpdate) => void
   replaceProject: (project: Project) => void
   updateEditorState: (updates: Partial<EditorState>) => void
   updatePreviewState: (updates: Partial<PreviewState>) => void
@@ -115,7 +129,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const previewIframeRef = useRef<HTMLIFrameElement | null>(null)
   const [isComponentPaletteOpen, setIsComponentPaletteOpen] = useState(false)
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
-  const { setTheme, setPanelOrder } = useSettings()
+  const { setTheme, setPanelOrder, setMultiPageEnabled } = useSettings()
   const restoredPreferencesRef = useRef(false)
   const [shareHydration, setShareHydration] = useState<ShareHydrationState>(() => {
     const token = getShareTokenFromLocation()
@@ -132,8 +146,9 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     if (preferences) {
       setTheme(preferences.theme)
       setPanelOrder(preferences.panelOrder)
+      setMultiPageEnabled(preferences.multiPageEnabled)
     }
-  }, [setPanelOrder, setTheme])
+  }, [setMultiPageEnabled, setPanelOrder, setTheme])
 
   useEffect(() => {
     if (shareHydration.status !== 'decoding' || !shareHydration.token) {
@@ -185,24 +200,52 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     }
   }, [shareHydration.status, shareHydration.token])
 
-  const updateProject = (updates: Partial<Project>) => {
-    setProjectState((prev) => ({
-      ...prev,
-      ...updates,
-      lastModified: new Date().toISOString(),
-    }))
+  const updateProject = (updates: ProjectUpdate) => {
+    setProjectState((prev) => {
+      let nextProject: Project = {
+        ...prev,
+        lastModified: new Date().toISOString(),
+      }
+
+      if (updates.name !== undefined) {
+        nextProject = { ...nextProject, name: updates.name }
+      }
+
+      if (updates.viewportSize !== undefined) {
+        nextProject = { ...nextProject, viewportSize: updates.viewportSize }
+      }
+
+      if (updates.panelLayout !== undefined) {
+        nextProject = { ...nextProject, panelLayout: updates.panelLayout }
+      }
+
+      if (updates.activePageId !== undefined) {
+        nextProject = setActivePage(nextProject, updates.activePageId)
+      }
+
+      if (updates.jsxCode !== undefined || updates.hooksCode !== undefined) {
+        nextProject = updateActivePageSource(nextProject, {
+          jsx: updates.jsxCode,
+          hooks: updates.hooksCode,
+        })
+      }
+
+      return normalizeProjectSelection(nextProject)
+    })
   }
 
   const replaceCurrentWorkingCopy = (
     newProject: Project,
     preferences: WebArcadeWorkingCopyPreferences
   ) => {
+    const normalizedProject = normalizeProjectSelection(newProject)
     notifyAgentSessionProjectReplaced()
-    setProjectState(newProject)
+    setProjectState(normalizedProject)
     setEditorState(createDefaultEditorState())
-    setPreviewState(createDefaultPreviewState(newProject.viewportSize))
+    setPreviewState(createDefaultPreviewState(normalizedProject.viewportSize))
     setTheme(preferences.theme)
     setPanelOrder(preferences.panelOrder)
+    setMultiPageEnabled(preferences.multiPageEnabled)
   }
 
   const replaceProject = (newProject: Project) => {
@@ -213,9 +256,9 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     setEditorState((prev) => ({ ...prev, ...updates }))
   }
 
-  const updatePreviewState = (updates: Partial<PreviewState>) => {
+  const updatePreviewState = useCallback((updates: Partial<PreviewState>) => {
     setPreviewState((prev) => ({ ...prev, ...updates }))
-  }
+  }, [])
 
   const recordSandboxConsoleMessage = (message: SandboxConsoleMessage) => {
     setPreviewState((prev) => ({
@@ -238,7 +281,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
   const insertSnippet = (snippet: ComponentSnippet) => {
     // Get current code for active tab
-    const currentCode = editorState.activeTab === 'JSX' ? project.jsxCode : project.hooksCode
+    const activeSource = getActiveSource(project)
+    const currentCode = editorState.activeTab === 'JSX' ? activeSource.jsx : activeSource.hooks
 
     // Parse template: replace ${N:placeholder} with placeholder text
     let parsedTemplate = snippet.template
@@ -274,12 +318,13 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     if (confirmed) {
       // Clear any potential storage conflicts by updating project cleanly
       notifyAgentSessionProjectReplaced()
-      setProjectState({
-        ...project,
-        jsxCode: FORM_SUMMARY_JSX_CODE,
-        hooksCode: '', // Empty hooks for template
+      setProjectState((prev) => ({
+        ...updateActivePageSource(prev, {
+          jsx: FORM_SUMMARY_JSX_CODE,
+          hooks: '',
+        }),
         lastModified: new Date().toISOString(),
-      })
+      }))
       // Reset editor state to JSX tab
       setEditorState(createDefaultEditorState())
     }
@@ -289,12 +334,13 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     const confirmed = window.confirm('Load Hooks demo? This will replace your current code.')
     if (confirmed) {
       notifyAgentSessionProjectReplaced()
-      setProjectState({
-        ...project,
-        jsxCode: HOOKS_DEMO_JSX_CODE,
-        hooksCode: HOOKS_DEMO_HOOKS_CODE,
+      setProjectState((prev) => ({
+        ...updateActivePageSource(prev, {
+          jsx: HOOKS_DEMO_JSX_CODE,
+          hooks: HOOKS_DEMO_HOOKS_CODE,
+        }),
         lastModified: new Date().toISOString(),
-      })
+      }))
       // Reset editor state to JSX tab
       setEditorState(createDefaultEditorState())
     }
@@ -372,9 +418,10 @@ const buildProjectFromSnapshot = (snapshot: ProjectSnapshot): Project => {
 
   return {
     ...freshProject,
-    jsxCode: nextJsx,
-    hooksCode: nextHooks,
+    source: createSinglePageProjectSource(nextJsx, nextHooks),
+    activePageId: FIRST_PAGE_ID,
     viewportSize: snapshot.preview.viewport,
+    version: CURRENT_PROJECT_VERSION,
     createdAt: now,
     lastModified: now,
   }

@@ -6,6 +6,7 @@ import { EditorTabs } from './EditorTabs'
 import { EditorToolbar } from './EditorToolbar'
 import { ComponentPalette } from '@/components/ComponentPalette'
 import { formatCode } from '@/services/formatter'
+import { getActiveSource } from '@/services/projectSource'
 import './EditorPane.css'
 
 export const EditorPane = () => {
@@ -26,7 +27,8 @@ export const EditorPane = () => {
   const editorRef = useRef<CodeEditorRef>(null)
 
   const currentTab = editorState.activeTab
-  const currentContent = currentTab === 'JSX' ? project.jsxCode : project.hooksCode
+  const activeSource = getActiveSource(project)
+  const currentContent = currentTab === 'JSX' ? activeSource.jsx : activeSource.hooks
 
   const handleCodeChange = (newContent: string) => {
     if (currentTab === 'JSX') {
@@ -53,7 +55,7 @@ export const EditorPane = () => {
     closeComponentPalette()
 
     // Insert the snippet at the current cursor position
-    const currentContent = currentTab === 'JSX' ? project.jsxCode : project.hooksCode
+    const currentContent = currentTab === 'JSX' ? activeSource.jsx : activeSource.hooks
     const cursor = currentTab === 'JSX' ? editorState.jsxCursor : editorState.hooksCursor
 
     // Simple insertion: add snippet at cursor or end of code

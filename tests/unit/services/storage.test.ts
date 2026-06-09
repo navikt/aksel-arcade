@@ -15,7 +15,8 @@ import {
   WEB_ARCADE_WORKING_COPY_STORAGE_KEY,
   type WebArcadeWorkingCopyPreferences,
 } from '@/services/storage'
-import type { Project } from '@/types/project'
+import { CURRENT_PROJECT_VERSION, type Project } from '@/types/project'
+import { FIRST_PAGE_ID, createSinglePageProjectSource, getStartPageSource } from '@/services/projectSource'
 import {
   setupLocalStorageMock,
   setupSessionStorageMock,
@@ -24,18 +25,31 @@ import {
   type MockSessionStorage,
 } from '../../helpers/mockLocalStorage'
 
-const createTestProject = (overrides: Partial<Project> = {}): Project => ({
-  id: crypto.randomUUID(),
-  name: 'Test Project',
-  jsxCode: '<Button>Test</Button>',
-  hooksCode: '',
-  viewportSize: 'MD',
-  panelLayout: 'editor-left',
-  version: '1.0.0',
-  createdAt: new Date().toISOString(),
-  lastModified: new Date().toISOString(),
-  ...overrides,
-})
+const createTestProject = (
+  overrides: Partial<Project> & { jsxCode?: string; hooksCode?: string } = {}
+): Project => {
+  const {
+    jsxCode = '<Button>Test</Button>',
+    hooksCode = '',
+    source,
+    activePageId = FIRST_PAGE_ID,
+    version = CURRENT_PROJECT_VERSION,
+    ...projectOverrides
+  } = overrides
+
+  return {
+    id: crypto.randomUUID(),
+    name: 'Test Project',
+    source: source ?? createSinglePageProjectSource(jsxCode, hooksCode),
+    activePageId,
+    viewportSize: 'MD',
+    panelLayout: 'editor-left',
+    version,
+    createdAt: new Date().toISOString(),
+    lastModified: new Date().toISOString(),
+    ...projectOverrides,
+  }
+}
 
 const createLegacyPortableProject = (project: Project) => ({
   version: project.version,
@@ -44,13 +58,27 @@ const createLegacyPortableProject = (project: Project) => ({
   createdAt: project.createdAt,
   lastModified: project.lastModified,
   code: {
-    jsxCode: project.jsxCode,
-    hooksCode: project.hooksCode,
+    jsxCode: getStartPageSource(project).jsx,
+    hooksCode: getStartPageSource(project).hooks,
   },
   ui: {
     viewportSize: project.viewportSize,
     panelLayout: project.panelLayout,
   },
+})
+
+const getPrimarySource = (project: Project) => getStartPageSource(project)
+
+const createLegacyStoredProject = (project: Project) => ({
+  version: '1.0.0',
+  id: project.id,
+  name: project.name,
+  jsxCode: getPrimarySource(project).jsx,
+  hooksCode: getPrimarySource(project).hooks,
+  viewportSize: project.viewportSize,
+  panelLayout: project.panelLayout,
+  createdAt: project.createdAt,
+  lastModified: project.lastModified,
 })
 
 const collectObjectKeys = (value: unknown): string[] => {
@@ -78,17 +106,7 @@ describe('Storage Service', () => {
 
   describe('saveProject', () => {
     it('should save valid project to tab-scoped sessionStorage', () => {
-      const project: Project = {
-        id: crypto.randomUUID(),
-        name: 'Test Project',
-        jsxCode: '<Button>Test</Button>',
-        hooksCode: '',
-        viewportSize: 'MD',
-        panelLayout: 'editor-left',
-        version: '1.0.0',
-        createdAt: new Date().toISOString(),
-        lastModified: new Date().toISOString(),
-      }
+      const project = createTestProject()
 
       const result = saveProject(project)
 
@@ -108,17 +126,10 @@ describe('Storage Service', () => {
 
     it('should reject projects larger than 5MB', () => {
       const largeCode = 'x'.repeat(6 * 1024 * 1024) // 6MB
-      const project: Project = {
-        id: crypto.randomUUID(),
+      const project = createTestProject({
         name: 'Large Project',
         jsxCode: largeCode,
-        hooksCode: '',
-        viewportSize: 'MD',
-        panelLayout: 'editor-left',
-        version: '1.0.0',
-        createdAt: new Date().toISOString(),
-        lastModified: new Date().toISOString(),
-      }
+      })
 
       const result = saveProject(project)
 
@@ -128,17 +139,10 @@ describe('Storage Service', () => {
 
     it('should warn when project size approaches 4MB', () => {
       const largeCode = 'x'.repeat(4.5 * 1024 * 1024) // 4.5MB
-      const project: Project = {
-        id: crypto.randomUUID(),
+      const project = createTestProject({
         name: 'Large Project',
         jsxCode: largeCode,
-        hooksCode: '',
-        viewportSize: 'MD',
-        panelLayout: 'editor-left',
-        version: '1.0.0',
-        createdAt: new Date().toISOString(),
-        lastModified: new Date().toISOString(),
-      }
+      })
 
       const result = saveProject(project)
 
@@ -160,17 +164,10 @@ describe('Storage Service', () => {
     })
 
     it('should update lastModified timestamp', () => {
-      const project: Project = {
-        id: crypto.randomUUID(),
-        name: 'Test Project',
-        jsxCode: '<Button>Test</Button>',
-        hooksCode: '',
-        viewportSize: 'MD',
-        panelLayout: 'editor-left',
-        version: '1.0.0',
+      const project = createTestProject({
         createdAt: '2025-01-01T00:00:00.000Z',
         lastModified: '2025-01-01T00:00:00.000Z',
-      }
+      })
 
       const result = saveProject(project)
       expect(result.success).toBe(true)
@@ -194,6 +191,7 @@ describe('Storage Service', () => {
       const preferences: WebArcadeWorkingCopyPreferences = {
         theme: 'light',
         panelOrder: 'preview-left',
+        multiPageEnabled: true,
       }
 
       const result = saveProject(project, { preferences })
@@ -222,17 +220,13 @@ describe('Storage Service', () => {
     })
 
     it('should restore saved project correctly', () => {
-      const project: Project = {
-        id: crypto.randomUUID(),
+      const project = createTestProject({
         name: 'My Saved Project',
         jsxCode: '<Box>Content</Box>',
         hooksCode: 'const useCustom = () => {}',
         viewportSize: 'LG',
         panelLayout: 'editor-right',
-        version: '1.0.0',
-        createdAt: new Date().toISOString(),
-        lastModified: new Date().toISOString(),
-      }
+      })
 
       saveProject(project)
       const result = loadProject()
@@ -240,9 +234,47 @@ describe('Storage Service', () => {
       expect(result.project).toBeTruthy()
       expect(result.fromStorage).toBe(true)
       expect(result.project!.name).toBe('My Saved Project')
-      expect(result.project!.jsxCode).toBe('<Box>Content</Box>')
+      expect(getPrimarySource(result.project!).jsx).toBe('<Box>Content</Box>')
+      expect(getPrimarySource(result.project!).hooks).toBe('const useCustom = () => {}')
       expect(result.project!.viewportSize).toBe('LG')
       expect(result.project!.panelLayout).toBe('editor-right')
+    })
+
+    it('migrates legacy single-page projects to the canonical pages source', () => {
+      const legacyProject = createLegacyStoredProject(
+        createTestProject({
+          name: 'Legacy Migrated Project',
+          jsxCode: '<Box>Legacy JSX</Box>',
+          hooksCode: 'export const useLegacy = () => "legacy"',
+          viewportSize: 'LG',
+        })
+      )
+      sessionStorage.setItem(WEB_ARCADE_WORKING_COPY_STORAGE_KEY, JSON.stringify(legacyProject))
+
+      const result = loadProject()
+
+      expect(result.fromStorage).toBe(true)
+      expect(result.migrated).toBe(true)
+      expect(result.project).toMatchObject({
+        name: 'Legacy Migrated Project',
+        activePageId: FIRST_PAGE_ID,
+        viewportSize: 'LG',
+        source: {
+          globalConfig: { jsx: '', hooks: '' },
+          startPageId: FIRST_PAGE_ID,
+          nextPageNumber: 2,
+        },
+      })
+      expect(result.project?.source.pages).toEqual([
+        {
+          id: FIRST_PAGE_ID,
+          name: 'Page 1',
+          source: {
+            jsx: '<Box>Legacy JSX</Box>',
+            hooks: 'export const useLegacy = () => "legacy"',
+          },
+        },
+      ])
     })
 
     it('should handle corrupted JSON gracefully', () => {
@@ -262,7 +294,7 @@ describe('Storage Service', () => {
       const result = loadProject()
 
       expect(result.project).toBeNull()
-      expect(result.error).toContain('Validation failed')
+      expect(result.error).toContain('Migration failed')
     })
 
     it('should ignore legacy browser-wide saved project data', () => {
@@ -277,7 +309,7 @@ describe('Storage Service', () => {
       expect(result.fromStorage).toBe(false)
       expect(result.project).toBeTruthy()
       expect(result.project!.name).toBe('Untitled Project')
-      expect(result.project!.jsxCode).not.toContain('Legacy should be ignored')
+      expect(getPrimarySource(result.project!).jsx).not.toContain('Legacy should be ignored')
       expect(localStorage.getItem(WEB_ARCADE_WORKING_COPY_STORAGE_KEY)).toBeTruthy()
     })
 
@@ -290,6 +322,7 @@ describe('Storage Service', () => {
       const preferences: WebArcadeWorkingCopyPreferences = {
         theme: 'light',
         panelOrder: 'preview-left',
+        multiPageEnabled: true,
       }
 
       saveProject(project, { preferences })
@@ -316,6 +349,7 @@ describe('Storage Service', () => {
       const initialPreferences: WebArcadeWorkingCopyPreferences = {
         theme: 'light',
         panelOrder: 'preview-left',
+        multiPageEnabled: true,
       }
       saveProject(initialProject, { preferences: initialPreferences })
 
@@ -326,21 +360,26 @@ describe('Storage Service', () => {
       const duplicatedLoad = loadProject()
       expect(duplicatedLoad.project).toMatchObject({
         name: 'Duplicated source tab',
-        jsxCode: '<Box>Original JSX</Box>',
-        hooksCode: 'export const useOriginal = () => "original"',
         viewportSize: 'XL',
         panelLayout: 'editor-right',
       })
+      expect(getPrimarySource(duplicatedLoad.project!).jsx).toBe('<Box>Original JSX</Box>')
+      expect(getPrimarySource(duplicatedLoad.project!).hooks).toBe(
+        'export const useOriginal = () => "original"'
+      )
       expect(duplicatedLoad.preferences).toEqual(initialPreferences)
 
       saveProject(
         {
           ...duplicatedLoad.project!,
           name: 'Duplicated tab edit',
-          jsxCode: '<Box>Duplicate tab JSX</Box>',
+          source: createSinglePageProjectSource(
+            '<Box>Duplicate tab JSX</Box>',
+            getPrimarySource(duplicatedLoad.project!).hooks
+          ),
           viewportSize: 'SM',
         },
-        { preferences: { theme: 'dark', panelOrder: 'code-left' } }
+        { preferences: { theme: 'dark', panelOrder: 'code-left', multiPageEnabled: false } }
       )
 
       Object.defineProperty(globalThis, 'sessionStorage', {
@@ -352,7 +391,10 @@ describe('Storage Service', () => {
         {
           ...initialProject,
           name: 'Original tab edit',
-          hooksCode: 'export const useOriginal = () => "edited original"',
+          source: createSinglePageProjectSource(
+            getPrimarySource(initialProject).jsx,
+            'export const useOriginal = () => "edited original"'
+          ),
           panelLayout: 'editor-left',
         },
         { preferences: initialPreferences }
@@ -362,39 +404,38 @@ describe('Storage Service', () => {
       const duplicatedStored = parseStoredProject(duplicatedTabStorage)
       expect(originalStored.project).toMatchObject({
         name: 'Original tab edit',
-        jsxCode: '<Box>Original JSX</Box>',
-        hooksCode: 'export const useOriginal = () => "edited original"',
         viewportSize: 'XL',
         panelLayout: 'editor-left',
       })
+      expect(getPrimarySource(originalStored.project).jsx).toBe('<Box>Original JSX</Box>')
+      expect(getPrimarySource(originalStored.project).hooks).toBe(
+        'export const useOriginal = () => "edited original"'
+      )
       expect(originalStored.preferences).toEqual(initialPreferences)
       expect(duplicatedStored.project).toMatchObject({
         name: 'Duplicated tab edit',
-        jsxCode: '<Box>Duplicate tab JSX</Box>',
-        hooksCode: 'export const useOriginal = () => "original"',
         viewportSize: 'SM',
         panelLayout: 'editor-right',
       })
+      expect(getPrimarySource(duplicatedStored.project).jsx).toBe('<Box>Duplicate tab JSX</Box>')
+      expect(getPrimarySource(duplicatedStored.project).hooks).toBe(
+        'export const useOriginal = () => "original"'
+      )
       expect(duplicatedStored.preferences).toEqual({
         theme: 'dark',
         panelOrder: 'code-left',
+        multiPageEnabled: false,
       })
     })
   })
 
   describe('validateProjectSize', () => {
     it('should calculate project size correctly', () => {
-      const project: Project = {
-        id: crypto.randomUUID(),
+      const project = createTestProject({
         name: 'Test',
         jsxCode: 'x'.repeat(1000),
         hooksCode: 'y'.repeat(1000),
-        viewportSize: 'MD',
-        panelLayout: 'editor-left',
-        version: '1.0.0',
-        createdAt: new Date().toISOString(),
-        lastModified: new Date().toISOString(),
-      }
+      })
 
       const result = validateProjectSize(project)
 
@@ -404,17 +445,10 @@ describe('Storage Service', () => {
     })
 
     it('should mark projects > 5MB as invalid', () => {
-      const project: Project = {
-        id: crypto.randomUUID(),
+      const project = createTestProject({
         name: 'Huge Project',
         jsxCode: 'x'.repeat(6 * 1024 * 1024),
-        hooksCode: '',
-        viewportSize: 'MD',
-        panelLayout: 'editor-left',
-        version: '1.0.0',
-        createdAt: new Date().toISOString(),
-        lastModified: new Date().toISOString(),
-      }
+      })
 
       const result = validateProjectSize(project)
 
@@ -423,17 +457,10 @@ describe('Storage Service', () => {
     })
 
     it('should warn for projects > 4MB', () => {
-      const project: Project = {
-        id: crypto.randomUUID(),
+      const project = createTestProject({
         name: 'Large Project',
         jsxCode: 'x'.repeat(4.5 * 1024 * 1024),
-        hooksCode: '',
-        viewportSize: 'MD',
-        panelLayout: 'editor-left',
-        version: '1.0.0',
-        createdAt: new Date().toISOString(),
-        lastModified: new Date().toISOString(),
-      }
+      })
 
       const result = validateProjectSize(project)
 
@@ -484,11 +511,10 @@ describe('Storage Service', () => {
         return originalCreateElement(tagName)
       }) as typeof document.createElement
 
-      const project: Project = {
-        ...createTestProject(),
+      const project = createTestProject({
         name: 'Export Test',
         jsxCode: '<Button>Click</Button>',
-      }
+      })
 
       exportProject(project)
 
@@ -552,6 +578,7 @@ describe('Storage Service', () => {
       expect(serialized).not.toContain('diagnostic-secret')
       expect(serialized).not.toContain('evidence-secret')
       expect(serialized).not.toContain('transport-secret')
+      expect(serialized).not.toContain('multiPageEnabled')
       expect(collectObjectKeys(packageData).join(' ')).not.toMatch(
         /agent|session|credential|endpoint|permission|checkpoint|diagnostic|evidence|transport|meta|exportedAt|createdAt|lastModified|id|panelLayout/i
       )
@@ -571,11 +598,10 @@ describe('Storage Service', () => {
       }) as typeof URL.createObjectURL
       global.URL.revokeObjectURL = () => {}
 
-      const project: Project = {
-        ...createTestProject(),
+      const project = createTestProject({
         name: 'Export Shape Test',
         jsxCode: '<HStack><Button>Click</Button></HStack>',
-      }
+      })
 
       try {
         exportProject(project)
@@ -665,12 +691,12 @@ describe('Storage Service', () => {
       expect(result.error).toBeUndefined()
       expect(result.project).toMatchObject({
         name: 'Package Import Test',
-        jsxCode: '<VStack><Heading>Packaged</Heading></VStack>',
-        hooksCode: 'export const usePackaged = () => "ok"',
         viewportSize: 'XL',
         panelLayout: 'editor-left',
-        version: '1.0.0',
+        version: CURRENT_PROJECT_VERSION,
       })
+      expect(getPrimarySource(result.project!).jsx).toBe('<VStack><Heading>Packaged</Heading></VStack>')
+      expect(getPrimarySource(result.project!).hooks).toBe('export const usePackaged = () => "ok"')
       expect(result.project!.id).not.toBe(sourceProject.id)
       expect(result.project!.createdAt).not.toBe(sourceProject.createdAt)
       expect(new Date(result.project!.lastModified).getTime()).toBeGreaterThanOrEqual(
@@ -705,10 +731,12 @@ describe('Storage Service', () => {
       expect(result.error).toBeUndefined()
       expect(result.project).toMatchObject({
         name: 'Case-insensitive Package Import Test',
-        jsxCode: '<Box>Case-insensitive package</Box>',
-        hooksCode: 'export const useCaseInsensitivePackage = () => "ok"',
         viewportSize: 'SM',
       })
+      expect(getPrimarySource(result.project!).jsx).toBe('<Box>Case-insensitive package</Box>')
+      expect(getPrimarySource(result.project!).hooks).toBe(
+        'export const useCaseInsensitivePackage = () => "ok"'
+      )
     })
 
     it('should reject clean package content when the file is not .akselarcade', async () => {
@@ -728,15 +756,12 @@ describe('Storage Service', () => {
 
     it('should reject legacy raw JSON project files', async () => {
       const project = {
-        id: crypto.randomUUID(),
-        name: 'Legacy Raw JSON Test',
-        jsxCode: '<Box>Legacy raw JSON</Box>',
-        hooksCode: '',
-        viewportSize: 'SM',
-        panelLayout: 'editor-left',
-        version: '1.0.0',
-        createdAt: new Date().toISOString(),
-        lastModified: new Date().toISOString(),
+        ...createTestProject({
+          name: 'Legacy Raw JSON Test',
+          jsxCode: '<Box>Legacy raw JSON</Box>',
+          viewportSize: 'SM',
+          version: '1.0.0',
+        }),
         agentSession: { credential: 'legacy-credential-secret' },
         diagnostics: [{ message: 'legacy-diagnostic-secret' }],
         transport: { endpoint: 'http://127.0.0.1:4321' },

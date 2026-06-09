@@ -3,6 +3,27 @@ export type ViewportSize = '2XL' | 'XL' | 'LG' | 'MD' | 'SM' | 'XS'
 export type PanelLayout = 'editor-left' | 'editor-right'
 export type ThemeMode = 'light' | 'dark'
 export type PanelOrder = 'code-left' | 'preview-left'
+export type ArcadePageId = `page${string}`
+
+export interface ArcadeSourceFile {
+  jsx: string
+  hooks: string
+}
+
+export interface ArcadePage {
+  id: ArcadePageId
+  name: string
+  source: ArcadeSourceFile
+}
+
+export interface ProjectSource {
+  globalConfig: ArcadeSourceFile
+  pages: ArcadePage[]
+  startPageId: ArcadePageId
+  nextPageNumber: number
+}
+
+export const CURRENT_PROJECT_VERSION = '2.0.0' as const
 
 export interface Project {
   // Identity
@@ -10,8 +31,8 @@ export interface Project {
   name: string // User-editable project name
 
   // Code content
-  jsxCode: string // JSX tab code content
-  hooksCode: string // Hooks tab code content
+  source: ProjectSource
+  activePageId: ArcadePageId
 
   // UI state
   viewportSize: ViewportSize // Selected responsive breakpoint

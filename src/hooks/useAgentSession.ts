@@ -27,12 +27,16 @@ import type { ThemeMode } from '@/contexts/SettingsContext'
 import type { Project, ViewportSize } from '@/types/project'
 import type { PreviewState } from '@/types/preview'
 import { VIEWPORTS } from '@/types/viewports'
+import { getActiveSource, updateActivePageSource } from '@/services/projectSource'
 import { validateProjectSize } from '@/services/storage'
 import { collectPreviewDiagnostics, type PreviewDiagnostics } from '@/services/previewDiagnostics'
 import type { PreviewEvidenceCaptureResult } from '@/services/previewEvidence'
 import { subscribeToAgentSessionProjectReplacement } from '@/services/agentSessionLifecycle'
 
-type AgentProjectUpdates = Partial<Pick<Project, 'name' | 'jsxCode' | 'hooksCode' | 'viewportSize'>>
+type AgentProjectUpdates = Partial<Pick<Project, 'name' | 'viewportSize'>> & {
+  jsxCode?: string
+  hooksCode?: string
+}
 
 interface UseAgentSessionOptions {
   project: Project
@@ -51,6 +55,7 @@ export const useAgentSession = ({
   onThemeChange,
   getPreviewEvidence,
 }: UseAgentSessionOptions) => {
+  const activeSource = getActiveSource(project)
   const [session, setSession] = useState<DesktopAgentSessionSnapshot | null>(null)
   const [permissions, setPermissions] = useState<AgentPermissions>({ ...DEFAULT_AGENT_PERMISSIONS })
   const coordinatorRef = useRef<DesktopAgentSessionCoordinator | null>(null)
@@ -60,8 +65,8 @@ export const useAgentSession = ({
   const readContextRef = useRef<AgentBridgeReadContext>({
     project: {
       name: project.name,
-      jsxCode: project.jsxCode,
-      hooksCode: project.hooksCode,
+      jsxCode: activeSource.jsx,
+      hooksCode: activeSource.hooks,
     },
     preview: {
       theme,
@@ -80,8 +85,8 @@ export const useAgentSession = ({
     () => ({
       project: {
         name: project.name,
-        jsxCode: project.jsxCode,
-        hooksCode: project.hooksCode,
+        jsxCode: activeSource.jsx,
+        hooksCode: activeSource.hooks,
       },
       preview: {
         theme,
@@ -89,7 +94,7 @@ export const useAgentSession = ({
       },
       diagnostics: collectPreviewDiagnostics(previewState),
     }),
-    [project.hooksCode, project.jsxCode, project.name, project.viewportSize, previewState, theme]
+    [activeSource.hooks, activeSource.jsx, project.name, project.viewportSize, previewState, theme]
   )
 
   permissionsRef.current = permissions
@@ -102,12 +107,13 @@ export const useAgentSession = ({
       nextTheme: ThemeMode,
       nextDiagnostics: PreviewDiagnostics = readContextRef.current.diagnostics
     ) => {
+      const nextActiveSource = getActiveSource(nextProject)
       projectRef.current = nextProject
       readContextRef.current = {
         project: {
           name: nextProject.name,
-          jsxCode: nextProject.jsxCode,
-          hooksCode: nextProject.hooksCode,
+          jsxCode: nextActiveSource.jsx,
+          hooksCode: nextActiveSource.hooks,
         },
         preview: {
           theme: nextTheme,
@@ -144,10 +150,7 @@ export const useAgentSession = ({
         )
       }
 
-      const nextProject = {
-        ...projectRef.current,
-        ...parsedRequest.projectUpdates,
-      }
+      const nextProject = applyAgentProjectUpdates(projectRef.current, parsedRequest.projectUpdates)
       const nextTheme = parsedRequest.theme ?? readContextRef.current.preview.theme
       const sizeStatus = validateProjectSize(nextProject)
       if (!sizeStatus.valid) {
@@ -263,6 +266,33 @@ export const useAgentSession = ({
     startAgentSession,
     stopAgentSession,
   }
+}
+
+const applyAgentProjectUpdates = (project: Project, updates: AgentProjectUpdates): Project => {
+  let nextProject = project
+
+  if (updates.name !== undefined) {
+    nextProject = {
+      ...nextProject,
+      name: updates.name,
+    }
+  }
+
+  if (updates.viewportSize !== undefined) {
+    nextProject = {
+      ...nextProject,
+      viewportSize: updates.viewportSize,
+    }
+  }
+
+  if (updates.jsxCode !== undefined || updates.hooksCode !== undefined) {
+    nextProject = updateActivePageSource(nextProject, {
+      jsx: updates.jsxCode,
+      hooks: updates.hooksCode,
+    })
+  }
+
+  return nextProject
 }
 
 interface ParsedAgentChangeRequest {
