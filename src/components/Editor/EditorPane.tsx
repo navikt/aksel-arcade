@@ -50,7 +50,14 @@ export const EditorPane = () => {
   const effectiveEditTarget = resolveSelectedEditTarget(multiPageEnabled, selectedEditTarget)
   const activeSource = getSourceForEditTarget(project, effectiveEditTarget)
   const currentContent = currentTab === 'JSX' ? activeSource.jsx : activeSource.hooks
-  const validPageIds = useMemo(() => project.source.pages.map((page) => page.id), [project.source.pages])
+  const pageNavigationTargets = useMemo(
+    () => project.source.pages.map(({ id, name }) => ({ id, name })),
+    [project.source.pages]
+  )
+  const validPageIds = useMemo(
+    () => pageNavigationTargets.map((page) => page.id),
+    [pageNavigationTargets]
+  )
   const errorPageIds = Array.from(
     new Set(
       [previewState.compileError?.pageId, previewState.runtimeError?.pageId].filter(
@@ -239,6 +246,7 @@ export const EditorPane = () => {
             onFocusChange={(isCodeEditorFocused) => updateEditorState({ isCodeEditorFocused })}
             onFormat={handleFormat}
             validPageIds={multiPageEnabled ? validPageIds : undefined}
+            pageNavigationTargets={multiPageEnabled ? pageNavigationTargets : undefined}
           />
         </Box>
       </Box>

@@ -2030,3 +2030,29 @@ Verification:
 - npm test -- --run
 - npm run build
 - Browser check at `http://127.0.0.1:4317/aksel-arcade/` with a stored multi-page project and `multiPageEnabled: false`: the share popover still showed the lossy-warning copy, Export still opened the confirmation dialog, and the console only showed the existing form-field `id`/`name` issue.
+
+### 2026-06-09 - Issue #186: Multi-page page-id autocomplete for page navigation
+
+Implemented:
+
+- Selected #186 as the highest-priority `ready-for-agent` feature from #186-#187 because it closes the remaining human-facing multi-page authoring gap after the page/runtime/share work already landed, while the pages-aware Agent bridge in #187 can build afterward on the now-complete authoring surface.
+- Read issue #181, issue #186, `docs/prd/0030-multi-page-support.md`, and the existing `progress.txt` notes before changing code.
+- Extended `src/services/akselAutocomplete.ts` with page-navigation completion contexts for `goToPage('…')`, `href="…"`, and `to={"…"}` so completions show the page display name as the label, the stable `pageNN` id as the detail, and insert the id while still allowing free typing.
+- Kept page-id matching ergonomic by filtering page navigation suggestions on either the display name or the typed page-id prefix, then returning the options in project page order instead of introducing a second page-sorting rule.
+- Updated `src/components/Editor/CodeEditor.tsx` so CodeMirror now gets the current page targets, uses them in the autocomplete override, and auto-triggers completions inside page-navigation string contexts in addition to the existing catalog-backed prop-value contexts.
+- Updated `src/components/Editor/EditorPane.tsx` to thread `{ id, name }` page metadata into `CodeEditor` while keeping stale-reference linting on the lighter `validPageIds` list.
+- Added focused regression coverage in `tests/unit/akselAutocomplete.test.ts` for `goToPage(...)`, `href`/`to`, name-vs-id filtering, inserted ids, and out-of-scope cursor positions.
+
+Verification:
+
+- npm install
+- npm run typecheck
+- npm run lint (existing `.eslintignore` deprecation notice and existing `InspectionPopover` hook dependency warning only)
+- CI=1 npm run test -- --run
+- npm run build
+- Browser check at `http://127.0.0.1:4191/aksel-arcade/` for enabling experimental multi-page authoring, adding Page 2, seeing the live CodeMirror autocomplete tooltip inside `goToPage('…')` with `Page 1` / `Page 2` labels and `page01` / `page02` details, confirming the same tooltip inside Global config `href="…"` authoring, and reloading into the default project with no console errors or warnings.
+
+Next note:
+
+- #187 can stay focused on protocol v3, page lifecycle bridge commands, and targeted page/global-config edits; the page-navigation suggestion source now lives in `EditorPane` → `CodeEditor` → `akselAutocomplete` and does not need to be duplicated in the Agent bridge layer.
+- For browser verification, prefer a fresh Vite port if a reused port appears to serve stale source from another worktree; `4191` was the clean port used for this branch’s verification.
