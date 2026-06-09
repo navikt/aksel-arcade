@@ -49,7 +49,7 @@ export const PreviewPane = () => {
     // Debounce transpilation by 500ms to avoid showing errors while typing
     debounceTimerRef.current = window.setTimeout(() => {
       const transpilePromise = multiPagePreviewSource
-        ? transpileProjectSource(multiPagePreviewSource)
+        ? transpileProjectSource(multiPagePreviewSource, { previewSessionKey: project.id })
         : transpileCode(singlePagePreviewJsx ?? '', singlePagePreviewHooks ?? '')
 
       transpilePromise
@@ -105,6 +105,7 @@ export const PreviewPane = () => {
       }
     }
   }, [
+    project.id,
     multiPagePreviewSource,
     multiPageEnabled,
     singlePagePreviewHooks,

@@ -83,8 +83,11 @@ return App;
   return runtimeFactory(React, Link)
 }
 
-const renderProjectPreview = async (source: ProjectSource) => {
-  const result = await transpileProjectSource(source)
+const renderProjectPreview = async (
+  source: ProjectSource,
+  { previewSessionKey }: { previewSessionKey?: string } = {}
+) => {
+  const result = await transpileProjectSource(source, { previewSessionKey })
 
   expect(result.success).toBe(true)
   expect(result.code).toBeTruthy()
@@ -101,6 +104,8 @@ describe('Multi-page preview runtime', () => {
   afterEach(() => {
     cleanup()
     document.body.innerHTML = ''
+    delete (window as typeof window & { __AKSEL_ARCADE_PREVIEW_STATE?: unknown })
+      .__AKSEL_ARCADE_PREVIEW_STATE
   })
 
   it('opens on the configured start page', async () => {
@@ -274,6 +279,119 @@ export const getSharedVisits = () => sharedVisits`,
     await user.click(screen.getByText('Open details'))
 
     expect((await screen.findByTestId('page-id')).textContent).toBe('page02')
+  })
+
+  it('preserves the current preview page across recompiles in the same preview session', async () => {
+    const user = userEvent.setup()
+    const previewSessionKey = 'preview-session'
+
+    const initialRender = await renderProjectPreview(
+      createProjectSource({
+        pages: [
+          createArcadePage(
+            'page01',
+            'Intro',
+            createArcadeSourceFile(
+              `export default function IntroPage() {
+  return (
+    <div>
+      <div data-testid="page-id">{currentPageId}</div>
+      <button type="button" onClick={() => goToPage('page02')}>
+        Go details
+      </button>
+    </div>
+  )
+}`,
+              ''
+            )
+          ),
+          createArcadePage(
+            'page02',
+            'Details',
+            createArcadeSourceFile(
+              `export default function DetailsPage() {
+  return <div data-testid="page-id">{currentPageId}</div>
+}`,
+              ''
+            )
+          ),
+        ],
+      }),
+      { previewSessionKey }
+    )
+
+    await user.click(await screen.findByRole('button', { name: /go details/i }))
+    expect((await screen.findByTestId('page-id')).textContent).toBe('page02')
+
+    initialRender.unmount()
+    document.body.innerHTML = ''
+
+    await renderProjectPreview(
+      createProjectSource({
+        pages: [
+          createArcadePage(
+            'page01',
+            'Intro',
+            createArcadeSourceFile(
+              `export default function IntroPage() {
+  return (
+    <div>
+      <div data-testid="page-id">{currentPageId}</div>
+      <div data-testid="edited">edited</div>
+      <button type="button" onClick={() => goToPage('page02')}>
+        Go details
+      </button>
+    </div>
+  )
+}`,
+              ''
+            )
+          ),
+          createArcadePage(
+            'page02',
+            'Details',
+            createArcadeSourceFile(
+              `export default function DetailsPage() {
+  return <div data-testid="page-id">{currentPageId}</div>
+}`,
+              ''
+            )
+          ),
+        ],
+      }),
+      { previewSessionKey }
+    )
+
+    expect((await screen.findByTestId('page-id')).textContent).toBe('page02')
+  })
+
+  it('maps multi-page compile errors back to the originating page source', async () => {
+    const result = await transpileProjectSource(
+      createProjectSource({
+        pages: [
+          createArcadePage(
+            'page01',
+            'Intro',
+            createArcadeSourceFile(
+              `export default function IntroPage() {
+  return <div>Okay</div>
+}`,
+              ''
+            )
+          ),
+          createArcadePage(
+            'page02',
+            'Details',
+            createArcadeSourceFile(`<Button>Broken`, '')
+          ),
+        ],
+      })
+    )
+
+    expect(result.success).toBe(false)
+    expect(result.error?.message).toContain('page02 JSX')
+    expect(result.error?.message).toContain('(1:')
+    expect(result.error?.line).toBe(0)
   })
 
   it('rejects bare global config JSX because it is shared scope, not a screen', async () => {

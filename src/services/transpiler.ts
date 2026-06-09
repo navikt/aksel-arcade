@@ -290,17 +290,26 @@ const normalizeModuleDeclarations = (
       : sourceCode
   )
 
-const createComponentEntrySource = (sourceCode: string, componentName: string): string => {
+const createComponentEntrySource = (
+  sourceCode: string,
+  componentName: string
+): ComponentEntrySource => {
   const trimmedJsx = sourceCode.trim()
 
   if (!trimmedJsx) {
-    return `function ${componentName}() { return null; }`
+    return {
+      code: `function ${componentName}() { return null; }`,
+      wrapperPrefixLines: 0,
+    }
   }
 
   const hasExportDefault = /export\s+default\s+(function|class|\(|const|let|var)/.test(sourceCode)
 
   if (hasExportDefault) {
-    return createDefaultExportComponent(sourceCode, componentName)
+    return {
+      code: createDefaultExportComponent(sourceCode, componentName),
+      wrapperPrefixLines: 0,
+    }
   }
 
   const rootElementMatches = trimmedJsx.match(/^\s*</gm)
@@ -308,19 +317,43 @@ const createComponentEntrySource = (sourceCode: string, componentName: string): 
     trimmedJsx.startsWith('<') && rootElementMatches && rootElementMatches.length > 1
 
   if (hasMultipleRoots) {
-    return `function ${componentName}() {\n  return (\n    <>\n${sourceCode}\n    </>\n  );\n}`
+    return {
+      code: `function ${componentName}() {\n  return (\n    <>\n${sourceCode}\n    </>\n  );\n}`,
+      wrapperPrefixLines: 3,
+    }
   }
 
-  return `function ${componentName}() {\n  return (\n    ${sourceCode}\n  );\n}`
+  return {
+    code: `function ${componentName}() {\n  return (\n    ${sourceCode}\n  );\n}`,
+    wrapperPrefixLines: 2,
+  }
+}
+
+interface CombinedSourceMapping {
+  label: string
+  generatedStartLine: number
+  generatedEndLine: number
+  sourceLineOffset: number
+  sourceLineCount: number
 }
 
 interface BuildCombinedSourceResult {
   code: string | null
   error: CompileError | null
+  sourceMappings?: CombinedSourceMapping[]
 }
 
 interface PreparedSourceBlock extends StripSupportedImportsResult {
   label: string
+}
+
+interface ComponentEntrySource {
+  code: string
+  wrapperPrefixLines: number
+}
+
+interface ProjectSourceTranspileOptions {
+  previewSessionKey?: string
 }
 
 const getFirstUnsupportedImport = (
@@ -364,7 +397,7 @@ ${strippedHooks.runtimePrelude}
 ${processedHooksCode}
 
 ${jsxRuntimePrelude}
-${processedJsxCode}
+${processedJsxCode.code}
 `,
     error: null,
   }
@@ -401,7 +434,39 @@ const createEmptyPagesError = (): CompileError => ({
   stack: null,
 })
 
-const buildProjectSourceCombinedCode = (source: ProjectSource): BuildCombinedSourceResult => {
+const splitLines = (sourceCode: string): string[] => sourceCode.split('\n')
+
+const appendLines = (lines: string[], sourceCode: string): void => {
+  lines.push(...splitLines(sourceCode))
+}
+
+const appendMappedLines = (
+  lines: string[],
+  sourceMappings: CombinedSourceMapping[],
+  label: string,
+  sourceCode: string,
+  sourceLineOffset = 0,
+  sourceLineCount = splitLines(sourceCode).length
+): void => {
+  if (!sourceCode) {
+    return
+  }
+
+  const generatedStartLine = lines.length + 1
+  appendLines(lines, sourceCode)
+  sourceMappings.push({
+    label,
+    generatedStartLine,
+    generatedEndLine: lines.length,
+    sourceLineOffset,
+    sourceLineCount,
+  })
+}
+
+const buildProjectSourceCombinedCode = (
+  source: ProjectSource,
+  { previewSessionKey }: ProjectSourceTranspileOptions = {}
+): BuildCombinedSourceResult => {
   const firstPage = source.pages[0]
   if (!firstPage) {
     return {
@@ -465,17 +530,11 @@ const buildProjectSourceCombinedCode = (source: ProjectSource): BuildCombinedSou
     return {
       pageId: page.id,
       pageModuleName,
-      source: `
-const ${pageModuleName} = (() => {
-${strippedHooks.runtimePrelude}
-${processedPageHooks}
-
-${pageJsxRuntimePrelude}
-${processedPageJsx}
-
-  return ${pageComponentName}
-})()
-`,
+      strippedHooks,
+      processedPageHooks,
+      pageJsxRuntimePrelude,
+      strippedJsx,
+      processedPageJsx,
     }
   })
   const startPageId = source.pages.some((page) => page.id === source.startPageId)
@@ -485,20 +544,53 @@ ${processedPageJsx}
     .map(({ pageId, pageModuleName }) => `  ${JSON.stringify(pageId)}: ${pageModuleName},`)
     .join('\n')
   const pageIds = source.pages.map((page) => page.id)
+  const lines: string[] = []
+  const sourceMappings: CombinedSourceMapping[] = []
 
-  return {
-    code: `
-${strippedGlobalHooks.runtimePrelude}
-${processedGlobalHooks}
-
-${globalJsxRuntimePrelude}
-${processedGlobalJsx}
-
-const __AkselArcadePageIds = ${JSON.stringify(pageIds)};
+  appendLines(lines, strippedGlobalHooks.runtimePrelude)
+  appendMappedLines(lines, sourceMappings, strippedGlobalHooks.label, processedGlobalHooks)
+  appendLines(lines, '')
+  appendLines(lines, globalJsxRuntimePrelude)
+  appendMappedLines(lines, sourceMappings, strippedGlobalJsx.label, processedGlobalJsx)
+  appendLines(lines, '')
+  appendLines(
+    lines,
+    `const __AkselArcadePageIds = ${JSON.stringify(pageIds)};
 const __AkselArcadeValidPageIds = new Set(__AkselArcadePageIds);
 const __AkselArcadeStartPageId = ${JSON.stringify(startPageId)};
+const __AkselArcadePreviewSessionKey = ${JSON.stringify(previewSessionKey ?? null)};
+const __AkselArcadeResolvePageId = (value) => {
+  if (typeof value !== 'string') {
+    return null;
+  }
+
+  return __AkselArcadeValidPageIds.has(value) ? value : null;
+};
+const __AkselArcadeReadPersistedPageId = () => {
+  if (typeof window === 'undefined' || !__AkselArcadePreviewSessionKey) {
+    return null;
+  }
+
+  const previewState = window.__AKSEL_ARCADE_PREVIEW_STATE;
+  if (!previewState || previewState.sessionKey !== __AkselArcadePreviewSessionKey) {
+    return null;
+  }
+
+  return __AkselArcadeResolvePageId(previewState.currentPageId);
+};
+const __AkselArcadePersistPageId = (pageId) => {
+  if (typeof window === 'undefined' || !__AkselArcadePreviewSessionKey) {
+    return;
+  }
+
+  window.__AKSEL_ARCADE_PREVIEW_STATE = {
+    sessionKey: __AkselArcadePreviewSessionKey,
+    currentPageId: pageId,
+  };
+};
+const __AkselArcadeInitialPageId = __AkselArcadeReadPersistedPageId() ?? __AkselArcadeStartPageId;
 const __AkselArcadeRuntime = {
-  currentPageId: __AkselArcadeStartPageId,
+  currentPageId: __AkselArcadeInitialPageId,
   goToPage: (pageId) => {
     const nextPageId = __AkselArcadeResolvePageId(pageId);
     if (!nextPageId) {
@@ -510,24 +602,48 @@ const __AkselArcadeRuntime = {
   },
 };
 const goToPage = (pageId) => __AkselArcadeRuntime.goToPage(pageId);
-let currentPageId = __AkselArcadeRuntime.currentPageId;
+let currentPageId = __AkselArcadeRuntime.currentPageId;`
+  )
+  appendLines(lines, '')
 
-const __AkselArcadeResolvePageId = (value) => {
-  if (typeof value !== 'string') {
-    return null;
-  }
+  pageBlocks.forEach(
+    ({
+      pageModuleName,
+      pageId,
+      strippedHooks,
+      processedPageHooks,
+      pageJsxRuntimePrelude,
+      strippedJsx,
+      processedPageJsx,
+    }) => {
+      appendLines(lines, `const ${pageModuleName} = (() => {`)
+      appendLines(lines, strippedHooks.runtimePrelude)
+      appendMappedLines(lines, sourceMappings, strippedHooks.label, processedPageHooks)
+      appendLines(lines, '')
+      appendLines(lines, pageJsxRuntimePrelude)
+      appendMappedLines(
+        lines,
+        sourceMappings,
+        strippedJsx.label,
+        processedPageJsx.code,
+        processedPageJsx.wrapperPrefixLines,
+        splitLines(strippedJsx.code).length
+      )
+      appendLines(lines, '')
+      appendLines(lines, `  return ${getPageComponentName(pageId)}`)
+      appendLines(lines, '})()')
+      appendLines(lines, '')
+    }
+  )
 
-  return __AkselArcadeValidPageIds.has(value) ? value : null;
-};
-
-${pageBlocks.map((pageBlock) => pageBlock.source).join('\n')}
-
-const __AkselArcadePageComponents = {
+  appendLines(
+    lines,
+    `const __AkselArcadePageComponents = {
 ${pageEntries}
 };
 
 function App() {
-  const [activePageId, setActivePageId] = React.useState(__AkselArcadeStartPageId);
+  const [activePageId, setActivePageId] = React.useState(__AkselArcadeInitialPageId);
 
   currentPageId = activePageId;
   __AkselArcadeRuntime.currentPageId = activePageId;
@@ -541,6 +657,10 @@ function App() {
     setActivePageId(nextPageId);
     return true;
   };
+
+  React.useEffect(() => {
+    __AkselArcadePersistPageId(activePageId);
+  }, [activePageId]);
 
   React.useEffect(() => {
     const rootElement = document.getElementById('root');
@@ -592,13 +712,54 @@ function App() {
     __AkselArcadePageComponents[__AkselArcadeStartPageId];
 
   return React.createElement(ActivePageComponent, { key: activePageId });
-}
-`,
+}`
+  )
+
+  return {
+    code: lines.join('\n'),
     error: null,
+    sourceMappings,
   }
 }
 
-const transpileCombinedCode = async (combinedCode: string): Promise<TranspileResult> => {
+interface TranspileCombinedCodeOptions {
+  sourceMappings?: CombinedSourceMapping[]
+}
+
+const findSourceMapping = (
+  sourceMappings: CombinedSourceMapping[],
+  generatedLine: number
+): CombinedSourceMapping | null => {
+  const containingMapping =
+    sourceMappings.find(
+      (sourceMapping) =>
+        generatedLine >= sourceMapping.generatedStartLine &&
+        generatedLine <= sourceMapping.generatedEndLine
+    ) ?? null
+
+  if (containingMapping) {
+    return containingMapping
+  }
+
+  return (
+    sourceMappings.reduce<CombinedSourceMapping | null>((closestMapping, sourceMapping) => {
+      if (sourceMapping.generatedStartLine > generatedLine) {
+        return closestMapping
+      }
+
+      if (!closestMapping || sourceMapping.generatedStartLine > closestMapping.generatedStartLine) {
+        return sourceMapping
+      }
+
+      return closestMapping
+    }, null) ?? null
+  )
+}
+
+const transpileCombinedCode = async (
+  combinedCode: string,
+  { sourceMappings = [] }: TranspileCombinedCodeOptions = {}
+): Promise<TranspileResult> => {
   try {
     const babel = await loadBabel()
     const result = babel.transform(combinedCode, {
@@ -632,7 +793,7 @@ const transpileCombinedCode = async (combinedCode: string): Promise<TranspileRes
       error: null,
     }
   } catch (error) {
-    const compileError = parseBabelError(error)
+    const compileError = parseBabelError(error, sourceMappings)
     return {
       success: false,
       code: null,
@@ -657,8 +818,11 @@ export const transpileCode = async (
   return transpileCombinedCode(combinedSource.code)
 }
 
-export const transpileProjectSource = async (source: ProjectSource): Promise<TranspileResult> => {
-  const combinedSource = buildProjectSourceCombinedCode(source)
+export const transpileProjectSource = async (
+  source: ProjectSource,
+  options?: ProjectSourceTranspileOptions
+): Promise<TranspileResult> => {
+  const combinedSource = buildProjectSourceCombinedCode(source, options)
   if (combinedSource.error || !combinedSource.code) {
     return {
       success: false,
@@ -667,18 +831,39 @@ export const transpileProjectSource = async (source: ProjectSource): Promise<Tra
     }
   }
 
-  return transpileCombinedCode(combinedSource.code)
+  return transpileCombinedCode(combinedSource.code, {
+    sourceMappings: combinedSource.sourceMappings,
+  })
 }
 
-const parseBabelError = (error: unknown): CompileError => {
+const parseBabelError = (
+  error: unknown,
+  sourceMappings: CombinedSourceMapping[] = []
+): CompileError => {
   if (error instanceof Error) {
     // Try to extract line and column from error message
     // Babel errors typically look like: "unknown: Unexpected token (3:15)"
     const match = error.message.match(/\((\d+):(\d+)\)/)
+    const generatedLine = match ? parseInt(match[1], 10) : null
+    const sourceMapping = generatedLine ? findSourceMapping(sourceMappings, generatedLine) : null
+    const mappedLine =
+      generatedLine && sourceMapping
+        ? Math.min(
+            sourceMapping.sourceLineCount,
+            Math.max(
+              1,
+              generatedLine - sourceMapping.generatedStartLine + 1 - sourceMapping.sourceLineOffset
+            )
+          )
+        : generatedLine
+    const mappedMessage =
+      sourceMapping && mappedLine
+        ? `${sourceMapping.label}: ${error.message.replace(/\((\d+):(\d+)\)/, `(${mappedLine}:$2)`)}`
+        : error.message
 
     return {
-      message: error.message,
-      line: match ? parseInt(match[1], 10) - 1 : null, // Convert to 0-indexed
+      message: mappedMessage,
+      line: mappedLine ? mappedLine - 1 : null, // Convert to 0-indexed
       column: match ? parseInt(match[2], 10) : null,
       stack: error.stack || null,
     }
