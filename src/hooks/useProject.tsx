@@ -14,6 +14,7 @@ import {
 
 import {
   CURRENT_PROJECT_VERSION,
+  type ArcadePageId,
   type Project,
   type ProjectSnapshot,
   type SelectedEditTarget,
@@ -31,11 +32,15 @@ import {
 } from '@/utils/projectDefaults'
 import {
   FIRST_PAGE_ID,
+  createPage as createProjectPage,
   createSinglePageProjectSource,
+  deletePage as deleteProjectPage,
   getSourceForEditTarget,
   normalizeProjectSelection,
+  renamePage as renameProjectPage,
   resolveSelectedEditTarget,
   setActivePage,
+  setStartPage as setProjectStartPage,
   updateActivePageSource,
   updateSourceForEditTarget,
 } from '@/services/projectSource'
@@ -85,6 +90,10 @@ interface AppState {
 
   // Actions
   updateProject: (updates: ProjectUpdate) => void
+  createPage: () => void
+  renamePage: (pageId: ArcadePageId, name: string) => void
+  deletePage: (pageId: ArcadePageId) => void
+  setStartPage: (pageId: ArcadePageId) => void
   replaceProject: (project: Project) => void
   updateEditorState: (updates: Partial<EditorState>) => void
   updatePreviewState: (updates: Partial<PreviewState>) => void
@@ -259,6 +268,31 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     })
   }
 
+  const applyProjectTransform = (transform: (project: Project) => Project) => {
+    setProjectState((prev) =>
+      normalizeProjectSelection({
+        ...transform(prev),
+        lastModified: new Date().toISOString(),
+      })
+    )
+  }
+
+  const createPage = () => {
+    applyProjectTransform((prev) => createProjectPage(prev))
+  }
+
+  const renamePage = (pageId: ArcadePageId, name: string) => {
+    applyProjectTransform((prev) => renameProjectPage(prev, pageId, name))
+  }
+
+  const deletePage = (pageId: ArcadePageId) => {
+    applyProjectTransform((prev) => deleteProjectPage(prev, pageId))
+  }
+
+  const setStartPage = (pageId: ArcadePageId) => {
+    applyProjectTransform((prev) => setProjectStartPage(prev, pageId))
+  }
+
   const replaceCurrentWorkingCopy = (
     newProject: Project,
     preferences: WebArcadeWorkingCopyPreferences
@@ -405,6 +439,10 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     isComponentPaletteOpen,
     isSettingsOpen,
     updateProject,
+    createPage,
+    renamePage,
+    deletePage,
+    setStartPage,
     replaceProject,
     updateEditorState,
     updatePreviewState,

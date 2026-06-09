@@ -20,6 +20,10 @@ export const EditorPane = () => {
     editorState,
     isComponentPaletteOpen,
     updateProject,
+    createPage,
+    renamePage,
+    deletePage,
+    setStartPage,
     updateEditorState,
     toggleComponentPalette,
     closeComponentPalette,
@@ -105,6 +109,23 @@ export const EditorPane = () => {
     updateProject({ activePageId: pageId })
   }
 
+  const handleAddPage = () => {
+    setSelectedEditTarget('page')
+    createPage()
+  }
+
+  const handlePageRename = (pageId: (typeof project.source.pages)[number]['id'], name: string) => {
+    renamePage(pageId, name)
+  }
+
+  const handlePageDelete = (pageId: (typeof project.source.pages)[number]['id']) => {
+    deletePage(pageId)
+  }
+
+  const handleStartPageSet = (pageId: (typeof project.source.pages)[number]['id']) => {
+    setStartPage(pageId)
+  }
+
   // For now, we always enable undo/redo buttons
   // CodeMirror's history system handles the actual state
   // TODO: Track CodeMirror's history state for precise button enabling
@@ -149,10 +170,15 @@ export const EditorPane = () => {
         {multiPageEnabled && pagePanelOpen && (
           <PagePanel
             activePageId={project.activePageId}
+            startPageId={project.source.startPageId}
             pages={project.source.pages}
             selectedEditTarget={effectiveEditTarget}
+            onAddPage={handleAddPage}
             onSelectGlobalConfig={handleGlobalConfigSelect}
             onSelectPage={handlePageSelect}
+            onRenamePage={handlePageRename}
+            onDeletePage={handlePageDelete}
+            onSetStartPage={handleStartPageSet}
           />
         )}
 
