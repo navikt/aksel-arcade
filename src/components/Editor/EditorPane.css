@@ -5,9 +5,20 @@
   background: var(--ax-bg-default);
 }
 
+.editor-pane__workspace {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+
+.editor-pane__header-group {
+  min-width: 0;
+}
+
 .editor-pane__editor {
   display: flex;
   flex: 1;
   flex-direction: column;
+  min-width: 0;
   min-height: 0;
 }

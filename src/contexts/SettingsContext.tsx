@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, type ReactNode } from 'react'
-import type { PanelOrder, ThemeMode } from '@/types/project'
+import type { PanelOrder, SelectedEditTarget, ThemeMode } from '@/types/project'
 
 export type { PanelOrder, ThemeMode }
 
@@ -7,12 +7,17 @@ interface SettingsContextValue {
   theme: ThemeMode
   panelOrder: PanelOrder
   multiPageEnabled: boolean
+  pagePanelOpen: boolean
+  selectedEditTarget: SelectedEditTarget
   toggleTheme: () => void
   togglePanelOrder: () => void
   toggleMultiPageEnabled: () => void
+  togglePagePanel: () => void
   setTheme: (nextTheme: ThemeMode) => void
   setPanelOrder: (nextPanelOrder: PanelOrder) => void
   setMultiPageEnabled: (enabled: boolean) => void
+  setPagePanelOpen: (open: boolean) => void
+  setSelectedEditTarget: (target: SelectedEditTarget) => void
 }
 
 const SettingsContext = createContext<SettingsContextValue | null>(null)
@@ -25,6 +30,8 @@ export const SettingsProvider = ({ children }: SettingsProviderProps) => {
   const [theme, setThemeState] = useState<ThemeMode>('dark')
   const [panelOrder, setPanelOrder] = useState<PanelOrder>('code-left')
   const [multiPageEnabled, setMultiPageEnabledState] = useState(false)
+  const [pagePanelOpen, setPagePanelOpenState] = useState(true)
+  const [selectedEditTarget, setSelectedEditTargetState] = useState<SelectedEditTarget>('page')
 
   const toggleTheme = () => {
     setThemeState((prev) => (prev === 'dark' ? 'light' : 'dark'))
@@ -36,6 +43,10 @@ export const SettingsProvider = ({ children }: SettingsProviderProps) => {
 
   const toggleMultiPageEnabled = () => {
     setMultiPageEnabledState((prev) => !prev)
+  }
+
+  const togglePagePanel = () => {
+    setPagePanelOpenState((prev) => !prev)
   }
 
   const setTheme = (nextTheme: ThemeMode) => {
@@ -50,18 +61,31 @@ export const SettingsProvider = ({ children }: SettingsProviderProps) => {
     setMultiPageEnabledState(enabled)
   }
 
+  const setPagePanelOpen = (open: boolean) => {
+    setPagePanelOpenState(open)
+  }
+
+  const setSelectedEditTarget = (target: SelectedEditTarget) => {
+    setSelectedEditTargetState(target)
+  }
+
   return (
     <SettingsContext.Provider
       value={{
         theme,
         panelOrder,
         multiPageEnabled,
+        pagePanelOpen,
+        selectedEditTarget,
         toggleTheme,
         togglePanelOrder,
         toggleMultiPageEnabled,
+        togglePagePanel,
         setTheme,
         setPanelOrder: setPanelOrderValue,
         setMultiPageEnabled,
+        setPagePanelOpen,
+        setSelectedEditTarget,
       }}
     >
       {children}

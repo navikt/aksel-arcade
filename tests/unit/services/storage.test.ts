@@ -189,6 +189,7 @@ describe('Storage Service', () => {
         panelLayout: 'editor-right',
       })
       const preferences: WebArcadeWorkingCopyPreferences = {
+        ...DEFAULT_WEB_ARCADE_WORKING_COPY_PREFERENCES,
         theme: 'light',
         panelOrder: 'preview-left',
         multiPageEnabled: true,
@@ -320,6 +321,7 @@ describe('Storage Service', () => {
         panelLayout: 'editor-right',
       })
       const preferences: WebArcadeWorkingCopyPreferences = {
+        ...DEFAULT_WEB_ARCADE_WORKING_COPY_PREFERENCES,
         theme: 'light',
         panelOrder: 'preview-left',
         multiPageEnabled: true,
@@ -337,6 +339,34 @@ describe('Storage Service', () => {
       expect(result.preferences).toEqual(preferences)
     })
 
+    it('defaults new page panel preferences when restoring older working copies', () => {
+      const project = createTestProject({ name: 'Older stored preferences' })
+      saveProject(project, {
+        preferences: {
+          ...DEFAULT_WEB_ARCADE_WORKING_COPY_PREFERENCES,
+          theme: 'light',
+          panelOrder: 'preview-left',
+          multiPageEnabled: true,
+        },
+      })
+
+      const stored = sessionStorage.getItem(WEB_ARCADE_WORKING_COPY_STORAGE_KEY)
+      const parsed = JSON.parse(stored!)
+      delete parsed.preferences.pagePanelOpen
+      delete parsed.preferences.selectedEditTarget
+      sessionStorage.setItem(WEB_ARCADE_WORKING_COPY_STORAGE_KEY, JSON.stringify(parsed))
+
+      const result = loadProject()
+
+      expect(result.preferences).toEqual({
+        theme: 'light',
+        panelOrder: 'preview-left',
+        multiPageEnabled: true,
+        pagePanelOpen: DEFAULT_WEB_ARCADE_WORKING_COPY_PREFERENCES.pagePanelOpen,
+        selectedEditTarget: DEFAULT_WEB_ARCADE_WORKING_COPY_PREFERENCES.selectedEditTarget,
+      })
+    })
+
     it('should model duplicated tabs as forked sessionStorage working copies', () => {
       const originalTabStorage = setupSessionStorageMock()
       const initialProject = createTestProject({
@@ -347,6 +377,7 @@ describe('Storage Service', () => {
         panelLayout: 'editor-right',
       })
       const initialPreferences: WebArcadeWorkingCopyPreferences = {
+        ...DEFAULT_WEB_ARCADE_WORKING_COPY_PREFERENCES,
         theme: 'light',
         panelOrder: 'preview-left',
         multiPageEnabled: true,
@@ -379,7 +410,14 @@ describe('Storage Service', () => {
           ),
           viewportSize: 'SM',
         },
-        { preferences: { theme: 'dark', panelOrder: 'code-left', multiPageEnabled: false } }
+        {
+          preferences: {
+            ...DEFAULT_WEB_ARCADE_WORKING_COPY_PREFERENCES,
+            theme: 'dark',
+            panelOrder: 'code-left',
+            multiPageEnabled: false,
+          },
+        }
       )
 
       Object.defineProperty(globalThis, 'sessionStorage', {
@@ -425,6 +463,8 @@ describe('Storage Service', () => {
         theme: 'dark',
         panelOrder: 'code-left',
         multiPageEnabled: false,
+        pagePanelOpen: DEFAULT_WEB_ARCADE_WORKING_COPY_PREFERENCES.pagePanelOpen,
+        selectedEditTarget: DEFAULT_WEB_ARCADE_WORKING_COPY_PREFERENCES.selectedEditTarget,
       })
     })
   })

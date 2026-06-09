@@ -1,12 +1,14 @@
 import { useContext, useRef } from 'react'
-import { Box, HStack } from '@navikt/ds-react'
+import { Box, Button, HStack } from '@navikt/ds-react'
 import { AppContext } from '@/hooks/useProject'
+import { useSettings } from '@/contexts/SettingsContext'
 import { CodeEditor, type CodeEditorRef } from './CodeEditor'
 import { EditorTabs } from './EditorTabs'
 import { EditorToolbar } from './EditorToolbar'
+import { PagePanel } from './PagePanel'
 import { ComponentPalette } from '@/components/ComponentPalette'
 import { formatCode } from '@/services/formatter'
-import { getActiveSource } from '@/services/projectSource'
+import { getSourceForEditTarget, resolveSelectedEditTarget } from '@/services/projectSource'
 import './EditorPane.css'
 
 export const EditorPane = () => {
@@ -22,19 +24,27 @@ export const EditorPane = () => {
     toggleComponentPalette,
     closeComponentPalette,
   } = context
+  const {
+    multiPageEnabled,
+    pagePanelOpen,
+    selectedEditTarget,
+    setSelectedEditTarget,
+    togglePagePanel,
+  } = useSettings()
 
   // Ref for the currently active editor to access undo/redo
   const editorRef = useRef<CodeEditorRef>(null)
 
   const currentTab = editorState.activeTab
-  const activeSource = getActiveSource(project)
+  const effectiveEditTarget = resolveSelectedEditTarget(multiPageEnabled, selectedEditTarget)
+  const activeSource = getSourceForEditTarget(project, effectiveEditTarget)
   const currentContent = currentTab === 'JSX' ? activeSource.jsx : activeSource.hooks
 
   const handleCodeChange = (newContent: string) => {
     if (currentTab === 'JSX') {
-      updateProject({ jsxCode: newContent })
+      updateProject({ jsxCode: newContent, editTarget: effectiveEditTarget })
     } else {
-      updateProject({ hooksCode: newContent })
+      updateProject({ hooksCode: newContent, editTarget: effectiveEditTarget })
     }
   }
 
@@ -86,6 +96,15 @@ export const EditorPane = () => {
     editorRef.current?.redo()
   }
 
+  const handleGlobalConfigSelect = () => {
+    setSelectedEditTarget('global-config')
+  }
+
+  const handlePageSelect = (pageId: (typeof project.source.pages)[number]['id']) => {
+    setSelectedEditTarget('page')
+    updateProject({ activePageId: pageId })
+  }
+
   // For now, we always enable undo/redo buttons
   // CodeMirror's history system handles the actual state
   // TODO: Track CodeMirror's history state for precise button enabling
@@ -102,7 +121,19 @@ export const EditorPane = () => {
         paddingBlock="space-8"
       >
         <HStack justify="space-between" align="center" gap="space-16">
-          <EditorTabs activeTab={currentTab} onTabChange={handleTabChange} />
+          <HStack className="editor-pane__header-group" gap="space-12" align="center">
+            {multiPageEnabled && (
+              <Button
+                variant="tertiary"
+                data-color="neutral"
+                size="small"
+                onClick={togglePagePanel}
+              >
+                {pagePanelOpen ? 'Hide pages' : 'Show pages'}
+              </Button>
+            )}
+            <EditorTabs activeTab={currentTab} onTabChange={handleTabChange} />
+          </HStack>
           <EditorToolbar
             canUndo={canUndo}
             canRedo={canRedo}
@@ -114,20 +145,32 @@ export const EditorPane = () => {
         </HStack>
       </Box>
 
-      <Box
-        data-name="Code editor"
-        className="editor-pane__editor"
-        borderWidth="0 1 0 0"
-        borderColor="neutral-subtleA"
-      >
-        <CodeEditor
-          ref={editorRef}
-          key={currentTab}
-          value={currentContent}
-          onChange={handleCodeChange}
-          onCursorChange={handleCursorChange}
-          onFormat={handleFormat}
-        />
+      <Box className="editor-pane__workspace">
+        {multiPageEnabled && pagePanelOpen && (
+          <PagePanel
+            activePageId={project.activePageId}
+            pages={project.source.pages}
+            selectedEditTarget={effectiveEditTarget}
+            onSelectGlobalConfig={handleGlobalConfigSelect}
+            onSelectPage={handlePageSelect}
+          />
+        )}
+
+        <Box
+          data-name="Code editor"
+          className="editor-pane__editor"
+          borderWidth="0 1 0 0"
+          borderColor="neutral-subtleA"
+        >
+          <CodeEditor
+            ref={editorRef}
+            key={`${effectiveEditTarget === 'global-config' ? 'global-config' : project.activePageId}-${currentTab}`}
+            value={currentContent}
+            onChange={handleCodeChange}
+            onCursorChange={handleCursorChange}
+            onFormat={handleFormat}
+          />
+        </Box>
       </Box>
 
       <ComponentPalette

@@ -85,9 +85,15 @@ const Harness = () => {
 
 const PersistedHarness = () => {
   const { project, shareHydration, applySharedSnapshot } = useProject()
-  const { theme, panelOrder, multiPageEnabled } = useSettings()
+  const { theme, panelOrder, multiPageEnabled, pagePanelOpen, selectedEditTarget } = useSettings()
   const source = getStartPageSource(project)
-  useAutoSave(project, { theme, panelOrder, multiPageEnabled })
+  useAutoSave(project, {
+    theme,
+    panelOrder,
+    multiPageEnabled,
+    pagePanelOpen,
+    selectedEditTarget,
+  })
 
   return (
     <div>
@@ -205,6 +211,7 @@ describe('share decode integration', () => {
     })
     saveProject(workingCopyProject, {
       preferences: {
+        ...DEFAULT_WEB_ARCADE_WORKING_COPY_PREFERENCES,
         theme: 'light',
         panelOrder: 'preview-left',
         multiPageEnabled: false,
@@ -238,6 +245,7 @@ describe('share decode integration', () => {
     })
     saveProject(previousProject, {
       preferences: {
+        ...DEFAULT_WEB_ARCADE_WORKING_COPY_PREFERENCES,
         theme: 'light',
         panelOrder: 'preview-left',
         multiPageEnabled: false,
@@ -368,6 +376,7 @@ describe('share decode integration', () => {
       panelLayout: 'editor-right',
     })
     const originalTabPreferences: WebArcadeWorkingCopyPreferences = {
+      ...DEFAULT_WEB_ARCADE_WORKING_COPY_PREFERENCES,
       theme: 'light',
       panelOrder: 'preview-left',
       multiPageEnabled: false,

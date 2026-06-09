@@ -9,6 +9,7 @@ import {
   type ProjectSettingsSnapshot,
   type ProjectSizeStatus,
   type ProjectSnapshot,
+  type SelectedEditTarget,
   type ThemeMode,
 } from '@/types/project'
 import {
@@ -50,6 +51,8 @@ export interface WebArcadeWorkingCopyPreferences {
   theme: ThemeMode
   panelOrder: PanelOrder
   multiPageEnabled: boolean
+  pagePanelOpen: boolean
+  selectedEditTarget: SelectedEditTarget
 }
 
 export interface SaveProjectOptions {
@@ -107,6 +110,8 @@ export const DEFAULT_WEB_ARCADE_WORKING_COPY_PREFERENCES: WebArcadeWorkingCopyPr
   theme: 'dark',
   panelOrder: 'code-left',
   multiPageEnabled: false,
+  pagePanelOpen: true,
+  selectedEditTarget: 'page',
 }
 
 export const SNAPSHOT_FILE_IDS = {
@@ -646,10 +651,28 @@ const validateWorkingCopyPreferences = (preferences: unknown): WebArcadeWorkingC
     throw new Error('Invalid Web Arcade working copy multi-page preference')
   }
 
+  const pagePanelOpen =
+    'pagePanelOpen' in preferences ? preferences.pagePanelOpen : DEFAULT_WEB_ARCADE_WORKING_COPY_PREFERENCES.pagePanelOpen
+
+  if (typeof pagePanelOpen !== 'boolean') {
+    throw new Error('Invalid Web Arcade working copy page panel preference')
+  }
+
+  const selectedEditTarget =
+    'selectedEditTarget' in preferences
+      ? preferences.selectedEditTarget
+      : DEFAULT_WEB_ARCADE_WORKING_COPY_PREFERENCES.selectedEditTarget
+
+  if (!isSelectedEditTarget(selectedEditTarget)) {
+    throw new Error('Invalid Web Arcade working copy edit target preference')
+  }
+
   return {
     theme: preferences.theme,
     panelOrder: preferences.panelOrder,
     multiPageEnabled,
+    pagePanelOpen,
+    selectedEditTarget,
   }
 }
 
@@ -657,6 +680,9 @@ const isThemeMode = (value: unknown): value is ThemeMode => value === 'light' ||
 
 const isPanelOrder = (value: unknown): value is PanelOrder =>
   value === 'code-left' || value === 'preview-left'
+
+const isSelectedEditTarget = (value: unknown): value is SelectedEditTarget =>
+  value === 'page' || value === 'global-config'
 
 const validateProjectSchema: (project: unknown) => asserts project is Project = (project) => {
   if (!project || typeof project !== 'object') {

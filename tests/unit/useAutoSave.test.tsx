@@ -22,8 +22,10 @@ const project = createDefaultProject()
 const Harness = () => {
   useAutoSave(project, {
     theme: 'dark',
-    panelOrder: 'editor-left',
+    panelOrder: 'code-left',
     multiPageEnabled: false,
+    pagePanelOpen: true,
+    selectedEditTarget: 'page',
   })
 
   return null

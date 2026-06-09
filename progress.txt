@@ -39,6 +39,31 @@ Implemented:
 Verification:
 - npm run typecheck
 - CI=1 npm run test -- --run
+
+### 2026-06-09 - Issue #184: Multi-page page panel and selected edit target
+
+Implemented:
+
+- Selected #184 as the highest-priority `ready-for-agent` feature from #184-#191 because it is the first user-facing multi-page workflow after #183 and it unblocks both #189 page lifecycle actions and #190 preview/editor sync.
+- Read issue #181, issue #184, `docs/prd/0030-multi-page-support.md`, and the existing `progress.txt` notes before changing code.
+- Asked for a quick rubber-duck critique before implementation; it caught two blind spots in the original plan — editor writes/snippet insertion still routed through the active page, and page mode needed to remain the effective editor target while multi-page is disabled — so the final design added shared edit-target routing helpers instead of only read-side selection.
+- Added working-copy preferences for `pagePanelOpen` and `selectedEditTarget`, defaulted older saved working copies safely, and threaded both through settings restore and autosave.
+- Added `getSourceForEditTarget`, `updateSourceForEditTarget`, and `resolveSelectedEditTarget` in `src/services/projectSource.ts` so the editor and snippet insertion can read/write either the active page or `globalConfig` without duplicating branching logic.
+- Added a push-drawer page panel in the editor with a header toggle, permanent `Global config` row, ordered page rows, and persisted open/closed state whenever experimental multi-page authoring is enabled.
+- Bound the JSX/Hooks tabs to the selected edit target while keeping preview behavior on the active page for now: choosing `Global config` swaps the editor source without changing the active page, and choosing a page row updates both the active page and the editor target.
+- Added regression coverage in `tests/integration/multi-page-page-panel.test.tsx`, `tests/unit/services/projectSource.test.ts`, and `tests/unit/services/storage.test.ts`, and updated autosave/share-decode tests for the expanded working-copy preference shape.
+
+Verification:
+
+- npm run typecheck
+- npm run lint (existing `InspectionPopover` hook dependency warning only)
+- CI=1 npm run test -- --run
+- npm run build
+- Browser check at `http://127.0.0.1:4174/aksel-arcade/` for enabling experimental multi-page authoring, page panel visibility, Global config selection, page panel hide/show, and no runtime console errors
+
+Next note:
+
+- #189 should build on the persisted `selectedEditTarget` / `pagePanelOpen` working-copy preferences and the edit-target helpers in `src/services/projectSource.ts` rather than adding a second editor-routing layer. #190 can reuse the same split between persisted active page and selected edit target when `Global config` has focus.
 - npm run lint
 - npm run build
 - Browser check at http://127.0.0.1:5174/aksel-arcade/ for default render, catalog-backed palette entries, runnable HStack snippet insertion, and no console errors.

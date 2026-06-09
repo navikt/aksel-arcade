@@ -4,6 +4,7 @@ import type {
   ArcadeSourceFile,
   Project,
   ProjectSource,
+  SelectedEditTarget,
 } from '@/types/project'
 
 export const FIRST_PAGE_ID = 'page01' as const
@@ -83,6 +84,12 @@ export const getActiveSource = (
   project: Pick<Project, 'source' | 'activePageId'>
 ): ArcadeSourceFile => getActivePage(project).source
 
+export const getSourceForEditTarget = (
+  project: Pick<Project, 'source' | 'activePageId'>,
+  editTarget: SelectedEditTarget
+): ArcadeSourceFile =>
+  editTarget === 'global-config' ? project.source.globalConfig : getActiveSource(project)
+
 export const updatePageSource = (
   project: Project,
   pageId: ArcadePageId,
@@ -135,6 +142,20 @@ export const updateGlobalConfigSource = (
     },
   },
 })
+
+export const updateSourceForEditTarget = (
+  project: Project,
+  editTarget: SelectedEditTarget,
+  updates: Partial<ArcadeSourceFile>
+): Project =>
+  editTarget === 'global-config'
+    ? updateGlobalConfigSource(project, updates)
+    : updateActivePageSource(project, updates)
+
+export const resolveSelectedEditTarget = (
+  multiPageEnabled: boolean,
+  selectedEditTarget: SelectedEditTarget
+): SelectedEditTarget => (multiPageEnabled ? selectedEditTarget : 'page')
 
 export const nextPageId = (source: Pick<ProjectSource, 'nextPageNumber'>): ArcadePageId =>
   formatPageId(source.nextPageNumber)

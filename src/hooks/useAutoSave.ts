@@ -15,7 +15,7 @@ export const useAutoSave = (project: Project, preferences: WebArcadeWorkingCopyP
   const timeoutRef = useRef<number | undefined>(undefined)
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle')
   const [saveError, setSaveError] = useState<string | null>(null)
-  const { theme, panelOrder, multiPageEnabled } = preferences
+  const { theme, panelOrder, multiPageEnabled, pagePanelOpen, selectedEditTarget } = preferences
 
   useEffect(() => {
     if (timeoutRef.current) {
@@ -28,7 +28,13 @@ export const useAutoSave = (project: Project, preferences: WebArcadeWorkingCopyP
       setSaveStatus('saving')
 
       const result: SaveResult = saveProject(project, {
-        preferences,
+        preferences: {
+          theme,
+          panelOrder,
+          multiPageEnabled,
+          pagePanelOpen,
+          selectedEditTarget,
+        },
       })
 
       if (result.success) {
@@ -53,7 +59,7 @@ export const useAutoSave = (project: Project, preferences: WebArcadeWorkingCopyP
         clearTimeout(timeoutRef.current)
       }
     }
-  }, [multiPageEnabled, panelOrder, project, theme])
+  }, [multiPageEnabled, pagePanelOpen, panelOrder, project, selectedEditTarget, theme])
 
   return { saveStatus, saveError }
 }
