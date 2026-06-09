@@ -2083,3 +2083,18 @@ Next note:
 
 - The single-page bridge path intentionally exposes the current active page plus empty `globalConfig`, matching the human-visible editor/preview surface and the earlier #183 compatibility behavior. If product wants strict "always expose page01/first page" semantics instead, clarify that before changing the bridge again.
 - Local Vite ports may already be occupied by other worktrees; `5173` in this environment was serving stale source from another session, and `5176` was the clean port used for the verified browser flow on this branch.
+
+### 2026-06-09 - PR #200 review follow-up
+
+Fixed one PR-scoped issue before merge:
+
+- Guarded `deletePage` in `src/hooks/useAgentSession.ts` so an Agent request that targets the last remaining page now returns a structured `invalid-request` bridge failure instead of throwing through the Desktop transport layer and breaking the JSON-RPC contract.
+- Added a regression in `tests/integration/project-controls-layout.test.tsx` that exercises the multi-page-enabled single-page state and proves the last-page delete attempt fails cleanly before any destructive mutation runs.
+
+Verification:
+
+- npm run typecheck
+- npm run lint (existing `.eslintignore` deprecation notice and existing `InspectionPopover` hook dependency warning only)
+- npm run build
+- npm run test -- --run
+- Browser check at `http://127.0.0.1:5176/aksel-arcade/` with the Desktop preload shim: after deleting `page02`, `deletePage({ pageId: 'page01' })` returned the expected `invalid-request` response, the project stayed on `page01`, and there were no console errors or warnings.

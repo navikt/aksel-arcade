@@ -239,6 +239,14 @@ export const useAgentSession = ({
         return createPageLifecycleFailure('deletePage', resolvedPage.code, resolvedPage.message)
       }
 
+      if (projectRef.current.source.pages.length <= 1) {
+        return createPageLifecycleFailure(
+          'deletePage',
+          'invalid-request',
+          'Cannot delete the last remaining Arcade page.'
+        )
+      }
+
       const nextProject = deleteProjectPage(projectRef.current, resolvedPage.pageId)
       syncCurrentContext(
         nextProject,

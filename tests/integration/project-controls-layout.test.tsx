@@ -1969,6 +1969,12 @@ describe('ProjectControls layout', () => {
       'applyAgentChange({ summary, target, jsxCode?, hooksCode?, viewportSize?, theme?, name? })'
     )
 
+    const deleteLastPageError = expectBridgeFailure(
+      callBridgeCommand(() => bridge.deletePage({ pageId: 'page01' })),
+      'invalid-request'
+    )
+    expect(deleteLastPageError.message).toMatch(/Cannot delete the last remaining Arcade page/i)
+
     expect(expectBridgeSuccess(callBridgeCommand(() => bridge.getProject()))).toMatchObject({
       pageMode: 'multi-page',
       globalConfig: {
