@@ -1,3 +1,4 @@
+import type { ProjectSource } from '@/types/project'
 import type { TranspileResult, CompileError } from '@/types/preview'
 
 // Lazy load Babel to avoid blocking initial page load
@@ -36,6 +37,8 @@ const LOCAL_HOOKS_IMPORT_PATTERN = /^\.{1,2}\/hooks(?:\/[\w.-]+)?(?:\.(?:[cm]?[j
 const IDENTIFIER_PATTERN = /^[A-Za-z_$][\w$]*$/
 const DEFAULT_EXPORT_DECLARATION_PATTERN =
   /export\s+default\s+(function|class)\s+([A-Za-z_$][\w$]*)/
+const EXPORT_NAMED_DECLARATION_PATTERN = /export\s+(const|let|var|function|class)\s+/g
+const EXPORT_NAMED_LIST_PATTERN = /export\s*\{[^}]+\}\s*;?\n?/g
 
 const getSupportedImportModule = (source: string): SupportedImportModule | null => {
   if (source === 'react') return 'react'
@@ -254,106 +257,350 @@ const removeDuplicateRuntimePreludeStatements = (
     .join('\n')
 }
 
-const createDeveloperModeComponent = (sourceCode: string): string => {
+const createDefaultExportComponent = (sourceCode: string, componentIdentifier: string): string => {
   const defaultDeclarationMatch = sourceCode.match(DEFAULT_EXPORT_DECLARATION_PATTERN)
 
   if (defaultDeclarationMatch) {
-    const [, declarationKind, componentName] = defaultDeclarationMatch
+    const [, declarationKind, declaredName] = defaultDeclarationMatch
     const processedSource = sourceCode.replace(
       DEFAULT_EXPORT_DECLARATION_PATTERN,
-      `${declarationKind} ${componentName}`
+      `${declarationKind} ${declaredName}`
     )
 
-    return componentName === 'App'
+    return declaredName === componentIdentifier
       ? processedSource
-      : `${processedSource}\nconst App = ${componentName};`
+      : `${processedSource}\nconst ${componentIdentifier} = ${declaredName};`
   }
 
-  return sourceCode.replace(/export\s+default\s+/g, 'const App = ')
+  return sourceCode.replace(/export\s+default\s+/g, `const ${componentIdentifier} = `)
 }
 
-export const transpileCode = async (
+const stripNamedExports = (sourceCode: string): string =>
+  sourceCode
+    .replace(EXPORT_NAMED_DECLARATION_PATTERN, '$1 ')
+    .replace(EXPORT_NAMED_LIST_PATTERN, '')
+
+const normalizeModuleDeclarations = (
+  sourceCode: string,
+  defaultExportIdentifier: string
+): string =>
+  stripNamedExports(
+    /export\s+default\s+/.test(sourceCode)
+      ? createDefaultExportComponent(sourceCode, defaultExportIdentifier)
+      : sourceCode
+  )
+
+const createComponentEntrySource = (sourceCode: string, componentName: string): string => {
+  const trimmedJsx = sourceCode.trim()
+
+  if (!trimmedJsx) {
+    return `function ${componentName}() { return null; }`
+  }
+
+  const hasExportDefault = /export\s+default\s+(function|class|\(|const|let|var)/.test(sourceCode)
+
+  if (hasExportDefault) {
+    return createDefaultExportComponent(sourceCode, componentName)
+  }
+
+  const rootElementMatches = trimmedJsx.match(/^\s*</gm)
+  const hasMultipleRoots =
+    trimmedJsx.startsWith('<') && rootElementMatches && rootElementMatches.length > 1
+
+  if (hasMultipleRoots) {
+    return `function ${componentName}() {\n  return (\n    <>\n${sourceCode}\n    </>\n  );\n}`
+  }
+
+  return `function ${componentName}() {\n  return (\n    ${sourceCode}\n  );\n}`
+}
+
+interface BuildCombinedSourceResult {
+  code: string | null
+  error: CompileError | null
+}
+
+interface PreparedSourceBlock extends StripSupportedImportsResult {
+  label: string
+}
+
+const getFirstUnsupportedImport = (
+  preparedBlocks: PreparedSourceBlock[]
+): UnsupportedImport | undefined =>
+  preparedBlocks.flatMap((block) => block.unsupportedImports)[0]
+
+const createPreparedSourceBlock = (label: string, sourceCode: string): PreparedSourceBlock => ({
+  label,
+  ...stripSupportedImports(sourceCode),
+})
+
+const buildSinglePageCombinedSource = (
   jsxCode: string,
   hooksCode: string
-): Promise<TranspileResult> => {
-  try {
-    const babel = await loadBabel()
+): BuildCombinedSourceResult => {
+  const strippedJsx = createPreparedSourceBlock('page JSX', jsxCode)
+  const strippedHooks = createPreparedSourceBlock('page Hooks', hooksCode)
+  const unsupportedImport = getFirstUnsupportedImport([strippedJsx, strippedHooks])
 
-    const strippedJsx = stripSupportedImports(jsxCode)
-    const strippedHooks = stripSupportedImports(hooksCode)
-    const unsupportedImport =
-      strippedJsx.unsupportedImports[0] ?? strippedHooks.unsupportedImports[0]
-
-    if (unsupportedImport) {
-      return {
-        success: false,
-        code: null,
-        error: createUnsupportedImportError(unsupportedImport),
-      }
+  if (unsupportedImport) {
+    return {
+      code: null,
+      error: createUnsupportedImportError(unsupportedImport),
     }
+  }
 
-    const cleanJsxCode = strippedJsx.code
-    const cleanHooksCode = strippedHooks.code
+  const processedHooksCode = normalizeModuleDeclarations(
+    strippedHooks.code,
+    '__AkselArcadeHooksDefault'
+  )
+  const processedJsxCode = createComponentEntrySource(strippedJsx.code, 'App')
+  const jsxRuntimePrelude = removeDuplicateRuntimePreludeStatements(
+    strippedJsx.runtimePrelude,
+    strippedHooks.runtimePrelude
+  )
 
-    // Check if code is empty after cleaning
-    const trimmedJsx = cleanJsxCode.trim()
-
-    // If completely empty, return a valid no-op component
-    if (!trimmedJsx) {
-      return {
-        success: true,
-        code: 'function App() { return null; }',
-        error: null,
-      }
-    }
-
-    // Smart wrapping: detect if user provided component structure
-    const hasExportDefault = /export\s+default\s+(function|class|\(|const|let|var)/.test(
-      cleanJsxCode
-    )
-
-    let processedJsxCode: string
-
-    if (hasExportDefault) {
-      // Developer mode: user provided full component, just clean up exports
-      processedJsxCode = createDeveloperModeComponent(cleanJsxCode)
-    } else {
-      // Designer mode: auto-wrap bare JSX in component structure
-      // Check if there are multiple root JSX elements by counting lines starting with <
-      const rootElementMatches = trimmedJsx.match(/^\s*</gm) // Lines starting with <
-      const hasMultipleRoots =
-        trimmedJsx.startsWith('<') && rootElementMatches && rootElementMatches.length > 1
-
-      if (hasMultipleRoots) {
-        // Wrap in fragment if multiple root elements (Fragment is invisible to user but needed for execution)
-        processedJsxCode = `function App() {\n  return (\n    <>\n${cleanJsxCode}\n    </>\n  );\n}`
-      } else {
-        // Single root element
-        processedJsxCode = `function App() {\n  return (\n    ${cleanJsxCode}\n  );\n}`
-      }
-    }
-
-    // Remove export statements from hooks code (export const, export function, etc.)
-    let processedHooksCode = cleanHooksCode.replace(
-      /export\s+(const|let|var|function|class)\s+/g,
-      '$1 '
-    )
-    processedHooksCode = processedHooksCode.replace(/export\s*\{[^}]+\}\s*;?\n?/g, '')
-
-    const jsxRuntimePrelude = removeDuplicateRuntimePreludeStatements(
-      strippedJsx.runtimePrelude,
-      strippedHooks.runtimePrelude
-    )
-
-    const combinedCode = `
+  return {
+    code: `
 ${strippedHooks.runtimePrelude}
 ${processedHooksCode}
 
 ${jsxRuntimePrelude}
 ${processedJsxCode}
-`
+`,
+    error: null,
+  }
+}
 
-    // Transpile with React and TypeScript presets
+const sanitizeIdentifier = (value: string): string => value.replace(/[^A-Za-z0-9_$]/g, '_')
+
+const getPageComponentName = (pageId: string): string =>
+  `__AkselArcadePageComponent_${sanitizeIdentifier(pageId)}`
+
+const getPageModuleName = (pageId: string): string => `__AkselArcadePage_${sanitizeIdentifier(pageId)}`
+
+const looksLikeBareGlobalConfigJsx = (sourceCode: string): boolean => {
+  const trimmedSource = sourceCode.trim()
+  if (!trimmedSource || /export\s+default\s+/.test(trimmedSource)) {
+    return false
+  }
+
+  return trimmedSource.startsWith('<') || trimmedSource.startsWith('(')
+}
+
+const createGlobalConfigJsxError = (): CompileError => ({
+  message:
+    'Global config JSX must contain shared declarations such as components or helpers; bare JSX is not rendered in the multi-page preview runtime.',
+  line: 0,
+  column: 0,
+  stack: null,
+})
+
+const createEmptyPagesError = (): CompileError => ({
+  message: 'Arcade project source must contain at least one page to render a preview.',
+  line: null,
+  column: null,
+  stack: null,
+})
+
+const buildProjectSourceCombinedCode = (source: ProjectSource): BuildCombinedSourceResult => {
+  const firstPage = source.pages[0]
+  if (!firstPage) {
+    return {
+      code: null,
+      error: createEmptyPagesError(),
+    }
+  }
+
+  const strippedGlobalHooks = createPreparedSourceBlock('global config Hooks', source.globalConfig.hooks)
+  const strippedGlobalJsx = createPreparedSourceBlock('global config JSX', source.globalConfig.jsx)
+  const preparedPages = source.pages.map((page) => ({
+    page,
+    strippedHooks: createPreparedSourceBlock(`${page.id} Hooks`, page.source.hooks),
+    strippedJsx: createPreparedSourceBlock(`${page.id} JSX`, page.source.jsx),
+  }))
+  const unsupportedImport = getFirstUnsupportedImport([
+    strippedGlobalHooks,
+    strippedGlobalJsx,
+    ...preparedPages.flatMap((preparedPage) => [preparedPage.strippedHooks, preparedPage.strippedJsx]),
+  ])
+
+  if (unsupportedImport) {
+    return {
+      code: null,
+      error: createUnsupportedImportError(unsupportedImport),
+    }
+  }
+
+  if (looksLikeBareGlobalConfigJsx(strippedGlobalJsx.code)) {
+    return {
+      code: null,
+      error: createGlobalConfigJsxError(),
+    }
+  }
+
+  const processedGlobalHooks = normalizeModuleDeclarations(
+    strippedGlobalHooks.code,
+    '__AkselArcadeGlobalHooksDefault'
+  )
+  const processedGlobalJsx = normalizeModuleDeclarations(
+    strippedGlobalJsx.code,
+    '__AkselArcadeGlobalConfigDefault'
+  )
+  const globalJsxRuntimePrelude = removeDuplicateRuntimePreludeStatements(
+    strippedGlobalJsx.runtimePrelude,
+    strippedGlobalHooks.runtimePrelude
+  )
+  const pageBlocks = preparedPages.map(({ page, strippedHooks, strippedJsx }) => {
+    const pageComponentName = getPageComponentName(page.id)
+    const pageModuleName = getPageModuleName(page.id)
+    const processedPageHooks = normalizeModuleDeclarations(
+      strippedHooks.code,
+      `${pageComponentName}HooksDefault`
+    )
+    const processedPageJsx = createComponentEntrySource(strippedJsx.code, pageComponentName)
+    const pageJsxRuntimePrelude = removeDuplicateRuntimePreludeStatements(
+      strippedJsx.runtimePrelude,
+      strippedHooks.runtimePrelude
+    )
+
+    return {
+      pageId: page.id,
+      pageModuleName,
+      source: `
+const ${pageModuleName} = (() => {
+${strippedHooks.runtimePrelude}
+${processedPageHooks}
+
+${pageJsxRuntimePrelude}
+${processedPageJsx}
+
+  return ${pageComponentName}
+})()
+`,
+    }
+  })
+  const startPageId = source.pages.some((page) => page.id === source.startPageId)
+    ? source.startPageId
+    : firstPage.id
+  const pageEntries = pageBlocks
+    .map(({ pageId, pageModuleName }) => `  ${JSON.stringify(pageId)}: ${pageModuleName},`)
+    .join('\n')
+  const pageIds = source.pages.map((page) => page.id)
+
+  return {
+    code: `
+${strippedGlobalHooks.runtimePrelude}
+${processedGlobalHooks}
+
+${globalJsxRuntimePrelude}
+${processedGlobalJsx}
+
+const __AkselArcadePageIds = ${JSON.stringify(pageIds)};
+const __AkselArcadeValidPageIds = new Set(__AkselArcadePageIds);
+const __AkselArcadeStartPageId = ${JSON.stringify(startPageId)};
+const __AkselArcadeRuntime = {
+  currentPageId: __AkselArcadeStartPageId,
+  goToPage: (pageId) => {
+    const nextPageId = __AkselArcadeResolvePageId(pageId);
+    if (!nextPageId) {
+      console.warn(\`Unknown Arcade page "\${String(pageId)}"\`);
+      return false;
+    }
+
+    return nextPageId === __AkselArcadeRuntime.currentPageId;
+  },
+};
+const goToPage = (pageId) => __AkselArcadeRuntime.goToPage(pageId);
+let currentPageId = __AkselArcadeRuntime.currentPageId;
+
+const __AkselArcadeResolvePageId = (value) => {
+  if (typeof value !== 'string') {
+    return null;
+  }
+
+  return __AkselArcadeValidPageIds.has(value) ? value : null;
+};
+
+${pageBlocks.map((pageBlock) => pageBlock.source).join('\n')}
+
+const __AkselArcadePageComponents = {
+${pageEntries}
+};
+
+function App() {
+  const [activePageId, setActivePageId] = React.useState(__AkselArcadeStartPageId);
+
+  currentPageId = activePageId;
+  __AkselArcadeRuntime.currentPageId = activePageId;
+  __AkselArcadeRuntime.goToPage = (pageId) => {
+    const nextPageId = __AkselArcadeResolvePageId(pageId);
+    if (!nextPageId) {
+      console.warn(\`Unknown Arcade page "\${String(pageId)}"\`);
+      return false;
+    }
+
+    setActivePageId(nextPageId);
+    return true;
+  };
+
+  React.useEffect(() => {
+    const rootElement = document.getElementById('root');
+    if (!rootElement) {
+      return undefined;
+    }
+
+    const handlePageLinkClick = (event) => {
+      if (
+        event.defaultPrevented ||
+        event.button !== 0 ||
+        event.metaKey ||
+        event.ctrlKey ||
+        event.shiftKey ||
+        event.altKey
+      ) {
+        return;
+      }
+
+      const target = event.target;
+      if (!(target instanceof Element)) {
+        return;
+      }
+
+      const anchor = target.closest('a');
+      if (!anchor || !rootElement.contains(anchor)) {
+        return;
+      }
+
+      const targetPageId =
+        __AkselArcadeResolvePageId(anchor.getAttribute('href')) ??
+        __AkselArcadeResolvePageId(anchor.getAttribute('to'));
+      if (!targetPageId) {
+        return;
+      }
+
+      event.preventDefault();
+      __AkselArcadeRuntime.goToPage(targetPageId);
+    };
+
+    document.addEventListener('click', handlePageLinkClick, true);
+    return () => {
+      document.removeEventListener('click', handlePageLinkClick, true);
+    };
+  }, []);
+
+  const ActivePageComponent =
+    __AkselArcadePageComponents[activePageId] ??
+    __AkselArcadePageComponents[__AkselArcadeStartPageId];
+
+  return React.createElement(ActivePageComponent, { key: activePageId });
+}
+`,
+    error: null,
+  }
+}
+
+const transpileCombinedCode = async (combinedCode: string): Promise<TranspileResult> => {
+  try {
+    const babel = await loadBabel()
     const result = babel.transform(combinedCode, {
       presets: ['react', 'typescript'],
       filename: 'app.tsx',
@@ -372,21 +619,11 @@ ${processedJsxCode}
       }
     }
 
-    // Clean up transpiled output
     let finalCode = result.code
 
-    // Remove "use strict" directives
     finalCode = finalCode.replace(/"use strict";\s*/g, '')
-
-    // Remove Object.defineProperty calls
     finalCode = finalCode.replace(/Object\.defineProperty\(exports[^;]+;\s*/g, '')
-
-    // Remove exports.__esModule
     finalCode = finalCode.replace(/exports\.__esModule\s*=\s*true;\s*/g, '')
-
-    // Ensure App is defined as a variable if it was exported
-    // Handle: exports.default = App; -> var App = App;
-    // But we need to keep the original function, so just remove the export assignment
     finalCode = finalCode.replace(/exports\.default\s*=\s*(\w+);\s*/g, '')
 
     return {
@@ -395,7 +632,6 @@ ${processedJsxCode}
       error: null,
     }
   } catch (error) {
-    // Parse Babel error for line/column info
     const compileError = parseBabelError(error)
     return {
       success: false,
@@ -403,6 +639,35 @@ ${processedJsxCode}
       error: compileError,
     }
   }
+}
+
+export const transpileCode = async (
+  jsxCode: string,
+  hooksCode: string
+): Promise<TranspileResult> => {
+  const combinedSource = buildSinglePageCombinedSource(jsxCode, hooksCode)
+  if (combinedSource.error || !combinedSource.code) {
+    return {
+      success: false,
+      code: null,
+      error: combinedSource.error,
+    }
+  }
+
+  return transpileCombinedCode(combinedSource.code)
+}
+
+export const transpileProjectSource = async (source: ProjectSource): Promise<TranspileResult> => {
+  const combinedSource = buildProjectSourceCombinedCode(source)
+  if (combinedSource.error || !combinedSource.code) {
+    return {
+      success: false,
+      code: null,
+      error: combinedSource.error,
+    }
+  }
+
+  return transpileCombinedCode(combinedSource.code)
 }
 
 const parseBabelError = (error: unknown): CompileError => {

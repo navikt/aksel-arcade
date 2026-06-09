@@ -96,6 +96,30 @@ Next note:
 Next note:
 - #7 and #8 should extend `src/data/akselCatalog.ts` rather than adding new parallel component/snippet/prop lists. Existing manual data is still present for non-starter entries, but the starter subset now has one catalog source of truth.
 
+### 2026-06-09 - Issue #188: Multi-page preview runtime for the canonical project source
+
+Implemented:
+
+- Selected #188 as the highest-priority `ready-for-agent` feature from #185-#191 because it turns the canonical multi-page project model into an actually navigable preview runtime and directly unblocks #190 active-page sync plus the later stale-reference follow-up.
+- Read issue #181, issue #188, `docs/prd/0030-multi-page-support.md`, and the existing `progress.txt` notes before changing code.
+- Asked for a rubber-duck critique before implementation; it caught three real blind spots in the first plan — designer-mode page JSX still needed per-page wrapping inside the new page IIFEs, delegated anchor navigation had to use `closest('a')`, and bare Global config JSX needed an explicit compile error instead of colliding with the runtime `App` component — so the final runtime keeps page authoring ergonomic without treating Global config as a screen.
+- Added `transpileProjectSource` in `src/services/transpiler.ts` so multi-page preview compiles Global config plus every page into one runtime with shared Global config scope, isolated per-page IIFEs, start-page boot, injected `goToPage()` / `currentPageId`, fresh page remounts on navigation, and delegated page-id `href`/`to` navigation inside the preview.
+- Kept `transpileCode` as the single-page path and updated `src/components/Preview/PreviewPane.tsx` to switch between single-page and multi-page transpilation based on the experimental setting, so multi-page edits now recompile from canonical `project.source` without pulling preview/panel synchronization from #190 into this issue.
+- Added `tests/integration/multi-page-preview-runtime.test.tsx` covering start-page rendering, shared Global config scope persistence, page-local remount/reset semantics, page-id anchor navigation, and the bare-Global-config compile guard.
+
+Verification:
+
+- npm run typecheck
+- npm run lint (existing `InspectionPopover` hook dependency warning only)
+- CI=1 npm run test -- --run
+- npm run build
+- Browser check at `http://127.0.0.1:4176/aksel-arcade/` for enabling experimental multi-page authoring, adding Page 2, preview start-page boot, `goToPage('page02')` button navigation to the Details page, `Link to="page01"` navigation back to Start, and no console errors
+
+Next note:
+
+- #190 should build on `transpileProjectSource` rather than reintroducing active-page-only compilation. The runtime already owns start-page boot and in-preview navigation; #190 only needs preview/host synchronization plus the Global config placeholder/error-sync layer on top.
+- Bare Global config JSX now fails fast on purpose in multi-page mode. Shared components/helpers belong there, but screens still belong in Arcade pages.
+
 2026-05-23 - Issue #7: Palette groups, statuses, and docs links
 
 Selected #7 as the highest-priority ready-for-agent feature because it is unblocked by #6 and unlocks later contextual icon autocomplete (#9) and v8 chrome work (#12).
