@@ -11,6 +11,7 @@ import {
   type AkselAutocompleteEntry,
   type AkselAutocompleteProp,
 } from '@/data/akselAutocompleteData'
+import type { ArcadePage } from '@/types/project'
 
 const COMPONENT_NAME_PATTERN = /^[A-Z][\w.]*$/
 const TAG_NAME_PATTERN = /^[A-Za-z][\w.]*$/
@@ -58,6 +59,8 @@ interface OpenTagContext {
   fragment: string
   componentName?: string
 }
+
+export type PageNavigationCompletionTarget = Pick<ArcadePage, 'id' | 'name'>
 
 function stripSnippetPlaceholders(template: string): string {
   return template.replace(
@@ -139,6 +142,34 @@ function getPropValueContext(openTag: OpenTagContext): {
     componentName,
     propName: propValueMatch[1],
     partialValue: propValueMatch[3],
+  }
+}
+
+function getPageNavigationContext(source: string, pos: number): {
+  partialValue: string
+} | null {
+  const beforeCursor = source.slice(0, pos)
+  const goToPageMatch = beforeCursor.match(/\bgoToPage\s*\(\s*(["'`])([^"'`]*)$/)
+  if (goToPageMatch) {
+    return {
+      partialValue: goToPageMatch[2],
+    }
+  }
+
+  const openTag = getOpenTagContext(source, pos)
+  if (!openTag) {
+    return null
+  }
+
+  const propValueMatch = openTag.fragment.match(
+    /(?:^|\s)(href|to)\s*=\s*(?:(["'])([^"']*)$|\{\s*(["'`])([^"'`]*)$)/
+  )
+  if (!propValueMatch) {
+    return null
+  }
+
+  return {
+    partialValue: propValueMatch[3] ?? propValueMatch[5] ?? '',
   }
 }
 
@@ -508,7 +539,56 @@ function valueOptions(prop: CompletionProp, partialValue: string): Completion[] 
   )
 }
 
-export function getAkselCompletionForSource(source: string, pos: number): CompletionResult | null {
+function pageNavigationMatches(
+  target: PageNavigationCompletionTarget,
+  partialValue: string
+): boolean {
+  if (!partialValue) {
+    return true
+  }
+
+  return (
+    matchesPartial(target.name, partialValue) ||
+    matchesPartial(target.id, partialValue)
+  )
+}
+
+function pageNavigationOption(target: PageNavigationCompletionTarget): Completion {
+  return {
+    label: target.name,
+    detail: target.id,
+    type: 'constant',
+    apply: target.id,
+  }
+}
+
+function pageNavigationOptions(
+  targets: readonly PageNavigationCompletionTarget[],
+  partialValue: string
+): Completion[] {
+  return targets
+    .filter((target) => pageNavigationMatches(target, partialValue))
+    .map(pageNavigationOption)
+}
+
+export function getAkselCompletionForSource(
+  source: string,
+  pos: number,
+  pageNavigationTargets?: readonly PageNavigationCompletionTarget[]
+): CompletionResult | null {
+  const pageNavigationContext = getPageNavigationContext(source, pos)
+  if (pageNavigationContext && pageNavigationTargets && pageNavigationTargets.length > 0) {
+    const options = pageNavigationOptions(pageNavigationTargets, pageNavigationContext.partialValue)
+
+    if (options.length > 0) {
+      return {
+        from: pos - pageNavigationContext.partialValue.length,
+        options,
+        filter: false,
+      }
+    }
+  }
+
   const openTag = getOpenTagContext(source, pos)
   if (!openTag) {
     return null
@@ -594,11 +674,22 @@ export function getAkselCompletionForSource(source: string, pos: number): Comple
   return null
 }
 
-export function getAkselCompletionForContext(context: CompletionContext): CompletionResult | null {
-  return getAkselCompletionForSource(context.state.doc.toString(), context.pos)
+export function getAkselCompletionForContext(
+  context: CompletionContext,
+  pageNavigationTargets?: readonly PageNavigationCompletionTarget[]
+): CompletionResult | null {
+  return getAkselCompletionForSource(context.state.doc.toString(), context.pos, pageNavigationTargets)
 }
 
-export function isAkselPropValueCompletionContext(source: string, pos: number): boolean {
+export function isAkselPropValueCompletionContext(
+  source: string,
+  pos: number,
+  pageNavigationTargets?: readonly PageNavigationCompletionTarget[]
+): boolean {
+  if (pageNavigationTargets && pageNavigationTargets.length > 0 && getPageNavigationContext(source, pos)) {
+    return true
+  }
+
   const openTag = getOpenTagContext(source, pos)
   if (!openTag) {
     return false

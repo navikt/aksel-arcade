@@ -13,6 +13,7 @@ import type { ReactCodeMirrorRef } from '@uiw/react-codemirror'
 import {
   getAkselCompletionForContext,
   isAkselPropValueCompletionContext,
+  type PageNavigationCompletionTarget,
 } from '@/services/akselAutocomplete'
 import { getStalePageReferenceMessage, getStalePageReferences } from '@/services/pageReferences'
 import type { ArcadePageId } from '@/types/project'
@@ -58,62 +59,65 @@ interface CodeEditorProps {
   onFormat?: () => void | Promise<void>
   language?: 'jsx' | 'typescript'
   validPageIds?: ArcadePageId[]
+  pageNavigationTargets?: readonly PageNavigationCompletionTarget[]
   readOnly?: boolean
 }
 
-// ViewPlugin to trigger autocomplete when cursor enters prop value quotes
-const cursorInQuotesPlugin = ViewPlugin.fromClass(class {
-  private lastPos: number = -1
-  private completionTimeout: number | null = null
-  private lastTriggerTime: number = 0
-  
-  update(update: ViewUpdate) {
-    // Only check on selection changes (cursor movement)
-    if (!update.selectionSet) return
-    
-    const pos = update.state.selection.main.head
-    
-    // Skip if cursor hasn't actually moved to a different position
-    if (pos === this.lastPos) return
-    this.lastPos = pos
-    
-    // Clear any pending completion trigger
-    if (this.completionTimeout !== null) {
-      window.clearTimeout(this.completionTimeout)
-      this.completionTimeout = null
-    }
-    
-    // Check if autocomplete is already open - if so, don't re-trigger
-    const status = completionStatus(update.state)
-    if (status === 'active') {
-      return
-    }
-    
-    // Prevent re-triggering too quickly (within 500ms of last trigger)
-    // This prevents the plugin from interfering with autocomplete navigation
-    const now = Date.now()
-    if (now - this.lastTriggerTime < 500) {
-      return
-    }
-    
-    // Check if cursor is inside catalog-backed prop value quotes
-    if (isAkselPropValueCompletionContext(update.state.doc.toString(), pos)) {
-      // Defer startCompletion to next tick to avoid calling during view update
-      this.completionTimeout = window.setTimeout(() => {
-        this.lastTriggerTime = Date.now()
-        startCompletion(update.view)
+const createCursorInQuotesPlugin = (
+  pageNavigationTargets?: readonly PageNavigationCompletionTarget[]
+) =>
+  ViewPlugin.fromClass(class {
+    private lastPos: number = -1
+    private completionTimeout: number | null = null
+    private lastTriggerTime: number = 0
+
+    update(update: ViewUpdate) {
+      // Only check on selection changes (cursor movement)
+      if (!update.selectionSet) return
+
+      const pos = update.state.selection.main.head
+
+      // Skip if cursor hasn't actually moved to a different position
+      if (pos === this.lastPos) return
+      this.lastPos = pos
+
+      // Clear any pending completion trigger
+      if (this.completionTimeout !== null) {
+        window.clearTimeout(this.completionTimeout)
         this.completionTimeout = null
-      }, 0)
+      }
+
+      // Check if autocomplete is already open - if so, don't re-trigger
+      const status = completionStatus(update.state)
+      if (status === 'active') {
+        return
+      }
+
+      // Prevent re-triggering too quickly (within 500ms of last trigger)
+      // This prevents the plugin from interfering with autocomplete navigation
+      const now = Date.now()
+      if (now - this.lastTriggerTime < 500) {
+        return
+      }
+
+      // Check if cursor is inside a supported autocomplete value context
+      if (isAkselPropValueCompletionContext(update.state.doc.toString(), pos, pageNavigationTargets)) {
+        // Defer startCompletion to next tick to avoid calling during view update
+        this.completionTimeout = window.setTimeout(() => {
+          this.lastTriggerTime = Date.now()
+          startCompletion(update.view)
+          this.completionTimeout = null
+        }, 0)
+      }
     }
-  }
-  
-  destroy() {
-    // Clean up timeout on plugin destruction
-    if (this.completionTimeout !== null) {
-      window.clearTimeout(this.completionTimeout)
+
+    destroy() {
+      // Clean up timeout on plugin destruction
+      if (this.completionTimeout !== null) {
+        window.clearTimeout(this.completionTimeout)
+      }
     }
-  }
-})
+  })
 
 // Create JSX linter using Babel for syntax validation
 const jsxLinter = linter((view) => {
@@ -183,6 +187,7 @@ export const CodeEditor = forwardRef<CodeEditorRef, CodeEditorProps>(({
   onFormat,
   language = 'jsx',
   validPageIds,
+  pageNavigationTargets,
   readOnly = false,
 }, ref) => {
   const editorRef = useRef<ReactCodeMirrorRef>(null)
@@ -249,19 +254,19 @@ export const CodeEditor = forwardRef<CodeEditorRef, CodeEditorProps>(({
     // Return the extensions array
     return [
       javascript({ jsx: language === 'jsx', typescript: true }),
-      autocompletion({ 
-        override: [getAkselCompletionForContext], 
+      autocompletion({
+        override: [(context) => getAkselCompletionForContext(context, pageNavigationTargets)],
         activateOnTyping: true,
         // Auto-trigger completion after selecting an option
         activateOnCompletion: () => true,
       }),
       bracketMatching(),
-      cursorInQuotesPlugin,
+      createCursorInQuotesPlugin(pageNavigationTargets),
       customKeymap,
       jsxLinter,
       pageReferenceLinter,
     ]
-  }, [language, onFormat, validPageIds]) // Memoize based on language and onFormat
+  }, [language, onFormat, pageNavigationTargets, validPageIds]) // Memoize based on editor inputs
 
   return (
     <div className="code-editor">

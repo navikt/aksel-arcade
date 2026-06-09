@@ -13,18 +13,44 @@ interface PropWithCompletionMetadata {
   values?: string[]
 }
 
-function completionFor(source: string) {
-  return getAkselCompletionForSource(source, source.length)
+const PAGE_NAVIGATION_TARGETS = [
+  { id: 'page01', name: 'Start' },
+  { id: 'page02', name: 'Details' },
+  { id: 'page03', name: 'Summary' },
+] as const
+
+function completionFor(
+  source: string,
+  pageNavigationTargets?: Parameters<typeof getAkselCompletionForSource>[2]
+) {
+  return getAkselCompletionForSource(source, source.length, pageNavigationTargets)
 }
 
-function labelsFor(source: string): string[] {
-  const result = completionFor(source)
+function labelsFor(
+  source: string,
+  pageNavigationTargets?: Parameters<typeof getAkselCompletionForSource>[2]
+): string[] {
+  const result = completionFor(source, pageNavigationTargets)
   return result?.options.map((option) => option.label) ?? []
 }
 
-function applyFor(source: string, label: string): string | undefined {
-  const apply = completionFor(source)?.options.find((option) => option.label === label)?.apply
+function applyFor(
+  source: string,
+  label: string,
+  pageNavigationTargets?: Parameters<typeof getAkselCompletionForSource>[2]
+): string | undefined {
+  const apply = completionFor(source, pageNavigationTargets)?.options.find(
+    (option) => option.label === label
+  )?.apply
   return typeof apply === 'string' ? apply : undefined
+}
+
+function optionFor(
+  source: string,
+  label: string,
+  pageNavigationTargets?: Parameters<typeof getAkselCompletionForSource>[2]
+) {
+  return completionFor(source, pageNavigationTargets)?.options.find((option) => option.label === label)
 }
 
 const BOOLEAN_COMPLETION_VALUES = new Set(['true', 'false'])
@@ -260,5 +286,41 @@ describe('Aksel-aware autocomplete contract', () => {
     expect(applyFor('<Button icon={<DogH', 'DogHarnessIcon')).toBe(
       'DogHarnessIcon title="a11y-title" fontSize="1.5rem" />}'
     )
+  })
+
+  it('suggests page navigation targets inside goToPage calls', () => {
+    const option = optionFor("const handleClick = () => goToPage('Det", 'Details', PAGE_NAVIGATION_TARGETS)
+
+    expect(labelsFor("const handleClick = () => goToPage('", PAGE_NAVIGATION_TARGETS)).toEqual([
+      'Start',
+      'Details',
+      'Summary',
+    ])
+    expect(labelsFor("const handleClick = () => goToPage('page0", PAGE_NAVIGATION_TARGETS)).toEqual([
+      'Start',
+      'Details',
+      'Summary',
+    ])
+    expect(option?.detail).toBe('page02')
+    expect(applyFor("const handleClick = () => goToPage('Det", 'Details', PAGE_NAVIGATION_TARGETS)).toBe(
+      'page02'
+    )
+  })
+
+  it('suggests page navigation targets inside href and to values', () => {
+    const hrefOption = optionFor('<Link href="Su', 'Summary', PAGE_NAVIGATION_TARGETS)
+    const toOption = optionFor('<Link to={"page02', 'Details', PAGE_NAVIGATION_TARGETS)
+
+    expect(hrefOption?.detail).toBe('page03')
+    expect(applyFor('<Link href="Su', 'Summary', PAGE_NAVIGATION_TARGETS)).toBe('page03')
+    expect(toOption?.detail).toBe('page02')
+    expect(applyFor('<Link to={"page02', 'Details', PAGE_NAVIGATION_TARGETS)).toBe('page02')
+  })
+
+  it('does not suggest page navigation targets outside supported contexts', () => {
+    expect(completionFor("const target = 'page0", PAGE_NAVIGATION_TARGETS)).toBeNull()
+    expect(completionFor('<Link id="page0', PAGE_NAVIGATION_TARGETS)).toBeNull()
+    expect(completionFor('<Link href="https://', PAGE_NAVIGATION_TARGETS)).toBeNull()
+    expect(completionFor('goToPage(page0', PAGE_NAVIGATION_TARGETS)).toBeNull()
   })
 })
