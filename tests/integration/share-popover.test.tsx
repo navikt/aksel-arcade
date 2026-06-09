@@ -6,6 +6,7 @@ import { AppProvider, useProject } from '@/hooks/useProject'
 import { SettingsProvider } from '@/contexts/SettingsContext'
 import { AppHeader } from '@/components/Header/AppHeader'
 import type { UseShareLinkOptions } from '@/hooks/useShareLink'
+import { getActiveSource } from '@/services/projectSource'
 import type {
   AgentBridgeCommandResult,
   AgentBridgeCommandName,
@@ -72,8 +73,8 @@ const Harness = ({
   } = useProject()
 
   const appendAlertSnippet = useCallback(() => {
-    updateProject({ jsxCode: `${project.jsxCode}${TEST_ALERT_SNIPPET}` })
-  }, [project.jsxCode, updateProject])
+    updateProject({ jsxCode: `${getActiveSource(project).jsx}${TEST_ALERT_SNIPPET}` })
+  }, [project, updateProject])
 
   useEffect(() => {
     const handleAppend = () => appendAlertSnippet()
@@ -123,7 +124,12 @@ const renderHeader = (
   )
 }
 
-const findAgentAccessButton = () => screen.findByRole('button', { name: /koble til agent/i })
+const AGENT_ACCESS_BUTTON_NAME = /connect an agent|koble til agent/i
+const AGENT_ACCESS_TOGGLE_NAME = /agent bridge|agent-tilgang/i
+const AGENT_STATUS_ACTIVE = 'Status: active'
+
+const findAgentAccessButton = () =>
+  screen.findByRole('button', { name: AGENT_ACCESS_BUTTON_NAME })
 
 const normalizeWhitespace = (value: string): string => value.replace(/\s+/g, ' ').trim()
 const AGENT_CHANGE_SUMMARY = 'Confidential Agent change summary'
@@ -286,10 +292,10 @@ const readBlobText = (blob: Blob): Promise<string> =>
 
 const startAgentAccess = async () => {
   fireEvent.click(await findAgentAccessButton())
-  expect(await screen.findByText(/Koble til agent/i)).toBeTruthy()
-  fireEvent.click(screen.getByRole('menuitemcheckbox', { name: /agent-tilgang/i }))
+  expect(await screen.findByText(AGENT_ACCESS_BUTTON_NAME)).toBeTruthy()
+  fireEvent.click(screen.getByRole('menuitemcheckbox', { name: AGENT_ACCESS_TOGGLE_NAME }))
 
-  await waitFor(() => expect(screen.getByRole('status').textContent).toBe('Status: aktiv'))
+  await waitFor(() => expect(screen.getByRole('status').textContent).toBe(AGENT_STATUS_ACTIVE))
   expect(Reflect.get(window, LEGACY_AGENT_BRIDGE_GLOBAL)).toBeUndefined()
   if (!currentDesktopTransport) {
     throw new Error('Expected Desktop transport preload to be installed before Agent access starts.')

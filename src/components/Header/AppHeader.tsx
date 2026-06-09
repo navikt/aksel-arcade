@@ -52,6 +52,7 @@ import {
 } from '@/hooks/useShareLink'
 import { SHARE_URL_CHAR_LIMIT } from '@/utils/shareEncoding'
 import { WEB_ARCADE_CAPABILITIES, type ShellCapabilities } from '@/services/shellCapabilities'
+import { getStartPageSource } from '@/services/projectSource'
 import './AppHeader.css'
 
 const AgentSessionMenu = lazy(() =>
@@ -115,7 +116,8 @@ export const AppHeader = ({
   const loadingDescriptionId = useId()
   const importConfirmDialogId = useId()
   const slowDescriptionId = `${loadingDescriptionId}-delay`
-  const { theme, toggleTheme, togglePanelOrder } = useSettings()
+  const { theme, toggleTheme, togglePanelOrder, multiPageEnabled, toggleMultiPageEnabled } =
+    useSettings()
   const {
     state: shareState,
     generateShareLink,
@@ -271,16 +273,17 @@ export const AppHeader = ({
   }
 
   const isGeneratingShare = shareState.status === 'generating' || shareState.status === 'warning'
+  const shareableSource = getStartPageSource(currentProject)
   const shareDependenciesFingerprint = useMemo(() => {
     const lastModified = currentProject.lastModified ?? 'unknown'
-    const jsxLength = currentProject.jsxCode.length
-    const hooksLength = currentProject.hooksCode.length
+    const jsxLength = shareableSource.jsx.length
+    const hooksLength = shareableSource.hooks.length
     return `${lastModified}|${jsxLength}|${hooksLength}|${currentProject.viewportSize}|${theme}`
   }, [
-    currentProject.hooksCode.length,
-    currentProject.jsxCode.length,
     currentProject.lastModified,
     currentProject.viewportSize,
+    shareableSource.hooks.length,
+    shareableSource.jsx.length,
     theme,
   ])
   const showOversizeMessage =
@@ -641,6 +644,14 @@ export const AppHeader = ({
                   onSelect={toggleTheme}
                 >
                   Switch to {theme === 'dark' ? 'light' : 'dark'} theme
+                </ActionMenu.Item>
+              </ActionMenu.Group>
+              <ActionMenu.Divider />
+              <ActionMenu.Group label="Experiments">
+                <ActionMenu.Item onSelect={toggleMultiPageEnabled}>
+                  {multiPageEnabled
+                    ? 'Disable experimental multi-page authoring'
+                    : 'Enable experimental multi-page authoring'}
                 </ActionMenu.Item>
               </ActionMenu.Group>
               <ActionMenu.Divider />

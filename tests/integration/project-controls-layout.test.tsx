@@ -5,6 +5,7 @@ import { SettingsProvider, useSettings } from '@/contexts/SettingsContext'
 import { AppHeader } from '@/components/Header/AppHeader'
 import { PreviewPane } from '@/components/Preview/PreviewPane'
 import { createDefaultProject } from '@/utils/projectDefaults'
+import { createSinglePageProjectSource, getActiveSource } from '@/services/projectSource'
 import {
   MAX_SANDBOX_CONSOLE_MESSAGES,
   type PreviewDiagnostics,
@@ -111,7 +112,7 @@ const Harness = ({
         Update Agent read fixture
       </button>
       <div data-testid="project-jsx-code" hidden>
-        {project.jsxCode}
+        {getActiveSource(project).jsx}
       </div>
       {shareHydration.status === 'ready' && (
         <button type="button" onClick={applySharedSnapshot}>
@@ -138,8 +139,14 @@ const renderHeader = (options?: HarnessProps) => {
   )
 }
 
-const findAgentAccessButton = () => screen.findByRole('button', { name: /koble til agent/i })
-const queryAgentAccessToggle = () => screen.queryByRole('menuitemcheckbox', { name: /agent-tilgang/i })
+const AGENT_ACCESS_BUTTON_NAME = /connect an agent|koble til agent/i
+const AGENT_ACCESS_TOGGLE_NAME = /agent bridge|agent-tilgang/i
+const AGENT_STATUS_ACTIVE = 'Status: active'
+const AGENT_STATUS_INACTIVE = 'Status: inactive'
+
+const findAgentAccessButton = () => screen.findByRole('button', { name: AGENT_ACCESS_BUTTON_NAME })
+const queryAgentAccessToggle = () =>
+  screen.queryByRole('menuitemcheckbox', { name: AGENT_ACCESS_TOGGLE_NAME })
 
 const collectObjectKeys = (value: unknown): string[] => {
   if (!value || typeof value !== 'object') {
@@ -223,7 +230,7 @@ const createProjectPackageFile = (text: string): File => {
 const createProjectPackageFileForCode = (name: string, jsxCode: string): File => {
   const project = createDefaultProject()
   project.name = name
-  project.jsxCode = jsxCode
+  project.source = createSinglePageProjectSource(jsxCode, getActiveSource(project).hooks)
 
   return createProjectPackageFile(
     JSON.stringify(createArcadeProjectPackage(project))
@@ -232,7 +239,7 @@ const createProjectPackageFileForCode = (name: string, jsxCode: string): File =>
 
 const createShareTokenForCode = async (jsxCode: string): Promise<string> => {
   const project = createDefaultProject()
-  project.jsxCode = jsxCode
+  project.source = createSinglePageProjectSource(jsxCode, getActiveSource(project).hooks)
 
   return createShareToken(await encodeSharePayload(createShareSnapshot(project)))
 }
@@ -398,16 +405,16 @@ const expectProjectReplacementRevokedAgentAccess = async (
   expect(desktopTransport.hasRequestHandler()).toBe(false)
 
   await ensureAgentMenuOpen()
-  expect(screen.getByRole('status').textContent).toBe('Status: inaktiv')
+  expect(screen.getByRole('status').textContent).toBe(AGENT_STATUS_INACTIVE)
   expect(screen.queryByRole('alert')).toBeNull()
   await closeAgentMenuIfOpen()
 }
 
 const startAgentAccess = async () => {
   await ensureAgentMenuOpen()
-  fireEvent.click(screen.getByRole('menuitemcheckbox', { name: /agent-tilgang/i }))
+  fireEvent.click(screen.getByRole('menuitemcheckbox', { name: AGENT_ACCESS_TOGGLE_NAME }))
 
-  await waitFor(() => expect(screen.getByRole('status').textContent).toBe('Status: aktiv'))
+  await waitFor(() => expect(screen.getByRole('status').textContent).toBe(AGENT_STATUS_ACTIVE))
   expectLegacyAgentBridgeAbsent()
   if (!currentDesktopTransport) {
     throw new Error('Expected Desktop transport preload to be installed before Agent access starts.')
@@ -433,7 +440,7 @@ const ensureAgentMenuOpen = async () => {
     fireEvent.click(button)
   }
 
-  expect(await screen.findByRole('menuitemcheckbox', { name: /agent-tilgang/i })).toBeTruthy()
+  expect(await screen.findByRole('menuitemcheckbox', { name: AGENT_ACCESS_TOGGLE_NAME })).toBeTruthy()
 }
 
 const closeAgentMenuIfOpen = async () => {
@@ -693,7 +700,7 @@ describe('ProjectControls layout', () => {
     const settingsButton = screen.getByRole('button', { name: /settings/i })
 
     expect(importInput.accept).toBe(ARCADE_PROJECT_IMPORT_ACCEPT)
-    expect(screen.queryByRole('button', { name: /koble til agent/i })).toBeNull()
+    expect(screen.queryByRole('button', { name: AGENT_ACCESS_BUTTON_NAME })).toBeNull()
     expectLegacyAgentBridgeAbsent()
     expect(currentDesktopTransport).toBeNull()
     expect(
@@ -779,16 +786,20 @@ describe('ProjectControls layout', () => {
 
     fireEvent.click(await findAgentAccessButton())
 
-    expect(await screen.findByText(/Koble til agent/i)).toBeTruthy()
-    expect(screen.queryByText(/kommandoen gir agenten tilgang/i)).toBeNull()
-    expect(screen.queryByText('Del bare med agenten du vil gi tilgang.')).toBeNull()
-    expect(screen.queryByRole('menuitem', { name: /Kopier agentkommando/i })).toBeNull()
+    expect(await screen.findByText(AGENT_ACCESS_BUTTON_NAME)).toBeTruthy()
+    expect(
+      screen.queryByText(/command will give the agent access|kommandoen gir agenten tilgang/i)
+    ).toBeNull()
+    expect(
+      screen.queryByText(/click the button below to copy a command|del bare med agenten du vil gi tilgang/i)
+    ).toBeNull()
+    expect(screen.queryByRole('menuitem', { name: /copy command|kopier agentkommando/i })).toBeNull()
     const inactiveStatus = screen.getByRole('status').textContent ?? ''
-    expect(inactiveStatus).toBe('Status: inaktiv')
+    expect(inactiveStatus).toBe(AGENT_STATUS_INACTIVE)
     expect(inactiveStatus).not.toMatch(/connected|disconnected/i)
 
     const accessItem = screen.getByRole('menuitemcheckbox', {
-      name: /agent-tilgang/i,
+      name: AGENT_ACCESS_TOGGLE_NAME,
     })
 
     expect(accessItem.getAttribute('aria-checked')).toBe('false')
@@ -805,10 +816,14 @@ describe('ProjectControls layout', () => {
 
     fireEvent.click(accessItem)
 
-    await waitFor(() => expect(screen.getByRole('status').textContent).toBe('Status: aktiv'))
-    expect(screen.getByText(/kommandoen gir agenten tilgang/i)).toBeTruthy()
-    expect(screen.getByText('Del bare med agenten du vil gi tilgang.')).toBeTruthy()
-    expect(screen.getByRole('menuitem', { name: /Kopier agentkommando/i })).toBeTruthy()
+    await waitFor(() => expect(screen.getByRole('status').textContent).toBe(AGENT_STATUS_ACTIVE))
+    expect(
+      screen.getByText(/command will give the agent access|kommandoen gir agenten tilgang/i)
+    ).toBeTruthy()
+    expect(
+      screen.getByText(/click the button below to copy a command|del bare med agenten du vil gi tilgang/i)
+    ).toBeTruthy()
+    expect(screen.getByRole('menuitem', { name: /copy command|kopier agentkommando/i })).toBeTruthy()
     expectLegacyAgentBridgeAbsent()
     await waitFor(() => expect(currentDesktopTransport?.hasRequestHandler()).toBe(true))
     if (!currentDesktopTransport) {
@@ -866,13 +881,13 @@ describe('ProjectControls layout', () => {
       projectMetadata: true,
     })
 
-    fireEvent.click(screen.getByRole('menuitemcheckbox', { name: /agent-tilgang/i }))
+    fireEvent.click(screen.getByRole('menuitemcheckbox', { name: AGENT_ACCESS_TOGGLE_NAME }))
 
-    expect(screen.getByRole('status').textContent).toBe('Status: inaktiv')
+    expect(screen.getByRole('status').textContent).toBe(AGENT_STATUS_INACTIVE)
     expectLegacyAgentBridgeAbsent()
     await waitFor(() => expect(currentDesktopTransport?.hasRequestHandler()).toBe(false))
 
-    fireEvent.click(screen.getByRole('menuitemcheckbox', { name: /agent-tilgang/i }))
+    fireEvent.click(screen.getByRole('menuitemcheckbox', { name: AGENT_ACCESS_TOGGLE_NAME }))
     await waitFor(() => expect(currentDesktopTransport?.hasRequestHandler()).toBe(true))
     expectLegacyAgentBridgeAbsent()
 
@@ -886,11 +901,11 @@ describe('ProjectControls layout', () => {
     expect(
       (
         await screen.findByRole('menuitemcheckbox', {
-          name: /agent-tilgang/i,
+          name: AGENT_ACCESS_TOGGLE_NAME,
         })
       ).getAttribute('aria-checked')
     ).toBe('false')
-    expect(screen.getByRole('status').textContent).toBe('Status: inaktiv')
+    expect(screen.getByRole('status').textContent).toBe(AGENT_STATUS_INACTIVE)
   })
 
   it('revokes active Agent access before explicit project replacements are exposed', async () => {
@@ -990,7 +1005,7 @@ describe('ProjectControls layout', () => {
     expect(desktopTransport.hasRequestHandler()).toBe(true)
     expectLegacyAgentBridgeAbsent()
     await ensureAgentMenuOpen()
-    expect(screen.getByRole('status').textContent).toBe('Status: aktiv')
+    expect(screen.getByRole('status').textContent).toBe(AGENT_STATUS_ACTIVE)
     await closeAgentMenuIfOpen()
   })
 
@@ -1004,11 +1019,15 @@ describe('ProjectControls layout', () => {
     renderHeader()
 
     fireEvent.click(await findAgentAccessButton())
-    expect(await screen.findByText(/Koble til agent/i)).toBeTruthy()
+    expect(await screen.findByText(AGENT_ACCESS_BUTTON_NAME)).toBeTruthy()
 
-    expect(screen.queryByText(/kommandoen gir agenten tilgang/i)).toBeNull()
-    expect(screen.queryByText('Del bare med agenten du vil gi tilgang.')).toBeNull()
-    expect(screen.queryByRole('menuitem', { name: /kopier agentkommando/i })).toBeNull()
+    expect(
+      screen.queryByText(/command will give the agent access|kommandoen gir agenten tilgang/i)
+    ).toBeNull()
+    expect(
+      screen.queryByText(/click the button below to copy a command|del bare med agenten du vil gi tilgang/i)
+    ).toBeNull()
+    expect(screen.queryByRole('menuitem', { name: /copy command|kopier agentkommando/i })).toBeNull()
     expect(screen.queryByRole('alert')).toBeNull()
     expect(writeText).not.toHaveBeenCalled()
   })
@@ -1026,7 +1045,7 @@ describe('ProjectControls layout', () => {
     renderHeader()
 
     await startAgentAccess()
-    fireEvent.click(screen.getByRole('menuitem', { name: /kopier agentkommando/i }))
+    fireEvent.click(screen.getByRole('menuitem', { name: /copy command|kopier agentkommando/i }))
 
     await waitFor(() => expect(writeText).toHaveBeenCalledTimes(1))
 
@@ -1311,9 +1330,9 @@ describe('ProjectControls layout', () => {
     }
     expect(captureAgentState(bridge)).toEqual(changed)
 
-    fireEvent.click(screen.getByRole('menuitemcheckbox', { name: /agent-tilgang/i }))
+    fireEvent.click(screen.getByRole('menuitemcheckbox', { name: AGENT_ACCESS_TOGGLE_NAME }))
 
-    expect(screen.getByRole('status').textContent).toBe('Status: inaktiv')
+    expect(screen.getByRole('status').textContent).toBe(AGENT_STATUS_INACTIVE)
     expect(screen.queryByRole('menuitem', { name: /gjenopprett/i })).toBeNull()
   })
 
@@ -1436,13 +1455,13 @@ describe('ProjectControls layout', () => {
 
       expect(screen.queryByRole('menuitem', { name: /gjenopprett/i })).toBeNull()
 
-      let accessToggle = screen.queryByRole('menuitemcheckbox', { name: /agent-tilgang/i })
+      let accessToggle = screen.queryByRole('menuitemcheckbox', { name: AGENT_ACCESS_TOGGLE_NAME })
       if (!accessToggle) {
         fireEvent.click(await findAgentAccessButton())
-        accessToggle = screen.getByRole('menuitemcheckbox', { name: /agent-tilgang/i })
+        accessToggle = screen.getByRole('menuitemcheckbox', { name: AGENT_ACCESS_TOGGLE_NAME })
       }
       fireEvent.click(accessToggle)
-      expect(screen.getByRole('status').textContent).toBe('Status: inaktiv')
+      expect(screen.getByRole('status').textContent).toBe(AGENT_STATUS_INACTIVE)
       expectLegacyAgentBridgeAbsent()
 
       const stoppedPackage = await exportCurrentProjectPackage(capturedBlobs)
@@ -1474,8 +1493,8 @@ describe('ProjectControls layout', () => {
       expectLegacyAgentBridgeAbsent()
 
       fireEvent.click(await findAgentAccessButton())
-      expect(await screen.findByText(/Koble til agent/i)).toBeTruthy()
-      expect(screen.getByRole('status').textContent).toBe('Status: inaktiv')
+      expect(await screen.findByText(AGENT_ACCESS_BUTTON_NAME)).toBeTruthy()
+      expect(screen.getByRole('status').textContent).toBe(AGENT_STATUS_INACTIVE)
       expect(screen.queryByRole('menuitem', { name: /gjenopprett/i })).toBeNull()
     } finally {
       global.URL.createObjectURL = originalCreateObjectURL
@@ -1504,9 +1523,11 @@ describe('ProjectControls layout', () => {
     renderHeader()
 
     await startAgentAccess()
-    fireEvent.click(screen.getByRole('menuitem', { name: /kopier agentkommando/i }))
+    fireEvent.click(screen.getByRole('menuitem', { name: /copy command|kopier agentkommando/i }))
 
-    expect((await screen.findByRole('alert')).textContent).toMatch(/kunne ikke kopiere/i)
+    expect((await screen.findByRole('alert')).textContent).toMatch(
+      /could not copy command|kunne ikke kopiere/i
+    )
     const serializedLog = JSON.stringify(consoleError.mock.calls)
     expect(serializedLog).not.toContain(command)
     expect(serializedLog).not.toContain(endpoint.endpoint)
@@ -1521,10 +1542,10 @@ describe('ProjectControls layout', () => {
     expect(screen.queryByText(/transport/i)).toBeNull()
     expect(screen.queryByText(/local server/i)).toBeNull()
 
-    fireEvent.click(screen.getByRole('menuitem', { name: /prøv igjen/i }))
+    fireEvent.click(screen.getByRole('menuitem', { name: /try again|prøv igjen/i }))
 
     await waitFor(() => expect(writeText).toHaveBeenCalledTimes(2))
-    expect(await screen.findByText(/agentkommando kopiert/i)).toBeTruthy()
+    expect(await screen.findByText(/command copied|agentkommando kopiert/i)).toBeTruthy()
     expect(screen.queryByText(endpoint.endpoint)).toBeNull()
     expect(screen.queryByText(endpoint.authorizationHeader)).toBeNull()
     expect(screen.queryByText(/getAgentInstructions/i)).toBeNull()
@@ -1549,7 +1570,7 @@ describe('ProjectControls layout', () => {
     })
     expect(projectData).not.toHaveProperty('id')
 
-    expect(screen.getByRole('status').textContent).toBe('Status: aktiv')
+    expect(screen.getByRole('status').textContent).toBe(AGENT_STATUS_ACTIVE)
 
     const previewResult = callBridgeCommand(() => bridge.getPreviewContext())
     expect(previewResult).toMatchObject({
@@ -1620,9 +1641,9 @@ describe('ProjectControls layout', () => {
       /share|export|storage|clipboard|cookie|document|window/i
     )
 
-    expect(screen.getByRole('status').textContent).toBe('Status: aktiv')
+    expect(screen.getByRole('status').textContent).toBe(AGENT_STATUS_ACTIVE)
 
-    fireEvent.click(screen.getByRole('menuitemcheckbox', { name: /agent-tilgang/i }))
+    fireEvent.click(screen.getByRole('menuitemcheckbox', { name: AGENT_ACCESS_TOGGLE_NAME }))
 
     await waitFor(() => expect(currentDesktopTransport?.hasRequestHandler()).toBe(false))
   })
@@ -1707,7 +1728,7 @@ describe('ProjectControls layout', () => {
     expect(serialized).not.toContain('clipboard')
     expect(serialized).not.toContain('.unsafe-css')
 
-    expect(screen.getByRole('status').textContent).toBe('Status: aktiv')
+    expect(screen.getByRole('status').textContent).toBe(AGENT_STATUS_ACTIVE)
 
     expect(expectBridgeSuccess(await bridge.getPreviewEvidence())).toEqual(evidence)
   })
@@ -1719,10 +1740,10 @@ describe('ProjectControls layout', () => {
     setupPreviewEvidenceFrame()
 
     expectBridgeSuccess(await bridge.getPreviewEvidence())
-    expect(screen.getByRole('status').textContent).toBe('Status: aktiv')
+    expect(screen.getByRole('status').textContent).toBe(AGENT_STATUS_ACTIVE)
 
-    fireEvent.click(screen.getByRole('menuitemcheckbox', { name: /agent-tilgang/i }))
-    expect(screen.getByRole('status').textContent).toBe('Status: inaktiv')
+    fireEvent.click(screen.getByRole('menuitemcheckbox', { name: AGENT_ACCESS_TOGGLE_NAME }))
+    expect(screen.getByRole('status').textContent).toBe(AGENT_STATUS_INACTIVE)
 
     await waitFor(() => expect(currentDesktopTransport?.hasRequestHandler()).toBe(false))
   })
@@ -1859,7 +1880,7 @@ describe('ProjectControls layout', () => {
     expect(changeData).toEqual({
       changedFields: ['jsxCode', 'hooksCode'],
     })
-    expect(screen.getByRole('status').textContent).toBe('Status: aktiv')
+    expect(screen.getByRole('status').textContent).toBe(AGENT_STATUS_ACTIVE)
 
     await waitFor(() => {
       const updatedProject = expectBridgeSuccess(callBridgeCommand(() => bridge.getProject()))

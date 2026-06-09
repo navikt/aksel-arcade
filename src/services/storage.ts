@@ -1,13 +1,24 @@
-import type {
-  Project,
-  ProjectFileSnapshot,
-  ProjectPreviewSnapshot,
-  ProjectSettingsSnapshot,
-  ProjectSizeStatus,
-  ProjectSnapshot,
-  PanelOrder,
-  ThemeMode,
+import {
+  CURRENT_PROJECT_VERSION,
+  type ArcadePage,
+  type ArcadeSourceFile,
+  type PanelOrder,
+  type Project,
+  type ProjectFileSnapshot,
+  type ProjectPreviewSnapshot,
+  type ProjectSettingsSnapshot,
+  type ProjectSizeStatus,
+  type ProjectSnapshot,
+  type ThemeMode,
 } from '@/types/project'
+import {
+  FIRST_PAGE_ID,
+  cloneProjectSource,
+  createSinglePageProjectSource,
+  getStartPageSource,
+  isArcadePageId,
+  normalizeProjectSelection,
+} from '@/services/projectSource'
 import { createDefaultProject } from '@/utils/projectDefaults'
 import { generateSecureUUID } from '@/utils/crypto'
 
@@ -17,7 +28,6 @@ const WEB_ARCADE_WORKING_COPY_FORMAT = 'aksel-arcade/web-working-copy' as const
 const WEB_ARCADE_WORKING_COPY_FORMAT_VERSION = 1
 const MAX_PROJECT_SIZE_BYTES = 5 * 1024 * 1024 // 5MB
 const WARN_PROJECT_SIZE_BYTES = 4 * 1024 * 1024 // 4MB
-const CURRENT_VERSION = '1.0.0'
 export const ARCADE_PROJECT_PACKAGE_FORMAT = 'aksel-arcade/project-package' as const
 export const ARCADE_PROJECT_PACKAGE_FORMAT_VERSION = 2
 export const ARCADE_PROJECT_PACKAGE_EXTENSION = '.akselarcade' as const
@@ -39,6 +49,7 @@ export interface SaveResult {
 export interface WebArcadeWorkingCopyPreferences {
   theme: ThemeMode
   panelOrder: PanelOrder
+  multiPageEnabled: boolean
 }
 
 export interface SaveProjectOptions {
@@ -95,6 +106,7 @@ export interface ShareSnapshotOverrides {
 export const DEFAULT_WEB_ARCADE_WORKING_COPY_PREFERENCES: WebArcadeWorkingCopyPreferences = {
   theme: 'dark',
   panelOrder: 'code-left',
+  multiPageEnabled: false,
 }
 
 export const SNAPSHOT_FILE_IDS = {
@@ -275,14 +287,16 @@ export const loadProject = (): LoadResult => {
 }
 
 export const createArcadeProjectPackage = (project: Project): ArcadeProjectPackage => {
+  const source = getStartPageSource(project)
+
   return {
     format: ARCADE_PROJECT_PACKAGE_FORMAT,
     formatVersion: ARCADE_PROJECT_PACKAGE_FORMAT_VERSION,
     project: {
       name: project.name,
       source: {
-        jsx: project.jsxCode,
-        hooks: project.hooksCode,
+        jsx: source.jsx,
+        hooks: source.hooks,
       },
       preview: {
         viewport: project.viewportSize,
@@ -366,11 +380,11 @@ const buildProjectFromCleanPackage = (payload: unknown): Project => {
   const now = new Date().toISOString()
 
   return normalizeImportedProject({
-    version: CURRENT_VERSION,
+    version: CURRENT_PROJECT_VERSION,
     id: generateSecureUUID(),
     name: cleanProject.name,
-    jsxCode: cleanProject.source.jsx,
-    hooksCode: cleanProject.source.hooks,
+    source: createSinglePageProjectSource(cleanProject.source.jsx, cleanProject.source.hooks),
+    activePageId: FIRST_PAGE_ID,
     viewportSize: cleanProject.preview.viewport,
     panelLayout: createDefaultProject().panelLayout,
     createdAt: now,
@@ -477,15 +491,15 @@ const formatCleanPackageRejection = (error: unknown): string => {
 
 const normalizeImportedProject = (project: unknown): Project => {
   validateProjectSchema(project)
-  return copyProjectFields(project)
+  return normalizeProjectSelection(copyProjectFields(project))
 }
 
 const copyProjectFields = (project: Project): Project => ({
   version: project.version,
   id: project.id,
   name: project.name,
-  jsxCode: project.jsxCode,
-  hooksCode: project.hooksCode,
+  source: cloneProjectSource(project.source),
+  activePageId: project.activePageId,
   viewportSize: project.viewportSize,
   panelLayout: project.panelLayout,
   createdAt: project.createdAt,
@@ -530,19 +544,21 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null
 
 const buildDefaultSnapshotFiles = (project: Project): ProjectFileSnapshot[] => {
+  const source = getStartPageSource(project)
+
   return [
     {
       id: SNAPSHOT_FILE_IDS.jsx,
       name: 'App.tsx',
       language: 'tsx',
-      content: project.jsxCode,
+      content: source.jsx,
       order: 0,
     },
     {
       id: SNAPSHOT_FILE_IDS.hooks,
       name: 'hooks.ts',
       language: 'tsx',
-      content: project.hooksCode,
+      content: source.hooks,
       order: 1,
     },
   ]
@@ -574,7 +590,7 @@ const restoreStoredProject = (storedProject: unknown): { project: Project; migra
     storedProject &&
     typeof storedProject === 'object' &&
     'version' in storedProject &&
-    storedProject.version !== CURRENT_VERSION
+    storedProject.version !== CURRENT_PROJECT_VERSION
   ) {
     return {
       project: migrateProject(storedProject),
@@ -583,7 +599,7 @@ const restoreStoredProject = (storedProject: unknown): { project: Project; migra
   }
 
   return {
-    project: storedProject as Project,
+    project: normalizeImportedProject(storedProject),
     migrated: false,
   }
 }
@@ -623,9 +639,17 @@ const validateWorkingCopyPreferences = (preferences: unknown): WebArcadeWorkingC
     throw new Error('Invalid Web Arcade working copy panel order')
   }
 
+  const multiPageEnabled =
+    'multiPageEnabled' in preferences ? preferences.multiPageEnabled : DEFAULT_WEB_ARCADE_WORKING_COPY_PREFERENCES.multiPageEnabled
+
+  if (typeof multiPageEnabled !== 'boolean') {
+    throw new Error('Invalid Web Arcade working copy multi-page preference')
+  }
+
   return {
     theme: preferences.theme,
     panelOrder: preferences.panelOrder,
+    multiPageEnabled,
   }
 }
 
@@ -654,12 +678,39 @@ const validateProjectSchema: (project: unknown) => asserts project is Project = 
     throw new Error('Invalid name field (1-100 characters)')
   }
 
-  if (typeof p.jsxCode !== 'string') {
-    throw new Error('Invalid jsxCode field (must be string)')
+  if (!isRecord(p.source)) {
+    throw new Error('Invalid source field (must be object)')
   }
 
-  if (typeof p.hooksCode !== 'string') {
-    throw new Error('Invalid hooksCode field (must be string)')
+  validateArcadeSourceFile(p.source.globalConfig, 'globalConfig')
+
+  if (!Array.isArray(p.source.pages) || p.source.pages.length === 0) {
+    throw new Error('Invalid pages field (must contain at least one Arcade page)')
+  }
+
+  if (
+    typeof p.source.nextPageNumber !== 'number' ||
+    !Number.isInteger(p.source.nextPageNumber) ||
+    p.source.nextPageNumber < 2
+  ) {
+    throw new Error('Invalid nextPageNumber field')
+  }
+
+  const pageIds = new Set<string>()
+  for (const page of p.source.pages) {
+    validateArcadePage(page)
+    if (pageIds.has(page.id)) {
+      throw new Error(`Duplicate Arcade page id "${page.id}"`)
+    }
+    pageIds.add(page.id)
+  }
+
+  if (!isArcadePageId(p.source.startPageId) || !pageIds.has(p.source.startPageId)) {
+    throw new Error('Invalid startPageId field')
+  }
+
+  if (!isArcadePageId(p.activePageId) || !pageIds.has(p.activePageId)) {
+    throw new Error('Invalid activePageId field')
   }
 
   const validViewports = ['XS', 'SM', 'MD', 'LG', 'XL', '2XL']
@@ -687,14 +738,100 @@ const migrateProject = (stored: unknown): Project => {
       ? (stored.version as string)
       : '0.0.0'
 
-  // No migrations for initial version
   if (version === '1.0.0') {
-    return stored as Project
+    return migrateLegacyProject(stored)
   }
 
-  // Future migrations go here
+  if (version === CURRENT_PROJECT_VERSION) {
+    return normalizeImportedProject(stored)
+  }
 
   throw new Error(`Unsupported schema version: ${version}`)
+}
+
+const validateArcadeSourceFile: (
+  value: unknown,
+  label: string
+) => asserts value is ArcadeSourceFile = (value, label) => {
+  if (!isRecord(value)) {
+    throw new Error(`Invalid ${label} field (must be object)`)
+  }
+
+  if (typeof value.jsx !== 'string') {
+    throw new Error(`Invalid ${label}.jsx field (must be string)`)
+  }
+
+  if (typeof value.hooks !== 'string') {
+    throw new Error(`Invalid ${label}.hooks field (must be string)`)
+  }
+}
+
+const validateArcadePage: (value: unknown) => asserts value is ArcadePage = (value) => {
+  if (!isRecord(value)) {
+    throw new Error('Invalid Arcade page entry')
+  }
+
+  if (!isArcadePageId(value.id)) {
+    throw new Error('Invalid Arcade page id')
+  }
+
+  if (typeof value.name !== 'string' || value.name.trim().length === 0) {
+    throw new Error('Invalid Arcade page name')
+  }
+
+  validateArcadeSourceFile(value.source, `Arcade page "${value.id}" source`)
+}
+
+const migrateLegacyProject = (stored: unknown): Project => {
+  if (!isRecord(stored)) {
+    throw new Error('Legacy project must be an object')
+  }
+
+  if (typeof stored.id !== 'string' || !isValidUUID(stored.id)) {
+    throw new Error('Invalid legacy id field (must be UUID)')
+  }
+
+  if (typeof stored.name !== 'string' || stored.name.trim().length === 0 || stored.name.length > 100) {
+    throw new Error('Invalid legacy name field (1-100 characters)')
+  }
+
+  if (typeof stored.jsxCode !== 'string') {
+    throw new Error('Invalid legacy jsxCode field (must be string)')
+  }
+
+  if (typeof stored.hooksCode !== 'string') {
+    throw new Error('Invalid legacy hooksCode field (must be string)')
+  }
+
+  const validViewports = ['XS', 'SM', 'MD', 'LG', 'XL', '2XL']
+  if (!validViewports.includes(stored.viewportSize as string)) {
+    throw new Error('Invalid legacy viewportSize field')
+  }
+
+  const validLayouts = ['editor-left', 'editor-right']
+  if (!validLayouts.includes(stored.panelLayout as string)) {
+    throw new Error('Invalid legacy panelLayout field')
+  }
+
+  if (typeof stored.createdAt !== 'string' || !isValidISODate(stored.createdAt)) {
+    throw new Error('Invalid legacy createdAt field (must be ISO 8601)')
+  }
+
+  if (typeof stored.lastModified !== 'string' || !isValidISODate(stored.lastModified)) {
+    throw new Error('Invalid legacy lastModified field (must be ISO 8601)')
+  }
+
+  return normalizeImportedProject({
+    version: CURRENT_PROJECT_VERSION,
+    id: stored.id,
+    name: stored.name,
+    source: createSinglePageProjectSource(stored.jsxCode, stored.hooksCode),
+    activePageId: FIRST_PAGE_ID,
+    viewportSize: stored.viewportSize,
+    panelLayout: stored.panelLayout,
+    createdAt: stored.createdAt,
+    lastModified: stored.lastModified,
+  })
 }
 
 const isValidUUID = (uuid: string): boolean => {

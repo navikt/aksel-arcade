@@ -17,6 +17,7 @@ import {
 import { fromBase64Url } from '@/utils/base64'
 import { createDefaultProject } from '@/utils/projectDefaults'
 import { createShareSnapshot, SNAPSHOT_FILE_IDS } from '@/services/storage'
+import { createSinglePageProjectSource, getStartPageSource } from '@/services/projectSource'
 
 const snapshotFixture: ProjectSnapshot = {
   version: '1.0.0',
@@ -64,8 +65,11 @@ const createNonShareableStateFixture = (): {
   project.version = '9.9.9'
   project.createdAt = '2024-01-01T00:00:00.000Z'
   project.lastModified = '2024-01-02T00:00:00.000Z'
-  project.jsxCode = 'export default function App() { return <div>Shareable JSX</div> }'
-  project.hooksCode = 'export function useShareableHook() { return "Shareable Hooks" }'
+  project.source = createSinglePageProjectSource(
+    'export default function App() { return <div>Shareable JSX</div> }',
+    'export function useShareableHook() { return "Shareable Hooks" }'
+  )
+  const source = getStartPageSource(project)
 
   const snapshot = createShareSnapshot(project, {
     files: [
@@ -73,7 +77,7 @@ const createNonShareableStateFixture = (): {
         id: SNAPSHOT_FILE_IDS.jsx,
         name: 'SenderOnlyApp.tsx',
         language: 'tsx',
-        content: project.jsxCode,
+        content: source.jsx,
         order: 10,
         isReadonly: true,
       },
@@ -81,7 +85,7 @@ const createNonShareableStateFixture = (): {
         id: SNAPSHOT_FILE_IDS.hooks,
         name: 'sender-only-hooks.ts',
         language: 'tsx',
-        content: project.hooksCode,
+        content: source.hooks,
         order: 20,
       },
       {
@@ -111,8 +115,8 @@ const createNonShareableStateFixture = (): {
     snapshot,
     expectedPayload: {
       source: {
-        jsx: project.jsxCode,
-        hooks: project.hooksCode,
+        jsx: source.jsx,
+        hooks: source.hooks,
       },
       preview: {
         viewport: 'LG',

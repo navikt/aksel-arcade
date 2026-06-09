@@ -2,6 +2,7 @@ import { useContext, useEffect, useState, useRef } from 'react'
 import { Alert, Box, HStack } from '@navikt/ds-react'
 import { AppContext } from '@/hooks/useProject'
 import { transpileCode } from '@/services/transpiler'
+import { getActiveSource } from '@/services/projectSource'
 import { useSettings } from '@/contexts/SettingsContext'
 import { LivePreview } from './LivePreview'
 import { ViewportToggle } from './ViewportToggle'
@@ -19,6 +20,7 @@ export const PreviewPane = () => {
 
   const { project, previewIframeRef, updatePreviewState, recordSandboxConsoleMessage } = context
   const { theme } = useSettings() // Use centralized theme from Settings
+  const activeSource = getActiveSource(project)
   const [transpiledCode, setTranspiledCode] = useState<string | null>(null)
   const [compileError, setCompileError] = useState<CompileError | null>(null)
   const [runtimeError, setRuntimeError] = useState<RuntimeError | null>(null)
@@ -43,7 +45,7 @@ export const PreviewPane = () => {
 
     // Debounce transpilation by 500ms to avoid showing errors while typing
     debounceTimerRef.current = window.setTimeout(() => {
-      transpileCode(project.jsxCode, project.hooksCode)
+      transpileCode(activeSource.jsx, activeSource.hooks)
         .then((result) => {
           if (isCancelled) return
 
@@ -95,7 +97,7 @@ export const PreviewPane = () => {
         clearTimeout(debounceTimerRef.current)
       }
     }
-  }, [project.jsxCode, project.hooksCode])
+  }, [activeSource.hooks, activeSource.jsx, updatePreviewState])
 
   const handleRenderSuccess = () => {
     setRuntimeError(null)

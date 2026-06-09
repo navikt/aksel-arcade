@@ -18,6 +18,8 @@ import { InspectionPopover } from './InspectionPopover'
 import './LivePreview.css'
 
 const PREVIEW_EVIDENCE_REQUEST_TIMEOUT_MS = 5_000
+const SANDBOX_IFRAME_SRC =
+  import.meta.env.MODE === 'test' ? 'about:blank' : import.meta.env.BASE_URL + 'sandbox.html'
 
 interface LivePreviewProps {
   iframeRef: React.RefObject<HTMLIFrameElement | null>
@@ -363,7 +365,7 @@ export const LivePreview = ({
       <iframe
         ref={iframeRef}
         className="live-preview__iframe"
-        src={import.meta.env.BASE_URL + 'sandbox.html'}
+        src={SANDBOX_IFRAME_SRC}
         sandbox="allow-scripts"
         referrerPolicy="no-referrer"
         title="Live Preview Sandbox"

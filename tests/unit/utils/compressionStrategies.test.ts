@@ -14,6 +14,7 @@ import {
 import type { ProjectSnapshot } from '@/types/project'
 import { createDefaultProject, FORM_SUMMARY_JSX_CODE, HOOKS_DEMO_HOOKS_CODE, HOOKS_DEMO_JSX_CODE } from '@/utils/projectDefaults'
 import { createShareSnapshot, SNAPSHOT_FILE_IDS } from '@/services/storage'
+import { createSinglePageProjectSource } from '@/services/projectSource'
 
 const BASE_URL = 'https://aksel.nav.no/arcade'
 const FIXTURE_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../fixtures/share')
@@ -29,11 +30,9 @@ const summarySnapshot = loadSnapshot('summary-page.json')
 const createSnapshotFromTemplate = (variant: 'hooks' | 'summary'): ProjectSnapshot => {
   const project = createDefaultProject()
   if (variant === 'hooks') {
-    project.jsxCode = HOOKS_DEMO_JSX_CODE
-    project.hooksCode = HOOKS_DEMO_HOOKS_CODE
+    project.source = createSinglePageProjectSource(HOOKS_DEMO_JSX_CODE, HOOKS_DEMO_HOOKS_CODE)
   } else {
-    project.jsxCode = FORM_SUMMARY_JSX_CODE
-    project.hooksCode = ''
+    project.source = createSinglePageProjectSource(FORM_SUMMARY_JSX_CODE, '')
   }
 
   return createShareSnapshot(project, {

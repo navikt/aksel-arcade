@@ -1766,3 +1766,28 @@ Verification:
 - npm run typecheck
 - npm run lint (passes with existing hook dependency warnings in `InspectionPopover` and `PreviewPane`)
 - CI=1 npm run test
+
+### 2026-06-09 - Issue #183: Multi-page canonical project source and workspace preference
+
+Implemented:
+
+- Selected #183 as the highest-priority `ready-for-agent` feature from #183-#191 because it is the foundational multi-page slice that later ready issues depend on.
+- Read issue #181, issue #183, `docs/prd/0030-multi-page-support.md`, and the existing `progress.txt` notes before changing code.
+- Replaced the flat project model with a canonical `project.source` shape containing `globalConfig`, ordered `pages`, `startPageId`, `nextPageNumber`, and top-level `activePageId`, while keeping the flag-off UX behaviorally single-page.
+- Added `src/services/projectSource.ts` to own canonical source creation, active/start page access, page lifecycle operations, selection normalization, and frozen monotonic page ids.
+- Bumped storage schema to `2.0.0` and added lossless migration from legacy single-page projects to `page01` / `Page 1` with empty global config.
+- Added the experimental working-copy-only `multiPageEnabled` preference, defaulted older saved preferences safely, and ensured autosave persists it without leaking it into shared/exported artifacts.
+- Kept current share/export/import behavior on the start-page source so portable artifacts remain single-page compatible while the stored working copy now uses the canonical source model.
+- Updated the editor, preview, and Desktop Agent bridge compatibility paths to read/write the active page source while preserving the current JSX/Hooks authoring surface.
+- Fixed a preview re-render loop by memoizing `updatePreviewState`, and used `about:blank` as the iframe source in test mode to keep preview tests deterministic.
+- Added canonical-model coverage in `tests/unit/services/projectSource.test.ts` and updated affected storage/share/integration tests for the new model and current Settings/Agent UI labels.
+
+Verification:
+
+- npm run typecheck
+- CI=1 npm run test -- --run
+- Browser check at `http://127.0.0.1:43183/aksel-arcade/` on an isolated local Vite port for app render, preview render, Settings menu visibility of `Enable experimental multi-page authoring`, successful toggle to `Disable experimental multi-page authoring`, and no console warnings/errors
+
+Next note:
+
+- Later multi-page issues should build on `src/services/projectSource.ts` and the canonical `project.source` model rather than reintroducing flat `jsxCode` / `hooksCode` storage. Keep `multiPageEnabled` local to working-copy preferences and keep portable share/export artifacts free of workspace-only flags.
