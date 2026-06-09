@@ -1,4 +1,4 @@
-import type { ProjectSource } from '@/types/project'
+import type { ArcadePageId, ProjectSource } from '@/types/project'
 import type { TranspileResult, CompileError } from '@/types/preview'
 
 // Lazy load Babel to avoid blocking initial page load
@@ -335,6 +335,7 @@ interface CombinedSourceMapping {
   generatedEndLine: number
   sourceLineOffset: number
   sourceLineCount: number
+  pageId: ArcadePageId | null
 }
 
 interface BuildCombinedSourceResult {
@@ -425,6 +426,7 @@ const createGlobalConfigJsxError = (): CompileError => ({
   line: 0,
   column: 0,
   stack: null,
+  pageId: null,
 })
 
 const createEmptyPagesError = (): CompileError => ({
@@ -432,6 +434,7 @@ const createEmptyPagesError = (): CompileError => ({
   line: null,
   column: null,
   stack: null,
+  pageId: null,
 })
 
 const splitLines = (sourceCode: string): string[] => sourceCode.split('\n')
@@ -446,7 +449,8 @@ const appendMappedLines = (
   label: string,
   sourceCode: string,
   sourceLineOffset = 0,
-  sourceLineCount = splitLines(sourceCode).length
+  sourceLineCount = splitLines(sourceCode).length,
+  pageId: ArcadePageId | null = null
 ): void => {
   if (!sourceCode) {
     return
@@ -460,6 +464,7 @@ const appendMappedLines = (
     generatedEndLine: lines.length,
     sourceLineOffset,
     sourceLineCount,
+    pageId,
   })
 }
 
@@ -589,6 +594,8 @@ const __AkselArcadePersistPageId = (pageId) => {
   };
 };
 const __AkselArcadeInitialPageId = __AkselArcadeReadPersistedPageId() ?? __AkselArcadeStartPageId;
+const __AkselArcadePreviewRuntimeBridgeKey = '__AKSEL_ARCADE_PREVIEW_RUNTIME';
+const __AkselArcadePreviewPageChangedEvent = '__AKSEL_ARCADE_PREVIEW_PAGE_CHANGED';
 const __AkselArcadeRuntime = {
   currentPageId: __AkselArcadeInitialPageId,
   goToPage: (pageId) => {
@@ -601,8 +608,31 @@ const __AkselArcadeRuntime = {
     return nextPageId === __AkselArcadeRuntime.currentPageId;
   },
 };
+const __AkselArcadeSyncPreviewRuntimeBridge = () => {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  window[__AkselArcadePreviewRuntimeBridgeKey] = {
+    currentPageId: __AkselArcadeRuntime.currentPageId,
+    goToPage: (pageId) => __AkselArcadeRuntime.goToPage(pageId),
+    hasPageId: (pageId) => __AkselArcadeResolvePageId(pageId) !== null,
+  };
+};
+const __AkselArcadeDispatchPageChanged = (pageId) => {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  window.dispatchEvent(
+    new CustomEvent(__AkselArcadePreviewPageChangedEvent, {
+      detail: { pageId },
+    })
+  );
+};
 const goToPage = (pageId) => __AkselArcadeRuntime.goToPage(pageId);
-let currentPageId = __AkselArcadeRuntime.currentPageId;`
+let currentPageId = __AkselArcadeRuntime.currentPageId;
+__AkselArcadeSyncPreviewRuntimeBridge();`
   )
   appendLines(lines, '')
 
@@ -618,7 +648,15 @@ let currentPageId = __AkselArcadeRuntime.currentPageId;`
     }) => {
       appendLines(lines, `const ${pageModuleName} = (() => {`)
       appendLines(lines, strippedHooks.runtimePrelude)
-      appendMappedLines(lines, sourceMappings, strippedHooks.label, processedPageHooks)
+      appendMappedLines(
+        lines,
+        sourceMappings,
+        strippedHooks.label,
+        processedPageHooks,
+        0,
+        splitLines(strippedHooks.code).length,
+        pageId
+      )
       appendLines(lines, '')
       appendLines(lines, pageJsxRuntimePrelude)
       appendMappedLines(
@@ -627,7 +665,8 @@ let currentPageId = __AkselArcadeRuntime.currentPageId;`
         strippedJsx.label,
         processedPageJsx.code,
         processedPageJsx.wrapperPrefixLines,
-        splitLines(strippedJsx.code).length
+        splitLines(strippedJsx.code).length,
+        pageId
       )
       appendLines(lines, '')
       appendLines(lines, `  return ${getPageComponentName(pageId)}`)
@@ -654,12 +693,18 @@ function App() {
       return false;
     }
 
+    if (nextPageId === __AkselArcadeRuntime.currentPageId) {
+      return true;
+    }
+
     setActivePageId(nextPageId);
     return true;
   };
+  __AkselArcadeSyncPreviewRuntimeBridge();
 
   React.useEffect(() => {
     __AkselArcadePersistPageId(activePageId);
+    __AkselArcadeDispatchPageChanged(activePageId);
   }, [activePageId]);
 
   React.useEffect(() => {
@@ -866,6 +911,7 @@ const parseBabelError = (
       line: mappedLine ? mappedLine - 1 : null, // Convert to 0-indexed
       column: match ? parseInt(match[2], 10) : null,
       stack: error.stack || null,
+      pageId: sourceMapping?.pageId ?? null,
     }
   }
 

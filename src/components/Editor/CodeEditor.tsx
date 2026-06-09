@@ -52,6 +52,7 @@ interface CodeEditorProps {
   value: string
   onChange: (value: string) => void
   onCursorChange?: (cursor: { line: number; column: number }) => void
+  onFocusChange?: (focused: boolean) => void
   onFormat?: () => void | Promise<void>
   language?: 'jsx' | 'typescript'
   readOnly?: boolean
@@ -175,6 +176,7 @@ export const CodeEditor = forwardRef<CodeEditorRef, CodeEditorProps>(({
   value,
   onChange,
   onCursorChange,
+  onFocusChange,
   onFormat,
   language = 'jsx',
   readOnly = false,
@@ -261,6 +263,8 @@ export const CodeEditor = forwardRef<CodeEditorRef, CodeEditorProps>(({
           }
         }}
         readOnly={readOnly}
+        onFocus={() => onFocusChange?.(true)}
+        onBlur={() => onFocusChange?.(false)}
         theme={akselEditorTheme}
         basicSetup={{
           lineNumbers: true,

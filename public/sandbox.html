@@ -315,7 +315,8 @@
           sendError('RUNTIME_ERROR', {
             message: `Sandbox initialization failed: ${err.message}`,
             componentStack: null,
-            stack: err.stack || ''
+            stack: err.stack || '',
+            pageId: getCurrentPreviewPageId()
           });
         } catch (postErr) {
           console.error('❌ Could not even send error to parent:', postErr);
@@ -334,6 +335,86 @@
     let currentRenderId = 0;
     let failedRenderId = null;
     let currentExecutionId = 0;
+    const PREVIEW_RUNTIME_BRIDGE_KEY = '__AKSEL_ARCADE_PREVIEW_RUNTIME';
+    const PREVIEW_PAGE_CHANGED_EVENT = '__AKSEL_ARCADE_PREVIEW_PAGE_CHANGED';
+    let pendingNavigationPageId = null;
+
+    function getPreviewRuntime() {
+      const runtime = window[PREVIEW_RUNTIME_BRIDGE_KEY];
+      if (
+        !runtime ||
+        typeof runtime.goToPage !== 'function' ||
+        typeof runtime.hasPageId !== 'function'
+      ) {
+        return null;
+      }
+
+      return runtime;
+    }
+
+    function getCurrentPreviewPageId() {
+      const runtime = getPreviewRuntime();
+      return typeof runtime?.currentPageId === 'string' ? runtime.currentPageId : null;
+    }
+
+    function navigatePreviewToPage(pageId) {
+      if (typeof pageId !== 'string' || pageId.length === 0) {
+        return false;
+      }
+
+      if (getCurrentPreviewPageId() === pageId) {
+        pendingNavigationPageId = null;
+        return true;
+      }
+
+      pendingNavigationPageId = pageId;
+      const runtime = getPreviewRuntime();
+      if (!runtime) {
+        return false;
+      }
+
+      if (!runtime.hasPageId(pageId)) {
+        return false;
+      }
+
+      return runtime.goToPage(pageId);
+    }
+
+    function flushPendingNavigation() {
+      if (!pendingNavigationPageId) {
+        return false;
+      }
+
+      const runtime = getPreviewRuntime();
+      if (!runtime) {
+        return false;
+      }
+
+      if (getCurrentPreviewPageId() === pendingNavigationPageId) {
+        pendingNavigationPageId = null;
+        return true;
+      }
+
+      if (!runtime.hasPageId(pendingNavigationPageId)) {
+        return false;
+      }
+
+      return runtime.goToPage(pendingNavigationPageId);
+    }
+
+    window.addEventListener(PREVIEW_PAGE_CHANGED_EVENT, (event) => {
+      const pageId = event.detail?.pageId;
+      if (typeof pageId !== 'string' || pageId.length === 0) {
+        return;
+      }
+
+      if (pendingNavigationPageId && pendingNavigationPageId !== pageId) {
+        return;
+      }
+
+      pendingNavigationPageId = null;
+      sendMessage('PREVIEW_PAGE_CHANGED', { pageId });
+    });
 
     function announceSandboxReady() {
       const sendReadyMessage = () => postMessageToParent(window.parent, {
@@ -391,6 +472,9 @@
             console.log('🚀 Executing code...');
             executeCode(message.payload);
             break;
+          case 'NAVIGATE_TO_PAGE':
+            navigatePreviewToPage(message.payload?.pageId);
+            break;
           case 'UPDATE_VIEWPORT':
             console.log('📐 Updating viewport...');
             updateViewport(message.payload);
@@ -418,7 +502,8 @@
         sendError('RUNTIME_ERROR', {
           message: error.message,
           componentStack: null,
-          stack: error.stack || ''
+          stack: error.stack || '',
+          pageId: getCurrentPreviewPageId()
         });
       }
     }
@@ -498,7 +583,8 @@
         sendError('RUNTIME_ERROR', {
           message: `Inspect toggle error: ${error.message}`,
           componentStack: null,
-          stack: error.stack || ''
+          stack: error.stack || '',
+          pageId: getCurrentPreviewPageId()
         });
       }
     }
@@ -829,7 +915,8 @@
         sendError('RUNTIME_ERROR', {
           message: `Theme update error: ${error.message}`,
           componentStack: null,
-          stack: error.stack || ''
+          stack: error.stack || '',
+          pageId: getCurrentPreviewPageId()
         });
       }
     }
@@ -967,7 +1054,8 @@
         sendError('RUNTIME_ERROR', {
           message: getErrorMessage(error),
           componentStack: extractComponentStack(error),
-          stack: getErrorStack(error)
+          stack: getErrorStack(error),
+          pageId: getCurrentPreviewPageId()
         });
       }
     }
@@ -1053,7 +1141,8 @@
         sendError('RUNTIME_ERROR', {
           message: getErrorMessage(error),
           componentStack: extractComponentStack(error),
-          stack: getErrorStack(error)
+          stack: getErrorStack(error),
+          pageId: getCurrentPreviewPageId()
         });
         throw error;
       }
@@ -1076,7 +1165,8 @@
           sendError('RUNTIME_ERROR', {
             message: getErrorMessage(error),
             componentStack: errorInfo?.componentStack || extractComponentStack(error),
-            stack: getErrorStack(error)
+            stack: getErrorStack(error),
+            pageId: getCurrentPreviewPageId()
           });
         }
 
@@ -1091,6 +1181,7 @@
         React.useEffect(() => {
           if (renderId === currentRenderId && failedRenderId !== renderId) {
             sendMessage('RENDER_SUCCESS', {});
+            flushPendingNavigation();
             console.log('✅ Render success');
           }
         }, []);

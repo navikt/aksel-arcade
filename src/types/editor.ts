@@ -26,6 +26,7 @@ export interface LintMarker {
 export interface EditorState {
   // Active context
   activeTab: EditorTab // Currently visible tab
+  isCodeEditorFocused: boolean
 
   // Cursor state (per tab)
   jsxCursor: CursorPosition // Cursor in JSX tab

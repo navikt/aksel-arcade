@@ -1,8 +1,8 @@
-import { useContext, useEffect, useState, useRef } from 'react'
-import { Alert, Box, HStack } from '@navikt/ds-react'
+import { useCallback, useContext, useEffect, useRef, useState } from 'react'
+import { Alert, BodyShort, Box, Detail, HStack, VStack } from '@navikt/ds-react'
 import { AppContext } from '@/hooks/useProject'
 import { transpileCode, transpileProjectSource } from '@/services/transpiler'
-import { getActiveSource } from '@/services/projectSource'
+import { getActiveSource, resolveSelectedEditTarget } from '@/services/projectSource'
 import { useSettings } from '@/contexts/SettingsContext'
 import { LivePreview } from './LivePreview'
 import { ViewportToggle } from './ViewportToggle'
@@ -18,17 +18,83 @@ export const PreviewPane = () => {
   const context = useContext(AppContext)
   if (!context) throw new Error('PreviewPane must be used within AppProvider')
 
-  const { project, previewIframeRef, updatePreviewState, recordSandboxConsoleMessage } = context
-  const { multiPageEnabled, theme } = useSettings() // Use centralized theme from Settings
+  const {
+    project,
+    editorState,
+    previewState,
+    previewIframeRef,
+    updatePreviewState,
+    recordSandboxConsoleMessage,
+    updateProject,
+  } = context
+  const { multiPageEnabled, theme, selectedEditTarget } = useSettings() // Use centralized theme from Settings
+  const effectiveEditTarget = resolveSelectedEditTarget(multiPageEnabled, selectedEditTarget)
   const activeSource = getActiveSource(project)
   const singlePagePreviewJsx = multiPageEnabled ? null : activeSource.jsx
   const singlePagePreviewHooks = multiPageEnabled ? null : activeSource.hooks
   const multiPagePreviewSource = multiPageEnabled ? project.source : null
+  const showGlobalConfigPlaceholder =
+    multiPageEnabled && effectiveEditTarget === 'global-config'
   const [transpiledCode, setTranspiledCode] = useState<string | null>(null)
   const [compileError, setCompileError] = useState<CompileError | null>(null)
   const [runtimeError, setRuntimeError] = useState<RuntimeError | null>(null)
   const [isInspectMode, setIsInspectMode] = useState(false)
   const debounceTimerRef = useRef<number | undefined>(undefined)
+  const pendingCompileErrorRef = useRef<CompileError | null>(null)
+  const isCodeEditorFocusedRef = useRef(editorState.isCodeEditorFocused)
+
+  const revealCompileError = useCallback(
+    (error: CompileError) => {
+      console.error('❌ Compile error:', error)
+      setCompileError(error)
+      updatePreviewState({
+        status: 'error',
+        compileError: error,
+        runtimeError: null,
+      })
+    },
+    [updatePreviewState]
+  )
+
+  const queueCompileError = useCallback(
+    (error: CompileError) => {
+      pendingCompileErrorRef.current = error
+      if (isCodeEditorFocusedRef.current) {
+        return
+      }
+
+      pendingCompileErrorRef.current = null
+      revealCompileError(error)
+    },
+    [revealCompileError]
+  )
+
+  useEffect(() => {
+    isCodeEditorFocusedRef.current = editorState.isCodeEditorFocused
+  }, [editorState.isCodeEditorFocused])
+
+  const isErrorRelevantToCurrentView = (
+    error: Pick<CompileError, 'pageId'> | Pick<RuntimeError, 'pageId'> | null
+  ) => {
+    if (!error) {
+      return false
+    }
+
+    if (error.pageId == null) {
+      return true
+    }
+
+    return effectiveEditTarget === 'page' && error.pageId === project.activePageId
+  }
+
+  const visibleCompileError =
+    previewState.status === 'transpiling' || !isErrorRelevantToCurrentView(compileError)
+      ? null
+      : compileError
+  const visibleRuntimeError =
+    previewState.status === 'transpiling' || !isErrorRelevantToCurrentView(runtimeError)
+      ? null
+      : runtimeError
 
   // Transpile code when JSX or hooks code changes (debounced to avoid errors while typing)
   useEffect(() => {
@@ -39,6 +105,8 @@ export const PreviewPane = () => {
       clearTimeout(debounceTimerRef.current)
     }
 
+    pendingCompileErrorRef.current = null
+    setCompileError(null)
     setRuntimeError(null)
     updatePreviewState({
       status: 'transpiling',
@@ -57,6 +125,7 @@ export const PreviewPane = () => {
           if (isCancelled) return
 
           if (result.success && result.code) {
+            pendingCompileErrorRef.current = null
             setTranspiledCode(result.code)
             setCompileError(null)
             setRuntimeError(null)
@@ -67,15 +136,7 @@ export const PreviewPane = () => {
               runtimeError: null,
             })
           } else if (result.error) {
-            console.error('❌ Compile error:', result.error)
-            setCompileError(result.error)
-            setTranspiledCode(null)
-            updatePreviewState({
-              status: 'error',
-              transpiledCode: null,
-              compileError: result.error,
-              runtimeError: null,
-            })
+            queueCompileError(result.error)
           }
         })
         .catch((err) => {
@@ -86,15 +147,9 @@ export const PreviewPane = () => {
             line: null,
             column: null,
             stack: null,
+            pageId: null,
           }
-          setCompileError(error)
-          setTranspiledCode(null)
-          updatePreviewState({
-            status: 'error',
-            transpiledCode: null,
-            compileError: error,
-            runtimeError: null,
-          })
+          queueCompileError(error)
         })
     }, 500)
 
@@ -108,12 +163,29 @@ export const PreviewPane = () => {
     project.id,
     multiPagePreviewSource,
     multiPageEnabled,
+    queueCompileError,
     singlePagePreviewHooks,
     singlePagePreviewJsx,
     updatePreviewState,
   ])
 
+  useEffect(() => {
+    if (editorState.isCodeEditorFocused) {
+      return
+    }
+
+    const pendingCompileError = pendingCompileErrorRef.current
+    if (!pendingCompileError) {
+      return
+    }
+
+    pendingCompileErrorRef.current = null
+    revealCompileError(pendingCompileError)
+  }, [editorState.isCodeEditorFocused, revealCompileError])
+
   const handleRenderSuccess = () => {
+    pendingCompileErrorRef.current = null
+    setCompileError(null)
     setRuntimeError(null)
     updatePreviewState({
       status: 'idle',
@@ -124,25 +196,29 @@ export const PreviewPane = () => {
   }
 
   const handleCompileError = (error: CompileError) => {
-    setCompileError(error)
-    updatePreviewState({
-      status: 'error',
-      compileError: error,
-      runtimeError: null,
-    })
+    queueCompileError(error)
   }
 
   const handleRuntimeError = (error: RuntimeError) => {
     setRuntimeError(error)
     updatePreviewState({
       status: 'error',
-      compileError: null,
       runtimeError: error,
     })
   }
 
   const handleConsoleMessage = (payload: SandboxConsolePayload) => {
     recordSandboxConsoleMessage(createSandboxConsoleMessage(payload))
+  }
+
+  const handlePreviewPageChange = (pageId: (typeof project.source.pages)[number]['id']) => {
+    if (effectiveEditTarget === 'global-config') {
+      return
+    }
+
+    if (pageId !== project.activePageId) {
+      updateProject({ activePageId: pageId })
+    }
   }
 
   const handleInspectToggle = (enabled: boolean) => {
@@ -171,7 +247,7 @@ export const PreviewPane = () => {
         background="default"
         className={`preview-pane__surface ${theme}`}
       >
-        {(compileError || runtimeError) && (
+        {(visibleCompileError || visibleRuntimeError) && (
           <div className="preview-pane__error error-overlay">
             <Alert
               variant="error"
@@ -182,18 +258,20 @@ export const PreviewPane = () => {
               }}
             >
               <strong>
-                {compileError ? 'Compile Error' : 'Runtime Error'}
-                {compileError &&
-                  compileError.line !== null &&
-                  ` (line ${(compileError.line || 0) + 1})`}
+                {visibleCompileError ? 'Compile Error' : 'Runtime Error'}
+                {visibleCompileError &&
+                  visibleCompileError.line !== null &&
+                  ` (line ${(visibleCompileError.line || 0) + 1})`}
               </strong>
               <pre className="preview-pane__error-message">
-                {(compileError || runtimeError)?.message}
+                {(visibleCompileError || visibleRuntimeError)?.message}
               </pre>
-              {runtimeError?.componentStack && (
+              {visibleRuntimeError?.componentStack && (
                 <details className="preview-pane__error-details">
                   <summary className="preview-pane__error-summary">Component Stack</summary>
-                  <pre className="preview-pane__component-stack">{runtimeError.componentStack}</pre>
+                  <pre className="preview-pane__component-stack">
+                    {visibleRuntimeError.componentStack}
+                  </pre>
                 </details>
               )}
             </Alert>
@@ -207,10 +285,30 @@ export const PreviewPane = () => {
           onCompileError={handleCompileError}
           onRuntimeError={handleRuntimeError}
           onConsoleMessage={handleConsoleMessage}
+          onPreviewPageChange={handlePreviewPageChange}
+          previewPageId={multiPageEnabled ? project.activePageId : null}
           viewportWidth={project.viewportSize}
           isInspectMode={isInspectMode}
           theme={theme}
         />
+
+        {showGlobalConfigPlaceholder && (
+          <Box
+            className="preview-pane__placeholder preview-pane__placeholder--overlay"
+            borderWidth="1"
+            borderColor="neutral-subtleA"
+            background="default"
+            padding="space-24"
+          >
+            <VStack gap="space-8">
+              <BodyShort weight="semibold">Global config has no preview</BodyShort>
+              <Detail size="small">
+                Shared JSX and Hooks stay in scope for every page. Select a page in the panel to
+                preview the running prototype.
+              </Detail>
+            </VStack>
+          </Box>
+        )}
       </Box>
     </Box>
   )

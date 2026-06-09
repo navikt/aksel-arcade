@@ -24,6 +24,15 @@ describe('Security Utilities', () => {
       expect(validateMainToSandboxMessage(message)).toBe(true)
     })
 
+    it('should accept valid NAVIGATE_TO_PAGE message', () => {
+      const message = {
+        type: 'NAVIGATE_TO_PAGE',
+        payload: { pageId: 'page02' },
+      }
+
+      expect(validateMainToSandboxMessage(message)).toBe(true)
+    })
+
     it('should accept valid UPDATE_VIEWPORT message', () => {
       const message = {
         type: 'UPDATE_VIEWPORT',
@@ -109,6 +118,15 @@ describe('Security Utilities', () => {
           componentStack: null,
           stack: 'Error: ...',
         },
+      }
+
+      expect(validateSandboxToMainMessage(message)).toBe(true)
+    })
+
+    it('should accept valid PREVIEW_PAGE_CHANGED message', () => {
+      const message = {
+        type: 'PREVIEW_PAGE_CHANGED',
+        payload: { pageId: 'page02' },
       }
 
       expect(validateSandboxToMainMessage(message)).toBe(true)
