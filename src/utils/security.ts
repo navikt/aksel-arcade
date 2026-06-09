@@ -20,6 +20,7 @@ export const validateMainToSandboxMessage = (data: unknown): data is MainToSandb
   const validTypes = [
     'CONNECT_SANDBOX',
     'EXECUTE_CODE',
+    'NAVIGATE_TO_PAGE',
     'UPDATE_VIEWPORT',
     'TOGGLE_INSPECT',
     'GET_INSPECTION_DATA',
@@ -41,6 +42,7 @@ export const validateSandboxToMainMessage = (data: unknown): data is SandboxToMa
     'RENDER_SUCCESS',
     'COMPILE_ERROR',
     'RUNTIME_ERROR',
+    'PREVIEW_PAGE_CHANGED',
     'INSPECTION_DATA',
     'THEME_UPDATED',
     'CONSOLE_LOG',

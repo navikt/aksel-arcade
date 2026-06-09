@@ -1,4 +1,4 @@
-import type { ViewportSize } from './project'
+import type { ArcadePageId, ViewportSize } from './project'
 import type { InspectionData } from './inspection'
 
 export type PreviewStatus = 'idle' | 'transpiling' | 'rendering' | 'error'
@@ -8,12 +8,14 @@ export interface CompileError {
   line: number | null
   column: number | null
   stack: string | null
+  pageId?: ArcadePageId | null
 }
 
 export interface RuntimeError {
   message: string
   componentStack: string | null
   stack: string
+  pageId?: ArcadePageId | null
 }
 
 export type SandboxConsoleLevel = 'log' | 'warn' | 'error'

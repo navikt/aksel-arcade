@@ -1,3 +1,4 @@
+import type { ArcadePageId } from './project'
 import type { CompileError, RuntimeError } from './preview'
 import type { InspectionData } from './inspection'
 import type { PreviewEvidenceCaptureResult } from '@/services/previewEvidence'
@@ -6,6 +7,7 @@ import type { PreviewEvidenceCaptureResult } from '@/services/previewEvidence'
 export type MainToSandboxMessage =
   | { type: 'CONNECT_SANDBOX' }
   | { type: 'EXECUTE_CODE'; payload: { jsxCode: string; hooksCode: string } }
+  | { type: 'NAVIGATE_TO_PAGE'; payload: { pageId: ArcadePageId } }
   | { type: 'UPDATE_VIEWPORT'; payload: { width: number } }
   | { type: 'TOGGLE_INSPECT'; payload: { enabled: boolean } }
   | { type: 'GET_INSPECTION_DATA'; payload: { x: number; y: number } }
@@ -18,6 +20,7 @@ export type SandboxToMainMessage =
   | { type: 'RENDER_SUCCESS' }
   | { type: 'COMPILE_ERROR'; payload: CompileError }
   | { type: 'RUNTIME_ERROR'; payload: RuntimeError }
+  | { type: 'PREVIEW_PAGE_CHANGED'; payload: { pageId: ArcadePageId } }
   | { type: 'INSPECTION_DATA'; payload: InspectionData | null }
   | { type: 'THEME_UPDATED'; payload: { theme: 'light' | 'dark' } }
   | { type: 'CONSOLE_LOG'; payload: { level: 'log' | 'warn' | 'error'; args: unknown[] } }

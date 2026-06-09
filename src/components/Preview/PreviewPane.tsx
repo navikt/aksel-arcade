@@ -1,8 +1,8 @@
 import { useContext, useEffect, useState, useRef } from 'react'
-import { Alert, Box, HStack } from '@navikt/ds-react'
+import { Alert, BodyShort, Box, Detail, HStack, VStack } from '@navikt/ds-react'
 import { AppContext } from '@/hooks/useProject'
 import { transpileCode, transpileProjectSource } from '@/services/transpiler'
-import { getActiveSource } from '@/services/projectSource'
+import { getActiveSource, resolveSelectedEditTarget } from '@/services/projectSource'
 import { useSettings } from '@/contexts/SettingsContext'
 import { LivePreview } from './LivePreview'
 import { ViewportToggle } from './ViewportToggle'
@@ -18,12 +18,16 @@ export const PreviewPane = () => {
   const context = useContext(AppContext)
   if (!context) throw new Error('PreviewPane must be used within AppProvider')
 
-  const { project, previewIframeRef, updatePreviewState, recordSandboxConsoleMessage } = context
-  const { multiPageEnabled, theme } = useSettings() // Use centralized theme from Settings
+  const { project, previewIframeRef, updatePreviewState, recordSandboxConsoleMessage, updateProject } =
+    context
+  const { multiPageEnabled, theme, selectedEditTarget } = useSettings() // Use centralized theme from Settings
+  const effectiveEditTarget = resolveSelectedEditTarget(multiPageEnabled, selectedEditTarget)
   const activeSource = getActiveSource(project)
   const singlePagePreviewJsx = multiPageEnabled ? null : activeSource.jsx
   const singlePagePreviewHooks = multiPageEnabled ? null : activeSource.hooks
   const multiPagePreviewSource = multiPageEnabled ? project.source : null
+  const showGlobalConfigPlaceholder =
+    multiPageEnabled && effectiveEditTarget === 'global-config'
   const [transpiledCode, setTranspiledCode] = useState<string | null>(null)
   const [compileError, setCompileError] = useState<CompileError | null>(null)
   const [runtimeError, setRuntimeError] = useState<RuntimeError | null>(null)
@@ -86,6 +90,7 @@ export const PreviewPane = () => {
             line: null,
             column: null,
             stack: null,
+            pageId: null,
           }
           setCompileError(error)
           setTranspiledCode(null)
@@ -112,6 +117,16 @@ export const PreviewPane = () => {
     singlePagePreviewJsx,
     updatePreviewState,
   ])
+
+  useEffect(() => {
+    if (!showGlobalConfigPlaceholder || !transpiledCode || compileError) {
+      return
+    }
+
+    updatePreviewState({
+      status: runtimeError ? 'error' : 'idle',
+    })
+  }, [compileError, runtimeError, showGlobalConfigPlaceholder, transpiledCode, updatePreviewState])
 
   const handleRenderSuccess = () => {
     setRuntimeError(null)
@@ -143,6 +158,20 @@ export const PreviewPane = () => {
 
   const handleConsoleMessage = (payload: SandboxConsolePayload) => {
     recordSandboxConsoleMessage(createSandboxConsoleMessage(payload))
+  }
+
+  const handlePreviewPageChange = (pageId: (typeof project.source.pages)[number]['id']) => {
+    if (runtimeError?.pageId && runtimeError.pageId !== pageId) {
+      setRuntimeError(null)
+      updatePreviewState({
+        status: compileError ? 'error' : 'idle',
+        runtimeError: null,
+      })
+    }
+
+    if (pageId !== project.activePageId) {
+      updateProject({ activePageId: pageId })
+    }
   }
 
   const handleInspectToggle = (enabled: boolean) => {
@@ -200,17 +229,37 @@ export const PreviewPane = () => {
           </div>
         )}
 
-        <LivePreview
-          iframeRef={previewIframeRef}
-          transpiledCode={transpiledCode}
-          onRenderSuccess={handleRenderSuccess}
-          onCompileError={handleCompileError}
-          onRuntimeError={handleRuntimeError}
-          onConsoleMessage={handleConsoleMessage}
-          viewportWidth={project.viewportSize}
-          isInspectMode={isInspectMode}
-          theme={theme}
-        />
+        {showGlobalConfigPlaceholder ? (
+          <Box
+            className="preview-pane__placeholder"
+            borderWidth="1"
+            borderColor="neutral-subtleA"
+            background="default"
+            padding="space-24"
+          >
+            <VStack gap="space-8">
+              <BodyShort weight="semibold">Global config has no preview</BodyShort>
+              <Detail size="small">
+                Shared JSX and Hooks stay in scope for every page. Select a page in the panel to
+                preview the running prototype.
+              </Detail>
+            </VStack>
+          </Box>
+        ) : (
+          <LivePreview
+            iframeRef={previewIframeRef}
+            transpiledCode={transpiledCode}
+            onRenderSuccess={handleRenderSuccess}
+            onCompileError={handleCompileError}
+            onRuntimeError={handleRuntimeError}
+            onConsoleMessage={handleConsoleMessage}
+            onPreviewPageChange={handlePreviewPageChange}
+            previewPageId={multiPageEnabled ? project.activePageId : null}
+            viewportWidth={project.viewportSize}
+            isInspectMode={isInspectMode}
+            theme={theme}
+          />
+        )}
       </Box>
     </Box>
   )

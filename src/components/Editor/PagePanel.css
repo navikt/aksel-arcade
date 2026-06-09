@@ -73,8 +73,17 @@
   min-width: 0;
 }
 
+.page-panel__status-group {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
 .page-panel__status {
   color: var(--ax-text-brand-blue);
+}
+
+.page-panel__status--error {
+  color: var(--ax-text-danger);
 }
 
 .page-panel__actions-trigger {

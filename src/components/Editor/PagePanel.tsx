@@ -17,6 +17,7 @@ interface PagePanelProps {
   activePageId: ArcadePageId
   startPageId: ArcadePageId
   pages: ArcadePage[]
+  errorPageId: ArcadePageId | null
   selectedEditTarget: SelectedEditTarget
   onAddPage: () => void
   onSelectGlobalConfig: () => void
@@ -30,6 +31,7 @@ export const PagePanel = ({
   activePageId,
   startPageId,
   pages,
+  errorPageId,
   selectedEditTarget,
   onAddPage,
   onSelectGlobalConfig,
@@ -179,7 +181,8 @@ export const PagePanel = ({
                 const isActivePage = page.id === activePageId
                 const isEditing = selectedEditTarget === 'page' && isActivePage
                 const isStartPage = page.id === startPageId
-                const statusLabels = [
+                const hasError = page.id === errorPageId
+                const lifecycleLabels = [
                   ...(isActivePage ? ['Active page'] : []),
                   ...(isStartPage ? ['Start page'] : []),
                 ]
@@ -246,10 +249,27 @@ export const PagePanel = ({
                         >
                           <div className="page-panel__row-header">
                             <BodyShort weight="semibold">{page.name}</BodyShort>
-                            {statusLabels.length > 0 && (
-                              <Detail size="small" className="page-panel__status">
-                                {statusLabels.join(' · ')}
-                              </Detail>
+                            {(hasError || lifecycleLabels.length > 0) && (
+                              <HStack
+                                gap="space-4"
+                                align="center"
+                                className="page-panel__status-group"
+                              >
+                                {hasError && (
+                                  <Detail
+                                    size="small"
+                                    className="page-panel__status page-panel__status--error"
+                                    aria-label="Page error"
+                                  >
+                                    Error
+                                  </Detail>
+                                )}
+                                {lifecycleLabels.length > 0 && (
+                                  <Detail size="small" className="page-panel__status">
+                                    {lifecycleLabels.join(' · ')}
+                                  </Detail>
+                                )}
+                              </HStack>
                             )}
                           </div>
                           <Detail size="small">{page.id}</Detail>

@@ -1,8 +1,9 @@
-import { useRef, useEffect, useState } from 'react'
+import { useCallback, useRef, useEffect, useState } from 'react'
 import type { MainToSandboxMessage, SandboxToMainMessage } from '@/types/messages'
-import type { ViewportSize } from '@/types/project'
+import type { ArcadePageId, ViewportSize } from '@/types/project'
 import type { InspectionData } from '@/types/inspection'
 import type { SandboxConsolePayload } from '@/services/previewDiagnostics'
+import type { CompileError, RuntimeError } from '@/types/preview'
 import {
   registerPreviewEvidenceRequestHandler,
   type PreviewEvidenceCaptureResult,
@@ -25,9 +26,11 @@ interface LivePreviewProps {
   iframeRef: React.RefObject<HTMLIFrameElement | null>
   transpiledCode: string | null
   onRenderSuccess: () => void
-  onCompileError: (error: { message: string; line: number | null; column: number | null; stack: string | null }) => void
-  onRuntimeError: (error: { message: string; componentStack: string | null; stack: string }) => void
+  onCompileError: (error: CompileError) => void
+  onRuntimeError: (error: RuntimeError) => void
   onConsoleMessage: (message: SandboxConsolePayload) => void
+  onPreviewPageChange: (pageId: ArcadePageId) => void
+  previewPageId: ArcadePageId | null
   viewportWidth: ViewportSize
   isInspectMode: boolean
   theme: 'light' | 'dark'
@@ -45,6 +48,8 @@ export const LivePreview = ({
   onCompileError,
   onRuntimeError,
   onConsoleMessage,
+  onPreviewPageChange,
+  previewPageId,
   viewportWidth,
   isInspectMode,
   theme,
@@ -58,12 +63,15 @@ export const LivePreview = ({
   const previewEvidenceUnregisterRef = useRef<(() => void) | null>(null)
   const sandboxConnectedRef = useRef(false)
   const sandboxRetiredRef = useRef(false)
+  const lastReportedPageIdRef = useRef<ArcadePageId | null>(null)
   const handlersRef = useRef({
     onRenderSuccess,
     onCompileError,
     onRuntimeError,
     onConsoleMessage,
+    onPreviewPageChange,
   })
+  const previewPageIdRef = useRef(previewPageId)
   
   // T082: Inspection state
   const [inspectionData, setInspectionData] = useState<InspectionData | null>(null)
@@ -73,13 +81,31 @@ export const LivePreview = ({
   }, [transpiledCode])
 
   useEffect(() => {
+    previewPageIdRef.current = previewPageId
+  }, [previewPageId])
+
+  useEffect(() => {
     handlersRef.current = {
       onRenderSuccess,
       onCompileError,
       onRuntimeError,
       onConsoleMessage,
+      onPreviewPageChange,
     }
-  }, [onRenderSuccess, onCompileError, onRuntimeError, onConsoleMessage])
+  }, [onRenderSuccess, onCompileError, onRuntimeError, onConsoleMessage, onPreviewPageChange])
+
+  const postNavigateToPage = useCallback((pageId: ArcadePageId) => {
+    if (!iframeRef.current?.contentWindow) {
+      return
+    }
+
+    const message: MainToSandboxMessage = {
+      type: 'NAVIGATE_TO_PAGE',
+      payload: { pageId },
+    }
+
+    postMessageToSandbox(iframeRef.current.contentWindow, message)
+  }, [iframeRef])
 
   // Listen for messages from sandbox
   useEffect(() => {
@@ -188,12 +214,22 @@ export const LivePreview = ({
           break
         case 'RENDER_SUCCESS':
           handlersRef.current.onRenderSuccess()
+          if (
+            previewPageIdRef.current &&
+            previewPageIdRef.current !== lastReportedPageIdRef.current
+          ) {
+            postNavigateToPage(previewPageIdRef.current)
+          }
           break
         case 'COMPILE_ERROR':
           handlersRef.current.onCompileError(message.payload)
           break
         case 'RUNTIME_ERROR':
           handlersRef.current.onRuntimeError(message.payload)
+          break
+        case 'PREVIEW_PAGE_CHANGED':
+          lastReportedPageIdRef.current = message.payload.pageId
+          handlersRef.current.onPreviewPageChange(message.payload.pageId)
           break
         case 'INSPECTION_DATA':
           // T082: Update popover position and content
@@ -291,7 +327,7 @@ export const LivePreview = ({
       window.removeEventListener('message', handleMessage)
       disconnectSandbox(false)
     }
-  }, [iframeRef])
+  }, [iframeRef, postNavigateToPage])
 
   // T083: Clear inspection popover when inspect mode disabled
   useEffect(() => {
@@ -311,7 +347,19 @@ export const LivePreview = ({
     postMessageToSandbox(iframeRef.current.contentWindow, message)
   }, [isInspectMode, sandboxReady, iframeRef])
 
-  // Send code to sandbox when it changes
+  // Send preview navigation requests when host selection changes
+  useEffect(() => {
+    if (!previewPageId || !sandboxReady) {
+      return
+    }
+
+    if (previewPageId === lastReportedPageIdRef.current) {
+      return
+    }
+
+    postNavigateToPage(previewPageId)
+  }, [postNavigateToPage, previewPageId, sandboxReady])
+
   useEffect(() => {
     if (!transpiledCode || !iframeRef.current?.contentWindow) {
       return

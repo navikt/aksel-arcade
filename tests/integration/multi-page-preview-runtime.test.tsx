@@ -392,6 +392,7 @@ export const getSharedVisits = () => sharedVisits`,
     expect(result.error?.message).toContain('page02 JSX')
     expect(result.error?.message).toContain('(1:')
     expect(result.error?.line).toBe(0)
+    expect(result.error?.pageId).toBe('page02')
   })
 
   it('rejects bare global config JSX because it is shared scope, not a screen', async () => {

@@ -40,6 +40,30 @@ Verification:
 - npm run typecheck
 - CI=1 npm run test -- --run
 
+### 2026-06-09 - Issue #190: Multi-page active-page sync across preview, panel, and editor
+
+Implemented:
+
+- Selected #190 as the highest-priority `ready-for-agent` feature from #185-#191 because it closes the core multi-page authoring loop between the panel, editor, and preview, and it directly unblocks #191 stale-reference diagnostics.
+- Read issue #181, issue #190, `docs/prd/0030-multi-page-support.md`, and the existing `progress.txt` notes before changing code.
+- Asked for a rubber-duck critique before implementation; it pushed the plan toward structured page-level error attribution and a safer preview bridge, so the final implementation keeps `pageId` metadata on preview errors and lets the sandbox queue host-requested page changes across recompiles instead of trusting the stale runtime.
+- Extended the preview message contract with `NAVIGATE_TO_PAGE` / `PREVIEW_PAGE_CHANGED`, exposed a pages-aware runtime bridge from `transpileProjectSource`, and updated `public/sandbox.html` so host page selections are queued until the current runtime can actually resolve that page id.
+- Updated `src/components/Preview/PreviewPane.tsx` and `src/components/Preview/LivePreview.tsx` so host page selection drives preview navigation, preview-side navigation updates the host `activePageId`, and selecting `Global config` swaps the iframe for a clear no-preview placeholder without dropping compile/runtime error handling.
+- Added page-scoped error attribution (`CompileError.pageId` / `RuntimeError.pageId`) and surfaced it in `src/components/Editor/PagePanel.tsx` so the affected page row shows an error indicator while later stale-reference work can layer on top of the same status surface.
+- Added regression coverage in `tests/integration/multi-page-preview-sync.test.tsx`, extended `tests/integration/multi-page-preview-runtime.test.tsx` to assert structured compile-error page attribution, and updated `tests/unit/utils/security.test.ts` for the new preview message types.
+
+Verification:
+
+- npm run typecheck
+- npm run lint (existing `InspectionPopover` hook dependency warning only)
+- npm test -- --run
+- npm run build
+- Browser check at `http://127.0.0.1:4178/aksel-arcade/` for enabling experimental multi-page authoring, Add page making Page 2 the active editor/preview target without console warnings, Global config placeholder rendering, and no console errors/warnings during the verified flow
+
+Next note:
+
+- #191 can build directly on the structured `pageId` error attribution and the `PREVIEW_PAGE_CHANGED` / `NAVIGATE_TO_PAGE` contract. Keep host-driven page selection going through the preview bridge; the sandbox queue now absorbs source-shape changes safely, which avoids the stale-runtime navigation warnings that appeared when Add page and preview sync happened in the same edit cycle.
+
 ### 2026-06-09 - Issue #189: Multi-page page lifecycle actions in the page panel
 
 Implemented:
