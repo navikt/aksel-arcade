@@ -40,6 +40,31 @@ Verification:
 - npm run typecheck
 - CI=1 npm run test -- --run
 
+### 2026-06-09 - Issue #189: Multi-page page lifecycle actions in the page panel
+
+Implemented:
+
+- Selected #189 as the highest-priority `ready-for-agent` feature from #185-#191 because it is the next concrete multi-page authoring step after #184, lets authors actually manage pages from the new panel, and unblocks later stale-reference/delete-impact work more directly than share, autocomplete, or agent-bridge follow-ups.
+- Read issue #181, issue #189, `docs/prd/0030-multi-page-support.md`, and the existing `progress.txt` notes before changing code.
+- Asked for a rubber-duck critique before implementation; it caught two real blind spots in the first plan — Add page needed to flip `selectedEditTarget` back to `page`, and inline rename needed UI-side empty-name validation instead of relying on the service throw path — so the final implementation keeps add-page orchestration in `EditorPane` and guards rename in the panel UI.
+- Added explicit structural page actions to `src/hooks/useProject.tsx` (`createPage`, `renamePage`, `deletePage`, `setStartPage`) so `src/services/projectSource.ts` remains the single source of truth for lifecycle rules while structural edits still update `lastModified` and preserve working-copy preferences.
+- Expanded `src/components/Editor/PagePanel.tsx` and `src/components/Editor/PagePanel.css` with a pinned **Add page** action, per-row action menus, inline rename state with Enter/Esc plus save/cancel buttons, visible start-page status, delete confirmation, and disabled start/delete actions when those lifecycle operations are not allowed.
+- Wired `src/components/Editor/EditorPane.tsx` so Add page always moves the editor back to the page target before creating the new page, keeping the selected-edit-target behavior from #184 coherent with the new lifecycle flow.
+- Added focused regression coverage in `tests/integration/multi-page-page-panel.test.tsx` for add/rename/set-start/delete/last-page protection, added a last-page delete guard test in `tests/unit/services/projectSource.test.ts`, and updated the manual `AppContext` test stub in `tests/integration/app-share-load-ui.test.tsx` for the expanded project actions.
+
+Verification:
+
+- npm run typecheck
+- npm run lint (existing `InspectionPopover` hook dependency warning only)
+- CI=1 npm run test -- --run
+- npm run build
+- Browser check at `http://127.0.0.1:4175/aksel-arcade/` for enabling experimental multi-page authoring, Add page, inline rename with Enter, Set as start page, delete confirmation, last-page delete protection, and no console errors
+
+Next note:
+
+- #191 can build directly on the new page action menus/dialog state in `PagePanel` and the explicit structural actions in `useProject` when it adds delete-impact counts and stale-reference panel indicators.
+- Local Vite ports may auto-increment when earlier sessions are still running; the successful browser verification for this worktree ran on `4175`, not the initially requested `4173`.
+
 ### 2026-06-09 - Issue #184: Multi-page page panel and selected edit target
 
 Implemented:

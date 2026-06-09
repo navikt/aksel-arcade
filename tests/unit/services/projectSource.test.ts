@@ -83,6 +83,12 @@ describe('projectSource service', () => {
     expect(deletedStartPage.source.pages.map((page) => page.id)).toEqual(['page01'])
   })
 
+  it('rejects deleting the last remaining page', () => {
+    expect(() => deletePage(createTestProject(), 'page01')).toThrow(
+      'Cannot delete the last remaining Arcade page'
+    )
+  })
+
   it('reads and writes the selected edit target without mutating the other source', () => {
     const project = updateGlobalConfigSource(createTestProject(), {
       jsx: '<Box>Shared chrome</Box>',
