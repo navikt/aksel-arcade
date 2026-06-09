@@ -143,6 +143,7 @@ const AGENT_ACCESS_BUTTON_NAME = /connect an agent|koble til agent/i
 const AGENT_ACCESS_TOGGLE_NAME = /agent bridge|agent-tilgang/i
 const AGENT_STATUS_ACTIVE = 'Status: active'
 const AGENT_STATUS_INACTIVE = 'Status: inactive'
+const DEFAULT_AGENT_SOURCE_TARGET = { type: 'page', pageId: 'page01' } as const
 
 const findAgentAccessButton = () => screen.findByRole('button', { name: AGENT_ACCESS_BUTTON_NAME })
 const queryAgentAccessToggle = () =>
@@ -301,6 +302,11 @@ type AgentTransportClient = {
   getPreviewEvidence: () => Promise<AgentBridgeCommandResult<PreviewEvidence>>
   getSessionState: () => AgentBridgeCommandResult<AgentSessionReadState>
   applyAgentChange: (request: unknown) => AgentBridgeCommandResult<AgentChangeResult>
+  createPage: (request?: unknown) => AgentBridgeCommandResult<{ pageId: string }>
+  renamePage: (request: unknown) => AgentBridgeCommandResult<{ pageId: string }>
+  deletePage: (request: unknown) => AgentBridgeCommandResult<{ pageId: string }>
+  setStartPage: (request: unknown) => AgentBridgeCommandResult<{ pageId: string }>
+  selectActivePage: (request: unknown) => AgentBridgeCommandResult<{ pageId: string }>
 }
 
 const createAgentTransportClient = (
@@ -374,6 +380,11 @@ const createAgentTransportClient = (
     getPreviewEvidence: () => routeAsync<PreviewEvidence>('getPreviewEvidence'),
     getSessionState: () => route<AgentSessionReadState>('getSessionState'),
     applyAgentChange: (request) => route<AgentChangeResult>('applyAgentChange', request),
+    createPage: (request) => route<{ pageId: string }>('createPage', request),
+    renamePage: (request) => route<{ pageId: string }>('renamePage', request),
+    deletePage: (request) => route<{ pageId: string }>('deletePage', request),
+    setStartPage: (request) => route<{ pageId: string }>('setStartPage', request),
+    selectActivePage: (request) => route<{ pageId: string }>('selectActivePage', request),
   }
 }
 
@@ -980,6 +991,7 @@ describe('ProjectControls layout', () => {
       callBridgeCommand(() =>
         bridge.applyAgentChange({
           summary: 'Normal Agent-applied change',
+          target: DEFAULT_AGENT_SOURCE_TARGET,
           jsxCode: nextJsx,
           viewportSize: 'XS',
           theme: 'light',
@@ -1136,6 +1148,7 @@ describe('ProjectControls layout', () => {
       method: 'applyAgentChange',
       params: {
         summary: 'Desktop transport update',
+        target: DEFAULT_AGENT_SOURCE_TARGET,
         jsxCode: nextJsx,
         viewportSize: 'LG',
         theme: 'light',
@@ -1272,6 +1285,7 @@ describe('ProjectControls layout', () => {
       method: 'applyAgentChange',
       params: {
         summary: 'Desktop immediate update',
+        target: DEFAULT_AGENT_SOURCE_TARGET,
         jsxCode: nextJsx,
         hooksCode: nextHooks,
         viewportSize: 'XS',
@@ -1400,6 +1414,7 @@ describe('ProjectControls layout', () => {
         method: 'applyAgentChange',
         params: {
           summary: changeSummary,
+          target: DEFAULT_AGENT_SOURCE_TARGET,
           jsxCode: nextJsx,
           hooksCode: nextHooks,
           viewportSize: 'XS',
@@ -1563,10 +1578,25 @@ describe('ProjectControls layout', () => {
       command: 'getProject',
     })
     const projectData = expectBridgeSuccess(projectResult)
-    expect(projectData).toEqual({
+    expect(projectData).toMatchObject({
       name: expect.any(String),
+      pageMode: 'single-page',
       jsxCode: expect.any(String),
       hooksCode: expect.any(String),
+      globalConfig: {
+        jsxCode: '',
+        hooksCode: '',
+      },
+      pages: [
+        {
+          id: 'page01',
+          name: 'Page 1',
+          jsxCode: expect.any(String),
+          hooksCode: expect.any(String),
+        },
+      ],
+      startPageId: 'page01',
+      activePageId: 'page01',
     })
     expect(projectData).not.toHaveProperty('id')
 
@@ -1857,6 +1887,177 @@ describe('ProjectControls layout', () => {
     })
   })
 
+  it('keeps the Agent bridge single-page until the human enables multi-page authoring', async () => {
+    renderHeader()
+
+    const bridge = await startAgentAccess()
+    const project = expectBridgeSuccess(callBridgeCommand(() => bridge.getProject()))
+    const instructions = expectBridgeSuccess(callBridgeCommand(() => bridge.getAgentInstructions()))
+
+    expect(project).toMatchObject({
+      pageMode: 'single-page',
+      globalConfig: {
+        jsxCode: '',
+        hooksCode: '',
+      },
+      pages: [
+        {
+          id: 'page01',
+          name: 'Page 1',
+        },
+      ],
+      startPageId: 'page01',
+      activePageId: 'page01',
+    })
+    expect(bridge.commandNames).not.toContain('createPage')
+    expect(instructions.commandNames).not.toContain('createPage')
+    expect(instructions.instructionsMarkdown).toMatch(
+      /ask the human to enable experimental multi-page authoring/i
+    )
+
+    const lifecycleError = expectBridgeFailure(
+      callBridgeCommand(() => bridge.createPage({})),
+      'unsupported-command'
+    )
+    expect(lifecycleError.message).toMatch(/enable experimental multi-page authoring/i)
+
+    const globalConfigError = expectBridgeFailure(
+      callBridgeCommand(() =>
+        bridge.applyAgentChange({
+          summary: 'Try hidden global config edit',
+          target: { type: 'global-config' },
+          jsxCode: '<Box>Hidden</Box>',
+        })
+      ),
+      'invalid-request'
+    )
+    expect(globalConfigError.message).toMatch(/Global config edits require experimental multi-page/i)
+  })
+
+  it('exposes pages-aware bridge commands and targeted source edits when multi-page is enabled', async () => {
+    renderHeader()
+
+    await selectSettingsMenuItem(/enable experimental multi-page authoring/i)
+    const bridge = await startAgentAccess()
+    await waitFor(() => {
+      expect(expectBridgeSuccess(callBridgeCommand(() => bridge.getProject())).pageMode).toBe(
+        'multi-page'
+      )
+    })
+
+    expect(bridge.commandNames).toEqual([
+      'getAgentInstructions',
+      'getProject',
+      'getPreviewContext',
+      'getDiagnostics',
+      'getPreviewEvidence',
+      'getSessionState',
+      'applyAgentChange',
+      'createPage',
+      'renamePage',
+      'deletePage',
+      'setStartPage',
+      'selectActivePage',
+    ])
+
+    const instructions = expectBridgeSuccess(callBridgeCommand(() => bridge.getAgentInstructions()))
+    expect(instructions.commandNames).toEqual(bridge.commandNames)
+    expect(instructions.instructionsMarkdown).toMatch(
+      /createPage, renamePage, deletePage, setStartPage, and selectActivePage/i
+    )
+    expect(instructions.instructionsMarkdown).toContain(
+      'applyAgentChange({ summary, target, jsxCode?, hooksCode?, viewportSize?, theme?, name? })'
+    )
+
+    const deleteLastPageError = expectBridgeFailure(
+      callBridgeCommand(() => bridge.deletePage({ pageId: 'page01' })),
+      'invalid-request'
+    )
+    expect(deleteLastPageError.message).toMatch(/Cannot delete the last remaining Arcade page/i)
+
+    expect(expectBridgeSuccess(callBridgeCommand(() => bridge.getProject()))).toMatchObject({
+      pageMode: 'multi-page',
+      globalConfig: {
+        jsxCode: '',
+        hooksCode: '',
+      },
+      pages: [
+        {
+          id: 'page01',
+          name: 'Page 1',
+        },
+      ],
+      startPageId: 'page01',
+      activePageId: 'page01',
+    })
+
+    expectBridgeSuccess(callBridgeCommand(() => bridge.createPage({})))
+    expectBridgeSuccess(
+      callBridgeCommand(() => bridge.renamePage({ pageId: 'page02', name: 'Details' }))
+    )
+    expectBridgeSuccess(
+      callBridgeCommand(() =>
+        bridge.applyAgentChange({
+          summary: 'Update shared config',
+          target: { type: 'global-config' },
+          hooksCode: 'export const useSharedValue = () => "shared"',
+        })
+      )
+    )
+    expectBridgeSuccess(
+      callBridgeCommand(() =>
+        bridge.applyAgentChange({
+          summary: 'Update page 2 source',
+          target: { type: 'page', pageId: 'page02' },
+          jsxCode: 'export default function App() { return <Heading>Details</Heading> }',
+          hooksCode: 'export const useDetails = () => "details"',
+        })
+      )
+    )
+    expectBridgeSuccess(callBridgeCommand(() => bridge.setStartPage({ pageId: 'page02' })))
+    expectBridgeSuccess(callBridgeCommand(() => bridge.selectActivePage({ pageId: 'page02' })))
+
+    await waitFor(() => {
+      expect(expectBridgeSuccess(callBridgeCommand(() => bridge.getProject()))).toMatchObject({
+        pageMode: 'multi-page',
+        startPageId: 'page02',
+        activePageId: 'page02',
+        jsxCode: 'export default function App() { return <Heading>Details</Heading> }',
+        hooksCode: 'export const useDetails = () => "details"',
+        globalConfig: {
+          jsxCode: '',
+          hooksCode: 'export const useSharedValue = () => "shared"',
+        },
+        pages: expect.arrayContaining([
+          expect.objectContaining({
+            id: 'page02',
+            name: 'Details',
+            jsxCode: 'export default function App() { return <Heading>Details</Heading> }',
+            hooksCode: 'export const useDetails = () => "details"',
+          }),
+        ]),
+      })
+      expect(screen.getByTestId('project-jsx-code').textContent).toContain('Details')
+    })
+
+    expectBridgeSuccess(callBridgeCommand(() => bridge.deletePage({ pageId: 'page02' })))
+
+    await waitFor(() => {
+      expect(expectBridgeSuccess(callBridgeCommand(() => bridge.getProject()))).toMatchObject({
+        pageMode: 'multi-page',
+        startPageId: 'page01',
+        activePageId: 'page01',
+        pages: [
+          expect.objectContaining({
+            id: 'page01',
+            name: 'Page 1',
+          }),
+        ],
+      })
+      expect(screen.getByTestId('project-jsx-code').textContent).not.toContain('Details')
+    })
+  })
+
   it('applies source replacements as normal project edits without rollback state', async () => {
     renderHeader()
 
@@ -1867,6 +2068,7 @@ describe('ProjectControls layout', () => {
     const changeResult = callBridgeCommand(() =>
       bridge.applyAgentChange({
         summary: 'Replace source for demo',
+        target: DEFAULT_AGENT_SOURCE_TARGET,
         jsxCode: nextJsx,
         hooksCode: nextHooks,
       })
@@ -1902,12 +2104,14 @@ describe('ProjectControls layout', () => {
       results.push(
         bridge.applyAgentChange({
           summary: 'First rapid change',
+          target: DEFAULT_AGENT_SOURCE_TARGET,
           jsxCode: firstJsx,
         })
       )
       results.push(
         bridge.applyAgentChange({
           summary: 'Second rapid change',
+          target: DEFAULT_AGENT_SOURCE_TARGET,
           jsxCode: secondJsx,
         })
       )
@@ -1989,6 +2193,7 @@ describe('ProjectControls layout', () => {
     const result = callBridgeCommand(() =>
       bridge.applyAgentChange({
         summary: 'Combined Agent update',
+        target: DEFAULT_AGENT_SOURCE_TARGET,
         jsxCode: nextJsx,
         hooksCode: nextHooks,
         viewportSize: 'LG',
@@ -2030,6 +2235,7 @@ describe('ProjectControls layout', () => {
       const result = callBridgeCommand(() =>
         bridge.applyAgentChange({
           summary: `change ${index}`,
+          target: DEFAULT_AGENT_SOURCE_TARGET,
           jsxCode: `export default function App() { return <Heading>Change ${index}</Heading> }`,
         })
       )
@@ -2052,6 +2258,7 @@ describe('ProjectControls layout', () => {
       callBridgeCommand(() =>
         bridge.applyAgentChange({
           summary: 'Seed change',
+          target: DEFAULT_AGENT_SOURCE_TARGET,
           jsxCode: 'export default function App() { return <Heading>Seed</Heading> }',
         })
       )
@@ -2085,6 +2292,22 @@ describe('ProjectControls layout', () => {
       },
       {
         request: {
+          summary: 'Missing target',
+          jsxCode: 'export default function App() { return <Heading>Missing target</Heading> }',
+        },
+        code: 'invalid-request',
+        message: /requires target/i,
+      },
+      {
+        request: {
+          summary: 'Target only',
+          target: DEFAULT_AGENT_SOURCE_TARGET,
+        },
+        code: 'invalid-request',
+        message: /target is only valid/i,
+      },
+      {
+        request: {
           summary: '   ',
           jsxCode: 'export default function App() { return <Heading>Blank</Heading> }',
         },
@@ -2109,6 +2332,7 @@ describe('ProjectControls layout', () => {
       {
         request: {
           summary: 'Unknown field',
+          target: DEFAULT_AGENT_SOURCE_TARGET,
           jsxCode: 'export default function App() { return <Heading>Changed</Heading> }',
           notes: 'Not part of the Agent change contract',
         },
@@ -2118,6 +2342,7 @@ describe('ProjectControls layout', () => {
       {
         request: {
           summary: 'Invalid viewport',
+          target: DEFAULT_AGENT_SOURCE_TARGET,
           jsxCode: 'export default function App() { return <Heading>Changed</Heading> }',
           viewportSize: 'XXL',
         },
@@ -2127,11 +2352,21 @@ describe('ProjectControls layout', () => {
       {
         request: {
           summary: 'Invalid theme',
+          target: DEFAULT_AGENT_SOURCE_TARGET,
           hooksCode: 'export const useAgentFixture = () => "theme"',
           theme: 'system',
         },
         code: 'invalid-request',
         message: /theme/i,
+      },
+      {
+        request: {
+          summary: 'Invalid target shape',
+          target: { type: 'page' },
+          jsxCode: 'export default function App() { return <Heading>Target</Heading> }',
+        },
+        code: 'invalid-request',
+        message: /valid pageId/i,
       },
       {
         request: {
@@ -2172,6 +2407,7 @@ describe('ProjectControls layout', () => {
     const result = callBridgeCommand(() =>
       bridge.applyAgentChange({
         summary: 'Oversized source replacement',
+        target: DEFAULT_AGENT_SOURCE_TARGET,
         jsxCode: oversizedJsx,
       })
     )
@@ -2193,6 +2429,7 @@ describe('ProjectControls layout', () => {
     const result = callBridgeCommand(() =>
       bridge.applyAgentChange({
         summary: 'Introduce invalid JSX',
+        target: DEFAULT_AGENT_SOURCE_TARGET,
         jsxCode: invalidJsx,
       })
     )

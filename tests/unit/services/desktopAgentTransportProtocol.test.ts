@@ -5,9 +5,11 @@ import {
   createAgentBridgeCommandRouter,
   type AgentBridgeCommandResult,
   type AgentBridgeController,
+  type AgentCreatePageResult,
   type AgentBridgeReadContext,
   type AgentChangeField,
   type AgentChangeResult,
+  type AgentPageLifecycleResult,
 } from '@/services/agentBridge'
 import {
   routeDesktopAgentTransportRequest,
@@ -35,8 +37,23 @@ const diagnostics: PreviewDiagnostics = {
 const readContext: AgentBridgeReadContext = {
   project: {
     name: 'Transport request test',
+    pageMode: 'single-page',
     jsxCode: '<Button>Read</Button>',
     hooksCode: 'const value = "read"',
+    globalConfig: {
+      jsxCode: '',
+      hooksCode: '',
+    },
+    pages: [
+      {
+        id: 'page01',
+        name: 'Page 1',
+        jsxCode: '<Button>Read</Button>',
+        hooksCode: 'const value = "read"',
+      },
+    ],
+    startPageId: 'page01',
+    activePageId: 'page01',
   },
   preview: {
     theme: 'dark',
@@ -55,6 +72,24 @@ const createApplySuccess = (
   },
 })
 
+const createPageSuccess = (): AgentBridgeCommandResult<AgentCreatePageResult> => ({
+  ok: true,
+  command: 'createPage',
+  data: {
+    pageId: 'page02',
+  },
+})
+
+const createPageLifecycleSuccess = (
+  command: 'renamePage' | 'deletePage' | 'setStartPage' | 'selectActivePage'
+): AgentBridgeCommandResult<AgentPageLifecycleResult> => ({
+  ok: true,
+  command,
+  data: {
+    pageId: 'page02',
+  },
+})
+
 const createController = (
   active = true,
   applyResult: AgentBridgeCommandResult<AgentChangeResult> = createApplySuccess()
@@ -69,6 +104,11 @@ const createController = (
       appliedRequests.push(request)
       return applyResult
     },
+    createPage: () => createPageSuccess(),
+    renamePage: () => createPageLifecycleSuccess('renamePage'),
+    deletePage: () => createPageLifecycleSuccess('deletePage'),
+    setStartPage: () => createPageLifecycleSuccess('setStartPage'),
+    selectActivePage: () => createPageLifecycleSuccess('selectActivePage'),
     getPreviewEvidence: async () => ({
       ok: true,
       evidence: {
@@ -192,6 +232,31 @@ describe('desktop Agent transport protocol', () => {
       result: createApplySuccess(),
     })
     expect(appliedRequests).toEqual([params])
+  })
+
+  it('returns a structured bridge error for known lifecycle commands that are unavailable in single-page mode', () => {
+    const { response } = routeRequest({
+      id: 'create-page-1',
+      method: 'createPage',
+      params: {},
+      sessionId: session.id,
+    })
+
+    expect(response).toMatchObject({
+      jsonrpc: '2.0',
+      id: 'create-page-1',
+      error: {
+        code: -32002,
+        data: {
+          code: 'unsupported-command',
+          command: 'createPage',
+          bridgeError: {
+            code: 'unsupported-command',
+            message: expect.stringMatching(/enable experimental multi-page authoring/i),
+          },
+        },
+      },
+    })
   })
 
   it('returns structured bridge validation failures for rejected Agent changes', () => {
