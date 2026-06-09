@@ -2015,3 +2015,18 @@ Verification:
 Next note:
 
 - #186 can build on the existing `validPageIds` plumbing in `EditorPane` / `CodeEditor`, while #187 can stay focused on protocol v3 and targeted page/global-config edits; neither needs to revisit the portable artifact contract unless the experiment stops being Start-page-only.
+
+### 2026-06-09 - PR #198 review follow-up
+
+Fixed one PR-scoped issue before merge:
+
+- The new multi-page share/export warning was incorrectly gated on the experimental multi-page preference, even though a stored project can still contain multiple pages and `Global config` after that UI toggle is turned off.
+- Removed the preference gate in `src/components/Header/AppHeader.tsx` so lossy Web share/export warnings depend on the actual project shape, then extended `tests/integration/share-popover.test.tsx` with a regression covering export from a hidden multi-page project while the experiment is disabled.
+
+Verification:
+
+- npm run typecheck
+- npm run lint (existing `.eslintignore` deprecation notice and existing `InspectionPopover` hook dependency warning only)
+- npm test -- --run
+- npm run build
+- Browser check at `http://127.0.0.1:4317/aksel-arcade/` with a stored multi-page project and `multiPageEnabled: false`: the share popover still showed the lossy-warning copy, Export still opened the confirmation dialog, and the console only showed the existing form-field `id`/`name` issue.

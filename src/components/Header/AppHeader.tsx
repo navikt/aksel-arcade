@@ -135,7 +135,7 @@ export const AppHeader = ({
   } = useShareLink(shareOptions)
   const canUseShareUrl = shellCapabilities.shareUrl.enabled
   const canUseAgentSessions = shellCapabilities.agentSessions.enabled
-  const portableArtifactWarning = multiPageEnabled ? getPortableArtifactWarning(currentProject) : null
+  const portableArtifactWarning = getPortableArtifactWarning(currentProject)
 
   const handleExport = () => {
     setShareOpen(false)

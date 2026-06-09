@@ -116,9 +116,9 @@ const Harness = ({
     updateProject({ jsxCode: `${getActiveSource(project).jsx}${TEST_ALERT_SNIPPET}` })
   }, [project, updateProject])
 
-  const loadLossyMultiPageProject = useCallback(() => {
+  const loadLossyMultiPageProject = useCallback((enabled = true) => {
     replaceProject(createLossyMultiPageProject())
-    setMultiPageEnabled(true)
+    setMultiPageEnabled(enabled)
   }, [replaceProject, setMultiPageEnabled])
 
   useEffect(() => {
@@ -130,7 +130,13 @@ const Harness = ({
   }, [appendAlertSnippet])
 
   useEffect(() => {
-    const handleLoad = () => loadLossyMultiPageProject()
+    const handleLoad = (event: Event) => {
+      const multiPageEnabled =
+        event instanceof CustomEvent && typeof event.detail?.multiPageEnabled === 'boolean'
+          ? event.detail.multiPageEnabled
+          : true
+      loadLossyMultiPageProject(multiPageEnabled)
+    }
     document.addEventListener('test:load-lossy-multi-page-project', handleLoad)
     return () => {
       document.removeEventListener('test:load-lossy-multi-page-project', handleLoad)
@@ -544,6 +550,29 @@ describe('Share popover integration', () => {
       fireEvent.click(within(exportDialog).getByRole('button', { name: /export start page only/i }))
 
       expect(exportSpy).toHaveBeenCalledTimes(1)
+    } finally {
+      exportSpy.mockRestore()
+    }
+  })
+
+  it('still warns before exporting a multi-page project when the experiment is disabled', async () => {
+    const exportSpy = vi.spyOn(storage, 'exportProject').mockImplementation(() => undefined)
+
+    try {
+      renderHeader()
+      act(() => {
+        document.dispatchEvent(
+          new CustomEvent('test:load-lossy-multi-page-project', {
+            detail: { multiPageEnabled: false },
+          })
+        )
+      })
+
+      fireEvent.click(screen.getByRole('button', { name: /^Export$/i }))
+
+      const exportDialog = await screen.findByRole('alertdialog', { name: /confirm export/i })
+      expect(within(exportDialog).getByText(MULTI_PAGE_PORTABLE_ARTIFACT_WARNING)).toBeTruthy()
+      expect(exportSpy).not.toHaveBeenCalled()
     } finally {
       exportSpy.mockRestore()
     }
