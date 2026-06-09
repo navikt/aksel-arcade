@@ -279,7 +279,7 @@ export const PagePanel = ({
                         >
                           <div className="page-panel__row-header">
                             <BodyShort weight="semibold">{page.name}</BodyShort>
-                            {(hasError || lifecycleLabels.length > 0) && (
+                            {(hasError || hasBrokenNavigation || lifecycleLabels.length > 0) && (
                               <HStack
                                 gap="space-4"
                                 align="center"

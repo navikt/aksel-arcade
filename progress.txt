@@ -1979,3 +1979,16 @@ Verification:
 Next note:
 
 - If later work wants a dedicated `Global config` broken-navigation badge, `analyzeProjectPageReferences()` already exposes `globalConfigStaleReferences`; the current UI intentionally fans those shared stale refs out to all page rows instead, because the broken navigation is reachable from every page that renders shared config code.
+
+### 2026-06-09 - PR #197 review follow-up
+
+Fixed one PR-scoped review issue before merge:
+
+- The page panel only rendered its status container for rows with errors or lifecycle labels, so an inactive, non-start page with stale references never showed the broken-navigation badge even though `hasBrokenNavigation` was already computed.
+- Expanded the `PagePanel` render guard to include `hasBrokenNavigation`, then added an integration regression proving the badge still appears when the affected page is neither active nor start page.
+
+Verification:
+
+- npm run typecheck
+- npm run lint (existing `InspectionPopover` hook dependency warning only)
+- CI=1 npm run test

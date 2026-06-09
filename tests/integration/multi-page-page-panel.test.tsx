@@ -344,4 +344,48 @@ describe('Multi-page page panel', () => {
       ).toBeNull()
     })
   })
+
+  it('shows broken-navigation for an inactive page without start-page status', async () => {
+    const user = userEvent.setup()
+    let project = createStoredMultiPageProject()
+    project = updatePageSource(project, 'page01', {
+      jsx: "<Button onClick={() => goToPage('page02')}>Open details</Button>",
+    })
+    project = createPage(project)
+    project = renamePage(project, 'page03', 'Review')
+    project = setActivePage(project, 'page03')
+    saveProject(project, {
+      preferences: {
+        ...DEFAULT_WEB_ARCADE_WORKING_COPY_PREFERENCES,
+        multiPageEnabled: true,
+        pagePanelOpen: true,
+        selectedEditTarget: 'page',
+      },
+    })
+
+    renderHarness()
+
+    await openPageActions(user, 'Details')
+    await user.click(await screen.findByRole('menuitem', { name: /set as start page/i }))
+
+    await waitFor(() => {
+      expect(screen.getByTestId('start-page-id').textContent).toBe('page02')
+      expect(screen.getByTestId('active-page-id').textContent).toBe('page03')
+    })
+
+    await openPageActions(user, 'Details')
+    await user.click(await screen.findByRole('menuitem', { name: /delete page/i }))
+    await user.click(await screen.findByRole('button', { name: /delete page/i }))
+
+    await waitFor(() => {
+      expect(screen.getByTestId('page-summary').textContent).toBe('page01:Page 1|page03:Review')
+      expect(screen.getByTestId('start-page-id').textContent).toBe('page01')
+      expect(screen.getByTestId('active-page-id').textContent).toBe('page03')
+      expect(
+        screen.getByRole('button', { name: /^Page 1/i }).querySelector(
+          '[aria-label="Broken page navigation"]'
+        )
+      ).toBeTruthy()
+    })
+  })
 })
