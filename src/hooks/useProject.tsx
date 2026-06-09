@@ -12,7 +12,13 @@ import {
 /* eslint-disable react-refresh/only-export-components */
 // Context providers intentionally export both context and hooks
 
-import { CURRENT_PROJECT_VERSION, type Project, type ProjectSnapshot, type ShareUrlMetadata } from '@/types/project'
+import {
+  CURRENT_PROJECT_VERSION,
+  type Project,
+  type ProjectSnapshot,
+  type SelectedEditTarget,
+  type ShareUrlMetadata,
+} from '@/types/project'
 import type { EditorState } from '@/types/editor'
 import type { PreviewState, SandboxConsoleMessage } from '@/types/preview'
 import {
@@ -26,10 +32,12 @@ import {
 import {
   FIRST_PAGE_ID,
   createSinglePageProjectSource,
-  getActiveSource,
+  getSourceForEditTarget,
   normalizeProjectSelection,
+  resolveSelectedEditTarget,
   setActivePage,
   updateActivePageSource,
+  updateSourceForEditTarget,
 } from '@/services/projectSource'
 import {
   DEFAULT_WEB_ARCADE_WORKING_COPY_PREFERENCES,
@@ -59,6 +67,7 @@ interface ShareHydrationState {
 type ProjectUpdate = Partial<Pick<Project, 'name' | 'viewportSize' | 'panelLayout' | 'activePageId'>> & {
   jsxCode?: string
   hooksCode?: string
+  editTarget?: SelectedEditTarget
 }
 
 interface AppState {
@@ -129,7 +138,15 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const previewIframeRef = useRef<HTMLIFrameElement | null>(null)
   const [isComponentPaletteOpen, setIsComponentPaletteOpen] = useState(false)
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
-  const { setTheme, setPanelOrder, setMultiPageEnabled } = useSettings()
+  const {
+    multiPageEnabled,
+    selectedEditTarget,
+    setTheme,
+    setPanelOrder,
+    setMultiPageEnabled,
+    setPagePanelOpen,
+    setSelectedEditTarget,
+  } = useSettings()
   const restoredPreferencesRef = useRef(false)
   const [shareHydration, setShareHydration] = useState<ShareHydrationState>(() => {
     const token = getShareTokenFromLocation()
@@ -147,8 +164,12 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       setTheme(preferences.theme)
       setPanelOrder(preferences.panelOrder)
       setMultiPageEnabled(preferences.multiPageEnabled)
+      setPagePanelOpen(preferences.pagePanelOpen)
+      setSelectedEditTarget(preferences.selectedEditTarget)
     }
-  }, [setMultiPageEnabled, setPanelOrder, setTheme])
+  }, [setMultiPageEnabled, setPagePanelOpen, setPanelOrder, setSelectedEditTarget, setTheme])
+
+  const effectiveEditTarget = resolveSelectedEditTarget(multiPageEnabled, selectedEditTarget)
 
   useEffect(() => {
     if (shareHydration.status !== 'decoding' || !shareHydration.token) {
@@ -224,7 +245,11 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       }
 
       if (updates.jsxCode !== undefined || updates.hooksCode !== undefined) {
-        nextProject = updateActivePageSource(nextProject, {
+        const editTarget = resolveSelectedEditTarget(
+          multiPageEnabled,
+          updates.editTarget ?? selectedEditTarget
+        )
+        nextProject = updateSourceForEditTarget(nextProject, editTarget, {
           jsx: updates.jsxCode,
           hooks: updates.hooksCode,
         })
@@ -246,6 +271,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     setTheme(preferences.theme)
     setPanelOrder(preferences.panelOrder)
     setMultiPageEnabled(preferences.multiPageEnabled)
+    setPagePanelOpen(preferences.pagePanelOpen)
+    setSelectedEditTarget(preferences.selectedEditTarget)
   }
 
   const replaceProject = (newProject: Project) => {
@@ -281,7 +308,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
   const insertSnippet = (snippet: ComponentSnippet) => {
     // Get current code for active tab
-    const activeSource = getActiveSource(project)
+    const activeSource = getSourceForEditTarget(project, effectiveEditTarget)
     const currentCode = editorState.activeTab === 'JSX' ? activeSource.jsx : activeSource.hooks
 
     // Parse template: replace ${N:placeholder} with placeholder text
@@ -296,9 +323,9 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
     // Update project with new code
     if (editorState.activeTab === 'JSX') {
-      updateProject({ jsxCode: newCode })
+      updateProject({ jsxCode: newCode, editTarget: effectiveEditTarget })
     } else {
-      updateProject({ hooksCode: newCode })
+      updateProject({ hooksCode: newCode, editTarget: effectiveEditTarget })
     }
   }
 

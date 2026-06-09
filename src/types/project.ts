@@ -4,6 +4,7 @@ export type PanelLayout = 'editor-left' | 'editor-right'
 export type ThemeMode = 'light' | 'dark'
 export type PanelOrder = 'code-left' | 'preview-left'
 export type ArcadePageId = `page${string}`
+export type SelectedEditTarget = 'page' | 'global-config'
 
 export interface ArcadeSourceFile {
   jsx: string

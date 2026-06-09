@@ -5,8 +5,13 @@ import {
   createPage,
   createSinglePageProjectSource,
   deletePage,
+  getActiveSource,
+  getSourceForEditTarget,
   renamePage,
+  resolveSelectedEditTarget,
   setStartPage,
+  updateGlobalConfigSource,
+  updateSourceForEditTarget,
 } from '@/services/projectSource'
 
 const createTestProject = (): Project => ({
@@ -76,5 +81,29 @@ describe('projectSource service', () => {
     expect(deletedStartPage.source.startPageId).toBe('page01')
     expect(deletedStartPage.activePageId).toBe('page01')
     expect(deletedStartPage.source.pages.map((page) => page.id)).toEqual(['page01'])
+  })
+
+  it('reads and writes the selected edit target without mutating the other source', () => {
+    const project = updateGlobalConfigSource(createTestProject(), {
+      jsx: '<Box>Shared chrome</Box>',
+      hooks: 'export const useShared = () => "shared"',
+    })
+
+    expect(getSourceForEditTarget(project, 'global-config')).toEqual({
+      jsx: '<Box>Shared chrome</Box>',
+      hooks: 'export const useShared = () => "shared"',
+    })
+
+    const updatedGlobalConfig = updateSourceForEditTarget(project, 'global-config', {
+      jsx: '<Box>Updated shared chrome</Box>',
+    })
+
+    expect(updatedGlobalConfig.source.globalConfig.jsx).toBe('<Box>Updated shared chrome</Box>')
+    expect(getActiveSource(updatedGlobalConfig).jsx).toBe('<Box>Page 1</Box>')
+  })
+
+  it('falls back to page editing when multi-page is disabled', () => {
+    expect(resolveSelectedEditTarget(true, 'global-config')).toBe('global-config')
+    expect(resolveSelectedEditTarget(false, 'global-config')).toBe('page')
   })
 })
