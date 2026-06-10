@@ -45,7 +45,14 @@ export const ComponentPalette = ({ open, onClose, onInsertComponent }: Component
     if (searchQuery.trim()) {
       return searchComponents(searchQuery)
     }
-    return getComponentsByCategory(activeTab)
+
+    const components = getComponentsByCategory(activeTab)
+
+    if (activeTab !== 'component') {
+      return components
+    }
+
+    return [...components].sort((left, right) => left.name.localeCompare(right.name))
   }, [searchQuery, activeTab])
 
   const handleInsert = (component: ComponentMetadata) => {
