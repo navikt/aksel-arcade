@@ -201,7 +201,7 @@ describe('Multi-page page panel', () => {
 
     const renameInput = screen.getByRole('textbox', { name: /rename page 3/i })
     const renameRow = renameInput.closest('.page-panel__rename')
-    if (!renameRow) {
+    if (!(renameRow instanceof HTMLElement)) {
       throw new Error('Expected rename row to be rendered')
     }
 
