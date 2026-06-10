@@ -437,6 +437,12 @@ const startAgentAccess = async () => {
 
 const selectSettingsMenuItem = async (name: RegExp) => {
   fireEvent.click(screen.getByRole('button', { name: /settings/i }))
+  const checkboxItem = screen.queryByRole('menuitemcheckbox', { name })
+  if (checkboxItem) {
+    fireEvent.click(checkboxItem)
+    return
+  }
+
   fireEvent.click(await screen.findByRole('menuitem', { name }))
 }
 
@@ -949,6 +955,21 @@ describe('ProjectControls layout', () => {
     })
     await waitFor(() => expect(screen.getByText('Imported Replacement Project')).toBeTruthy())
     await expectProjectReplacementRevokedAgentAccess(desktopTransport, 4)
+  })
+
+  it('shows multiple pages as a checkbox in settings', async () => {
+    renderHeader()
+
+    fireEvent.click(screen.getByRole('button', { name: /settings/i }))
+
+    expect(
+      (
+        await screen.findByRole('menuitemcheckbox', {
+          name: /multiple pages/i,
+        })
+      ).getAttribute('aria-checked')
+    ).toBe('false')
+    expect(screen.queryByRole('menuitem', { name: /multiple pages/i })).toBeNull()
   })
 
   it('revokes active Agent access when loading a shared project snapshot', async () => {
@@ -1937,7 +1958,7 @@ describe('ProjectControls layout', () => {
   it('exposes pages-aware bridge commands and targeted source edits when multi-page is enabled', async () => {
     renderHeader()
 
-    await selectSettingsMenuItem(/enable experimental multi-page authoring/i)
+    await selectSettingsMenuItem(/multiple pages/i)
     const bridge = await startAgentAccess()
     await waitFor(() => {
       expect(expectBridgeSuccess(callBridgeCommand(() => bridge.getProject())).pageMode).toBe(
