@@ -7,9 +7,20 @@ import {
   Detail,
   Dialog,
   HStack,
+  TextField,
   VStack,
 } from '@navikt/ds-react'
-import { CheckmarkIcon, PlusIcon, XMarkIcon } from '@navikt/aksel-icons'
+import {
+  CheckmarkIcon,
+  ExclamationmarkTriangleIcon,
+  HouseIcon,
+  LinkBrokenIcon,
+  MenuElipsisVerticalIcon,
+  PencilIcon,
+  PlusIcon,
+  TrashIcon,
+  XMarkIcon,
+} from '@navikt/aksel-icons'
 import type { DeletePageImpact } from '@/services/pageReferences'
 import type { ArcadePage, ArcadePageId, SelectedEditTarget } from '@/types/project'
 import './PagePanel.css'
@@ -74,10 +85,10 @@ export const PagePanel = ({
   const rowButtonRefs = useRef(new Map<ArcadePageId, HTMLButtonElement>())
 
   const deletePageCandidate = deletePageId
-    ? pages.find((page) => page.id === deletePageId) ?? null
+    ? (pages.find((page) => page.id === deletePageId) ?? null)
     : null
   const deletePageImpact = deletePageCandidate
-    ? deletePageImpacts[deletePageCandidate.id] ?? EMPTY_DELETE_PAGE_IMPACT
+    ? (deletePageImpacts[deletePageCandidate.id] ?? EMPTY_DELETE_PAGE_IMPACT)
     : EMPTY_DELETE_PAGE_IMPACT
 
   useEffect(() => {
@@ -107,15 +118,14 @@ export const PagePanel = ({
     }, 0)
   }
 
-  const registerRowButtonRef =
-    (pageId: ArcadePageId) => (node: HTMLButtonElement | null) => {
-      if (node) {
-        rowButtonRefs.current.set(pageId, node)
-        return
-      }
-
-      rowButtonRefs.current.delete(pageId)
+  const registerRowButtonRef = (pageId: ArcadePageId) => (node: HTMLButtonElement | null) => {
+    if (node) {
+      rowButtonRefs.current.set(pageId, node)
+      return
     }
+
+    rowButtonRefs.current.delete(pageId)
+  }
 
   const handleRenameStart = (page: ArcadePage) => {
     setRenamingPageId(page.id)
@@ -174,16 +184,17 @@ export const PagePanel = ({
     onDeletePage(deletePageCandidate.id)
     setDeletePageId(null)
   }
+  const isGlobalConfigActive = selectedEditTarget === 'global-config'
+  const isPageTargetActive = selectedEditTarget === 'page'
 
   return (
     <>
       <Box
         as="aside"
+        id="page-panel"
         className="page-panel"
         borderWidth="0 1 0 0"
         borderColor="neutral-subtleA"
-        paddingInline="space-12"
-        paddingBlock="space-16"
       >
         <VStack gap="space-24" className="page-panel__content">
           <section aria-label="Config">
@@ -192,12 +203,16 @@ export const PagePanel = ({
             </Detail>
             <button
               type="button"
-              className="page-panel__row"
-              data-editing={selectedEditTarget === 'global-config'}
+              className="page-panel__row page-panel__row--config"
+              data-active-page={isGlobalConfigActive}
               onClick={onSelectGlobalConfig}
             >
-              <BodyShort weight="semibold">Global config</BodyShort>
-              <Detail size="small">Shared JSX and Hooks</Detail>
+              <BodyShort size="small" weight="semibold" className="page-panel__title">
+                Global config
+              </BodyShort>
+              <Detail size="small" className="page-panel__subtitle-text">
+                Shared JSX and Hooks
+              </Detail>
             </button>
           </section>
 
@@ -205,31 +220,41 @@ export const PagePanel = ({
             <Detail className="page-panel__section-label" size="small">
               Pages
             </Detail>
-            <VStack gap="space-8">
+            <VStack gap="space-4">
               {pages.map((page) => {
-                const isActivePage = page.id === activePageId
-                const isEditing = selectedEditTarget === 'page' && isActivePage
+                const isActivePage = isPageTargetActive && page.id === activePageId
                 const isStartPage = page.id === startPageId
                 const hasError = errorPageIds.includes(page.id)
                 const hasBrokenNavigation = brokenNavigationPageIds.includes(page.id)
-                const lifecycleLabels = [
-                  ...(isActivePage ? ['Active page'] : []),
-                  ...(isStartPage ? ['Start page'] : []),
-                ]
+                const pageStatusIndicator = hasError ? (
+                  <span
+                    className="page-panel__indicator page-panel__indicator--danger"
+                    aria-label="Page error"
+                    role="img"
+                  >
+                    <ExclamationmarkTriangleIcon aria-hidden fontSize="1.25rem" />
+                  </span>
+                ) : hasBrokenNavigation ? (
+                  <span
+                    className="page-panel__indicator page-panel__indicator--danger"
+                    aria-label="Broken page navigation"
+                    role="img"
+                  >
+                    <LinkBrokenIcon aria-hidden fontSize="1.25rem" />
+                  </span>
+                ) : null
 
                 return (
-                  <div key={page.id} className="page-panel__item">
+                  <div key={page.id} className="page-panel__item" data-active-page={isActivePage}>
                     {renamingPageId === page.id ? (
-                      <div
-                        className="page-panel__row page-panel__rename"
-                        data-active-page={isActivePage}
-                        data-editing={isEditing}
-                      >
+                      <div className="page-panel__row page-panel__row--page page-panel__rename">
                         <div className="page-panel__rename-fields">
-                          <input
+                          <TextField
                             ref={renameInputRef}
+                            label={`Rename ${page.name}`}
+                            hideLabel
+                            size="small"
                             className="page-panel__rename-input"
-                            aria-label={`Rename ${page.name}`}
                             value={renameDraft}
                             onChange={(event) => {
                               setRenameDraft(event.target.value)
@@ -238,18 +263,13 @@ export const PagePanel = ({
                               }
                             }}
                             onKeyDown={handleRenameKeyDown}
+                            error={renameError ?? undefined}
                           />
-                          <Detail size="small">{page.id}</Detail>
-                          {renameError && (
-                            <Detail size="small" className="page-panel__rename-error" role="alert">
-                              {renameError}
-                            </Detail>
-                          )}
                         </div>
-                        <HStack gap="space-8" className="page-panel__rename-actions">
+                        <HStack gap="space-4" className="page-panel__rename-actions">
                           <Button
                             icon={<CheckmarkIcon aria-hidden />}
-                            variant="secondary"
+                            variant="tertiary"
                             data-color="success"
                             size="xsmall"
                             aria-label={`Save name for ${page.name}`}
@@ -258,7 +278,7 @@ export const PagePanel = ({
                           />
                           <Button
                             icon={<XMarkIcon aria-hidden />}
-                            variant="secondary"
+                            variant="tertiary"
                             data-color="danger"
                             size="xsmall"
                             aria-label={`Cancel rename for ${page.name}`}
@@ -271,77 +291,71 @@ export const PagePanel = ({
                         <button
                           ref={registerRowButtonRef(page.id)}
                           type="button"
-                          className="page-panel__row"
+                          className="page-panel__row page-panel__row--page"
                           data-active-page={isActivePage}
-                          data-editing={isEditing}
                           aria-current={isActivePage ? 'page' : undefined}
                           onClick={() => onSelectPage(page.id)}
                         >
                           <div className="page-panel__row-header">
-                            <BodyShort weight="semibold">{page.name}</BodyShort>
-                            {(hasError || hasBrokenNavigation || lifecycleLabels.length > 0) && (
-                              <HStack
-                                gap="space-4"
-                                align="center"
-                                className="page-panel__status-group"
-                              >
-                                {hasError ? (
-                                  <Detail
-                                    size="small"
-                                    className="page-panel__status page-panel__status--error"
-                                    aria-label="Page error"
-                                  >
-                                    Error
-                                  </Detail>
-                                ) : hasBrokenNavigation ? (
-                                  <Detail
-                                    size="small"
-                                    className="page-panel__status page-panel__status--warning"
-                                    aria-label="Broken page navigation"
-                                  >
-                                    Broken nav
-                                  </Detail>
-                                ) : null}
-                                {lifecycleLabels.length > 0 && (
-                                  <Detail size="small" className="page-panel__status">
-                                    {lifecycleLabels.join(' · ')}
-                                  </Detail>
-                                )}
-                              </HStack>
-                            )}
+                            <BodyShort size="small" weight="semibold" className="page-panel__title">
+                              {page.name}
+                            </BodyShort>
+                            {pageStatusIndicator}
                           </div>
-                          <Detail size="small">{page.id}</Detail>
+                          <div className="page-panel__row-subtitle">
+                            {isStartPage && (
+                              <span
+                                className="page-panel__indicator page-panel__indicator--home"
+                                aria-label="Home page"
+                                role="img"
+                              >
+                                <HouseIcon aria-hidden fontSize="1rem" />
+                              </span>
+                            )}
+                            <Detail size="small" className="page-panel__subtitle-text">
+                              {page.id}
+                            </Detail>
+                          </div>
                         </button>
-                        <ActionMenu>
-                          <ActionMenu.Trigger>
-                            <Button
-                              variant="tertiary"
-                              data-color="neutral"
-                              size="xsmall"
-                              className="page-panel__actions-trigger"
-                              aria-label={`Page actions for ${page.name}`}
-                            >
-                              ...
-                            </Button>
-                          </ActionMenu.Trigger>
-                          <ActionMenu.Content>
-                            <ActionMenu.Item
-                              disabled={isStartPage}
-                              onSelect={() => onSetStartPage(page.id)}
-                            >
-                              Set as start page
-                            </ActionMenu.Item>
-                            <ActionMenu.Item onSelect={() => handleRenameStart(page)}>
-                              Rename
-                            </ActionMenu.Item>
-                            <ActionMenu.Item
-                              disabled={pages.length <= 1}
-                              onSelect={() => setDeletePageId(page.id)}
-                            >
-                              Delete page
-                            </ActionMenu.Item>
-                          </ActionMenu.Content>
-                        </ActionMenu>
+                        <div className="page-panel__actions">
+                          <ActionMenu>
+                            <ActionMenu.Trigger>
+                              <Button
+                                variant="tertiary"
+                                data-color="neutral"
+                                size="xsmall"
+                                className="page-panel__actions-trigger"
+                                aria-label={`Page actions for ${page.name}`}
+                                icon={<MenuElipsisVerticalIcon aria-hidden />}
+                              />
+                            </ActionMenu.Trigger>
+                            <ActionMenu.Content>
+                              <ActionMenu.Label>Actions</ActionMenu.Label>
+                              <ActionMenu.Item
+                                icon={<HouseIcon aria-hidden />}
+                                disabled={isStartPage}
+                                onSelect={() => onSetStartPage(page.id)}
+                              >
+                                Set as start page
+                              </ActionMenu.Item>
+                              <ActionMenu.Item
+                                icon={<PencilIcon aria-hidden />}
+                                onSelect={() => handleRenameStart(page)}
+                              >
+                                Rename
+                              </ActionMenu.Item>
+                              <ActionMenu.Divider />
+                              <ActionMenu.Item
+                                variant="danger"
+                                icon={<TrashIcon aria-hidden />}
+                                disabled={pages.length <= 1}
+                                onSelect={() => setDeletePageId(page.id)}
+                              >
+                                Delete page
+                              </ActionMenu.Item>
+                            </ActionMenu.Content>
+                          </ActionMenu>
+                        </div>
                       </>
                     )}
                   </div>
@@ -357,6 +371,7 @@ export const PagePanel = ({
             data-color="neutral"
             size="small"
             icon={<PlusIcon aria-hidden />}
+            className="page-panel__add-button"
             onClick={onAddPage}
           >
             Add page
@@ -364,7 +379,10 @@ export const PagePanel = ({
         </div>
       </Box>
 
-      <Dialog open={Boolean(deletePageCandidate)} onOpenChange={(open) => !open && setDeletePageId(null)}>
+      <Dialog
+        open={Boolean(deletePageCandidate)}
+        onOpenChange={(open) => !open && setDeletePageId(null)}
+      >
         <Dialog.Popup role="alertdialog" aria-label="Delete page" closeOnOutsideClick={false}>
           <Dialog.Body>
             <VStack gap="space-12">
@@ -400,7 +418,12 @@ export const PagePanel = ({
                 Cancel
               </Button>
             </Dialog.CloseTrigger>
-            <Button type="button" variant="primary" data-color="danger" onClick={handleDeleteConfirm}>
+            <Button
+              type="button"
+              variant="primary"
+              data-color="danger"
+              onClick={handleDeleteConfirm}
+            >
               Delete page
             </Button>
           </Dialog.Footer>

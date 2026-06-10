@@ -1,5 +1,6 @@
 import { useContext, useMemo, useRef } from 'react'
-import { Box, Button, HStack } from '@navikt/ds-react'
+import { Box, Button } from '@navikt/ds-react'
+import { SidebarLeftIcon } from '@navikt/aksel-icons'
 import { AppContext } from '@/hooks/useProject'
 import { useSettings } from '@/contexts/SettingsContext'
 import { CodeEditor, type CodeEditorRef } from './CodeEditor'
@@ -187,29 +188,36 @@ export const EditorPane = () => {
         paddingInline="space-20"
         paddingBlock="space-8"
       >
-        <HStack justify="space-between" align="center" gap="space-16">
-          <HStack className="editor-pane__header-group" gap="space-12" align="center">
+        <div className="editor-pane__header">
+          <div className="editor-pane__header-start">
             {multiPageEnabled && (
               <Button
                 variant="tertiary"
                 data-color="neutral"
-                size="small"
+                size="xsmall"
+                className="editor-pane__panel-toggle"
+                aria-label={pagePanelOpen ? 'Hide pages' : 'Show pages'}
+                aria-controls="page-panel"
+                aria-pressed={pagePanelOpen}
+                icon={<SidebarLeftIcon aria-hidden />}
                 onClick={togglePagePanel}
-              >
-                {pagePanelOpen ? 'Hide pages' : 'Show pages'}
-              </Button>
+              />
             )}
+          </div>
+          <div className="editor-pane__header-center">
             <EditorTabs activeTab={currentTab} onTabChange={handleTabChange} />
-          </HStack>
-          <EditorToolbar
-            canUndo={canUndo}
-            canRedo={canRedo}
-            onAddComponent={() => toggleComponentPalette()}
-            onFormat={handleFormat}
-            onUndo={handleUndo}
-            onRedo={handleRedo}
-          />
-        </HStack>
+          </div>
+          <div className="editor-pane__header-end">
+            <EditorToolbar
+              canUndo={canUndo}
+              canRedo={canRedo}
+              onAddComponent={() => toggleComponentPalette()}
+              onFormat={handleFormat}
+              onUndo={handleUndo}
+              onRedo={handleRedo}
+            />
+          </div>
+        </div>
       </Box>
 
       <Box className="editor-pane__workspace">

@@ -1,14 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { forwardRef, useImperativeHandle } from 'react'
 import { SettingsProvider, useSettings } from '@/contexts/SettingsContext'
 import { AppProvider, useProject } from '@/hooks/useProject'
 import { EditorPane } from '@/components/Editor/EditorPane'
-import {
-  DEFAULT_WEB_ARCADE_WORKING_COPY_PREFERENCES,
-  saveProject,
-} from '@/services/storage'
+import { DEFAULT_WEB_ARCADE_WORKING_COPY_PREFERENCES, saveProject } from '@/services/storage'
 import {
   createPage,
   renamePage,
@@ -140,9 +137,14 @@ describe('Multi-page page panel', () => {
       expect(screen.getByRole('button', { name: /hide pages/i })).toBeTruthy()
     })
 
+    const globalConfigButton = screen.getByRole('button', { name: /global config/i })
+    const detailsButton = screen.getByRole('button', { name: /^details/i })
     expect(screen.getByTestId('selected-edit-target').textContent).toBe('global-config')
     expect(screen.getByTestId('active-page-id').textContent).toBe('page02')
     expect(getCodeEditor().value).toContain('Shared chrome')
+    expect(globalConfigButton.getAttribute('data-active-page')).toBe('true')
+    expect(detailsButton.getAttribute('data-active-page')).toBe('false')
+    expect(detailsButton.getAttribute('aria-current')).toBeNull()
 
     fireEvent.change(getCodeEditor(), { target: { value: '<Box>Shared chrome updated</Box>' } })
 
@@ -156,6 +158,7 @@ describe('Multi-page page panel', () => {
       expect(screen.getByTestId('active-page-id').textContent).toBe('page01')
       expect(getCodeEditor().value).toContain('Page 1 content')
     })
+    expect(globalConfigButton.getAttribute('data-active-page')).toBe('false')
 
     fireEvent.change(getCodeEditor(), { target: { value: '<Box>Page 1 updated</Box>' } })
 
@@ -197,6 +200,14 @@ describe('Multi-page page panel', () => {
     await user.click(await screen.findByRole('menuitem', { name: /rename/i }))
 
     const renameInput = screen.getByRole('textbox', { name: /rename page 3/i })
+    const renameRow = renameInput.closest('.page-panel__rename')
+    if (!renameRow) {
+      throw new Error('Expected rename row to be rendered')
+    }
+
+    expect(within(renameRow).queryByText('page03')).toBeNull()
+    expect(screen.getByRole('button', { name: /save name for page 3/i })).toBeTruthy()
+    expect(screen.getByRole('button', { name: /cancel rename for page 3/i })).toBeTruthy()
     await user.clear(renameInput)
     await user.type(renameInput, 'Checkout{Escape}')
 
@@ -214,6 +225,32 @@ describe('Multi-page page panel', () => {
       expect(screen.queryByRole('textbox', { name: /rename page 3/i })).toBeNull()
       expect(screen.getByTestId('page-summary').textContent).toContain('page03:Checkout')
     })
+  })
+
+  it('shows the home page as an icon and keeps the active page state out of the visible labels', async () => {
+    const user = userEvent.setup()
+    const project = createStoredMultiPageProject()
+    saveProject(project, {
+      preferences: {
+        ...DEFAULT_WEB_ARCADE_WORKING_COPY_PREFERENCES,
+        multiPageEnabled: true,
+        pagePanelOpen: true,
+        selectedEditTarget: 'page',
+      },
+    })
+
+    renderHarness()
+
+    const pageOneRow = await screen.findByRole('button', { name: /^Page 1/i })
+    const detailsRow = screen.getByRole('button', { name: /^Details/i })
+
+    expect(pageOneRow.querySelector('[aria-label="Home page"]')).toBeTruthy()
+    expect(detailsRow.getAttribute('aria-current')).toBe('page')
+    expect(pageOneRow.textContent).not.toMatch(/Start page/i)
+    expect(detailsRow.textContent).not.toMatch(/Active page/i)
+
+    await openPageActions(user, 'Details')
+    expect(await screen.findByText('Actions')).toBeTruthy()
   })
 
   it('sets the start page, deletes with confirmation, and protects the last remaining page', async () => {
@@ -255,7 +292,8 @@ describe('Multi-page page panel', () => {
     const deleteAction = await screen.findByRole('menuitem', { name: /delete page/i })
 
     expect(
-      deleteAction.getAttribute('aria-disabled') === 'true' || deleteAction.hasAttribute('data-disabled')
+      deleteAction.getAttribute('aria-disabled') === 'true' ||
+        deleteAction.hasAttribute('data-disabled')
     ).toBe(true)
   })
 
@@ -288,9 +326,9 @@ describe('Multi-page page panel', () => {
     await waitFor(() => {
       expect(screen.getByTestId('page-summary').textContent).toBe('page01:Page 1')
       expect(
-        screen.getByRole('button', { name: /^Page 1/i }).querySelector(
-          '[aria-label="Broken page navigation"]'
-        )
+        screen
+          .getByRole('button', { name: /^Page 1/i })
+          .querySelector('[aria-label="Broken page navigation"]')
       ).toBeTruthy()
     })
 
@@ -298,9 +336,9 @@ describe('Multi-page page panel', () => {
 
     await waitFor(() => {
       expect(
-        screen.getByRole('button', { name: /^Page 1/i }).querySelector(
-          '[aria-label="Broken page navigation"]'
-        )
+        screen
+          .getByRole('button', { name: /^Page 1/i })
+          .querySelector('[aria-label="Broken page navigation"]')
       ).toBeNull()
     })
   })
@@ -327,9 +365,9 @@ describe('Multi-page page panel', () => {
 
     await waitFor(() => {
       expect(
-        screen.getByRole('button', { name: /^Page 1/i }).querySelector(
-          '[aria-label="Broken page navigation"]'
-        )
+        screen
+          .getByRole('button', { name: /^Page 1/i })
+          .querySelector('[aria-label="Broken page navigation"]')
       ).toBeTruthy()
     })
 
@@ -338,9 +376,9 @@ describe('Multi-page page panel', () => {
 
     await waitFor(() => {
       expect(
-        screen.getByRole('button', { name: /^Page 1/i }).querySelector(
-          '[aria-label="Broken page navigation"]'
-        )
+        screen
+          .getByRole('button', { name: /^Page 1/i })
+          .querySelector('[aria-label="Broken page navigation"]')
       ).toBeNull()
     })
   })
@@ -382,9 +420,9 @@ describe('Multi-page page panel', () => {
       expect(screen.getByTestId('start-page-id').textContent).toBe('page01')
       expect(screen.getByTestId('active-page-id').textContent).toBe('page03')
       expect(
-        screen.getByRole('button', { name: /^Page 1/i }).querySelector(
-          '[aria-label="Broken page navigation"]'
-        )
+        screen
+          .getByRole('button', { name: /^Page 1/i })
+          .querySelector('[aria-label="Broken page navigation"]')
       ).toBeTruthy()
     })
   })
