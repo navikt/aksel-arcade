@@ -160,6 +160,26 @@ _Avoid_: Agent operating instructions, Aksel training
 **Arcade project source** that represents a UI with current Aksel React components, layout primitives, icons, and `--ax` design tokens before using native HTML or custom CSS fallbacks.
 _Avoid_: Visual mimic, prop-free HTML, screenshot-only JSX
 
+**Aksel insertion catalog**:
+The shared set of all non-deprecated top-level, renderable Aksel UI choices that Arcade authoring aids offer as complete **Aksel-valid Arcade JSX** blocks across **Web Arcade** and **Desktop Arcade**. An insertion choice must be present in current Aksel documentation, render in Arcade’s current Aksel runtime, not be excluded by current replacement guidance, and be behavior-complete for the component’s primary interaction. It may have a user-facing label that differs from the literal Aksel component name when one Aksel component has multiple common runnable defaults. The catalog guides new authoring and does not define whether existing source can still render.
+_Avoid_: Raw component list, subcomponent list, autocomplete docs data, infrastructure component, one export equals one choice
+
+**Multi-part insertion**:
+An authoring-aid insertion that updates JSX and Hooks in the same **Arcade project source** edit target when a behavior-complete Aksel choice needs supporting state, ids, or refs. Generated hook support code may include a short comment explaining which inserted example needs it, and repeated insertions must avoid support-code name collisions.
+_Avoid_: JSX-only snippet, hidden side effect
+
+**Contextual subcomponent suggestion**:
+A code autocomplete suggestion for a compound Aksel subcomponent that appears only where the surrounding JSX has the relevant parent component ancestry. When a compound parent expects direct children, matching subcomponents rank ahead of general child-level choices.
+_Avoid_: Top-level subcomponent option, global subcomponent autocomplete
+
+**Contextual child suggestion**:
+A code autocomplete suggestion for a parent-bound Aksel child component that is not useful as a top-level insertion, such as a `Radio` inside a `RadioGroup`.
+_Avoid_: Top-level insertion choice, arbitrary child suggestion
+
+**Child-level component suggestion**:
+A code autocomplete suggestion for a general renderable Aksel choice, including layout primitives, offered where JSX children can be written without being tied to a specific compound parent. Arcade may omit otherwise valid choices at constrained compound positions when suggesting them would steer users toward poor Aksel structure.
+_Avoid_: Compound subcomponent suggestion, prop suggestion
+
 **Agent change**:
 An agent-authored change applied to one or more parts of the active **Arcade project** during an **Agent session** — the **Global config** code, an individual **Arcade page**'s code, or the project's page set itself (adding, renaming, or removing an **Arcade page**, or changing the **Start page**). The app assigns page ids; an agent never chooses them.
 _Avoid_: Proposed change, patch, command, cursor edit
