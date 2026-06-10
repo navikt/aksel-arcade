@@ -3,13 +3,14 @@ import iconMetadata from '@navikt/aksel-icons/metadata'
 import {
   AKSEL_CATALOG,
   AKSEL_CATALOG_VERSION,
+  getCatalogComponent,
   getCatalogPaletteComponents,
   getCatalogPropValues,
   getCatalogSnippets,
   getCatalogTokenValues,
   listCatalogEntries,
 } from '../../src/data/akselCatalog'
-import { getComponentsByCategory } from '../../src/data/akselComponents'
+import { getComponentsByCategory, searchComponents } from '../../src/data/akselComponents'
 import {
   AI_INSTRUCTIONS,
   AKSEL_METADATA,
@@ -119,6 +120,37 @@ describe('Aksel catalog starter path', () => {
 
     expect(hstack?.snippet).toContain('gap="space-16"')
     expect(hstack?.snippet).not.toContain('gap="4"')
+  })
+
+  it('routes BodyShort, Heading, and Tag through the shared catalog for Add menu data', () => {
+    const componentEntries = listCatalogEntries({ groups: ['component'], statuses: ['current'] })
+    const paletteComponents = getComponentsByCategory('component')
+    const bodyShortEntry = getCatalogComponent('BodyShort')
+    const headingEntry = getCatalogComponent('Heading')
+    const tagEntry = getCatalogComponent('Tag')
+    const tagPaletteEntry = paletteComponents.find((component) => component.name === 'Tag')
+
+    expect(componentEntries.map((entry) => entry.name)).toEqual(
+      expect.arrayContaining(['BodyShort', 'Heading', 'Tag'])
+    )
+    expect(bodyShortEntry?.snippet.code).toBe('<BodyShort>Short text</BodyShort>')
+    expect(headingEntry?.snippet.code).toBe(
+      '<Heading level="1" size="large">Heading text</Heading>'
+    )
+    expect(tagEntry?.snippet.code).toBe(
+      '<Tag variant="moderate" data-color="info">In progress</Tag>'
+    )
+    expect(tagPaletteEntry).toEqual(
+      expect.objectContaining({
+        snippet: '<Tag variant="moderate" data-color="info">In progress</Tag>',
+        description: 'Tag label component.',
+        keywords: expect.arrayContaining(['badge', 'status']),
+      })
+    )
+    expect(searchComponents('badge')).toContainEqual(expect.objectContaining({ name: 'Tag' }))
+    expect(AKSEL_SNIPPETS.find((snippet) => snippet.name === 'Tag')?.template).toBe(
+      '<Tag variant="moderate" data-color="info">In progress</Tag>'
+    )
   })
 
   it('makes the editor snippet and prop metadata paths prefer the same catalog source', () => {

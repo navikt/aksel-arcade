@@ -24,6 +24,7 @@ export interface ComponentMetadata {
   category: AkselCatalogGroup
   status?: AkselCatalogStatus
   import: string // e.g., "@navikt/ds-react"
+  keywords?: string[]
   props: ComponentProp[]
   snippet: string // Default code snippet
   description?: string
@@ -1112,6 +1113,8 @@ export const searchComponents = (query: string): ComponentMetadata[] => {
   const lowerQuery = query.toLowerCase()
   return allComponents.filter(
     (c) =>
-      c.name.toLowerCase().includes(lowerQuery) || c.description?.toLowerCase().includes(lowerQuery)
+      c.name.toLowerCase().includes(lowerQuery) ||
+      c.description?.toLowerCase().includes(lowerQuery) ||
+      c.keywords?.some((keyword) => keyword.toLowerCase().includes(lowerQuery))
   )
 }
