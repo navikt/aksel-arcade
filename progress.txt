@@ -2098,3 +2098,28 @@ Verification:
 - npm run build
 - npm run test -- --run
 - Browser check at `http://127.0.0.1:5176/aksel-arcade/` with the Desktop preload shim: after deleting `page02`, `deletePage({ pageId: 'page01' })` returned the expected `invalid-request` response, the project stayed on `page01`, and there were no console errors or warnings.
+
+### 2026-06-10 - Issue #206: Establish shared Aksel insertion catalog tracer
+
+Implemented:
+
+- Selected #206 as the highest-priority `ready-for-agent` feature from #206-#217 because it is the shared **Aksel insertion catalog** tracer that every later authoring issue in this batch is explicitly blocked on.
+- Read issue #205, `CONTEXT.md`, and the existing `progress.txt` notes before changing code so the slice stayed aligned with the PRD language and the current authoring roadmap.
+- Added current catalog entries for the tracer components `BodyShort`, `Heading`, and `Tag` in `src/data/akselCatalog.ts`, including docs links, keywords, curated visible snippets, and the current Tag variant/data-color guidance instead of the stale `variant="info"` path.
+- Extended `getCatalogPaletteComponents()` / `src/data/akselComponents.ts` so active Add-menu data can carry catalog keywords and search against them, which keeps the catalog query layer usable for both discovery and insertion without leaking storage details into the modal UI.
+- Updated `src/services/akselAutocomplete.ts` so top-level component completion now prefers shared catalog entries whenever a component exists in the catalog, while generated docs data remains the fallback source for uncataloged top-level choices and still powers prop / prop-value intelligence.
+- Added focused regression coverage in `tests/unit/akselCatalog.test.ts` and `tests/unit/akselAutocomplete.test.ts` proving the tracer components now come from the shared catalog for Add-menu data, keyword search, autocomplete detail text, and autocomplete insertion payloads.
+
+Verification:
+
+- npm install
+- npm run typecheck
+- npm run lint (existing `.eslintignore` deprecation notice and existing `InspectionPopover` hook dependency warning only)
+- npm run test -- --run
+- npm run build
+- Browser check at `http://127.0.0.1:4181/aksel-arcade/`: confirmed the Add menu shows `BodyShort`, `Heading`, and `Tag`; confirmed Add inserts the new Tag catalog snippet (`<Tag variant="moderate" data-color="info">In progress</Tag>`) and the preview renders it; confirmed the browser-loaded autocomplete service returns the catalog apply strings for `BodyShort` and `Heading`, then loaded those exact snippets into the editor and saw both render in preview with no console errors.
+
+Next note:
+
+- #207 can now focus narrowly on the author-facing `Combobox` / `UNSAFE_Combobox` alias cleanup, because the top-level autocomplete path now has an explicit catalog-first merge point instead of only the docs-derived list.
+- When browser-verifying this worktree, `4173`-`4180` were already serving other sessions; `4181` was the clean Vite port for this branch.

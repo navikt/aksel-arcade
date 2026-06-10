@@ -1,9 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import iconMetadata from '@navikt/aksel-icons/metadata'
-import {
-  AKSEL_AUTOCOMPLETE_ENTRIES,
-  AKSEL_ICON_PROPS,
-} from '../../src/data/akselAutocompleteData'
+import { AKSEL_AUTOCOMPLETE_ENTRIES, AKSEL_ICON_PROPS } from '../../src/data/akselAutocompleteData'
 import { listCatalogEntries } from '../../src/data/akselCatalog'
 import { getAkselCompletionForSource } from '../../src/services/akselAutocomplete'
 
@@ -50,7 +47,9 @@ function optionFor(
   label: string,
   pageNavigationTargets?: Parameters<typeof getAkselCompletionForSource>[2]
 ) {
-  return completionFor(source, pageNavigationTargets)?.options.find((option) => option.label === label)
+  return completionFor(source, pageNavigationTargets)?.options.find(
+    (option) => option.label === label
+  )
 }
 
 const BOOLEAN_COMPLETION_VALUES = new Set(['true', 'false'])
@@ -148,6 +147,21 @@ describe('Aksel-aware autocomplete contract', () => {
     )
   })
 
+  it('prefers catalog-backed tracer details and insertions for top-level BodyShort, Heading, and Tag', () => {
+    expect(optionFor('<Body', 'BodyShort')?.detail).toBe(
+      'Short body text with compact line height.'
+    )
+    expect(applyFor('<Body', 'BodyShort')).toBe('BodyShort>Short text</BodyShort>')
+    expect(optionFor('<Head', 'Heading')?.detail).toBe('Heading text.')
+    expect(applyFor('<Head', 'Heading')).toBe(
+      'Heading level="1" size="large">Heading text</Heading>'
+    )
+    expect(optionFor('<Tag', 'Tag')?.detail).toBe('Tag label component.')
+    expect(applyFor('<Tag', 'Tag')).toBe(
+      'Tag variant="moderate" data-color="info">In progress</Tag>'
+    )
+  })
+
   it('keeps Aksel icons out of default component tag suggestions', () => {
     const labels = labelsFor('<')
     const iconNames = Object.values(iconMetadata).map((icon) => `${icon.name}Icon`)
@@ -222,9 +236,10 @@ describe('Aksel-aware autocomplete contract', () => {
     expect(applyFor('<Button v', 'variant')).toBe('variant=""')
 
     for (const [componentName, propName] of booleanProps) {
-      expect(applyFor(`<${componentName} ${propName}`, propName), `${componentName}.${propName}`).toBe(
-        propName
-      )
+      expect(
+        applyFor(`<${componentName} ${propName}`, propName),
+        `${componentName}.${propName}`
+      ).toBe(propName)
     }
   })
 
@@ -289,22 +304,24 @@ describe('Aksel-aware autocomplete contract', () => {
   })
 
   it('suggests page navigation targets inside goToPage calls', () => {
-    const option = optionFor("const handleClick = () => goToPage('Det", 'Details', PAGE_NAVIGATION_TARGETS)
+    const option = optionFor(
+      "const handleClick = () => goToPage('Det",
+      'Details',
+      PAGE_NAVIGATION_TARGETS
+    )
 
     expect(labelsFor("const handleClick = () => goToPage('", PAGE_NAVIGATION_TARGETS)).toEqual([
       'Start',
       'Details',
       'Summary',
     ])
-    expect(labelsFor("const handleClick = () => goToPage('page0", PAGE_NAVIGATION_TARGETS)).toEqual([
-      'Start',
-      'Details',
-      'Summary',
-    ])
-    expect(option?.detail).toBe('page02')
-    expect(applyFor("const handleClick = () => goToPage('Det", 'Details', PAGE_NAVIGATION_TARGETS)).toBe(
-      'page02'
+    expect(labelsFor("const handleClick = () => goToPage('page0", PAGE_NAVIGATION_TARGETS)).toEqual(
+      ['Start', 'Details', 'Summary']
     )
+    expect(option?.detail).toBe('page02')
+    expect(
+      applyFor("const handleClick = () => goToPage('Det", 'Details', PAGE_NAVIGATION_TARGETS)
+    ).toBe('page02')
   })
 
   it('suggests page navigation targets inside href and to values', () => {

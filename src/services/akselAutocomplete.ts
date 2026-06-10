@@ -32,25 +32,27 @@ const catalogEntries = listCatalogEntries({
   statuses: ['current', 'experimental'],
 })
 const catalogEntriesByName = new Map(catalogEntries.map((entry) => [entry.name, entry]))
+const catalogCompletionEntries = catalogEntries
+  .filter((entry) => entry.group !== 'icon')
+  .map((entry) => ({ ...entry, source: 'catalog' as const }))
+const catalogEntryNames = new Set(catalogCompletionEntries.map((entry) => entry.name))
 const docsEntries = AKSEL_AUTOCOMPLETE_ENTRIES.map((entry) => ({
   ...entry,
   source: 'docs' as const,
 }))
 const comboboxAliasEntry = docsEntries.find((entry) => entry.name === 'Combobox')
-const docsAliasEntries = comboboxAliasEntry
-  ? [{ ...comboboxAliasEntry, name: 'UNSAFE_Combobox' }]
-  : []
+const docsAliasEntries =
+  comboboxAliasEntry && !catalogEntryNames.has('UNSAFE_Combobox')
+    ? [{ ...comboboxAliasEntry, name: 'UNSAFE_Combobox' }]
+    : []
 const iconEntries = catalogEntries
   .filter((entry) => entry.group === 'icon')
   .map((entry) => ({ ...entry, source: 'catalog' as const }))
-const docsEntryNames = new Set([...docsEntries, ...docsAliasEntries].map((entry) => entry.name))
-const extraCatalogEntries = catalogEntries
-  .filter((entry) => entry.group !== 'icon' && !docsEntryNames.has(entry.name))
-  .map((entry) => ({ ...entry, source: 'catalog' as const }))
+const fallbackDocsEntries = docsEntries.filter((entry) => !catalogEntryNames.has(entry.name))
 const completionEntries: CompletionEntry[] = [
-  ...docsEntries,
+  ...catalogCompletionEntries,
+  ...fallbackDocsEntries,
   ...docsAliasEntries,
-  ...extraCatalogEntries,
 ]
 const docsEntriesByName = new Map(docsEntries.map((entry) => [entry.name, entry]))
 
@@ -145,7 +147,10 @@ function getPropValueContext(openTag: OpenTagContext): {
   }
 }
 
-function getPageNavigationContext(source: string, pos: number): {
+function getPageNavigationContext(
+  source: string,
+  pos: number
+): {
   partialValue: string
 } | null {
   const beforeCursor = source.slice(0, pos)
@@ -208,9 +213,7 @@ function getPropExpressionValueContext(openTag: OpenTagContext): {
     return null
   }
 
-  const propExpressionMatch = openTag.fragment.match(
-    /(?:^|\s)([\w-]+)\s*=\s*\{\s*([A-Z][\w.]*)?$/
-  )
+  const propExpressionMatch = openTag.fragment.match(/(?:^|\s)([\w-]+)\s*=\s*\{\s*([A-Z][\w.]*)?$/)
   if (!propExpressionMatch) {
     return null
   }
@@ -303,8 +306,8 @@ function isIconProp(componentName: string, propName: string): boolean {
   const prop = getPropDefinition(componentName, propName)
   return Boolean(
     prop &&
-      prop.type.toLowerCase().includes('reactnode') &&
-      prop.description.toLowerCase().includes('icon')
+    prop.type.toLowerCase().includes('reactnode') &&
+    prop.description.toLowerCase().includes('icon')
   )
 }
 
@@ -547,10 +550,7 @@ function pageNavigationMatches(
     return true
   }
 
-  return (
-    matchesPartial(target.name, partialValue) ||
-    matchesPartial(target.id, partialValue)
-  )
+  return matchesPartial(target.name, partialValue) || matchesPartial(target.id, partialValue)
 }
 
 function pageNavigationOption(target: PageNavigationCompletionTarget): Completion {
@@ -646,11 +646,12 @@ export function getAkselCompletionForSource(
     const isIconPropTagContext = isInsideIconPropExpression(source, openTag.tagStart)
     const shouldSuggestComponents =
       tagNameContext.query === '' || COMPONENT_NAME_PATTERN.test(tagNameContext.query)
-    const componentOptions = isIconPropTagContext || !shouldSuggestComponents
-      ? []
-      : completionEntries
-          .filter((entry) => matchesPartial(entry.name, tagNameContext.query))
-          .map(componentOption)
+    const componentOptions =
+      isIconPropTagContext || !shouldSuggestComponents
+        ? []
+        : completionEntries
+            .filter((entry) => matchesPartial(entry.name, tagNameContext.query))
+            .map(componentOption)
     const iconOptions =
       isIconPropTagContext || isIconLikeTagQuery(tagNameContext.query, componentOptions.length > 0)
         ? iconComponentOptions(tagNameContext.query, isIconPropTagContext ? 'icon-prop-tag' : 'tag')
@@ -678,7 +679,11 @@ export function getAkselCompletionForContext(
   context: CompletionContext,
   pageNavigationTargets?: readonly PageNavigationCompletionTarget[]
 ): CompletionResult | null {
-  return getAkselCompletionForSource(context.state.doc.toString(), context.pos, pageNavigationTargets)
+  return getAkselCompletionForSource(
+    context.state.doc.toString(),
+    context.pos,
+    pageNavigationTargets
+  )
 }
 
 export function isAkselPropValueCompletionContext(
@@ -686,7 +691,11 @@ export function isAkselPropValueCompletionContext(
   pos: number,
   pageNavigationTargets?: readonly PageNavigationCompletionTarget[]
 ): boolean {
-  if (pageNavigationTargets && pageNavigationTargets.length > 0 && getPageNavigationContext(source, pos)) {
+  if (
+    pageNavigationTargets &&
+    pageNavigationTargets.length > 0 &&
+    getPageNavigationContext(source, pos)
+  ) {
     return true
   }
 
