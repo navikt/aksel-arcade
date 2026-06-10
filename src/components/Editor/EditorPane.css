@@ -11,8 +11,35 @@
   min-height: 0;
 }
 
-.editor-pane__header-group {
+.editor-pane__header {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--ax-space-16);
+}
+
+.editor-pane__header-start {
+  display: flex;
+  align-items: center;
+}
+
+.editor-pane__header-center {
+  display: flex;
+  justify-content: center;
   min-width: 0;
+}
+
+.editor-pane__header-end {
+  display: flex;
+  justify-content: flex-end;
+  min-width: 0;
+}
+
+.editor-pane__panel-toggle {
+  min-width: 24px;
+  width: 24px;
+  height: 24px;
+  padding: 0;
 }
 
 .editor-pane__editor {
