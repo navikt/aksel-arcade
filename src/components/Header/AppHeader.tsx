@@ -123,7 +123,7 @@ export const AppHeader = ({
   const exportConfirmDialogId = useId()
   const importConfirmDialogId = useId()
   const slowDescriptionId = `${loadingDescriptionId}-delay`
-  const { theme, toggleTheme, togglePanelOrder, multiPageEnabled, toggleMultiPageEnabled } =
+  const { theme, toggleTheme, togglePanelOrder, multiPageEnabled, setMultiPageEnabled } =
     useSettings()
   const {
     state: shareState,
@@ -673,11 +673,12 @@ export const AppHeader = ({
               </ActionMenu.Group>
               <ActionMenu.Divider />
               <ActionMenu.Group label="Experiments">
-                <ActionMenu.Item onSelect={toggleMultiPageEnabled}>
-                  {multiPageEnabled
-                    ? 'Disable experimental multi-page authoring'
-                    : 'Enable experimental multi-page authoring'}
-                </ActionMenu.Item>
+                <ActionMenu.CheckboxItem
+                  checked={multiPageEnabled}
+                  onCheckedChange={setMultiPageEnabled}
+                >
+                  Multiple pages
+                </ActionMenu.CheckboxItem>
               </ActionMenu.Group>
               <ActionMenu.Divider />
               <ActionMenu.Group label="Templates">
