@@ -28,4 +28,18 @@ describe('ComponentPalette', () => {
     expect(container.querySelectorAll('.component-docs-link')).toHaveLength(0)
     expect(screen.queryByRole('link', { name: 'Docs' })).toBeNull()
   })
+
+  it('sorts the Components tab alphabetically', async () => {
+    await act(async () => {
+      render(<ComponentPalette open onClose={vi.fn()} onInsertComponent={vi.fn()} />)
+    })
+
+    const componentNames = screen
+      .getAllByRole('heading', { level: 3 })
+      .map((heading) => heading.textContent?.trim() ?? '')
+
+    expect(componentNames).toEqual(
+      [...componentNames].sort((left, right) => left.localeCompare(right))
+    )
+  })
 })
