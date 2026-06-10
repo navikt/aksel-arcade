@@ -57,12 +57,6 @@ One of Aksel Arcade's most powerful features! Enable inspect mode to:
 - **Still exportable**: Oversize warnings now include a dedicated **Use Export instead** CTA that triggers the JSON export flow without leaving the popover.
 - **Telemetry-backed SLA**: Every generation and clipboard attempt emits a telemetry event so we can prove the 95% < 3 s / 99% clipboard-success targets from the spec.
 
-## ✅ Share Success Criteria
-
-- **95% of share generations finish < 3 s** — the telemetry payload exposes `withinTarget: true` whenever we’re inside the budget, so you can check `window.__AKSEL_TELEMETRY_LOG__` in DevTools while testing.
-- **99% clipboard success rate** — CopyButton paths use the native API first and log `share_clipboard` events with `outcome: "success"`; fallback selections show up as `"fallback"` and should stay below 1%.
-- **Oversize guard rails fire before compression** — as soon as estimates cross 3,600 characters the popover shows a warning badge, and any token projected to exceed 4,000 characters logs a `share_generation` event with `outcome: "oversize"` and disables the CopyButton while surfacing the export CTA.
-
 ### 🛡️ Safe Sandbox
 - Code runs in an isolated iframe for security
 - No backend dependencies—fully offline-capable
@@ -141,16 +135,6 @@ Inspect mode helps you understand your UI structure:
 - Create backups of your work
 - Transfer projects between browsers
 - Build a library of reusable patterns
-
----
-
-## ⌨️ Keyboard Shortcuts
-
-| Action | Mac | Windows/Linux |
-|--------|-----|---------------|
-| Undo | `Cmd+Z` | `Ctrl+Z` |
-| Redo | `Cmd+Shift+Z` | `Ctrl+Y` |
-
 
 ---
 
