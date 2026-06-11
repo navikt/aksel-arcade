@@ -1,5 +1,6 @@
 import type { ArcadePageId, ProjectSource } from '@/types/project'
 import type { TranspileResult, CompileError } from '@/types/preview'
+import { looksLikeModuleSource } from '@/services/jsxValidation'
 
 // Lazy load Babel to avoid blocking initial page load
 let Babel: typeof import('@babel/standalone') | null = null
@@ -259,6 +260,7 @@ const removeDuplicateRuntimePreludeStatements = (
 
 const createDefaultExportComponent = (sourceCode: string, componentIdentifier: string): string => {
   const defaultDeclarationMatch = sourceCode.match(DEFAULT_EXPORT_DECLARATION_PATTERN)
+  const defaultIdentifierMatch = sourceCode.match(/export\s+default\s+([A-Za-z_$][\w$]*)\s*;?/)
 
   if (defaultDeclarationMatch) {
     const [, declarationKind, declaredName] = defaultDeclarationMatch
@@ -270,6 +272,16 @@ const createDefaultExportComponent = (sourceCode: string, componentIdentifier: s
     return declaredName === componentIdentifier
       ? processedSource
       : `${processedSource}\nconst ${componentIdentifier} = ${declaredName};`
+  }
+
+  if (defaultIdentifierMatch) {
+    const [, defaultIdentifier] = defaultIdentifierMatch
+    return defaultIdentifier === componentIdentifier
+      ? sourceCode.replace(/export\s+default\s+[A-Za-z_$][\w$]*\s*;?/g, '')
+      : sourceCode.replace(
+          /export\s+default\s+[A-Za-z_$][\w$]*\s*;?/g,
+          `const ${componentIdentifier} = ${defaultIdentifier};`
+        )
   }
 
   return sourceCode.replace(/export\s+default\s+/g, `const ${componentIdentifier} = `)
@@ -303,11 +315,9 @@ const createComponentEntrySource = (
     }
   }
 
-  const hasExportDefault = /export\s+default\s+(function|class|\(|const|let|var)/.test(sourceCode)
-
-  if (hasExportDefault) {
+  if (looksLikeModuleSource(sourceCode)) {
     return {
-      code: createDefaultExportComponent(sourceCode, componentName),
+      code: normalizeModuleDeclarations(sourceCode, componentName),
       wrapperPrefixLines: 0,
     }
   }

@@ -3,10 +3,43 @@ export interface JsxValidationSource {
   sourceStartLine: number
 }
 
-const MODULE_SOURCE_PATTERN = /^\s*(?:export\b|(?:async\s+)?function\b|class\b|const\b|let\b|var\b)/
+const MODULE_SOURCE_PATTERN =
+  /^(?:import\b|export\b|(?:async\s+)?function\b|class\b|const\b|let\b|var\b)/
+
+function stripLeadingTrivia(sourceCode: string): string {
+  let remainingSource = sourceCode
+
+  while (true) {
+    const withoutWhitespace = remainingSource.replace(/^\s+/, '')
+
+    if (withoutWhitespace !== remainingSource) {
+      remainingSource = withoutWhitespace
+      continue
+    }
+
+    if (remainingSource.startsWith('//')) {
+      const nextLineIndex = remainingSource.indexOf('\n')
+      remainingSource = nextLineIndex === -1 ? '' : remainingSource.slice(nextLineIndex + 1)
+      continue
+    }
+
+    if (remainingSource.startsWith('/*')) {
+      const commentEndIndex = remainingSource.indexOf('*/')
+
+      if (commentEndIndex === -1) {
+        return remainingSource
+      }
+
+      remainingSource = remainingSource.slice(commentEndIndex + 2)
+      continue
+    }
+
+    return remainingSource
+  }
+}
 
 export function looksLikeModuleSource(sourceCode: string): boolean {
-  return MODULE_SOURCE_PATTERN.test(sourceCode)
+  return MODULE_SOURCE_PATTERN.test(stripLeadingTrivia(sourceCode))
 }
 
 export function buildJsxValidationSource(sourceCode: string): JsxValidationSource {

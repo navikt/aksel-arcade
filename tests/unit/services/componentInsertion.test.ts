@@ -143,6 +143,34 @@ describe('component insertion service', () => {
     })
   })
 
+  it('injects component setup into exported arrow-function App modules without wrapping the file', async () => {
+    const source = createArcadeSourceFile(
+      'import { VStack } from "@navikt/ds-react"\n' +
+        'export const App = (): JSX.Element => {\n' +
+        '  return <VStack></VStack>\n' +
+        '}\n' +
+        'export default App',
+      ''
+    )
+    const insertionPoint = source.jsx.indexOf('</VStack>')
+
+    const nextSource = applyComponentInsertion(source, paginationInsertion, {
+      kind: 'autocomplete',
+      from: insertionPoint,
+      to: insertionPoint,
+    })
+
+    expect(nextSource.jsx).toContain('export const App = (): JSX.Element => {\n  // __AKSEL_ARCADE_COMPONENT_SETUP__')
+    expect(nextSource.jsx).toContain('const [pageState, setPageState] = useState(1)')
+    expect(nextSource.jsx).toContain('return <VStack><Pagination')
+    expect(nextSource.jsx).not.toContain('(() => {')
+
+    await expect(transpileCode(nextSource.jsx, nextSource.hooks)).resolves.toMatchObject({
+      success: true,
+      error: null,
+    })
+  })
+
   it('replaces JSX completion ranges and preserves existing Hooks code', () => {
     const source = createArcadeSourceFile('<Pagi', 'const selectedFilter = "all"')
 

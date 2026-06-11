@@ -170,6 +170,25 @@ export default () => {
     expect(result.code).toContain('App')
   })
 
+  it('should transpile exported const App modules with a separate default export', async () => {
+    const jsxCode = `import { Box } from "@navikt/ds-react";
+
+export const App = (): JSX.Element => {
+  return <Box>Content</Box>;
+}
+
+export default App`
+
+    const result = await transpileCode(jsxCode, '')
+
+    expect(result.success).toBe(true)
+    expect(result.code).toBeTruthy()
+    expect(result.code).toContain('const App =')
+    expect(result.code).toContain('React.createElement')
+    expect(result.code).not.toContain('import')
+    expect(result.code).not.toContain('export')
+  })
+
   it('should combine hooks code with jsx code', async () => {
     const hooksCode = `import { useState } from "react";
 

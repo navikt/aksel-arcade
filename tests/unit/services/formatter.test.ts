@@ -23,4 +23,17 @@ describe('formatCode', () => {
       'export default function App()'
     )
   })
+
+  it('formats import-led component modules directly', async () => {
+    const source =
+      '// comment before imports\n' +
+      "import { VStack } from '@navikt/ds-react'\n" +
+      'export default function App() {\n' +
+      'return <VStack />\n' +
+      '}'
+
+    await expect(formatCode(source, { parser: 'babel' })).resolves.toContain(
+      "import { VStack } from '@navikt/ds-react'"
+    )
+  })
 })

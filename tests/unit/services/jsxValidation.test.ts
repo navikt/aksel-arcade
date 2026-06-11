@@ -50,4 +50,18 @@ describe('buildJsxValidationSource', () => {
       })
     ).not.toThrow()
   })
+
+  it('treats import-led component modules as module sources', () => {
+    const source =
+      '// comment before imports\n' +
+      "import { VStack } from '@navikt/ds-react'\n" +
+      'export default function App() {\n' +
+      '  return <VStack></VStack>\n' +
+      '}'
+    const { code, sourceStartLine } = buildJsxValidationSource(source)
+
+    expect(looksLikeModuleSource(source)).toBe(true)
+    expect(code).toBe(source)
+    expect(sourceStartLine).toBe(1)
+  })
 })

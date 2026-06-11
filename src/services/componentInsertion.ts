@@ -25,8 +25,10 @@ const COMPONENT_SETUP_MARKER = '// __AKSEL_ARCADE_COMPONENT_SETUP__'
 const COMPONENT_SETUP_WRAPPER_PATTERN = new RegExp(
   String.raw`^\(\(\) => \{\n {2}\/\/ __AKSEL_ARCADE_COMPONENT_SETUP__\n([\s\S]*?)\n\n {2}return \(\n {4}<>\n([\s\S]*?)\n {4}<\/>\n {2}\)\n\}\)\(\)$`
 )
-const FUNCTION_COMPONENT_OPENING_PATTERN =
-  /^\s*(?:export\s+default\s+)?function\s+\w+\s*\([^)]*\)\s*\{/
+const FUNCTION_COMPONENT_OPENING_PATTERNS = [
+  /^(?:export\s+default\s+)?function\s+\w+\s*\([^)]*\)\s*\{/m,
+  /^(?:export\s+)?(?:const|let|var)\s+\w+\s*=\s*(?:async\s*)?(?:\([^)]*\)|[A-Za-z_$][\w$]*)\s*(?::[^=]+)?=>\s*\{/m,
+]
 
 function stripSnippetPlaceholders(template: string): string {
   return template.replace(
@@ -195,16 +197,20 @@ function applyFunctionComponentSetup(source: string, setupBlock: string): string
     }
   }
 
-  const functionOpeningMatch = source.match(FUNCTION_COMPONENT_OPENING_PATTERN)
+  const functionOpeningMatch = FUNCTION_COMPONENT_OPENING_PATTERNS.flatMap((pattern) => {
+    const match = source.match(pattern)
+    return match ? [{ match, index: match.index ?? 0 }] : []
+  }).sort((left, right) => left.index - right.index)[0]
 
   if (!functionOpeningMatch) {
     return null
   }
 
-  const functionOpening = functionOpeningMatch[0]
-  const body = source.slice(functionOpening.length).trimStart()
+  const functionOpening = functionOpeningMatch.match[0]
+  const functionOpeningEnd = functionOpeningMatch.index + functionOpening.length
+  const body = source.slice(functionOpeningEnd).trimStart()
 
-  return `${functionOpening}\n  ${COMPONENT_SETUP_MARKER}\n${indentBlock(setupBlock, '  ')}\n\n${body}`
+  return `${source.slice(0, functionOpeningEnd)}\n  ${COMPONENT_SETUP_MARKER}\n${indentBlock(setupBlock, '  ')}\n\n${body}`
 }
 
 function applyComponentSetup(source: string, setupBlock: string): string {
