@@ -17,6 +17,7 @@ import {
   type PageNavigationCompletionTarget,
 } from '@/services/akselAutocomplete'
 import { getStalePageReferenceMessage, getStalePageReferences } from '@/services/pageReferences'
+import { buildJsxValidationSource } from '@/services/jsxValidation'
 import type { ArcadePageId } from '@/types/project'
 import * as Babel from '@babel/standalone'
 import './CodeEditor.css'
@@ -125,21 +126,7 @@ const createCursorInQuotesPlugin = (
 const jsxLinter = linter((view) => {
   const diagnostics: Diagnostic[] = []
   const code = view.state.doc.toString()
-
-  // Wrap in default export component for validation
-  const wrappedCode = `
-import { Button, TextField, Select, Checkbox, Radio, Box, Stack, Grid } from '@navikt/ds-react'
-
-function App() {
-  return (
-    <>
-${code}
-    </>
-  );
-}
-
-export default App;
-`
+  const { code: wrappedCode, sourceStartLine } = buildJsxValidationSource(code)
 
   try {
     Babel.transform(wrappedCode, {
@@ -150,14 +137,13 @@ export default App;
     if (error && typeof error === 'object' && 'loc' in error) {
       const babelError = error as { loc?: { line: number; column: number }; message?: string }
       if (babelError.loc) {
-        // Adjust line number to account for wrapper (subtract 6 lines)
-        const actualLine = Math.max(0, babelError.loc.line - 6)
+        const actualLine = Math.max(0, babelError.loc.line - sourceStartLine)
         const lineCount = view.state.doc.lines
-        
+
         // Ensure we don't try to access invalid line numbers
         if (actualLine < lineCount) {
           const pos = view.state.doc.line(actualLine + 1).from + (babelError.loc.column || 0)
-          
+
           diagnostics.push({
             from: pos,
             to: pos,

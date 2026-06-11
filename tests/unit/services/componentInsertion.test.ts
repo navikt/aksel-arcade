@@ -103,6 +103,21 @@ describe('component insertion service', () => {
     expect(secondSource.jsx).toContain('page={pageState2}')
   })
 
+  it('routes component-setup insertions into JSX even when the Hooks tab is active', () => {
+    const source = createArcadeSourceFile('<VStack></VStack>', 'const existing = true')
+
+    const nextSource = applyComponentInsertion(source, paginationInsertion, {
+      kind: 'palette',
+      activeTab: 'Hooks',
+      jsxCursor: { line: 0, column: '<VStack>'.length },
+      hooksCursor: { line: 0, column: 0 },
+    })
+
+    expect(nextSource.jsx).toContain('const [pageState, setPageState] = useState(1)')
+    expect(nextSource.jsx).toContain('<VStack><Pagination')
+    expect(nextSource.hooks).toBe('const existing = true')
+  })
+
   it('replaces JSX completion ranges and preserves existing Hooks code', () => {
     const source = createArcadeSourceFile('<Pagi', 'const selectedFilter = "all"')
 

@@ -228,6 +228,13 @@ export function applyComponentInsertion(
     }
   }
 
+  if (componentSetupBlock) {
+    return {
+      jsx: applyJsxSetup(insertBlockAtCursor(source.jsx, location.jsxCursor, jsxBlock)),
+      hooks: source.hooks,
+    }
+  }
+
   if (location.activeTab === 'Hooks') {
     return {
       jsx: source.jsx,

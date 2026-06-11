@@ -2257,3 +2257,20 @@ Verification:
 Next note:
 
 - Stateful catalog entries that must stay insertable inside primitives should prefer the new `componentSetup` path until the runtime model changes and Hooks-tab code can execute inside component scope. Keep browser/stateful insertion checks focused on exact cursor placement inside single-line parents, because that was the real regression behind the failed `VStack` insertion.
+
+### 2026-06-11 - PR #223 review follow-up for Issue #211
+
+Fixed before merge:
+
+- A focused PR review caught that the JSX editor linter still validated source by wrapping it in a fragment, which falsely flagged the new component-setup Pagination wrapper (`(() => { ... })()`) as invalid even though the preview transpiler accepts it as a single return expression.
+- Added `src/services/jsxValidation.ts` so editor validation now mirrors the real component-entry shape more closely: single-root expressions such as the component-setup IIFE validate directly, while true multi-root JSX still gets fragment wrapping.
+- Fixed `applyComponentInsertion()` so palette insertions with `componentSetup` still target JSX even when the Hooks tab is active, matching the earlier multi-part insertion behavior and preventing raw `<Pagination ... />` JSX from being written into Hooks code.
+- Added regression coverage in `tests/unit/services/jsxValidation.test.ts` and extended `tests/unit/services/componentInsertion.test.ts` for the Hooks-tab component-setup path.
+
+Verification:
+
+- npm run lint (existing `.eslintignore` deprecation notice and existing `InspectionPopover` hook dependency warning only)
+- npm run typecheck
+- npm run test -- --run
+- npm run build
+- Browser check at `http://127.0.0.1:4311/aksel-arcade/`: confirmed Add -> `Pagination` on the JSX tab produces no CodeMirror lint errors, Add -> `Pagination` while the Hooks tab is active leaves Hooks content unchanged while still updating JSX, pagination remains interactive in preview, and the verified flow produced no browser console errors.
