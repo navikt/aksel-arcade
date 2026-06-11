@@ -187,11 +187,11 @@ describe('Aksel-aware autocomplete contract', () => {
     )
   })
 
-  it('routes Pagination through the catalog multi-part insertion callback', () => {
+  it('routes Pagination through the catalog insertion callback with composable JSX', () => {
     const onApplyCatalogInsertion = vi.fn()
     const option = optionFor('<Pagi', 'Pagination', undefined, onApplyCatalogInsertion)
 
-    expect(option?.detail).toBe('Pagination controls with local page state.')
+    expect(option?.detail).toBe('Pagination controls with Hooks-tab state.')
     expect(typeof option?.apply).toBe('function')
 
     if (typeof option?.apply !== 'function') {
@@ -204,7 +204,9 @@ describe('Aksel-aware autocomplete contract', () => {
       from: 0,
       to: 5,
       insertion: expect.objectContaining({
-        jsx: expect.stringMatching(/^>\s*\{\(\(\) => \{/),
+        jsx: expect.stringContaining(
+          'Pagination\n  {...usePaginationState{{paginationSuffix}}()}\n  count={9}'
+        ),
         hooks: expect.stringContaining(
           'export const usePaginationState{{paginationSuffix}} = (initialPage = 1) => {'
         ),

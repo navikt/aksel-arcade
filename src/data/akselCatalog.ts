@@ -810,7 +810,7 @@ export const AKSEL_CATALOG: AkselCatalogEntry[] = [
     importName: 'Pagination',
     importGuidance: "import { Pagination } from '@navikt/ds-react';",
     docs: `${COMPONENT_DOCS_BASE}/pagination`,
-    description: 'Pagination controls with local page state.',
+    description: 'Pagination controls with Hooks-tab state.',
     keywords: ['pagination', 'paging', 'pager', 'pages', 'navigation', 'results'],
     props: [
       {
@@ -845,27 +845,22 @@ export const AKSEL_CATALOG: AkselCatalogEntry[] = [
     ],
     snippet: {
       code:
-        '<>\n' +
-        '{(() => {\n' +
-        '  const paginationState{{paginationSuffix}} = usePaginationState{{paginationSuffix}}()\n' +
-        '\n' +
-        '  return (\n' +
-        '    <Pagination\n' +
-        '      page={paginationState{{paginationSuffix}}.page}\n' +
-        '      count={10}\n' +
-        '      onPageChange={paginationState{{paginationSuffix}}.setPage}\n' +
-        '      srHeading={{ tag: "h2", text: "Result pages" }}\n' +
-        '    />\n' +
-        '  )\n' +
-        '})()}\n' +
-        '</>',
+        '<Pagination\n' +
+        '  {...usePaginationState{{paginationSuffix}}()}\n' +
+        '  count={9}\n' +
+        '  boundaryCount={1}\n' +
+        '  siblingCount={1}\n' +
+        '/>',
       hooksCode:
         'export const usePaginationState{{paginationSuffix}} = (initialPage = 1) => {\n' +
-        '  const [page, setPage] = useState(initialPage)\n' +
+        '  const [pageState, setPageState] = useState(initialPage)\n' +
         '\n' +
-        '  return { page, setPage }\n' +
+        '  return {\n' +
+        '    page: pageState,\n' +
+        '    onPageChange: setPageState,\n' +
+        '  }\n' +
         '}',
-      description: 'Pagination with stateful page changes.',
+      description: 'Composable Pagination with Hooks-tab state.',
     },
   },
   {

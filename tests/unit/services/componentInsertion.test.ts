@@ -4,25 +4,20 @@ import { applyComponentInsertion, createJsxOnlyInsertion } from '@/services/comp
 
 const paginationInsertion = {
   jsx:
-    '<>\n' +
-    '{(() => {\n' +
-    '  const paginationState{{paginationSuffix}} = usePaginationState{{paginationSuffix}}()\n' +
-    '\n' +
-    '  return (\n' +
-    '    <Pagination\n' +
-    '      page={paginationState{{paginationSuffix}}.page}\n' +
-    '      count={10}\n' +
-    '      onPageChange={paginationState{{paginationSuffix}}.setPage}\n' +
-    '      srHeading={{ tag: "h2", text: "Result pages" }}\n' +
-    '    />\n' +
-    '  )\n' +
-    '})()}\n' +
-    '</>',
+    '<Pagination\n' +
+    '  {...usePaginationState{{paginationSuffix}}()}\n' +
+    '  count={9}\n' +
+    '  boundaryCount={1}\n' +
+    '  siblingCount={1}\n' +
+    '/>',
   hooks:
     'export const usePaginationState{{paginationSuffix}} = (initialPage = 1) => {\n' +
-    '  const [page, setPage] = useState(initialPage)\n' +
+    '  const [pageState, setPageState] = useState(initialPage)\n' +
     '\n' +
-    '  return { page, setPage }\n' +
+    '  return {\n' +
+    '    page: pageState,\n' +
+    '    onPageChange: setPageState,\n' +
+    '  }\n' +
     '}',
 }
 
@@ -53,13 +48,17 @@ describe('component insertion service', () => {
     })
 
     expect(nextSource.jsx).toContain('<BodyShort>Results</BodyShort>')
-    expect(nextSource.jsx).toContain('usePaginationState()')
+    expect(nextSource.jsx).toContain('{...usePaginationState()}')
+    expect(nextSource.jsx).not.toContain('{(() => {')
     expect(nextSource.hooks).toBe(
       'const existing = true\n\n' +
         'export const usePaginationState = (initialPage = 1) => {\n' +
-        '  const [page, setPage] = useState(initialPage)\n' +
+        '  const [pageState, setPageState] = useState(initialPage)\n' +
         '\n' +
-        '  return { page, setPage }\n' +
+        '  return {\n' +
+        '    page: pageState,\n' +
+        '    onPageChange: setPageState,\n' +
+        '  }\n' +
         '}'
     )
   })
@@ -79,8 +78,8 @@ describe('component insertion service', () => {
       hooksCursor: { line: 0, column: 0 },
     })
 
-    expect(secondSource.jsx).toContain('usePaginationState()')
-    expect(secondSource.jsx).toContain('usePaginationState2()')
+    expect(secondSource.jsx).toContain('{...usePaginationState()}')
+    expect(secondSource.jsx).toContain('{...usePaginationState2()}')
     expect(secondSource.hooks).toContain('export const usePaginationState = (initialPage = 1) => {')
     expect(secondSource.hooks).toContain(
       'export const usePaginationState2 = (initialPage = 1) => {'
@@ -97,13 +96,17 @@ describe('component insertion service', () => {
     })
 
     expect(nextSource.jsx).toContain('<Pagination')
-    expect(nextSource.jsx).toContain('usePaginationState()')
+    expect(nextSource.jsx).toContain('{...usePaginationState()}')
+    expect(nextSource.jsx).not.toContain('{(() => {')
     expect(nextSource.hooks).toBe(
       'const selectedFilter = "all"\n\n' +
         'export const usePaginationState = (initialPage = 1) => {\n' +
-        '  const [page, setPage] = useState(initialPage)\n' +
+        '  const [pageState, setPageState] = useState(initialPage)\n' +
         '\n' +
-        '  return { page, setPage }\n' +
+        '  return {\n' +
+        '    page: pageState,\n' +
+        '    onPageChange: setPageState,\n' +
+        '  }\n' +
         '}'
     )
   })
