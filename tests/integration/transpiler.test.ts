@@ -185,6 +185,21 @@ export default function () {
     expect(result.code).not.toContain('const App = function;')
   })
 
+  it('should handle async anonymous default-export arrow components', async () => {
+    const jsxCode = `import { Box } from "@navikt/ds-react";
+
+export default async () => {
+  return <Box>Content</Box>;
+}`
+
+    const result = await transpileCode(jsxCode, '')
+
+    expect(result.success).toBe(true)
+    expect(result.code).toBeTruthy()
+    expect(result.code).toContain('const App = async')
+    expect(result.code).not.toContain('const App = async;')
+  })
+
   it('should transpile exported const App modules with a separate default export', async () => {
     const jsxCode = `import { Box } from "@navikt/ds-react";
 

@@ -40,6 +40,10 @@ const DEFAULT_EXPORT_DECLARATION_PATTERN =
   /export\s+default\s+((?:async\s+)?function|class)\s+([A-Za-z_$][\w$]*)/
 const DEFAULT_EXPORT_IDENTIFIER_PATTERN =
   /export\s+default\s+(?!(?:async\s+function|function|class)\b)([A-Za-z_$][\w$]*)\s*;?/
+const ANONYMOUS_DEFAULT_EXPORT_DECLARATION_PATTERN =
+  /export\s+default\s+((?:async\s+)?function|class)\s*(?=\()/
+const ANONYMOUS_DEFAULT_EXPORT_ARROW_PATTERN =
+  /export\s+default\s+(?:async\s*)?(?:\([^)]*\)|[A-Za-z_$][\w$]*)\s*(?::[^=]+)?=>/
 const EXPORT_NAMED_DECLARATION_PATTERN = /export\s+(const|let|var|function|class)\s+/g
 const EXPORT_NAMED_LIST_PATTERN = /export\s*\{[^}]+\}\s*;?\n?/g
 
@@ -274,6 +278,13 @@ const createDefaultExportComponent = (sourceCode: string, componentIdentifier: s
     return declaredName === componentIdentifier
       ? processedSource
       : `${processedSource}\nconst ${componentIdentifier} = ${declaredName};`
+  }
+
+  if (
+    ANONYMOUS_DEFAULT_EXPORT_DECLARATION_PATTERN.test(sourceCode) ||
+    ANONYMOUS_DEFAULT_EXPORT_ARROW_PATTERN.test(sourceCode)
+  ) {
+    return sourceCode.replace(/export\s+default\s+/, `const ${componentIdentifier} = `)
   }
 
   if (defaultIdentifierMatch) {
