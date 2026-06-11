@@ -5,6 +5,8 @@
  * Supports JSX/TSX formatting with React conventions.
  */
 
+import { looksLikeModuleSource } from '@/services/jsxValidation'
+
 // Prettier is loaded dynamically to avoid bundle size impact
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let prettierModule: any = null
@@ -92,6 +94,24 @@ function stripFragmentWrapper(code: string): string {
 export async function formatCode(code: string, options: FormatOptions = {}): Promise<string> {
   try {
     const { prettier, parserBabel, parserEstree } = await loadPrettier()
+
+    if (looksLikeModuleSource(code)) {
+      return (
+        await prettier.format(code, {
+          parser: options.parser || 'babel',
+          plugins: [parserEstree, parserBabel],
+          printWidth: options.printWidth || 100,
+          tabWidth: options.tabWidth || 2,
+          singleQuote: options.singleQuote !== undefined ? options.singleQuote : true,
+          semi: options.semi !== undefined ? options.semi : false,
+          trailingComma: options.trailingComma || 'es5',
+          arrowParens: 'always',
+          jsxSingleQuote: false,
+          bracketSpacing: true,
+          jsxBracketSameLine: false,
+        })
+      ).trim()
+    }
 
     // Detect if code has multiple root JSX elements by counting opening tags
     // at the start of lines (ignoring whitespace)

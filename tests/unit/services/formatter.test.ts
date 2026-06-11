@@ -11,4 +11,16 @@ describe('formatCode', () => {
 
     await expect(formatCode(source, { parser: 'babel' })).resolves.toContain('const [pageState, setPageState] = useState(1)')
   })
+
+  it('formats exported App sources directly without wrapping them in a JSX return shell', async () => {
+    const source =
+      'export default function App() {\n' +
+      'const [pageState, setPageState] = useState(1)\n' +
+      'return <VStack><Pagination page={pageState} onPageChange={setPageState} count={9} /></VStack>\n' +
+      '}'
+
+    await expect(formatCode(source, { parser: 'babel' })).resolves.toContain(
+      'export default function App()'
+    )
+  })
 })
