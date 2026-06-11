@@ -64,6 +64,49 @@ describe('ComponentPalette', () => {
     )
   })
 
+  it('passes hook-backed DatePicker insertion metadata through the Add menu boundary', async () => {
+    const user = userEvent.setup()
+    const onInsertComponent = vi.fn()
+
+    await act(async () => {
+      render(<ComponentPalette open onClose={vi.fn()} onInsertComponent={onInsertComponent} />)
+    })
+
+    await user.type(screen.getByRole('textbox', { name: /search components/i }), 'DatePicker')
+    await user.click(screen.getByRole('link', { name: 'DatePicker' }))
+
+    expect(onInsertComponent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: 'DatePicker',
+        insertion: expect.objectContaining({
+          jsx: '<DatePickerField{{datePickerFieldSuffix}} />',
+          hooks: expect.stringContaining('const { datepickerProps, inputProps } = useDatepicker({'),
+        }),
+      })
+    )
+  })
+
+  it('passes grouped Radio snippets through the Add menu boundary', async () => {
+    const user = userEvent.setup()
+    const onInsertComponent = vi.fn()
+
+    await act(async () => {
+      render(<ComponentPalette open onClose={vi.fn()} onInsertComponent={onInsertComponent} />)
+    })
+
+    await user.type(screen.getByRole('textbox', { name: /search components/i }), 'Radio')
+    await user.click(screen.getByRole('link', { name: 'Radio' }))
+
+    expect(onInsertComponent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: 'Radio',
+        snippet: expect.stringContaining(
+          '<RadioGroup legend="Choose delivery speed" defaultValue="standard" name="deliverySpeed">'
+        ),
+      })
+    )
+  })
+
   it('passes uncontrolled Tabs snippets through the Add menu boundary', async () => {
     const user = userEvent.setup()
     const onInsertComponent = vi.fn()

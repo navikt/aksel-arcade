@@ -22,6 +22,28 @@ const paginationInsertion = {
     '}',
 }
 
+const datePickerInsertion = {
+  jsx: '<DatePickerField{{datePickerFieldSuffix}} />',
+  hooks:
+    'export const DatePickerField{{datePickerFieldSuffix}} = () => {\n' +
+    '  const { datepickerProps, inputProps } = useDatepicker({\n' +
+    '    defaultSelected: new Date("2025-06-15"),\n' +
+    '    fromDate: new Date("2025-01-01"),\n' +
+    '    toDate: new Date("2025-12-31"),\n' +
+    '  })\n' +
+    '\n' +
+    '  return (\n' +
+    '    <DatePicker {...datepickerProps}>\n' +
+    '      <DatePicker.Input\n' +
+    '        {...inputProps}\n' +
+    '        label="Choose meeting date"\n' +
+    '        description="Pick a date in 2025."\n' +
+    '      />\n' +
+    '    </DatePicker>\n' +
+    '  )\n' +
+    '}',
+}
+
 describe('component insertion service', () => {
   it('preserves JSX-only Add menu insertion on the active JSX tab', () => {
     const source = createArcadeSourceFile('<Box>First</Box>\n<Box>Second</Box>', '')
@@ -86,6 +108,27 @@ describe('component insertion service', () => {
     expect(secondSource.hooks).toContain(
       'export const usePaginationState2 = (initialPage = 1) => {'
     )
+  })
+
+  it('avoids helper-component name collisions for picker insertions', () => {
+    const firstSource = applyComponentInsertion(createArcadeSourceFile('', ''), datePickerInsertion, {
+      kind: 'palette',
+      activeTab: 'JSX',
+      jsxCursor: { line: 0, column: 0 },
+      hooksCursor: { line: 0, column: 0 },
+    })
+
+    const secondSource = applyComponentInsertion(firstSource, datePickerInsertion, {
+      kind: 'palette',
+      activeTab: 'JSX',
+      jsxCursor: { line: 1, column: 0 },
+      hooksCursor: { line: 0, column: 0 },
+    })
+
+    expect(secondSource.jsx).toContain('<DatePickerField />')
+    expect(secondSource.jsx).toContain('<DatePickerField2 />')
+    expect(secondSource.hooks).toContain('export const DatePickerField = () => {')
+    expect(secondSource.hooks).toContain('export const DatePickerField2 = () => {')
   })
 
   it('replaces JSX completion ranges and preserves existing Hooks code', () => {

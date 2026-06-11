@@ -190,6 +190,27 @@ describe('Aksel-aware autocomplete contract', () => {
     )
   })
 
+  it('prefers catalog-backed form control details and insertions for top-level targets', () => {
+    expect(optionFor('<Check', 'Checkbox')?.detail).toBe('Checkbox input with a visible label.')
+    expect(applyFor('<Check', 'Checkbox')).toContain('description="You can change this later."')
+    expect(applyFor('<Check', 'Checkbox')).toContain('name="emailUpdates"')
+    expect(optionFor('<Radio', 'Radio')?.detail).toBe(
+      'Single-choice radio group with a visible legend.'
+    )
+    expect(applyFor('<Radio', 'Radio')).toContain(
+      'RadioGroup legend="Choose delivery speed" defaultValue="standard" name="deliverySpeed">'
+    )
+    expect(optionFor('<Sear', 'Search')?.detail).toBe(
+      'Search field inside an accessible search form.'
+    )
+    expect(applyFor('<Sear', 'Search')).toContain(
+      'form role="search" onSubmit={(event) => event.preventDefault()}'
+    )
+    expect(applyFor('<Sele', 'Select')).toContain('defaultValue=""')
+    expect(applyFor('<Swit', 'Switch')).toContain('defaultChecked')
+    expect(applyFor('<Texta', 'Textarea')).toContain('minRows={4}')
+  })
+
   it('routes Pagination through the catalog insertion callback with composable JSX', () => {
     const onApplyCatalogInsertion = vi.fn()
     const option = optionFor('<Pagi', 'Pagination', undefined, onApplyCatalogInsertion)
@@ -217,10 +238,83 @@ describe('Aksel-aware autocomplete contract', () => {
     })
   })
 
-  it('hides multi-part catalog insertions when the editor cannot apply them safely', () => {
-    const result = getAkselCompletionForSource('<Pagi', '<Pagi'.length, undefined, undefined)
+  it('routes DatePicker, MonthPicker, and ToggleGroup through the catalog insertion callback', () => {
+    const onApplyCatalogInsertion = vi.fn()
+    const cases = [
+      {
+        source: '<DateP',
+        label: 'DatePicker',
+        expectedJsx: '<DatePickerField{{datePickerFieldSuffix}} />',
+        expectedHooks: 'useDatepicker({',
+      },
+      {
+        source: '<MonthP',
+        label: 'MonthPicker',
+        expectedJsx: '<MonthPickerField{{monthPickerFieldSuffix}} />',
+        expectedHooks: 'useMonthpicker({',
+      },
+      {
+        source: '<ToggleG',
+        label: 'ToggleGroup',
+        expectedJsx: '<ToggleGroup\n  {...useToggleGroupState{{toggleGroupSuffix}}()}',
+        expectedHooks:
+          'export const useToggleGroupState{{toggleGroupSuffix}} = (initialValue = "list") => {',
+      },
+    ] as const
 
-    expect(result?.options.find((option) => option.label === 'Pagination')).toBeUndefined()
+    for (const { source, label } of cases) {
+      const option = optionFor(source, label, undefined, onApplyCatalogInsertion)
+
+      expect(option?.detail).not.toBeUndefined()
+      expect(typeof option?.apply).toBe('function')
+
+      if (typeof option?.apply !== 'function') {
+        throw new Error(`Expected ${label} completion to use a custom apply callback`)
+      }
+
+      option.apply({} as never, option as never, 0, source.length)
+    }
+
+    expect(onApplyCatalogInsertion).toHaveBeenNthCalledWith(1, {
+      from: 0,
+      to: '<DateP'.length,
+      insertion: expect.objectContaining({
+        jsx: 'DatePickerField{{datePickerFieldSuffix}} />',
+        hooks: expect.stringContaining('useDatepicker({'),
+      }),
+    })
+    expect(onApplyCatalogInsertion).toHaveBeenNthCalledWith(2, {
+      from: 0,
+      to: '<MonthP'.length,
+      insertion: expect.objectContaining({
+        jsx: 'MonthPickerField{{monthPickerFieldSuffix}} />',
+        hooks: expect.stringContaining('useMonthpicker({'),
+      }),
+    })
+    expect(onApplyCatalogInsertion).toHaveBeenNthCalledWith(3, {
+      from: 0,
+      to: '<ToggleG'.length,
+      insertion: expect.objectContaining({
+        jsx: expect.stringContaining('{...useToggleGroupState{{toggleGroupSuffix}}()}'),
+        hooks: expect.stringContaining(
+          'export const useToggleGroupState{{toggleGroupSuffix}} = (initialValue = "list") => {'
+        ),
+      }),
+    })
+  })
+
+  it('hides multi-part catalog insertions when the editor cannot apply them safely', () => {
+    const cases = [
+      ['<DateP', 'DatePicker'],
+      ['<MonthP', 'MonthPicker'],
+      ['<Pagi', 'Pagination'],
+      ['<ToggleG', 'ToggleGroup'],
+    ] as const
+
+    for (const [source, label] of cases) {
+      const result = getAkselCompletionForSource(source, source.length, undefined, undefined)
+      expect(result?.options.find((option) => option.label === label)).toBeUndefined()
+    }
   })
 
   it('keeps Combobox as the only author-facing autocomplete name', () => {

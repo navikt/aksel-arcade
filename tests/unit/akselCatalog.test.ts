@@ -175,6 +175,66 @@ describe('Aksel catalog starter path', () => {
     )
   })
 
+  it('routes form and input examples through the shared catalog for Add menu data', () => {
+    const componentEntries = listCatalogEntries({ groups: ['component'], statuses: ['current'] })
+    const paletteComponents = getComponentsByCategory('component')
+    const checkboxEntry = getCatalogComponent('Checkbox')
+    const radioEntry = getCatalogComponent('Radio')
+    const searchEntry = getCatalogComponent('Search')
+    const selectEntry = getCatalogComponent('Select')
+    const switchEntry = getCatalogComponent('Switch')
+    const textareaEntry = getCatalogComponent('Textarea')
+    const toggleGroupEntry = getCatalogComponent('ToggleGroup')
+
+    expect(componentEntries.map((entry) => entry.name)).toEqual(
+      expect.arrayContaining([
+        'Checkbox',
+        'Radio',
+        'Search',
+        'Select',
+        'Switch',
+        'Textarea',
+        'ToggleGroup',
+      ])
+    )
+    expect(checkboxEntry?.snippet.code).toContain('description="You can change this later."')
+    expect(checkboxEntry?.snippet.code).toContain('name="emailUpdates"')
+    expect(radioEntry?.snippet.code).toContain(
+      '<RadioGroup legend="Choose delivery speed" defaultValue="standard" name="deliverySpeed">'
+    )
+    expect(searchEntry?.snippet.code).toContain(
+      '<form role="search" onSubmit={(event) => event.preventDefault()}>'
+    )
+    expect(selectEntry?.snippet.code).toContain('label="Choose delivery window"')
+    expect(selectEntry?.snippet.code).toContain('defaultValue=""')
+    expect(selectEntry?.snippet.code).toContain('name="deliveryWindow"')
+    expect(switchEntry?.snippet.code).toContain('<Switch defaultChecked')
+    expect(textareaEntry?.snippet.code).toContain('minRows={4}')
+    expect(toggleGroupEntry?.snippet.code).toContain(
+      '{...useToggleGroupState{{toggleGroupSuffix}}()}'
+    )
+    expect(toggleGroupEntry?.snippet.hooksCode).toContain(
+      'export const useToggleGroupState{{toggleGroupSuffix}} = (initialValue = "list") => {'
+    )
+    expect(
+      paletteComponents.find((component) => component.name === 'Radio')?.snippet
+    ).toContain('<RadioGroup legend="Choose delivery speed" defaultValue="standard" name="deliverySpeed">')
+    expect(
+      paletteComponents.find((component) => component.name === 'ToggleGroup')?.insertion
+    ).toEqual(
+      expect.objectContaining({
+        jsx: expect.stringContaining('{...useToggleGroupState{{toggleGroupSuffix}}()}'),
+        hooks: expect.stringContaining(
+          'export const useToggleGroupState{{toggleGroupSuffix}} = (initialValue = "list") => {'
+        ),
+      })
+    )
+    expect(searchComponents('radiogroup')).toContainEqual(expect.objectContaining({ name: 'Radio' }))
+    expect(searchComponents('segmented')).toContainEqual(
+      expect.objectContaining({ name: 'ToggleGroup' })
+    )
+  })
+
   it('exposes Pagination as a catalog-backed multi-part insertion', () => {
     const paginationEntry = getCatalogComponent('Pagination')
     const paginationPaletteEntry = getComponentsByCategory('component').find(
@@ -218,13 +278,61 @@ describe('Aksel catalog starter path', () => {
     expect(searchComponents('pager')).toContainEqual(expect.objectContaining({ name: 'Pagination' }))
   })
 
+  it('exposes DatePicker, MonthPicker, and ToggleGroup as catalog-backed stateful insertions', () => {
+    const datePickerEntry = getCatalogComponent('DatePicker')
+    const monthPickerEntry = getCatalogComponent('MonthPicker')
+    const toggleGroupEntry = getCatalogComponent('ToggleGroup')
+    const datePickerSnippet = AKSEL_SNIPPETS.find((snippet) => snippet.name === 'DatePicker')
+    const monthPickerSnippet = AKSEL_SNIPPETS.find((snippet) => snippet.name === 'MonthPicker')
+    const toggleGroupSnippet = AKSEL_SNIPPETS.find((snippet) => snippet.name === 'ToggleGroup')
+
+    expect(datePickerEntry?.snippet.code).toBe('<DatePickerField{{datePickerFieldSuffix}} />')
+    expect(datePickerEntry?.snippet.hooksCode).toContain(
+      'const { datepickerProps, inputProps } = useDatepicker({'
+    )
+    expect(datePickerEntry?.snippet.hooksCode).toContain('label="Choose meeting date"')
+    expect(datePickerEntry?.snippet.hooksCode).toContain('name="meetingDate"')
+    expect(monthPickerEntry?.snippet.code).toBe('<MonthPickerField{{monthPickerFieldSuffix}} />')
+    expect(monthPickerEntry?.snippet.hooksCode).toContain(
+      'const { monthpickerProps, inputProps } = useMonthpicker({'
+    )
+    expect(monthPickerEntry?.snippet.hooksCode).toContain('label="Choose reporting month"')
+    expect(monthPickerEntry?.snippet.hooksCode).toContain('name="reportingMonth"')
+    expect(toggleGroupEntry?.snippet.code).toContain(
+      '{...useToggleGroupState{{toggleGroupSuffix}}()}'
+    )
+    expect(datePickerSnippet?.insertion).toEqual(
+      expect.objectContaining({
+        jsx: '<DatePickerField{{datePickerFieldSuffix}} />',
+        hooks: expect.stringContaining('useDatepicker({'),
+      })
+    )
+    expect(monthPickerSnippet?.insertion).toEqual(
+      expect.objectContaining({
+        jsx: '<MonthPickerField{{monthPickerFieldSuffix}} />',
+        hooks: expect.stringContaining('useMonthpicker({'),
+      })
+    )
+    expect(toggleGroupSnippet?.insertion).toEqual(
+      expect.objectContaining({
+        jsx: expect.stringContaining('{...useToggleGroupState{{toggleGroupSuffix}}()}'),
+        hooks: expect.stringContaining('const [selectedView, setSelectedView] = useState'),
+      })
+    )
+  })
+
   it('keeps every Hooks-backed catalog snippet composable in JSX', () => {
     const hooksBackedEntries = listCatalogEntries({
       groups: ['layout', 'component'],
       statuses: ['current', 'experimental'],
     }).filter((entry) => entry.snippet.hooksCode)
 
-    expect(hooksBackedEntries).toHaveLength(1)
+    expect(hooksBackedEntries.map((entry) => entry.name).sort()).toEqual([
+      'DatePicker',
+      'MonthPicker',
+      'Pagination',
+      'ToggleGroup',
+    ])
 
     for (const entry of hooksBackedEntries) {
       expect(entry.snippet.code.trim().startsWith('<')).toBe(true)
