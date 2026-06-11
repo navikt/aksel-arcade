@@ -14,9 +14,11 @@ describe('built-in project templates', () => {
     const combinedTemplates = BUILT_IN_JSX_TEMPLATES.join('\n')
 
     expect(combinedTemplates).not.toContain('BoxNew')
+    expect(combinedTemplates).not.toContain('<Alert')
     expect(combinedTemplates).not.toMatch(/\bgap="\d+"/)
     expect(combinedTemplates).not.toMatch(/borderRadius="(?:large|xlarge|medium|small)"/)
     expect(combinedTemplates).toContain('<Box')
+    expect(combinedTemplates).toContain('<InlineMessage')
     expect(combinedTemplates).toContain('gap="space-32"')
     expect(combinedTemplates).toContain('borderRadius="8"')
   })

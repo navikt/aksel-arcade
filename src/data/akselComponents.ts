@@ -9,6 +9,7 @@ import {
   type AkselCatalogGroup,
   type AkselCatalogStatus,
 } from './akselCatalog'
+import { filterNewAuthoringEntries } from './akselAuthoringPolicy'
 
 export interface ComponentProp {
   name: string
@@ -1092,7 +1093,7 @@ const legacyCatalogComponentNames = new Set(
 )
 
 // Combined export
-export const allComponents: ComponentMetadata[] = [
+export const allComponents: ComponentMetadata[] = filterNewAuthoringEntries([
   ...catalogComponents,
   ...layoutComponents.filter(
     (component) =>
@@ -1102,7 +1103,7 @@ export const allComponents: ComponentMetadata[] = [
     (component) =>
       !catalogComponentNames.has(component.name) && !legacyCatalogComponentNames.has(component.name)
   ),
-]
+])
 
 // Helper functions
 export const getComponentsByCategory = (category: AkselCatalogGroup): ComponentMetadata[] => {

@@ -114,6 +114,28 @@ describe('Aksel catalog starter path', () => {
     expect(searchSnippets('boxnew')).toHaveLength(0)
   })
 
+  it('keeps Alert and Modal available for compatibility but hides them from new authoring discovery', () => {
+    const legacyEntries = listCatalogEntries({ statuses: ['legacy'] })
+    const paletteComponents = getCatalogPaletteComponents()
+
+    expect(legacyEntries.map((entry) => entry.name)).toEqual(
+      expect.arrayContaining(['Alert'])
+    )
+    expect(getCatalogComponent('Alert')?.status).toBe('legacy')
+    expect(paletteComponents.some((component) => component.name === 'Alert')).toBe(false)
+    expect(paletteComponents.some((component) => component.name === 'Modal')).toBe(false)
+    expect(getComponentsByCategory('component').some((component) => component.name === 'Alert')).toBe(
+      false
+    )
+    expect(getComponentsByCategory('component').some((component) => component.name === 'Modal')).toBe(
+      false
+    )
+    expect(AKSEL_SNIPPETS.some((snippet) => snippet.name === 'Alert')).toBe(false)
+    expect(AKSEL_SNIPPETS.some((snippet) => snippet.name === 'Modal')).toBe(false)
+    expect(searchComponents('alert')).not.toContainEqual(expect.objectContaining({ name: 'Alert' }))
+    expect(searchComponents('modal')).not.toContainEqual(expect.objectContaining({ name: 'Modal' }))
+  })
+
   it('makes the active palette helpers prefer catalog data for the starter subset', () => {
     const layoutComponents = getComponentsByCategory('layout')
     const hstack = layoutComponents.find((component) => component.name === 'HStack')
