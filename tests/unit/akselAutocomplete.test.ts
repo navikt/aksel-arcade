@@ -145,6 +145,7 @@ describe('Aksel-aware autocomplete contract', () => {
         'Ingress',
       ])
     )
+    expect(labels).not.toContain('UNSAFE_Combobox')
   })
 
   it('prefers catalog-backed tracer details and insertions for top-level BodyShort, Heading, and Tag', () => {
@@ -160,6 +161,14 @@ describe('Aksel-aware autocomplete contract', () => {
     expect(applyFor('<Tag', 'Tag')).toBe(
       'Tag variant="moderate" data-color="info">In progress</Tag>'
     )
+  })
+
+  it('keeps Combobox as the only author-facing autocomplete name', () => {
+    expect(labelsFor('<Comb')).toContain('Combobox')
+    expect(applyFor('<Comb', 'Combobox')).toBe('Combobox')
+    expect(labelsFor('<UNSAFE')).not.toContain('UNSAFE_Combobox')
+    expect(labelsFor('<UNSAFE_Combobox l')).not.toContain('label')
+    expect(labelsFor('<UNSAFE_Combobox size="s')).not.toContain('small')
   })
 
   it('keeps Aksel icons out of default component tag suggestions', () => {
@@ -222,7 +231,7 @@ describe('Aksel-aware autocomplete contract', () => {
     expect(labelsFor('<Box a')).toContain('asChild')
     expect(labelsFor('<Accordion s')).toContain('size')
     expect(labelsFor('<DataGrid c')).toContain('columns')
-    expect(labelsFor('<UNSAFE_Combobox l')).toContain('label')
+    expect(labelsFor('<Combobox l')).toContain('label')
     expect(labelsFor('<PlusIcon aria-')).toContain('aria-hidden')
   })
 

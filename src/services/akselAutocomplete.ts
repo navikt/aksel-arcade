@@ -40,20 +40,11 @@ const docsEntries = AKSEL_AUTOCOMPLETE_ENTRIES.map((entry) => ({
   ...entry,
   source: 'docs' as const,
 }))
-const comboboxAliasEntry = docsEntries.find((entry) => entry.name === 'Combobox')
-const docsAliasEntries =
-  comboboxAliasEntry && !catalogEntryNames.has('UNSAFE_Combobox')
-    ? [{ ...comboboxAliasEntry, name: 'UNSAFE_Combobox' }]
-    : []
 const iconEntries = catalogEntries
   .filter((entry) => entry.group === 'icon')
   .map((entry) => ({ ...entry, source: 'catalog' as const }))
 const fallbackDocsEntries = docsEntries.filter((entry) => !catalogEntryNames.has(entry.name))
-const completionEntries: CompletionEntry[] = [
-  ...catalogCompletionEntries,
-  ...fallbackDocsEntries,
-  ...docsAliasEntries,
-]
+const completionEntries: CompletionEntry[] = [...catalogCompletionEntries, ...fallbackDocsEntries]
 const docsEntriesByName = new Map(docsEntries.map((entry) => [entry.name, entry]))
 
 interface OpenTagContext {
@@ -285,14 +276,6 @@ function mergeCatalogPropValues(
   return dedupeValues([...(existingProp?.values ?? []), ...(catalogProp.values ?? [])])
 }
 
-function normalizeComponentName(componentName: string): string {
-  if (componentName === 'UNSAFE_Combobox') {
-    return 'Combobox'
-  }
-
-  return componentName
-}
-
 function isIconComponent(componentName: string): boolean {
   return catalogEntriesByName.get(componentName)?.group === 'icon'
 }
@@ -358,13 +341,12 @@ function compareIconEntries(
 }
 
 function getComponentProps(componentName: string): CompletionProp[] {
-  const normalizedComponentName = normalizeComponentName(componentName)
-  if (isIconComponent(normalizedComponentName)) {
+  if (isIconComponent(componentName)) {
     return AKSEL_ICON_PROPS
   }
 
-  const docsEntry = docsEntriesByName.get(normalizedComponentName)
-  const catalogEntry = getCatalogComponent(normalizedComponentName)
+  const docsEntry = docsEntriesByName.get(componentName)
+  const catalogEntry = getCatalogComponent(componentName)
   const propsByName = new Map<string, CompletionProp>()
 
   for (const prop of docsEntry?.props ?? []) {
@@ -409,10 +391,6 @@ function getEntryApply(entry: CompletionEntry): string {
   let apply = catalogEntry ? stripSnippetPlaceholders(catalogEntry.snippet.code) : entry.name
   if (apply.startsWith('<')) {
     apply = apply.slice(1)
-  }
-
-  if (entry.name === 'Combobox') {
-    return apply === 'Combobox' ? 'UNSAFE_Combobox' : apply.replace(/^Combobox/, 'UNSAFE_Combobox')
   }
 
   return apply
