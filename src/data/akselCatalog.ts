@@ -51,6 +51,7 @@ export type AkselAutocompleteDiscovery = 'contextual-only' | 'top-level'
 export interface AkselContextualAutocompleteChild {
   name: string
   discovery?: AkselAutocompleteDiscovery
+  insertion?: ComponentInsertion
 }
 
 export interface AkselContextualAutocompleteRule {
@@ -358,12 +359,28 @@ const AKSEL_CONTEXTUAL_AUTOCOMPLETE_RULES: AkselContextualAutocompleteRule[] = [
   },
   {
     parent: 'RadioGroup',
-    children: [{ name: 'Radio', discovery: 'top-level' }],
+    children: [
+      {
+        name: 'Radio',
+        discovery: 'top-level',
+        insertion: {
+          jsx: '<Radio value="option1">Option 1</Radio>',
+        },
+      },
+    ],
     exclusive: true,
   },
   {
     parent: 'CheckboxGroup',
-    children: [{ name: 'Checkbox', discovery: 'top-level' }],
+    children: [
+      {
+        name: 'Checkbox',
+        discovery: 'top-level',
+        insertion: {
+          jsx: '<Checkbox value="option1">Option 1</Checkbox>',
+        },
+      },
+    ],
     exclusive: true,
   },
 ]

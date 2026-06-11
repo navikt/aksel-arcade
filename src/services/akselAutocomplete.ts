@@ -615,12 +615,13 @@ function contextualComponentOptions(
   const contextualEntries = rule.children
     .map((child) => {
       const entry = getCompletionEntry(child.name)
-      if (!entry || !supportsCatalogInsertion(entry, onApplyCatalogInsertion)) {
+      if (!entry || !supportsCatalogInsertion(entry, onApplyCatalogInsertion, child.insertion)) {
         return null
       }
 
       return {
         entry,
+        insertion: child.insertion,
         name: child.name,
         aliases: [child.name, getContextualRelativeName(parentName, child.name)],
       }
@@ -635,7 +636,7 @@ function contextualComponentOptions(
       aliases: child.aliases,
     })),
     options: contextualEntries.map((child, index) => ({
-      ...componentOption(child.entry, onApplyCatalogInsertion),
+      ...componentOption(child.entry, onApplyCatalogInsertion, child.insertion),
       boost: 100 - index,
     })),
   }
@@ -755,15 +756,23 @@ function getEntryApply(entry: CompletionEntry): string {
   return apply
 }
 
-function getCatalogInsertion(entry: AkselCatalogEntry): ComponentInsertion {
-  return {
-    jsx: entry.snippet.code,
-    hooks: entry.snippet.hooksCode,
-  }
+function getCatalogInsertion(
+  entry: AkselCatalogEntry,
+  insertionOverride?: ComponentInsertion
+): ComponentInsertion {
+  return (
+    insertionOverride ?? {
+      jsx: entry.snippet.code,
+      hooks: entry.snippet.hooksCode,
+    }
+  )
 }
 
-function getAutocompleteCatalogInsertion(entry: AkselCatalogEntry): ComponentInsertion {
-  const insertion = getCatalogInsertion(entry)
+function getAutocompleteCatalogInsertion(
+  entry: AkselCatalogEntry,
+  insertionOverride?: ComponentInsertion
+): ComponentInsertion {
+  const insertion = getCatalogInsertion(entry, insertionOverride)
 
   return {
     ...insertion,
@@ -773,17 +782,42 @@ function getAutocompleteCatalogInsertion(entry: AkselCatalogEntry): ComponentIns
 
 function supportsCatalogInsertion(
   entry: CompletionEntry,
-  onApplyCatalogInsertion?: ApplyCatalogInsertion
+  onApplyCatalogInsertion?: ApplyCatalogInsertion,
+  insertionOverride?: ComponentInsertion
 ): boolean {
-  return !(entry.source === 'catalog' && entry.snippet.hooksCode && !onApplyCatalogInsertion)
+  const hooksCode = entry.source === 'catalog'
+    ? getCatalogInsertion(entry, insertionOverride).hooks
+    : undefined
+
+  return !(entry.source === 'catalog' && hooksCode && !onApplyCatalogInsertion)
 }
 
 function componentOption(
   entry: CompletionEntry,
-  onApplyCatalogInsertion?: ApplyCatalogInsertion
+  onApplyCatalogInsertion?: ApplyCatalogInsertion,
+  insertionOverride?: ComponentInsertion
 ): Completion {
   const catalogInsertion =
-    entry.source === 'catalog' ? getAutocompleteCatalogInsertion(entry) : undefined
+    entry.source === 'catalog' ? getAutocompleteCatalogInsertion(entry, insertionOverride) : undefined
+  let apply: Completion['apply'] = getEntryApply(entry)
+
+  if (catalogInsertion?.hooks && onApplyCatalogInsertion) {
+    const applyCatalogInsertion: NonNullable<Exclude<Completion['apply'], string>> = (
+      _view,
+      _completion,
+      from,
+      to
+    ) => {
+      onApplyCatalogInsertion({
+        insertion: catalogInsertion,
+        from,
+        to,
+      })
+    }
+    apply = applyCatalogInsertion
+  } else if (insertionOverride && catalogInsertion) {
+    apply = catalogInsertion.jsx
+  }
 
   return {
     label: entry.name,
@@ -793,16 +827,7 @@ function componentOption(
         ? 'function'
         : 'class',
     detail: getEntryDescription(entry),
-    apply:
-      catalogInsertion?.hooks && onApplyCatalogInsertion
-        ? (_view, _completion, from, to) => {
-            onApplyCatalogInsertion({
-              insertion: catalogInsertion,
-              from,
-              to,
-            })
-          }
-        : getEntryApply(entry),
+    apply,
   }
 }
 

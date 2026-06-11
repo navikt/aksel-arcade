@@ -395,6 +395,15 @@ describe('Aksel-aware autocomplete contract', () => {
     expect(labelsFor('<CheckboxGroup legend="Select">\n  <')).toEqual(['Checkbox'])
   })
 
+  it('applies child-safe contextual snippets inside RadioGroup and CheckboxGroup', () => {
+    expect(applyFor('<RadioGroup legend="Pick one">\n  <', 'Radio')).toBe(
+      'Radio value="option1">Option 1</Radio>'
+    )
+    expect(applyFor('<CheckboxGroup legend="Select">\n  <', 'Checkbox')).toBe(
+      'Checkbox value="option1">Option 1</Checkbox>'
+    )
+  })
+
   it('suppresses generic child-level suggestions in constrained compound positions', () => {
     expect(labelsFor('<Accordion>\n  <')).not.toContain('Box')
     expect(labelsFor('<ActionMenu>\n  <ActionMenu.Content>\n    <')).not.toContain('Button')

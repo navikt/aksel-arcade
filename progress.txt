@@ -2309,3 +2309,20 @@ Next note:
 
 - #214 and #217 can reuse the same two multi-part patterns introduced here: prop-spread helpers when one state pair is enough (`Pagination`, `ToggleGroup`), and Hook-tab helper components when the Aksel API returns paired prop bundles (`DatePicker`, `MonthPicker`). Keep the JSX insertion root composable and keep helper logic in Hooks instead of reintroducing inline wrapper fragments or IIFEs.
 - Keep adding explicit field names to future form-control snippets when the example renders real inputs. The authoring contract now covers visible defaults and runtime-safe state, but browser autofill/audit hygiene is another easy regression surface for these slices.
+
+### 2026-06-11 - PR #226 review follow-up for issue #216
+
+Implemented:
+
+- PR review found that the contextual `Radio` and `Checkbox` completions added by #210 were still borrowing the wrong insertion payloads after the #216 catalog work: `Radio` inside `RadioGroup` inserted the full top-level `RadioGroup` snippet again, and `Checkbox` inside `CheckboxGroup` reused the standalone checkbox snippet without the grouped-child `value` prop.
+- Extended the contextual autocomplete metadata in `src/data/akselCatalog.ts` so parent-bound child suggestions can override their insertion payload without changing the shared top-level catalog entry.
+- Updated `src/services/akselAutocomplete.ts` so contextual child completions honor those override insertions both when filtering available options and when applying the selected completion, while leaving the normal top-level catalog apply path unchanged.
+- Added regression coverage in `tests/unit/akselAutocomplete.test.ts` that asserts the actual applied completion text for `RadioGroup -> Radio` and `CheckboxGroup -> Checkbox`, not just the presence of the suggestion label.
+
+Verification:
+
+- npm run typecheck
+- npm run lint (existing `.eslintignore` deprecation notice and existing `InspectionPopover` hook dependency warning only)
+- npm run test -- --run
+- npm run build
+- Browser check at `http://127.0.0.1:4321/aksel-arcade/`: confirmed contextual `Radio` completion inside `RadioGroup` inserts a single `<Radio value="option1">...</Radio>` child and renders cleanly in preview; confirmed `CheckboxGroup` still offers only the contextual `Checkbox` child completion, with the inserted text locked by the new regression test.
