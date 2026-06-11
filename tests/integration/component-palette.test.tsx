@@ -86,6 +86,28 @@ describe('ComponentPalette', () => {
     )
   })
 
+  it('passes hook-backed Dialog insertion metadata through the Add menu boundary', async () => {
+    const user = userEvent.setup()
+    const onInsertComponent = vi.fn()
+
+    await act(async () => {
+      render(<ComponentPalette open onClose={vi.fn()} onInsertComponent={onInsertComponent} />)
+    })
+
+    await user.type(screen.getByRole('textbox', { name: /search components/i }), 'Dialog')
+    await user.click(screen.getByRole('link', { name: 'Dialog' }))
+
+    expect(onInsertComponent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: 'Dialog',
+        insertion: expect.objectContaining({
+          jsx: '<ReviewDialog{{dialogSuffix}} />',
+          hooks: expect.stringContaining('export const ReviewDialog{{dialogSuffix}} = () => {'),
+        }),
+      })
+    )
+  })
+
   it('passes grouped Radio snippets through the Add menu boundary', async () => {
     const user = userEvent.setup()
     const onInsertComponent = vi.fn()

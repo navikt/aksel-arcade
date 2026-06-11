@@ -5,6 +5,7 @@ import type { ComponentInsertion } from '@/types/snippets'
 const SNIPPET_PLACEHOLDER_PATTERN = /\$\{(\d+):([^}]+)\}/g
 const COLLISION_TOKEN_PATTERN = /\{\{[\w]+\}\}/g
 const IDENTIFIER_PREFIX = /[A-Za-z_$][\w$]*/
+const IDENTIFIER_PART = /[\w$]/
 
 interface PaletteInsertionLocation {
   kind: 'palette'
@@ -49,7 +50,17 @@ function getCollisionTokens(templates: string[]): string[] {
 
 function getIdentifierTemplatesForToken(template: string, token: string): string[] {
   const pattern = new RegExp(`${IDENTIFIER_PREFIX.source}${escapeRegExp(token)}[\\w$]*`, 'g')
-  return Array.from(new Set(template.match(pattern) ?? []))
+  return Array.from(
+    new Set(
+      Array.from(template.matchAll(pattern))
+        .filter((match) => {
+          const start = match.index ?? 0
+          const precedingCharacter = template[start - 1]
+          return precedingCharacter !== '-' && !IDENTIFIER_PART.test(precedingCharacter ?? '')
+        })
+        .map((match) => match[0])
+    )
+  )
 }
 
 function sourceContainsIdentifier(source: string, identifier: string): boolean {

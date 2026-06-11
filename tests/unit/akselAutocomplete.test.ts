@@ -211,6 +211,34 @@ describe('Aksel-aware autocomplete contract', () => {
     expect(applyFor('<Texta', 'Textarea')).toContain('minRows={4}')
   })
 
+  it('prefers catalog-backed feedback and form-shell details and insertions for top-level targets', () => {
+    expect(optionFor('<Inline', 'InlineMessage')?.detail).toBe(
+      'Inline status message for short feedback.'
+    )
+    expect(applyFor('<Inline', 'InlineMessage')).toBe(
+      'InlineMessage status="success">Draft saved at 14:35</InlineMessage>'
+    )
+    expect(optionFor('<Global', 'GlobalAlert')?.detail).toBe(
+      'Page-wide alert banner for important updates.'
+    )
+    expect(applyFor('<Global', 'GlobalAlert')).toContain('GlobalAlert status="announcement">')
+    expect(optionFor('<Local', 'LocalAlert')?.detail).toBe(
+      'Section-level alert for nearby feedback.'
+    )
+    expect(applyFor('<Local', 'LocalAlert')).toContain('LocalAlert status="warning">')
+    expect(applyFor('<Field', 'Fieldset')).toContain('Fieldset legend="Employer phone number">')
+    expect(applyFor('<CheckboxG', 'CheckboxGroup')).toContain('defaultValue={["email"]}')
+    expect(applyFor('<ErrorM', 'ErrorMessage')).toContain('showIcon')
+    expect(applyFor('<ErrorS', 'ErrorSummary')).toContain(
+      'ErrorSummary heading="You must fix these errors before continuing:"'
+    )
+    expect(applyFor('<FileU', 'FileUpload')).toContain('FileUpload.Dropzone')
+    expect(applyFor('<FormS', 'FormSummary')).toContain('<FormSummary.Footer>')
+    expect(optionFor('<FormP', 'FormProgress')?.detail).toBe(
+      'Experimental step indicator for multi-step forms.'
+    )
+  })
+
   it('routes Pagination through the catalog insertion callback with composable JSX', () => {
     const onApplyCatalogInsertion = vi.fn()
     const option = optionFor('<Pagi', 'Pagination', undefined, onApplyCatalogInsertion)
@@ -303,9 +331,36 @@ describe('Aksel-aware autocomplete contract', () => {
     })
   })
 
+  it('routes Dialog through the catalog insertion callback with trigger and close support', () => {
+    const onApplyCatalogInsertion = vi.fn()
+    const option = optionFor('<Dial', 'Dialog', undefined, onApplyCatalogInsertion)
+
+    expect(option?.detail).toBe('Controlled dialog with trigger and close actions.')
+    expect(typeof option?.apply).toBe('function')
+
+    if (typeof option?.apply !== 'function') {
+      throw new Error('Expected Dialog completion to use a custom apply callback')
+    }
+
+    option.apply({} as never, option as never, 0, '<Dial'.length)
+
+    const [call] = onApplyCatalogInsertion.mock.calls
+    expect(call?.[0]).toMatchObject({
+      from: 0,
+      to: '<Dial'.length,
+      insertion: expect.objectContaining({
+        jsx: 'ReviewDialog{{dialogSuffix}} />',
+      }),
+    })
+    expect(call?.[0]?.insertion.hooks).toContain('export const ReviewDialog{{dialogSuffix}} = () => {')
+    expect(call?.[0]?.insertion.hooks).toContain('Dialog.CloseTrigger')
+    expect(call?.[0]?.insertion.hooks).toContain('review-dialog-popup{{dialogSuffix}}')
+  })
+
   it('hides multi-part catalog insertions when the editor cannot apply them safely', () => {
     const cases = [
       ['<DateP', 'DatePicker'],
+      ['<Dial', 'Dialog'],
       ['<MonthP', 'MonthPicker'],
       ['<Pagi', 'Pagination'],
       ['<ToggleG', 'ToggleGroup'],
