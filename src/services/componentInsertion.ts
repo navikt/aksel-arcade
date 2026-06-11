@@ -25,6 +25,8 @@ const COMPONENT_SETUP_MARKER = '// __AKSEL_ARCADE_COMPONENT_SETUP__'
 const COMPONENT_SETUP_WRAPPER_PATTERN = new RegExp(
   String.raw`^\(\(\) => \{\n {2}\/\/ __AKSEL_ARCADE_COMPONENT_SETUP__\n([\s\S]*?)\n\n {2}return \(\n {4}<>\n([\s\S]*?)\n {4}<\/>\n {2}\)\n\}\)\(\)$`
 )
+const FUNCTION_COMPONENT_OPENING_PATTERN =
+  /^\s*(?:export\s+default\s+)?function\s+\w+\s*\([^)]*\)\s*\{/
 
 function stripSnippetPlaceholders(template: string): string {
   return template.replace(
@@ -180,17 +182,48 @@ function parseComponentSetupWrappedSource(source: string): { setup: string; body
   }
 }
 
+function applyFunctionComponentSetup(source: string, setupBlock: string): string | null {
+  const markerLine = `  ${COMPONENT_SETUP_MARKER}`
+  const markerIndex = source.indexOf(markerLine)
+
+  if (markerIndex !== -1) {
+    const setupStart = source.indexOf('\n', markerIndex)
+    const setupEnd = setupStart === -1 ? -1 : source.indexOf('\n\n', setupStart + 1)
+
+    if (setupStart !== -1 && setupEnd !== -1) {
+      return `${source.slice(0, setupEnd)}\n${indentBlock(setupBlock, '  ')}${source.slice(setupEnd)}`
+    }
+  }
+
+  const functionOpeningMatch = source.match(FUNCTION_COMPONENT_OPENING_PATTERN)
+
+  if (!functionOpeningMatch) {
+    return null
+  }
+
+  const functionOpening = functionOpeningMatch[0]
+  const body = source.slice(functionOpening.length).trimStart()
+
+  return `${functionOpening}\n  ${COMPONENT_SETUP_MARKER}\n${indentBlock(setupBlock, '  ')}\n\n${body}`
+}
+
 function applyComponentSetup(source: string, setupBlock: string): string {
   const existingWrapper = parseComponentSetupWrappedSource(source)
 
-  if (!existingWrapper) {
-    return buildComponentSetupWrappedSource(source, setupBlock)
+  if (existingWrapper) {
+    return buildComponentSetupWrappedSource(
+      existingWrapper.body,
+      `${existingWrapper.setup}\n${setupBlock}`
+    )
   }
 
-  return buildComponentSetupWrappedSource(
-    existingWrapper.body,
-    `${existingWrapper.setup}\n${setupBlock}`
-  )
+  const functionComponentSource = applyFunctionComponentSetup(source, setupBlock)
+
+  if (functionComponentSource) {
+    return functionComponentSource
+  }
+
+  return buildComponentSetupWrappedSource(source, setupBlock)
 }
 
 export function createJsxOnlyInsertion(jsx: string): ComponentInsertion {

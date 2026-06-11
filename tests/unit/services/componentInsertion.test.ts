@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { createArcadeSourceFile } from '@/services/projectSource'
 import { applyComponentInsertion, createJsxOnlyInsertion } from '@/services/componentInsertion'
+import { transpileCode } from '@/services/transpiler'
 
 const paginationInsertion = {
   jsx:
@@ -116,6 +117,30 @@ describe('component insertion service', () => {
     expect(nextSource.jsx).toContain('const [pageState, setPageState] = useState(1)')
     expect(nextSource.jsx).toContain('<VStack><Pagination')
     expect(nextSource.hooks).toBe('const existing = true')
+  })
+
+  it('injects component setup into exported function components instead of wrapping the whole file', async () => {
+    const source = createArcadeSourceFile(
+      'export default function App() {\n  return <VStack></VStack>\n}',
+      ''
+    )
+    const insertionPoint = source.jsx.indexOf('</VStack>')
+
+    const nextSource = applyComponentInsertion(source, paginationInsertion, {
+      kind: 'autocomplete',
+      from: insertionPoint,
+      to: insertionPoint,
+    })
+
+    expect(nextSource.jsx).toContain('export default function App() {\n  // __AKSEL_ARCADE_COMPONENT_SETUP__')
+    expect(nextSource.jsx).toContain('const [pageState, setPageState] = useState(1)')
+    expect(nextSource.jsx).toContain('return <VStack><Pagination')
+    expect(nextSource.jsx).not.toContain('(() => {')
+
+    await expect(transpileCode(nextSource.jsx, nextSource.hooks)).resolves.toMatchObject({
+      success: true,
+      error: null,
+    })
   })
 
   it('replaces JSX completion ranges and preserves existing Hooks code', () => {

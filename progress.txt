@@ -2267,7 +2267,8 @@ Fixed before merge:
 - Fixed `applyComponentInsertion()` so palette insertions with `componentSetup` still target JSX even when the Hooks tab is active, matching the earlier multi-part insertion behavior and preventing raw `<Pagination ... />` JSX from being written into Hooks code.
 - Fixed `formatCode()` so it no longer mistakes nested JSX inside the component-setup IIFE for top-level multi-root JSX, which restores the **Format** action after inserting Pagination.
 - Hid page-scoped insertions from the Add dialog while editing `Global config`, and blocked the matching autocomplete insertion callback on that target so `Pagination` cannot write compile-breaking page JSX into shared global code.
-- Added regression coverage in `tests/unit/services/jsxValidation.test.ts`, `tests/unit/services/formatter.test.ts`, extended `tests/unit/services/componentInsertion.test.ts`, and updated `tests/integration/component-palette.test.tsx` for the Global-config filtering path.
+- Fixed the `componentSetup` injection path for JSX tabs that already use `export default function App() { ... }`: instead of wrapping the entire file in an IIFE fragment, setup now injects into the existing function component body so exported-component authoring stays valid.
+- Added regression coverage in `tests/unit/services/jsxValidation.test.ts`, `tests/unit/services/formatter.test.ts`, extended `tests/unit/services/componentInsertion.test.ts`, and updated `tests/integration/component-palette.test.tsx` for the Global-config filtering path plus the exported-component insertion case.
 
 Verification:
 
