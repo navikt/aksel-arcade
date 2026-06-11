@@ -188,6 +188,26 @@ describe('component insertion service', () => {
     expect(secondSource.hooks).toContain('id="review-dialog-popup2"')
   })
 
+  it('ignores unrelated popup identifiers when inserting the first dialog helper', () => {
+    const source = createArcadeSourceFile('', 'const popup = true')
+
+    const nextSource = applyComponentInsertion(source, dialogInsertion, {
+      kind: 'palette',
+      activeTab: 'JSX',
+      jsxCursor: { line: 0, column: 0 },
+      hooksCursor: { line: 0, column: 0 },
+    })
+
+    expect(nextSource.jsx).toBe('<ReviewDialog />')
+    expect(nextSource.hooks).toContain('const popup = true')
+    expect(nextSource.hooks).toContain('export const ReviewDialog = () => {')
+    expect(nextSource.hooks).toContain('const [dialogOpen, setDialogOpen] = useState(false)')
+    expect(nextSource.hooks).toContain('id="review-dialog-popup"')
+    expect(nextSource.hooks).not.toContain('ReviewDialog2')
+    expect(nextSource.hooks).not.toContain('dialogOpen2')
+    expect(nextSource.hooks).not.toContain('review-dialog-popup2')
+  })
+
   it('replaces JSX completion ranges and preserves existing Hooks code', () => {
     const source = createArcadeSourceFile('<Pagi', 'const selectedFilter = "all"')
 

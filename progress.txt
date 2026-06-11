@@ -2350,3 +2350,20 @@ Verification:
 Next note:
 
 - #214 and #217 should reuse the same composable-root contract here: keep inserted JSX placeable inside surrounding layouts and keep helper logic in Hooks when a component needs state. `Dialog` now provides another example of the helper-component pattern alongside the picker/toggle helpers from #216.
+
+### 2026-06-12 - PR #227 review follow-up for issue #215
+
+Implemented:
+
+- PR review found one real suffix-collision bug in the new `Dialog` insertion flow: `src/services/componentInsertion.ts` was treating the hyphenated popup-id fragment `popup{{dialogSuffix}}` as an identifier template, so existing unrelated `popup` identifiers in Hooks could force the very first dialog insertion to become `ReviewDialog2`.
+- Tightened identifier-template extraction so collision suffixing only considers real identifier starts and ignores hyphenated string fragments like the `review-dialog-popup{{dialogSuffix}}` id.
+- Added a focused regression in `tests/unit/services/componentInsertion.test.ts` that seeds Hooks with `const popup = true` and proves the first inserted dialog still uses unsuffixed `ReviewDialog`, `dialogOpen`, and `review-dialog-popup`.
+
+Verification:
+
+- npm run test -- --run tests/unit/services/componentInsertion.test.ts
+- npm run typecheck
+- npm run lint (existing `.eslintignore` deprecation notice and existing `InspectionPopover` hook dependency warning only)
+- npm run test -- --run
+- npm run build
+- Browser check at `http://127.0.0.1:4327/aksel-arcade/`: with Hooks set to `const popup = true`, confirmed Add -> `Dialog` inserts unsuffixed `<ReviewDialog />`, keeps the helper as `export const ReviewDialog = () => { ... }`, keeps `id="review-dialog-popup"`, opens in preview, and produces no browser console errors.
