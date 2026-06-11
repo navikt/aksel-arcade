@@ -167,8 +167,11 @@ describe('Aksel-aware autocomplete contract', () => {
     expect(labelsFor('<Comb')).toContain('Combobox')
     expect(applyFor('<Comb', 'Combobox')).toBe('Combobox')
     expect(labelsFor('<UNSAFE')).not.toContain('UNSAFE_Combobox')
-    expect(labelsFor('<UNSAFE_Combobox l')).not.toContain('label')
-    expect(labelsFor('<UNSAFE_Combobox size="s')).not.toContain('small')
+  })
+
+  it('keeps legacy UNSAFE_Combobox prop and value completions working for stored source', () => {
+    expect(labelsFor('<UNSAFE_Combobox l')).toContain('label')
+    expect(labelsFor('<UNSAFE_Combobox readOnly="t')).toContain('true')
   })
 
   it('keeps Aksel icons out of default component tag suggestions', () => {

@@ -2147,3 +2147,23 @@ Next note:
 
 - Keep `Combobox -> UNSAFE_Combobox` mapping inside `src/sandboxAksel.ts` only; this issue intentionally removed the alias from authoring surfaces, not the runtime compatibility layer.
 - #208 can centralize replacement/deprecation filtering next without needing to touch the Combobox alias path again; the browser Add menu still exposes deprecated `Alert` and replaced `Modal`, which matches the open follow-up.
+
+### 2026-06-11 - PR #220 review follow-up for Issue #207
+
+Fixed before merge:
+
+- A focused PR review caught one real regression in the first #207 patch: stored projects that still contain `<UNSAFE_Combobox ...>` lost Combobox prop and prop-value autocomplete even though the runtime alias still lets those pages render.
+- Restored alias-aware autocomplete lookup in `src/services/akselAutocomplete.ts` only for metadata resolution by normalizing `UNSAFE_Combobox` back to `Combobox` inside `getComponentProps()`. This keeps the unsafe name hidden from top-level authoring suggestions and insertions while preserving editor help for legacy stored source.
+- Updated `tests/unit/akselAutocomplete.test.ts` so the regression coverage now proves both sides of the contract together: top-level autocomplete still exposes only `Combobox`, and legacy `<UNSAFE_Combobox ...>` source still gets prop/value completions through the compatibility lookup path.
+
+Verification:
+
+- npm run lint (existing `.eslintignore` deprecation notice and existing `InspectionPopover` hook dependency warning only)
+- npm run build
+- npm run typecheck
+- npm run test -- --run
+- Browser check at `http://127.0.0.1:4183/aksel-arcade/`: confirmed typing `<Comb` in the editor still shows only the public `Combobox` completion with no unsafe alias surfaced in the UI; the legacy `UNSAFE_Combobox` compatibility path is now covered by the focused unit regression because the browser editor only surfaces the public-name flow for new authoring.
+
+Next note:
+
+- Do not remove the metadata-side `UNSAFE_Combobox -> Combobox` normalization until stored Arcade project source is migrated off the unsafe name. Runtime compatibility alone is not enough for legacy editor autocomplete.

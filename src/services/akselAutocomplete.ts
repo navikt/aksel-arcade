@@ -340,13 +340,23 @@ function compareIconEntries(
   return first.name.localeCompare(second.name)
 }
 
+function normalizeComponentLookupName(componentName: string): string {
+  if (componentName === 'UNSAFE_Combobox') {
+    return 'Combobox'
+  }
+
+  return componentName
+}
+
 function getComponentProps(componentName: string): CompletionProp[] {
-  if (isIconComponent(componentName)) {
+  const normalizedComponentName = normalizeComponentLookupName(componentName)
+
+  if (isIconComponent(normalizedComponentName)) {
     return AKSEL_ICON_PROPS
   }
 
-  const docsEntry = docsEntriesByName.get(componentName)
-  const catalogEntry = getCatalogComponent(componentName)
+  const docsEntry = docsEntriesByName.get(normalizedComponentName)
+  const catalogEntry = getCatalogComponent(normalizedComponentName)
   const propsByName = new Map<string, CompletionProp>()
 
   for (const prop of docsEntry?.props ?? []) {
