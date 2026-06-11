@@ -2284,3 +2284,45 @@ Next note:
 
 - Extend `AKSEL_CONTEXTUAL_AUTOCOMPLETE_RULES` in `src/data/akselCatalog.ts` for later compound slices instead of adding one-off autocomplete branches. The `exclusive` flag now controls whether a parent should suppress generic child suggestions completely, and the child `discovery` flag preserves intentional top-level exceptions such as Radio/Checkbox-style catalog choices.
 - Keep the top-level autocomplete filter strict: catalog exceptions like `Page.Block` stay allowed, but docs-only dotted subcomponents and lowercase helper exports should remain hidden from global discovery unless a future catalog decision makes them an intentional top-level insertion choice.
+
+### 2026-06-11 - Issue #216: Fix form, picker, and input insertions
+
+Implemented:
+
+- Selected #216 as the highest-priority `ready-for-agent` feature from #209-#217 because #210 and #211 had already landed, and this slice fixes the broadest set of high-frequency authoring controls still missing catalog-backed, behavior-complete defaults - including the explicitly broken Radio insertion path.
+- Re-read issue #205, `CONTEXT.md`, and the latest `progress.txt` notes before changing code so the implementation stayed aligned with the shared **Aksel insertion catalog** contract, the composable JSX rule from post-#211 feedback, and the existing contextual-child behavior from #210.
+- Expanded `src/data/akselCatalog.ts` with catalog-backed entries for Checkbox, Radio, DatePicker, MonthPicker, Search, Select, Switch, Textarea, and ToggleGroup. The new snippets now carry current docs links, searchable keywords, visible labels/content, and explicit form-field names where the example renders a real input.
+- Replaced the broken top-level Radio snippet with a valid `RadioGroup` example, so Add/autocomplete no longer emit the old `Radio.Group` runtime error path while still keeping child `Radio` suggestions scoped to `RadioGroup` from the earlier contextual-autocomplete work.
+- Added multi-part insertion support for the remaining stateful controls in this slice: DatePicker and MonthPicker now insert Hook-tab helper components that own the `useDatepicker` / `useMonthpicker` prop-pair wiring, while ToggleGroup follows the Pagination-style prop-spread helper pattern with `useState`-backed `value` / `onChange`.
+- Kept the simpler form controls accessible and immediately usable out of the box: Search now inserts inside a `role="search"` form with a stable field name, Select includes a visible placeholder plus options, Switch/Checkbox include descriptive labels, and Textarea gets helper text plus a usable initial size.
+- Added regression coverage in `tests/unit/akselCatalog.test.ts`, `tests/unit/akselAutocomplete.test.ts`, `tests/integration/component-palette.test.tsx`, and `tests/unit/services/componentInsertion.test.ts` for grouped-control snippets, stateful picker/toggle insertions, collision-safe Hook-tab helpers, and Add/autocomplete parity for the #216 component set.
+
+Verification:
+
+- npm run typecheck
+- npm run lint (existing `.eslintignore` deprecation notice and existing `InspectionPopover` hook dependency warning only)
+- npm run test -- --run
+- npm run build
+- Browser check at `http://127.0.0.1:4321/aksel-arcade/`: confirmed RadioGroup selection, DatePicker date changes, MonthPicker month changes, Pagination page changes, Search/Select/Textarea input, ToggleGroup state changes, and no browser console errors or warnings during the clean verified flow
+
+Next note:
+
+- #214 and #217 can reuse the same two multi-part patterns introduced here: prop-spread helpers when one state pair is enough (`Pagination`, `ToggleGroup`), and Hook-tab helper components when the Aksel API returns paired prop bundles (`DatePicker`, `MonthPicker`). Keep the JSX insertion root composable and keep helper logic in Hooks instead of reintroducing inline wrapper fragments or IIFEs.
+- Keep adding explicit field names to future form-control snippets when the example renders real inputs. The authoring contract now covers visible defaults and runtime-safe state, but browser autofill/audit hygiene is another easy regression surface for these slices.
+
+### 2026-06-11 - PR #226 review follow-up for issue #216
+
+Implemented:
+
+- PR review found that the contextual `Radio` and `Checkbox` completions added by #210 were still borrowing the wrong insertion payloads after the #216 catalog work: `Radio` inside `RadioGroup` inserted the full top-level `RadioGroup` snippet again, and `Checkbox` inside `CheckboxGroup` reused the standalone checkbox snippet without the grouped-child `value` prop.
+- Extended the contextual autocomplete metadata in `src/data/akselCatalog.ts` so parent-bound child suggestions can override their insertion payload without changing the shared top-level catalog entry.
+- Updated `src/services/akselAutocomplete.ts` so contextual child completions honor those override insertions both when filtering available options and when applying the selected completion, while leaving the normal top-level catalog apply path unchanged.
+- Added regression coverage in `tests/unit/akselAutocomplete.test.ts` that asserts the actual applied completion text for `RadioGroup -> Radio` and `CheckboxGroup -> Checkbox`, not just the presence of the suggestion label.
+
+Verification:
+
+- npm run typecheck
+- npm run lint (existing `.eslintignore` deprecation notice and existing `InspectionPopover` hook dependency warning only)
+- npm run test -- --run
+- npm run build
+- Browser check at `http://127.0.0.1:4321/aksel-arcade/`: confirmed contextual `Radio` completion inside `RadioGroup` inserts a single `<Radio value="option1">...</Radio>` child and renders cleanly in preview; confirmed `CheckboxGroup` still offers only the contextual `Checkbox` child completion, with the inserted text locked by the new regression test.

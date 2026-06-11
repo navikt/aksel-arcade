@@ -51,6 +51,7 @@ export type AkselAutocompleteDiscovery = 'contextual-only' | 'top-level'
 export interface AkselContextualAutocompleteChild {
   name: string
   discovery?: AkselAutocompleteDiscovery
+  insertion?: ComponentInsertion
 }
 
 export interface AkselContextualAutocompleteRule {
@@ -358,12 +359,28 @@ const AKSEL_CONTEXTUAL_AUTOCOMPLETE_RULES: AkselContextualAutocompleteRule[] = [
   },
   {
     parent: 'RadioGroup',
-    children: [{ name: 'Radio', discovery: 'top-level' }],
+    children: [
+      {
+        name: 'Radio',
+        discovery: 'top-level',
+        insertion: {
+          jsx: '<Radio value="option1">Option 1</Radio>',
+        },
+      },
+    ],
     exclusive: true,
   },
   {
     parent: 'CheckboxGroup',
-    children: [{ name: 'Checkbox', discovery: 'top-level' }],
+    children: [
+      {
+        name: 'Checkbox',
+        discovery: 'top-level',
+        insertion: {
+          jsx: '<Checkbox value="option1">Option 1</Checkbox>',
+        },
+      },
+    ],
     exclusive: true,
   },
 ]
@@ -787,6 +804,483 @@ export const AKSEL_CATALOG: AkselCatalogEntry[] = [
     snippet: {
       code: '<Button variant="primary">Button text</Button>',
       description: 'Primary action button.',
+    },
+  },
+  {
+    id: 'checkbox',
+    name: 'Checkbox',
+    group: 'component',
+    status: 'current',
+    package: '@navikt/ds-react',
+    importName: 'Checkbox',
+    importGuidance: "import { Checkbox } from '@navikt/ds-react';",
+    docs: `${COMPONENT_DOCS_BASE}/checkbox`,
+    description: 'Checkbox input with a visible label.',
+    keywords: ['checkbox', 'check', 'consent', 'boolean', 'form', 'input'],
+    props: [
+      {
+        name: 'value',
+        type: 'string',
+        description: 'Submitted checkbox value.',
+      },
+      {
+        name: 'indeterminate',
+        type: 'boolean',
+        values: ['true', 'false'],
+        valueKind: 'enum',
+        description: 'Show a partially selected state.',
+      },
+      {
+        name: 'description',
+        type: 'ReactNode',
+        description: 'Additional helper text for the checkbox.',
+      },
+      {
+        name: 'size',
+        type: '"medium" | "small"',
+        values: ['medium', 'small'],
+        valueKind: 'enum',
+        default: 'medium',
+        description: 'Checkbox size.',
+      },
+    ],
+    snippet: {
+      code:
+        '<Checkbox description="You can change this later." name="emailUpdates">\n' +
+        '  Send me email updates\n' +
+        '</Checkbox>',
+      description: 'Visible checkbox example.',
+    },
+  },
+  {
+    id: 'radio',
+    name: 'Radio',
+    group: 'component',
+    status: 'current',
+    package: '@navikt/ds-react',
+    importName: 'Radio',
+    importGuidance: "import { Radio, RadioGroup } from '@navikt/ds-react';",
+    docs: `${COMPONENT_DOCS_BASE}/radio`,
+    description: 'Single-choice radio group with a visible legend.',
+    keywords: ['radio', 'radiogroup', 'single choice', 'choice', 'form', 'input'],
+    props: [
+      {
+        name: 'value',
+        type: 'string',
+        required: true,
+        description: 'Value submitted when the radio is selected.',
+      },
+      {
+        name: 'description',
+        type: 'ReactNode',
+        description: 'Additional helper text for the radio option.',
+      },
+      {
+        name: 'size',
+        type: '"medium" | "small"',
+        values: ['medium', 'small'],
+        valueKind: 'enum',
+        default: 'medium',
+        description: 'Radio size.',
+      },
+    ],
+    snippet: {
+      code:
+        '<RadioGroup legend="Choose delivery speed" defaultValue="standard" name="deliverySpeed">\n' +
+        '  <Radio value="standard">Standard</Radio>\n' +
+        '  <Radio value="express">Express</Radio>\n' +
+        '</RadioGroup>',
+      description: 'Single-choice radio group example.',
+    },
+  },
+  {
+    id: 'datepicker',
+    name: 'DatePicker',
+    group: 'component',
+    status: 'current',
+    package: '@navikt/ds-react',
+    importName: 'DatePicker',
+    importGuidance: "import { DatePicker, useDatepicker } from '@navikt/ds-react';",
+    docs: `${COMPONENT_DOCS_BASE}/datepicker`,
+    description: 'Hook-backed date picker input.',
+    keywords: ['date', 'datepicker', 'calendar', 'form', 'input'],
+    props: [
+      {
+        name: 'fromDate',
+        type: 'Date',
+        description: 'The earliest selectable day.',
+      },
+      {
+        name: 'toDate',
+        type: 'Date',
+        description: 'The latest selectable day.',
+      },
+      {
+        name: 'dropdownCaption',
+        type: 'boolean',
+        values: ['true', 'false'],
+        valueKind: 'enum',
+        description: 'Show month and year dropdowns when fromDate and toDate are set.',
+      },
+      {
+        name: 'disableWeekends',
+        type: 'boolean',
+        values: ['true', 'false'],
+        valueKind: 'enum',
+        description: 'Disable Saturday and Sunday.',
+      },
+      {
+        name: 'mode',
+        type: '"single" | "multiple" | "range"',
+        values: ['single', 'multiple', 'range'],
+        valueKind: 'enum',
+        description: 'Date selection mode.',
+      },
+    ],
+    snippet: {
+      code: '<DatePickerField{{datePickerFieldSuffix}} />',
+      hooksCode:
+        'export const DatePickerField{{datePickerFieldSuffix}} = () => {\n' +
+        '  const { datepickerProps, inputProps } = useDatepicker({\n' +
+        '    defaultSelected: new Date("2025-06-15"),\n' +
+        '    fromDate: new Date("2025-01-01"),\n' +
+        '    toDate: new Date("2025-12-31"),\n' +
+        '  })\n' +
+        '\n' +
+        '  return (\n' +
+        '    <DatePicker {...datepickerProps}>\n' +
+        '      <DatePicker.Input\n' +
+        '        {...inputProps}\n' +
+        '        label="Choose meeting date"\n' +
+        '        description="Pick a date in 2025."\n' +
+        '        name="meetingDate"\n' +
+        '      />\n' +
+        '    </DatePicker>\n' +
+        '  )\n' +
+        '}',
+      description: 'Date picker input with Hooks-tab state.',
+    },
+  },
+  {
+    id: 'monthpicker',
+    name: 'MonthPicker',
+    group: 'component',
+    status: 'current',
+    package: '@navikt/ds-react',
+    importName: 'MonthPicker',
+    importGuidance: "import { MonthPicker, useMonthpicker } from '@navikt/ds-react';",
+    docs: `${COMPONENT_DOCS_BASE}/monthpicker`,
+    description: 'Hook-backed month picker input.',
+    keywords: ['month', 'monthpicker', 'calendar', 'form', 'input'],
+    props: [
+      {
+        name: 'fromDate',
+        type: 'Date',
+        description: 'The earliest selectable month.',
+      },
+      {
+        name: 'toDate',
+        type: 'Date',
+        description: 'The latest selectable month.',
+      },
+      {
+        name: 'dropdownCaption',
+        type: 'boolean',
+        values: ['true', 'false'],
+        valueKind: 'enum',
+        description: 'Show a year dropdown when fromDate and toDate are set.',
+      },
+      {
+        name: 'selected',
+        type: 'Date',
+        description: 'Controlled selected month.',
+      },
+      {
+        name: 'defaultSelected',
+        type: 'Date',
+        description: 'Initial selected month for uncontrolled state.',
+      },
+    ],
+    snippet: {
+      code: '<MonthPickerField{{monthPickerFieldSuffix}} />',
+      hooksCode:
+        'export const MonthPickerField{{monthPickerFieldSuffix}} = () => {\n' +
+        '  const { monthpickerProps, inputProps } = useMonthpicker({\n' +
+        '    defaultSelected: new Date("2025-09-01"),\n' +
+        '    fromDate: new Date("2025-01-01"),\n' +
+        '    toDate: new Date("2025-12-31"),\n' +
+        '  })\n' +
+        '\n' +
+        '  return (\n' +
+        '    <MonthPicker {...monthpickerProps}>\n' +
+        '      <MonthPicker.Input\n' +
+        '        {...inputProps}\n' +
+        '        label="Choose reporting month"\n' +
+        '        description="Select a month in 2025."\n' +
+        '        name="reportingMonth"\n' +
+        '      />\n' +
+        '    </MonthPicker>\n' +
+        '  )\n' +
+        '}',
+      description: 'Month picker input with Hooks-tab state.',
+    },
+  },
+  {
+    id: 'search',
+    name: 'Search',
+    group: 'component',
+    status: 'current',
+    package: '@navikt/ds-react',
+    importName: 'Search',
+    importGuidance: "import { Search } from '@navikt/ds-react';",
+    docs: `${COMPONENT_DOCS_BASE}/search`,
+    description: 'Search field inside an accessible search form.',
+    keywords: ['search', 'find', 'query', 'filter', 'input'],
+    props: [
+      {
+        name: 'label',
+        type: 'ReactNode',
+        required: true,
+        description: 'Accessible search label.',
+      },
+      {
+        name: 'variant',
+        type: '"primary" | "secondary" | "simple"',
+        values: ['primary', 'secondary', 'simple'],
+        valueKind: 'enum',
+        default: 'primary',
+        description: 'Search button style.',
+      },
+      {
+        name: 'clearButton',
+        type: 'boolean',
+        values: ['true', 'false'],
+        valueKind: 'enum',
+        description: 'Show the clear button.',
+      },
+      {
+        name: 'htmlSize',
+        type: 'number | string',
+        description: 'HTML input width in characters.',
+      },
+    ],
+    snippet: {
+      code:
+        '<form role="search" onSubmit={(event) => event.preventDefault()}>\n' +
+        '  <Search label="Search projects" variant="secondary" name="projectSearch" />\n' +
+        '</form>',
+      description: 'Accessible search form example.',
+    },
+  },
+  {
+    id: 'select',
+    name: 'Select',
+    group: 'component',
+    status: 'current',
+    package: '@navikt/ds-react',
+    importName: 'Select',
+    importGuidance: "import { Select } from '@navikt/ds-react';",
+    docs: `${COMPONENT_DOCS_BASE}/select`,
+    description: 'Labeled select input with visible choices.',
+    keywords: ['select', 'dropdown', 'options', 'form', 'menu'],
+    props: [
+      {
+        name: 'label',
+        type: 'ReactNode',
+        required: true,
+        description: 'Select label.',
+      },
+      {
+        name: 'size',
+        type: '"medium" | "small"',
+        values: ['medium', 'small'],
+        valueKind: 'enum',
+        default: 'medium',
+        description: 'Select size.',
+      },
+      {
+        name: 'description',
+        type: 'ReactNode',
+        description: 'Additional helper text.',
+      },
+      {
+        name: 'hideLabel',
+        type: 'boolean',
+        values: ['true', 'false'],
+        valueKind: 'enum',
+        description: 'Hide the label visually while keeping it accessible.',
+      },
+    ],
+    snippet: {
+      code:
+        '<Select label="Choose delivery window" defaultValue="" name="deliveryWindow">\n' +
+        '  <option value="" disabled>Select an option</option>\n' +
+        '  <option value="morning">Morning</option>\n' +
+        '  <option value="afternoon">Afternoon</option>\n' +
+        '</Select>',
+      description: 'Select with placeholder and options.',
+    },
+  },
+  {
+    id: 'switch',
+    name: 'Switch',
+    group: 'component',
+    status: 'current',
+    package: '@navikt/ds-react',
+    importName: 'Switch',
+    importGuidance: "import { Switch } from '@navikt/ds-react';",
+    docs: `${COMPONENT_DOCS_BASE}/switch`,
+    description: 'Toggle switch with a visible label.',
+    keywords: ['switch', 'toggle', 'boolean', 'settings', 'form'],
+    props: [
+      {
+        name: 'description',
+        type: 'ReactNode',
+        description: 'Additional helper text.',
+      },
+      {
+        name: 'size',
+        type: '"medium" | "small"',
+        values: ['medium', 'small'],
+        valueKind: 'enum',
+        default: 'medium',
+        description: 'Switch size.',
+      },
+      {
+        name: 'position',
+        type: '"left" | "right"',
+        values: ['left', 'right'],
+        valueKind: 'enum',
+        description: 'Place the switch on the left or right side of the label.',
+      },
+      {
+        name: 'loading',
+        type: 'boolean',
+        values: ['true', 'false'],
+        valueKind: 'enum',
+        description: 'Show a short loading state.',
+      },
+    ],
+    snippet: {
+      code:
+        '<Switch defaultChecked description="Turn this off if you do not want reminder emails." name="emailReminders">\n' +
+        '  Email reminders\n' +
+        '</Switch>',
+      description: 'Visible switch example.',
+    },
+  },
+  {
+    id: 'textarea',
+    name: 'Textarea',
+    group: 'component',
+    status: 'current',
+    package: '@navikt/ds-react',
+    importName: 'Textarea',
+    importGuidance: "import { Textarea } from '@navikt/ds-react';",
+    docs: `${COMPONENT_DOCS_BASE}/textarea`,
+    description: 'Multi-line text input with label and helper text.',
+    keywords: ['textarea', 'multiline', 'text', 'form', 'input'],
+    props: [
+      {
+        name: 'label',
+        type: 'ReactNode',
+        required: true,
+        description: 'Textarea label.',
+      },
+      {
+        name: 'description',
+        type: 'ReactNode',
+        description: 'Additional helper text.',
+      },
+      {
+        name: 'minRows',
+        type: 'number',
+        description: 'Minimum number of visible text rows.',
+      },
+      {
+        name: 'resize',
+        type: 'boolean | "vertical" | "horizontal"',
+        values: ['true', 'false', 'vertical', 'horizontal'],
+        valueKind: 'enum',
+        description: 'Allow resizing the field.',
+      },
+      {
+        name: 'maxLength',
+        type: 'number',
+        description: 'Character counter limit.',
+      },
+    ],
+    snippet: {
+      code:
+        '<Textarea\n' +
+        '  label="Additional details"\n' +
+        '  description="Include anything the reviewer should know."\n' +
+        '  name="additionalDetails"\n' +
+        '  minRows={4}\n' +
+        '/>',
+      description: 'Labeled multi-line text field.',
+    },
+  },
+  {
+    id: 'togglegroup',
+    name: 'ToggleGroup',
+    group: 'component',
+    status: 'current',
+    package: '@navikt/ds-react',
+    importName: 'ToggleGroup',
+    importGuidance: "import { ToggleGroup } from '@navikt/ds-react';",
+    docs: `${COMPONENT_DOCS_BASE}/toggle-group`,
+    description: 'Toggle group with Hooks-tab selection state.',
+    keywords: ['toggle', 'group', 'segmented', 'choice', 'filter', 'view'],
+    props: [
+      {
+        name: 'value',
+        type: 'string',
+        description: 'Controlled selected value.',
+      },
+      {
+        name: 'defaultValue',
+        type: 'string',
+        description: 'Initial selected value for uncontrolled state.',
+      },
+      {
+        name: 'onChange',
+        type: '(value: string) => void',
+        required: true,
+        description: 'Callback when the selected item changes.',
+      },
+      {
+        name: 'label',
+        type: 'ReactNode',
+        description: 'Label describing the toggle group.',
+      },
+      {
+        name: 'fill',
+        type: 'boolean',
+        values: ['true', 'false'],
+        valueKind: 'enum',
+        description: 'Stretch the items to fill the available width.',
+      },
+    ],
+    snippet: {
+      code:
+        '<ToggleGroup\n' +
+        '  {...useToggleGroupState{{toggleGroupSuffix}}()}\n' +
+        '  label="Choose view"\n' +
+        '>\n' +
+        '  <ToggleGroup.Item value="list">List</ToggleGroup.Item>\n' +
+        '  <ToggleGroup.Item value="calendar">Calendar</ToggleGroup.Item>\n' +
+        '</ToggleGroup>',
+      hooksCode:
+        'export const useToggleGroupState{{toggleGroupSuffix}} = (initialValue = "list") => {\n' +
+        '  const [selectedView, setSelectedView] = useState(initialValue)\n' +
+        '\n' +
+        '  return {\n' +
+        '    value: selectedView,\n' +
+        '    onChange: setSelectedView,\n' +
+        '  }\n' +
+        '}',
+      description: 'Toggle group with Hooks-tab state.',
     },
   },
   {
