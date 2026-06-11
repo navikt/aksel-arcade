@@ -169,6 +169,51 @@ describe('component insertion service', () => {
     })
   })
 
+  it('injects component setup into anonymous default-export function components instead of wrapping the file', async () => {
+    const source = createArcadeSourceFile(
+      'export default function () {\n  return <VStack></VStack>\n}',
+      ''
+    )
+    const insertionPoint = source.jsx.indexOf('</VStack>')
+
+    const nextSource = applyComponentInsertion(source, paginationInsertion, {
+      kind: 'autocomplete',
+      from: insertionPoint,
+      to: insertionPoint,
+    })
+
+    expect(nextSource.jsx).toContain('export default function () {\n  // __AKSEL_ARCADE_COMPONENT_SETUP__')
+    expect(nextSource.jsx).toContain('const [pageState, setPageState] = useState(1)')
+    expect(nextSource.jsx).toContain('return <VStack><Pagination')
+    expect(nextSource.jsx).not.toContain('(() => {')
+
+    await expect(transpileCode(nextSource.jsx, nextSource.hooks)).resolves.toMatchObject({
+      success: true,
+      error: null,
+    })
+  })
+
+  it('injects component setup into anonymous default-export arrow components without wrapping the file', async () => {
+    const source = createArcadeSourceFile('export default () => <VStack></VStack>', '')
+    const insertionPoint = source.jsx.indexOf('</VStack>')
+
+    const nextSource = applyComponentInsertion(source, paginationInsertion, {
+      kind: 'autocomplete',
+      from: insertionPoint,
+      to: insertionPoint,
+    })
+
+    expect(nextSource.jsx).toContain('export default () => {\n  // __AKSEL_ARCADE_COMPONENT_SETUP__')
+    expect(nextSource.jsx).toContain('const [pageState, setPageState] = useState(1)')
+    expect(nextSource.jsx).toContain('return <VStack><Pagination')
+    expect(nextSource.jsx).not.toContain('(() => {')
+
+    await expect(transpileCode(nextSource.jsx, nextSource.hooks)).resolves.toMatchObject({
+      success: true,
+      error: null,
+    })
+  })
+
   it('replaces JSX completion ranges and preserves existing Hooks code', () => {
     const source = createArcadeSourceFile('<Pagi', 'const selectedFilter = "all"')
 

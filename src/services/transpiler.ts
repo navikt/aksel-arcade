@@ -37,7 +37,9 @@ const STATIC_IMPORT_PATTERN =
 const LOCAL_HOOKS_IMPORT_PATTERN = /^\.{1,2}\/hooks(?:\/[\w.-]+)?(?:\.(?:[cm]?[jt]sx?))?$/
 const IDENTIFIER_PATTERN = /^[A-Za-z_$][\w$]*$/
 const DEFAULT_EXPORT_DECLARATION_PATTERN =
-  /export\s+default\s+(function|class)\s+([A-Za-z_$][\w$]*)/
+  /export\s+default\s+((?:async\s+)?function|class)\s+([A-Za-z_$][\w$]*)/
+const DEFAULT_EXPORT_IDENTIFIER_PATTERN =
+  /export\s+default\s+(?!(?:async\s+function|function|class)\b)([A-Za-z_$][\w$]*)\s*;?/
 const EXPORT_NAMED_DECLARATION_PATTERN = /export\s+(const|let|var|function|class)\s+/g
 const EXPORT_NAMED_LIST_PATTERN = /export\s*\{[^}]+\}\s*;?\n?/g
 
@@ -260,7 +262,7 @@ const removeDuplicateRuntimePreludeStatements = (
 
 const createDefaultExportComponent = (sourceCode: string, componentIdentifier: string): string => {
   const defaultDeclarationMatch = sourceCode.match(DEFAULT_EXPORT_DECLARATION_PATTERN)
-  const defaultIdentifierMatch = sourceCode.match(/export\s+default\s+([A-Za-z_$][\w$]*)\s*;?/)
+  const defaultIdentifierMatch = sourceCode.match(DEFAULT_EXPORT_IDENTIFIER_PATTERN)
 
   if (defaultDeclarationMatch) {
     const [, declarationKind, declaredName] = defaultDeclarationMatch
@@ -279,7 +281,7 @@ const createDefaultExportComponent = (sourceCode: string, componentIdentifier: s
     return defaultIdentifier === componentIdentifier
       ? sourceCode.replace(/export\s+default\s+[A-Za-z_$][\w$]*\s*;?/g, '')
       : sourceCode.replace(
-          /export\s+default\s+[A-Za-z_$][\w$]*\s*;?/g,
+          DEFAULT_EXPORT_IDENTIFIER_PATTERN,
           `const ${componentIdentifier} = ${defaultIdentifier};`
         )
   }

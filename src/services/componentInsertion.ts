@@ -26,11 +26,14 @@ const COMPONENT_SETUP_WRAPPER_PATTERN = new RegExp(
   String.raw`^\(\(\) => \{\n {2}\/\/ __AKSEL_ARCADE_COMPONENT_SETUP__\n([\s\S]*?)\n\n {2}return \(\n {4}<>\n([\s\S]*?)\n {4}<\/>\n {2}\)\n\}\)\(\)$`
 )
 const FUNCTION_COMPONENT_OPENING_PATTERNS = [
-  /^(?:export\s+default\s+)?function\s+\w+\s*\([^)]*\)\s*\{/m,
+  /^(?:export\s+default\s+)?(?:async\s+)?function(?:\s+\w+)?\s*\([^)]*\)\s*(?::\s*[^{]+)?\s*\{/m,
   /^(?:export\s+)?(?:const|let|var)\s+\w+\s*=\s*(?:async\s*)?(?:\([^)]*\)|[A-Za-z_$][\w$]*)\s*(?::[^=]+)?=>\s*\{/m,
+  /^export\s+default\s+(?:async\s*)?(?:\([^)]*\)|[A-Za-z_$][\w$]*)\s*(?::[^=]+)?=>\s*\{/m,
 ]
-const CONCISE_ARROW_COMPONENT_PATTERN =
-  /^((?:export\s+)?(?:const|let|var)\s+\w+\s*=\s*(?:async\s*)?(?:\([^)]*\)|[A-Za-z_$][\w$]*)\s*(?::[^=]+)?=>)\s*([\s\S]*?)(;?)(?=\n(?:export\b|const\b|let\b|var\b|function\b|class\b)|(?![\s\S]))/m
+const CONCISE_ARROW_COMPONENT_PATTERNS = [
+  /^((?:export\s+)?(?:const|let|var)\s+\w+\s*=\s*(?:async\s*)?(?:\([^)]*\)|[A-Za-z_$][\w$]*)\s*(?::[^=]+)?=>)\s*([\s\S]*?)(;?)(?=\n(?:export\b|const\b|let\b|var\b|function\b|class\b)|(?![\s\S]))/m,
+  /^(export\s+default\s+(?:async\s*)?(?:\([^)]*\)|[A-Za-z_$][\w$]*)\s*(?::[^=]+)?=>)\s*([\s\S]*?)(;?)(?=\n(?:export\b|const\b|let\b|var\b|function\b|class\b)|(?![\s\S]))/m,
+]
 
 function stripSnippetPlaceholders(template: string): string {
   return template.replace(
@@ -212,15 +215,18 @@ function applyFunctionComponentSetup(source: string, setupBlock: string): string
     return `${source.slice(0, functionOpeningEnd)}\n  ${COMPONENT_SETUP_MARKER}\n${indentBlock(setupBlock, '  ')}\n\n${body}`
   }
 
-  const conciseArrowMatch = source.match(CONCISE_ARROW_COMPONENT_PATTERN)
+  const conciseArrowMatch = CONCISE_ARROW_COMPONENT_PATTERNS.flatMap((pattern) => {
+    const match = source.match(pattern)
+    return match ? [{ match, index: match.index ?? 0 }] : []
+  }).sort((left, right) => left.index - right.index)[0]
 
   if (!conciseArrowMatch || conciseArrowMatch.index === undefined) {
     return null
   }
 
-  const concisePrefix = conciseArrowMatch[1]
-  const conciseExpression = conciseArrowMatch[2].trim()
-  const conciseTerminator = conciseArrowMatch[3] ?? ''
+  const concisePrefix = conciseArrowMatch.match[1]
+  const conciseExpression = conciseArrowMatch.match[2].trim()
+  const conciseTerminator = conciseArrowMatch.match[3] ?? ''
   const conciseComponentSource =
     `${concisePrefix} {\n` +
     `  ${COMPONENT_SETUP_MARKER}\n` +
@@ -229,7 +235,7 @@ function applyFunctionComponentSetup(source: string, setupBlock: string): string
     '}'
 
   return `${source.slice(0, conciseArrowMatch.index)}${conciseComponentSource}${source.slice(
-    conciseArrowMatch.index + conciseArrowMatch[0].length
+    conciseArrowMatch.index + conciseArrowMatch.match[0].length
   )}`
 }
 
