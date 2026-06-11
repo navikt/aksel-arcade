@@ -2235,3 +2235,26 @@ Verification:
 - npm run test -- --run
 - npm run build
 - Browser check at `http://127.0.0.1:4311/aksel-arcade/`: confirmed typing `<Pagi` in the Hooks tab shows no `Pagination` completion, typing `<Pagi` in JSX still offers `Pagination`, accepting it still renders the preview pagination controls, the hook support code lands in the Hooks tab, and the clean verified session had no browser console errors.
+
+### 2026-06-11 - Post-#211 insertion contract update from user feedback
+
+Implemented:
+
+- Fresh user feedback on the new `Pagination` / `Tabs` authoring flow clarified a stricter system contract for Add-menu and autocomplete insertions: JSX must stay composable inside the surrounding layout tree, and helper logic must live in Hooks instead of being injected into the JSX buffer as wrapper fragments or IIFEs.
+- Updated the shared `Pagination` catalog insertion so the JSX payload is now a plain placeable `<Pagination ... />` tag while the reusable state helper stays in Hooks as `usePaginationState{{paginationSuffix}}(...)`; the JSX now consumes that helper through prop spread instead of a fragment-wrapped local IIFE.
+- Updated `Tabs` starter snippets to use uncontrolled `defaultValue="tab1"` instead of a controlled `value="tab1"` without `onChange`, so Add-menu insertion yields a clickable preview without requiring extra support code.
+- Added a catalog-level regression guard proving every Hooks-backed insertion keeps a plain JSX root and does not inject wrapper IIFEs/fragments, so future stateful snippet work fails fast in tests if it violates the composable-layout contract again.
+
+Verification:
+
+- npm run typecheck
+- npm run lint (existing `.eslintignore` deprecation notice and existing `InspectionPopover` hook dependency warning only)
+- npm run build
+- npm run test -- --run
+
+Next note:
+
+- This contract applies directly to #209, #214, #215, #216, and #217 because those remaining slices still touch author-facing insertions for interactive/stateful components; do not introduce wrapper JSX around the inserted node when fixing those issues.
+- #210 should preserve the same contract for autocomplete-triggered compound insertions: if a completion needs helper code, the JSX apply string still has to remain composable at the insertion point.
+- #213 should explicitly audit for this rule when comparing docs/runtime/catalog snippets, because wrapper-based JSX insertions are now a known system-level regression class.
+- #212 looks mostly static (`content`, `typography`, `link`) and probably does not need special handling beyond the normal composable-snippet expectation, unless one of its target components later grows Hooks-backed support code.

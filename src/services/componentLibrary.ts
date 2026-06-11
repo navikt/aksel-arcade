@@ -315,7 +315,7 @@ const MANUAL_AKSEL_SNIPPETS: ComponentSnippet[] = [
     category: 'component',
     keywords: ['tabs', 'navigation', 'panel', 'switch'],
     template:
-      '<Tabs value="tab1">\n  <Tabs.List>\n    <Tabs.Tab value="tab1" label="${1:Tab 1}" />\n    <Tabs.Tab value="tab2" label="${2:Tab 2}" />\n  </Tabs.List>\n  <Tabs.Panel value="tab1">${3:Content 1}</Tabs.Panel>\n  <Tabs.Panel value="tab2">${4:Content 2}</Tabs.Panel>\n</Tabs>',
+      '<Tabs defaultValue="tab1">\n  <Tabs.List>\n    <Tabs.Tab value="tab1" label="${1:Tab 1}" />\n    <Tabs.Tab value="tab2" label="${2:Tab 2}" />\n  </Tabs.List>\n  <Tabs.Panel value="tab1">${3:Content 1}</Tabs.Panel>\n  <Tabs.Panel value="tab2">${4:Content 2}</Tabs.Panel>\n</Tabs>',
     description: 'Tab navigation',
     import: "import { Tabs } from '@navikt/ds-react';",
   },

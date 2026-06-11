@@ -2243,10 +2243,14 @@ export const AKSEL_COMPONENTS: Record<string, ComponentMetadata> = {
     description: 'Tab navigation',
     props: [
       {
+        name: 'defaultValue',
+        type: 'string',
+        description: 'Initial active tab value',
+      },
+      {
         name: 'value',
         type: 'string',
-        required: true,
-        description: 'Active tab value',
+        description: 'Active tab value when controlled',
       },
       {
         name: 'onChange',

@@ -182,21 +182,25 @@ describe('Aksel catalog starter path', () => {
     )
     const paginationSnippet = AKSEL_SNIPPETS.find((snippet) => snippet.name === 'Pagination')
 
+    expect(paginationEntry?.description).toBe('Pagination controls with Hooks-tab state.')
     expect(paginationEntry?.snippet.code).toContain(
-      'const paginationState{{paginationSuffix}} = usePaginationState{{paginationSuffix}}()'
+      '{...usePaginationState{{paginationSuffix}}()}'
+    )
+    expect(paginationEntry?.snippet.code).not.toContain('{(() => {')
+    expect(paginationEntry?.snippet.code).toContain(
+      'srHeading={{ tag: "h2", text: "Result pages" }}'
     )
     expect(paginationEntry?.snippet.hooksCode).toContain(
       'export const usePaginationState{{paginationSuffix}} = (initialPage = 1) => {'
     )
+    expect(paginationEntry?.snippet.hooksCode).toContain(
+      'const [pageState, setPageState] = useState(initialPage)'
+    )
     expect(paginationPaletteEntry).toEqual(
       expect.objectContaining({
-        snippet: expect.stringContaining(
-          'const paginationState{{paginationSuffix}} = usePaginationState{{paginationSuffix}}()'
-        ),
+        snippet: expect.stringContaining('{...usePaginationState{{paginationSuffix}}()}'),
         insertion: expect.objectContaining({
-          jsx: expect.stringContaining(
-            'const paginationState{{paginationSuffix}} = usePaginationState{{paginationSuffix}}()'
-          ),
+          jsx: expect.stringContaining('{...usePaginationState{{paginationSuffix}}()}'),
           hooks: expect.stringContaining(
             'export const usePaginationState{{paginationSuffix}} = (initialPage = 1) => {'
           ),
@@ -205,15 +209,39 @@ describe('Aksel catalog starter path', () => {
     )
     expect(paginationSnippet?.insertion).toEqual(
       expect.objectContaining({
-        jsx: expect.stringContaining(
-          'const paginationState{{paginationSuffix}} = usePaginationState{{paginationSuffix}}()'
-        ),
+        jsx: expect.stringContaining('{...usePaginationState{{paginationSuffix}}()}'),
         hooks: expect.stringContaining(
           'export const usePaginationState{{paginationSuffix}} = (initialPage = 1) => {'
         ),
       })
     )
     expect(searchComponents('pager')).toContainEqual(expect.objectContaining({ name: 'Pagination' }))
+  })
+
+  it('keeps every Hooks-backed catalog snippet composable in JSX', () => {
+    const hooksBackedEntries = listCatalogEntries({
+      groups: ['layout', 'component'],
+      statuses: ['current', 'experimental'],
+    }).filter((entry) => entry.snippet.hooksCode)
+
+    expect(hooksBackedEntries).toHaveLength(1)
+
+    for (const entry of hooksBackedEntries) {
+      expect(entry.snippet.code.trim().startsWith('<')).toBe(true)
+      expect(entry.snippet.code).not.toContain('{(() => {')
+      expect(entry.snippet.code.trim().startsWith('<>')).toBe(false)
+    }
+  })
+
+  it('keeps Tabs snippets uncontrolled so preview clicks can switch panels', () => {
+    const tabsPaletteEntry = getComponentsByCategory('component').find(
+      (component) => component.name === 'Tabs'
+    )
+    const tabsSnippet = AKSEL_SNIPPETS.find((snippet) => snippet.name === 'Tabs')
+
+    expect(tabsPaletteEntry?.snippet).toContain('<Tabs defaultValue="tab1">')
+    expect(tabsPaletteEntry?.snippet).not.toContain('<Tabs value="tab1">')
+    expect(tabsSnippet?.template).toContain('<Tabs defaultValue="tab1">')
   })
 
   it('makes the editor snippet and prop metadata paths prefer the same catalog source', () => {

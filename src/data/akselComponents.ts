@@ -891,12 +891,13 @@ export const uiComponents: ComponentMetadata[] = [
     import: '@navikt/ds-react',
     description: 'Tab navigation',
     props: [
-      { name: 'value', type: 'string', required: true, description: 'Active tab value' },
+      { name: 'defaultValue', type: 'string', description: 'Initial active tab value' },
+      { name: 'value', type: 'string', description: 'Active tab value when controlled' },
       { name: 'onChange', type: 'function', description: 'Tab change handler' },
       { name: 'size', type: '"medium" | "small"', values: ['medium', 'small'], default: 'medium' },
     ],
     snippet:
-      '<Tabs value="tab1">\n  <Tabs.List>\n    <Tabs.Tab value="tab1" label="Tab 1" />\n    <Tabs.Tab value="tab2" label="Tab 2" />\n  </Tabs.List>\n  <Tabs.Panel value="tab1">Content 1</Tabs.Panel>\n  <Tabs.Panel value="tab2">Content 2</Tabs.Panel>\n</Tabs>',
+      '<Tabs defaultValue="tab1">\n  <Tabs.List>\n    <Tabs.Tab value="tab1" label="Tab 1" />\n    <Tabs.Tab value="tab2" label="Tab 2" />\n  </Tabs.List>\n  <Tabs.Panel value="tab1">Content 1</Tabs.Panel>\n  <Tabs.Panel value="tab2">Content 2</Tabs.Panel>\n</Tabs>',
   },
   {
     name: 'Tag',
