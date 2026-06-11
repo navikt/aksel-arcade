@@ -82,4 +82,23 @@ describe('ComponentPalette', () => {
       })
     )
   })
+
+  it('can hide page-scoped insertions from the Add menu', async () => {
+    const user = userEvent.setup()
+
+    await act(async () => {
+      render(
+        <ComponentPalette
+          open
+          onClose={vi.fn()}
+          onInsertComponent={vi.fn()}
+          isComponentAvailable={(component) => !(component.insertion?.hooks || component.insertion?.componentSetup)}
+        />
+      )
+    })
+
+    await user.type(screen.getByRole('textbox', { name: /search components/i }), 'Pagination')
+
+    expect(screen.getByText('No components found matching "Pagination"')).toBeTruthy()
+  })
 })

@@ -61,6 +61,13 @@ export const EditorPane = () => {
     () => pageNavigationTargets.map((page) => page.id),
     [pageNavigationTargets]
   )
+  const blocksPageScopedInsertion = multiPageEnabled && effectiveEditTarget === 'global-config'
+  const canApplyCatalogInsertion = currentTab === 'JSX' && !blocksPageScopedInsertion
+  const isPaletteComponentAvailable = useCallback(
+    (component: ComponentMetadata) =>
+      !blocksPageScopedInsertion || !(component.insertion?.hooks || component.insertion?.componentSetup),
+    [blocksPageScopedInsertion]
+  )
   const errorPageIds = Array.from(
     new Set(
       [previewState.compileError?.pageId, previewState.runtimeError?.pageId].filter(
@@ -115,6 +122,10 @@ export const EditorPane = () => {
 
   const handleAutocompleteInsertion = useCallback(
     ({ insertion, from, to }: { insertion: Parameters<typeof applyComponentInsertion>[1]; from: number; to: number }) => {
+      if (blocksPageScopedInsertion && (insertion.hooks || insertion.componentSetup)) {
+        return
+      }
+
       const nextSource = applyComponentInsertion(activeSource, insertion, {
         kind: 'autocomplete',
         from,
@@ -127,7 +138,7 @@ export const EditorPane = () => {
         editTarget: effectiveEditTarget,
       })
     },
-    [activeSource, effectiveEditTarget, updateProject]
+    [activeSource, blocksPageScopedInsertion, effectiveEditTarget, updateProject]
   )
 
   const handleComponentInsert = useCallback(
@@ -135,6 +146,11 @@ export const EditorPane = () => {
       closeComponentPalette()
 
       const insertion = component.insertion ?? createJsxOnlyInsertion(component.snippet)
+
+      if (blocksPageScopedInsertion && (insertion.hooks || insertion.componentSetup)) {
+        return
+      }
+
       const nextSource = applyComponentInsertion(activeSource, insertion, {
         kind: 'palette',
         activeTab: currentTab,
@@ -154,6 +170,7 @@ export const EditorPane = () => {
       currentTab,
       editorState.hooksCursor,
       editorState.jsxCursor,
+      blocksPageScopedInsertion,
       effectiveEditTarget,
       updateProject,
     ]
@@ -284,13 +301,14 @@ export const EditorPane = () => {
             onFormat={handleFormat}
             validPageIds={multiPageEnabled ? validPageIds : undefined}
             pageNavigationTargets={multiPageEnabled ? pageNavigationTargets : undefined}
-            onApplyCatalogInsertion={currentTab === 'JSX' ? handleAutocompleteInsertion : undefined}
+            onApplyCatalogInsertion={canApplyCatalogInsertion ? handleAutocompleteInsertion : undefined}
           />
         </Box>
       </Box>
 
       <ComponentPalette
         open={isComponentPaletteOpen}
+        isComponentAvailable={isPaletteComponentAvailable}
         onInsertComponent={handleComponentInsert}
         onClose={() => closeComponentPalette()}
       />

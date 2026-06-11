@@ -2265,7 +2265,9 @@ Fixed before merge:
 - A focused PR review caught that the JSX editor linter still validated source by wrapping it in a fragment, which falsely flagged the new component-setup Pagination wrapper (`(() => { ... })()`) as invalid even though the preview transpiler accepts it as a single return expression.
 - Added `src/services/jsxValidation.ts` so editor validation now mirrors the real component-entry shape more closely: single-root expressions such as the component-setup IIFE validate directly, while true multi-root JSX still gets fragment wrapping.
 - Fixed `applyComponentInsertion()` so palette insertions with `componentSetup` still target JSX even when the Hooks tab is active, matching the earlier multi-part insertion behavior and preventing raw `<Pagination ... />` JSX from being written into Hooks code.
-- Added regression coverage in `tests/unit/services/jsxValidation.test.ts` and extended `tests/unit/services/componentInsertion.test.ts` for the Hooks-tab component-setup path.
+- Fixed `formatCode()` so it no longer mistakes nested JSX inside the component-setup IIFE for top-level multi-root JSX, which restores the **Format** action after inserting Pagination.
+- Hid page-scoped insertions from the Add dialog while editing `Global config`, and blocked the matching autocomplete insertion callback on that target so `Pagination` cannot write compile-breaking page JSX into shared global code.
+- Added regression coverage in `tests/unit/services/jsxValidation.test.ts`, `tests/unit/services/formatter.test.ts`, extended `tests/unit/services/componentInsertion.test.ts`, and updated `tests/integration/component-palette.test.tsx` for the Global-config filtering path.
 
 Verification:
 
@@ -2273,4 +2275,4 @@ Verification:
 - npm run typecheck
 - npm run test -- --run
 - npm run build
-- Browser check at `http://127.0.0.1:4311/aksel-arcade/`: confirmed Add -> `Pagination` on the JSX tab produces no CodeMirror lint errors, Add -> `Pagination` while the Hooks tab is active leaves Hooks content unchanged while still updating JSX, pagination remains interactive in preview, and the verified flow produced no browser console errors.
+- Browser check at `http://127.0.0.1:4311/aksel-arcade/`: confirmed Add -> `Pagination` on the JSX tab produces no CodeMirror lint errors, Add -> `Pagination` while the Hooks tab is active leaves Hooks content unchanged while still updating JSX, **Format** still works after the component-setup insertion, pagination remains interactive in preview, and the verified flow produced no browser console errors.

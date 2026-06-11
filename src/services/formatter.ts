@@ -97,7 +97,8 @@ export async function formatCode(code: string, options: FormatOptions = {}): Pro
     // at the start of lines (ignoring whitespace)
     const trimmedCode = code.trim()
     const rootElementMatches = trimmedCode.match(/^\s*</gm) // Lines starting with <
-    const hasMultipleRootElements = rootElementMatches && rootElementMatches.length > 1
+    const hasMultipleRootElements =
+      trimmedCode.startsWith('<') && !!rootElementMatches && rootElementMatches.length > 1
 
     // Auto-wrap multiple elements in Fragment to make valid JSX
     const codeToFormat = hasMultipleRootElements ? `<>\n${code}\n</>` : code

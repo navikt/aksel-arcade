@@ -23,9 +23,15 @@ interface ComponentPaletteProps {
   open: boolean
   onClose: () => void
   onInsertComponent: (component: ComponentMetadata) => void
+  isComponentAvailable?: (component: ComponentMetadata) => boolean
 }
 
-export const ComponentPalette = ({ open, onClose, onInsertComponent }: ComponentPaletteProps) => {
+export const ComponentPalette = ({
+  open,
+  onClose,
+  onInsertComponent,
+  isComponentAvailable = () => true,
+}: ComponentPaletteProps) => {
   const [searchQuery, setSearchQuery] = useState('')
   const [activeTab, setActiveTab] = useState<AkselCatalogGroup>('component')
   const searchInputRef = useRef<HTMLInputElement>(null)
@@ -43,17 +49,18 @@ export const ComponentPalette = ({ open, onClose, onInsertComponent }: Component
   // Filter components based on search and active tab
   const filteredComponents = useMemo(() => {
     if (searchQuery.trim()) {
-      return searchComponents(searchQuery)
+      return searchComponents(searchQuery).filter(isComponentAvailable)
     }
 
     const components = getComponentsByCategory(activeTab)
+      .filter(isComponentAvailable)
 
     if (activeTab !== 'component') {
       return components
     }
 
     return [...components].sort((left, right) => left.name.localeCompare(right.name))
-  }, [searchQuery, activeTab])
+  }, [searchQuery, activeTab, isComponentAvailable])
 
   const handleInsert = (component: ComponentMetadata) => {
     onInsertComponent(component)
