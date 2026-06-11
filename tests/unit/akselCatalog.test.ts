@@ -235,6 +235,80 @@ describe('Aksel catalog starter path', () => {
     )
   })
 
+  it('routes feedback, dialog, and form-shell examples through the shared catalog for Add menu data', () => {
+    const componentEntries = listCatalogEntries({ groups: ['component'], statuses: ['current'] })
+    const paletteComponents = getComponentsByCategory('component')
+    const inlineMessageEntry = getCatalogComponent('InlineMessage')
+    const globalAlertEntry = getCatalogComponent('GlobalAlert')
+    const localAlertEntry = getCatalogComponent('LocalAlert')
+    const dialogEntry = getCatalogComponent('Dialog')
+    const fieldsetEntry = getCatalogComponent('Fieldset')
+    const checkboxGroupEntry = getCatalogComponent('CheckboxGroup')
+    const errorMessageEntry = getCatalogComponent('ErrorMessage')
+    const errorSummaryEntry = getCatalogComponent('ErrorSummary')
+    const fileUploadEntry = getCatalogComponent('FileUpload')
+    const formSummaryEntry = getCatalogComponent('FormSummary')
+    const formProgressEntry = getCatalogComponent('FormProgress')
+
+    expect(componentEntries.map((entry) => entry.name)).toEqual(
+      expect.arrayContaining([
+        'InlineMessage',
+        'GlobalAlert',
+        'LocalAlert',
+        'Dialog',
+        'Fieldset',
+        'CheckboxGroup',
+        'ErrorMessage',
+        'ErrorSummary',
+        'FileUpload',
+        'FormSummary',
+      ])
+    )
+    expect(inlineMessageEntry?.snippet.code).toBe(
+      '<InlineMessage status="success">Draft saved at 14:35</InlineMessage>'
+    )
+    expect(globalAlertEntry?.snippet.code).toContain('<GlobalAlert status="announcement">')
+    expect(localAlertEntry?.snippet.code).toContain('<LocalAlert status="warning">')
+    expect(dialogEntry?.snippet.code).toBe('<ReviewDialog{{dialogSuffix}} />')
+    expect(dialogEntry?.snippet.hooksCode).toContain(
+      'export const ReviewDialog{{dialogSuffix}} = () => {'
+    )
+    expect(dialogEntry?.snippet.hooksCode).toContain('Dialog.CloseTrigger')
+    expect(fieldsetEntry?.snippet.code).toContain('<Fieldset legend="Employer phone number">')
+    expect(checkboxGroupEntry?.snippet.code).toContain(
+      '<CheckboxGroup\n  legend="How should we notify you?"'
+    )
+    expect(errorMessageEntry?.snippet.code).toBe(
+      '<ErrorMessage showIcon>Enter a valid email address.</ErrorMessage>'
+    )
+    expect(errorSummaryEntry?.snippet.code).toContain(
+      '<ErrorSummary heading="You must fix these errors before continuing:">'
+    )
+    expect(fileUploadEntry?.snippet.code).toContain('<FileUpload.Dropzone')
+    expect(fileUploadEntry?.snippet.code).toContain(
+      'button={{ action: "delete", onClick: () => {} }}'
+    )
+    expect(formSummaryEntry?.snippet.code).toContain('<FormSummary.Footer>')
+    expect(formProgressEntry?.snippet.code).toContain(
+      '<FormProgress totalSteps={3} activeStep={1}>'
+    )
+    expect(paletteComponents.find((component) => component.name === 'Dialog')?.insertion).toEqual(
+      expect.objectContaining({
+        jsx: '<ReviewDialog{{dialogSuffix}} />',
+        hooks: expect.stringContaining('export const ReviewDialog{{dialogSuffix}} = () => {'),
+      })
+    )
+    expect(
+      paletteComponents.find((component) => component.name === 'InlineMessage')?.snippet
+    ).toBe('<InlineMessage status="success">Draft saved at 14:35</InlineMessage>')
+    expect(searchComponents('modal replacement')).toContainEqual(
+      expect.objectContaining({ name: 'Dialog' })
+    )
+    expect(searchComponents('attachment')).toContainEqual(
+      expect.objectContaining({ name: 'FileUpload' })
+    )
+  })
+
   it('exposes Pagination as a catalog-backed multi-part insertion', () => {
     const paginationEntry = getCatalogComponent('Pagination')
     const paginationPaletteEntry = getComponentsByCategory('component').find(
@@ -329,6 +403,7 @@ describe('Aksel catalog starter path', () => {
 
     expect(hooksBackedEntries.map((entry) => entry.name).sort()).toEqual([
       'DatePicker',
+      'Dialog',
       'MonthPicker',
       'Pagination',
       'ToggleGroup',

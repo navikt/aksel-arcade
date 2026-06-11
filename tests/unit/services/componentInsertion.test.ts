@@ -44,6 +44,40 @@ const datePickerInsertion = {
     '}',
 }
 
+const dialogInsertion = {
+  jsx: '<ReviewDialog{{dialogSuffix}} />',
+  hooks:
+    'export const ReviewDialog{{dialogSuffix}} = () => {\n' +
+    '  const [dialogOpen{{dialogSuffix}}, setDialogOpen{{dialogSuffix}}] = useState(false)\n' +
+    '\n' +
+    '  return (\n' +
+    '    <>\n' +
+    '      <Button type="button" onClick={() => setDialogOpen{{dialogSuffix}}(true)}>\n' +
+    '        Review summary\n' +
+    '      </Button>\n' +
+    '      <Dialog open={dialogOpen{{dialogSuffix}}} onOpenChange={setDialogOpen{{dialogSuffix}}}>\n' +
+    '        <Dialog.Popup id="review-dialog-popup{{dialogSuffix}}">\n' +
+    '          <Dialog.Header>\n' +
+    '            <Dialog.Title>Ready to send?</Dialog.Title>\n' +
+    '          </Dialog.Header>\n' +
+    '          <Dialog.Body>\n' +
+    '            <BodyShort>Confirm when attachments are ready.</BodyShort>\n' +
+    '          </Dialog.Body>\n' +
+    '          <Dialog.Footer>\n' +
+    '            <Dialog.CloseTrigger>\n' +
+    '              <Button type="button" variant="secondary">Go back</Button>\n' +
+    '            </Dialog.CloseTrigger>\n' +
+    '            <Button type="button" onClick={() => setDialogOpen{{dialogSuffix}}(false)}>\n' +
+    '              Confirm\n' +
+    '            </Button>\n' +
+    '          </Dialog.Footer>\n' +
+    '        </Dialog.Popup>\n' +
+    '      </Dialog>\n' +
+    '    </>\n' +
+    '  )\n' +
+    '}',
+}
+
 describe('component insertion service', () => {
   it('preserves JSX-only Add menu insertion on the active JSX tab', () => {
     const source = createArcadeSourceFile('<Box>First</Box>\n<Box>Second</Box>', '')
@@ -129,6 +163,29 @@ describe('component insertion service', () => {
     expect(secondSource.jsx).toContain('<DatePickerField2 />')
     expect(secondSource.hooks).toContain('export const DatePickerField = () => {')
     expect(secondSource.hooks).toContain('export const DatePickerField2 = () => {')
+  })
+
+  it('avoids helper-component and popup id collisions for dialog insertions', () => {
+    const firstSource = applyComponentInsertion(createArcadeSourceFile('', ''), dialogInsertion, {
+      kind: 'palette',
+      activeTab: 'JSX',
+      jsxCursor: { line: 0, column: 0 },
+      hooksCursor: { line: 0, column: 0 },
+    })
+
+    const secondSource = applyComponentInsertion(firstSource, dialogInsertion, {
+      kind: 'palette',
+      activeTab: 'JSX',
+      jsxCursor: { line: 1, column: 0 },
+      hooksCursor: { line: 0, column: 0 },
+    })
+
+    expect(secondSource.jsx).toContain('<ReviewDialog />')
+    expect(secondSource.jsx).toContain('<ReviewDialog2 />')
+    expect(secondSource.hooks).toContain('export const ReviewDialog = () => {')
+    expect(secondSource.hooks).toContain('export const ReviewDialog2 = () => {')
+    expect(secondSource.hooks).toContain('id="review-dialog-popup"')
+    expect(secondSource.hooks).toContain('id="review-dialog-popup2"')
   })
 
   it('replaces JSX completion ranges and preserves existing Hooks code', () => {

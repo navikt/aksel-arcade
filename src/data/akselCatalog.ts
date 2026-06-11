@@ -1593,6 +1593,477 @@ export const AKSEL_CATALOG: AkselCatalogEntry[] = [
     },
   },
   {
+    id: 'inlinemessage',
+    name: 'InlineMessage',
+    group: 'component',
+    status: 'current',
+    package: '@navikt/ds-react',
+    importName: 'InlineMessage',
+    importGuidance: "import { InlineMessage } from '@navikt/ds-react';",
+    docs: `${COMPONENT_DOCS_BASE}/inlinemessage`,
+    description: 'Inline status message for short feedback.',
+    keywords: ['inline message', 'message', 'status', 'feedback', 'success', 'warning'],
+    props: [
+      {
+        name: 'status',
+        type: '"info" | "success" | "warning" | "error"',
+        values: ['info', 'success', 'warning', 'error'],
+        valueKind: 'enum',
+        required: true,
+        description: 'Inline feedback status.',
+      },
+      {
+        name: 'size',
+        type: '"medium" | "small"',
+        values: ['medium', 'small'],
+        valueKind: 'enum',
+        default: 'medium',
+        description: 'Inline message size.',
+      },
+    ],
+    snippet: {
+      code: '<InlineMessage status="success">Draft saved at 14:35</InlineMessage>',
+      description: 'Inline success message.',
+    },
+  },
+  {
+    id: 'globalalert',
+    name: 'GlobalAlert',
+    group: 'component',
+    status: 'current',
+    package: '@navikt/ds-react',
+    importName: 'GlobalAlert',
+    importGuidance: "import { GlobalAlert } from '@navikt/ds-react';",
+    docs: `${COMPONENT_DOCS_BASE}/globalalert`,
+    description: 'Page-wide alert banner for important updates.',
+    keywords: ['global alert', 'alert', 'banner', 'feedback', 'announcement', 'system'],
+    props: [
+      {
+        name: 'status',
+        type: '"announcement" | "success" | "warning" | "error"',
+        values: ['announcement', 'success', 'warning', 'error'],
+        valueKind: 'enum',
+        required: true,
+        description: 'Alert status.',
+      },
+      {
+        name: 'size',
+        type: '"medium" | "small"',
+        values: ['medium', 'small'],
+        valueKind: 'enum',
+        default: 'medium',
+        description: 'Alert size.',
+      },
+      {
+        name: 'centered',
+        type: 'boolean',
+        values: ['true', 'false'],
+        valueKind: 'enum',
+        description: 'Center the title and content.',
+      },
+    ],
+    snippet: {
+      code:
+        '<GlobalAlert status="announcement">\n' +
+        '  <GlobalAlert.Header>\n' +
+        '    <GlobalAlert.Title>Scheduled maintenance on Sunday night</GlobalAlert.Title>\n' +
+        '  </GlobalAlert.Header>\n' +
+        '  <GlobalAlert.Content>\n' +
+        '    The application will be unavailable from 23:00 to 01:00 while we deploy updates.\n' +
+        '  </GlobalAlert.Content>\n' +
+        '</GlobalAlert>',
+      description: 'Visible global announcement banner.',
+    },
+  },
+  {
+    id: 'localalert',
+    name: 'LocalAlert',
+    group: 'component',
+    status: 'current',
+    package: '@navikt/ds-react',
+    importName: 'LocalAlert',
+    importGuidance: "import { LocalAlert } from '@navikt/ds-react';",
+    docs: `${COMPONENT_DOCS_BASE}/localalert`,
+    description: 'Section-level alert for nearby feedback.',
+    keywords: ['local alert', 'alert', 'feedback', 'warning', 'message', 'section'],
+    props: [
+      {
+        name: 'status',
+        type: '"announcement" | "success" | "warning" | "error"',
+        values: ['announcement', 'success', 'warning', 'error'],
+        valueKind: 'enum',
+        required: true,
+        description: 'Alert status.',
+      },
+      {
+        name: 'size',
+        type: '"medium" | "small"',
+        values: ['medium', 'small'],
+        valueKind: 'enum',
+        default: 'medium',
+        description: 'Alert size.',
+      },
+    ],
+    snippet: {
+      code:
+        '<LocalAlert status="warning">\n' +
+        '  <LocalAlert.Header>\n' +
+        '    <LocalAlert.Title>Missing supporting documents</LocalAlert.Title>\n' +
+        '  </LocalAlert.Header>\n' +
+        '  <LocalAlert.Content>\n' +
+        '    Upload the latest payslip before you send the application.\n' +
+        '  </LocalAlert.Content>\n' +
+        '</LocalAlert>',
+      description: 'Visible local warning message.',
+    },
+  },
+  {
+    id: 'dialog',
+    name: 'Dialog',
+    group: 'component',
+    status: 'current',
+    package: '@navikt/ds-react',
+    importName: 'Dialog',
+    importGuidance: "import { BodyShort, Button, Dialog } from '@navikt/ds-react';",
+    docs: `${COMPONENT_DOCS_BASE}/dialog`,
+    description: 'Controlled dialog with trigger and close actions.',
+    keywords: ['dialog', 'modal replacement', 'overlay', 'popup', 'confirmation'],
+    props: [
+      {
+        name: 'open',
+        type: 'boolean',
+        values: ['true', 'false'],
+        valueKind: 'enum',
+        description: 'Controlled open state.',
+      },
+      {
+        name: 'onOpenChange',
+        type: '(open: boolean) => void',
+        description: 'Callback when the open state changes.',
+      },
+      {
+        name: 'size',
+        type: '"medium" | "small"',
+        values: ['medium', 'small'],
+        valueKind: 'enum',
+        default: 'medium',
+        description: 'Dialog size.',
+      },
+    ],
+    snippet: {
+      code: '<ReviewDialog{{dialogSuffix}} />',
+      hooksCode:
+        'export const ReviewDialog{{dialogSuffix}} = () => {\n' +
+        '  const [dialogOpen{{dialogSuffix}}, setDialogOpen{{dialogSuffix}}] = useState(false)\n' +
+        '\n' +
+        '  return (\n' +
+        '    <>\n' +
+        '      <Button\n' +
+        '        type="button"\n' +
+        '        variant="secondary"\n' +
+        '        onClick={() => setDialogOpen{{dialogSuffix}}(true)}\n' +
+        '        aria-haspopup="dialog"\n' +
+        '        aria-controls={dialogOpen{{dialogSuffix}} ? "review-dialog-popup{{dialogSuffix}}" : undefined}\n' +
+        '      >\n' +
+        '        Review summary\n' +
+        '      </Button>\n' +
+        '      <Dialog open={dialogOpen{{dialogSuffix}}} onOpenChange={setDialogOpen{{dialogSuffix}}}>\n' +
+        '        <Dialog.Popup id="review-dialog-popup{{dialogSuffix}}">\n' +
+        '          <Dialog.Header>\n' +
+        '            <Dialog.Title>Ready to send?</Dialog.Title>\n' +
+        '            <Dialog.Description>\n' +
+        '              Review the summary before you submit the application.\n' +
+        '            </Dialog.Description>\n' +
+        '          </Dialog.Header>\n' +
+        '          <Dialog.Body>\n' +
+        '            <BodyShort spacing>The draft is saved and ready for a final check.</BodyShort>\n' +
+        '            <BodyShort>Confirm when the required attachments are in place.</BodyShort>\n' +
+        '          </Dialog.Body>\n' +
+        '          <Dialog.Footer>\n' +
+        '            <Dialog.CloseTrigger>\n' +
+        '              <Button type="button" variant="secondary">Go back</Button>\n' +
+        '            </Dialog.CloseTrigger>\n' +
+        '            <Button type="button" onClick={() => setDialogOpen{{dialogSuffix}}(false)}>\n' +
+        '              Confirm\n' +
+        '            </Button>\n' +
+        '          </Dialog.Footer>\n' +
+        '        </Dialog.Popup>\n' +
+        '      </Dialog>\n' +
+        '    </>\n' +
+        '  )\n' +
+        '}',
+      description: 'Dialog example with trigger, open state, and close actions.',
+    },
+  },
+  {
+    id: 'fieldset',
+    name: 'Fieldset',
+    group: 'component',
+    status: 'current',
+    package: '@navikt/ds-react',
+    importName: 'Fieldset',
+    importGuidance:
+      "import { BodyShort, Fieldset, HStack, Select, TextField } from '@navikt/ds-react';",
+    docs: `${COMPONENT_DOCS_BASE}/fieldset`,
+    description: 'Semantic group for related form fields.',
+    keywords: ['fieldset', 'group', 'form', 'legend', 'address', 'semantics'],
+    props: [
+      {
+        name: 'legend',
+        type: 'ReactNode',
+        required: true,
+        description: 'Fieldset legend.',
+      },
+      {
+        name: 'description',
+        type: 'ReactNode',
+        description: 'Additional guidance for the grouped fields.',
+      },
+      {
+        name: 'hideLegend',
+        type: 'boolean',
+        values: ['true', 'false'],
+        valueKind: 'enum',
+        description: 'Show the legend for screen readers only.',
+      },
+      {
+        name: 'error',
+        type: 'ReactNode',
+        description: 'Error message for the field group.',
+      },
+    ],
+    snippet: {
+      code:
+        '<Fieldset legend="Employer phone number">\n' +
+        '  <HStack gap="space-16">\n' +
+        '    <Select label={<BodyShort as="span">Country code</BodyShort>} defaultValue="">\n' +
+        '      <option value="" disabled>Select</option>\n' +
+        '      <option value="+45">+45</option>\n' +
+        '      <option value="+46">+46</option>\n' +
+        '      <option value="+47">+47</option>\n' +
+        '    </Select>\n' +
+        '    <TextField label={<BodyShort as="span">Number</BodyShort>} htmlSize={8} name="employerPhone" />\n' +
+        '  </HStack>\n' +
+        '</Fieldset>',
+      description: 'Grouped phone fields with a shared legend.',
+    },
+  },
+  {
+    id: 'checkboxgroup',
+    name: 'CheckboxGroup',
+    group: 'component',
+    status: 'current',
+    package: '@navikt/ds-react',
+    importName: 'CheckboxGroup',
+    importGuidance: "import { Checkbox, CheckboxGroup } from '@navikt/ds-react';",
+    docs: `${COMPONENT_DOCS_BASE}/checkbox`,
+    description: 'Checkbox group with legend and multiple choices.',
+    keywords: ['checkbox group', 'checkboxes', 'multi-select', 'choices', 'form'],
+    props: [
+      {
+        name: 'legend',
+        type: 'ReactNode',
+        required: true,
+        description: 'Fieldset legend.',
+      },
+      {
+        name: 'description',
+        type: 'ReactNode',
+        description: 'Additional guidance for the choices.',
+      },
+      {
+        name: 'defaultValue',
+        type: 'any[]',
+        description: 'Default checked values.',
+      },
+      {
+        name: 'error',
+        type: 'ReactNode',
+        description: 'Error message for the group.',
+      },
+    ],
+    snippet: {
+      code:
+        '<CheckboxGroup\n' +
+        '  legend="How should we notify you?"\n' +
+        '  description="Select all channels that should receive updates."\n' +
+        '  defaultValue={["email"]}\n' +
+        '>\n' +
+        '  <Checkbox value="email">Email</Checkbox>\n' +
+        '  <Checkbox value="sms">SMS</Checkbox>\n' +
+        '  <Checkbox value="push">Push notification</Checkbox>\n' +
+        '</CheckboxGroup>',
+      description: 'Checkbox group with multiple visible options.',
+    },
+  },
+  {
+    id: 'errormessage',
+    name: 'ErrorMessage',
+    group: 'component',
+    status: 'current',
+    package: '@navikt/ds-react',
+    importName: 'ErrorMessage',
+    importGuidance: "import { ErrorMessage } from '@navikt/ds-react';",
+    docs: `${COMPONENT_DOCS_BASE}/typography`,
+    description: 'Inline validation message with optional icon.',
+    keywords: ['error message', 'validation', 'error', 'form', 'feedback'],
+    props: [
+      {
+        name: 'size',
+        type: '"medium" | "small"',
+        values: ['medium', 'small'],
+        valueKind: 'enum',
+        default: 'medium',
+        description: 'Error message size.',
+      },
+      {
+        name: 'showIcon',
+        type: 'boolean',
+        values: ['true', 'false'],
+        valueKind: 'enum',
+        description: 'Render the warning icon.',
+      },
+      {
+        name: 'spacing',
+        type: 'boolean',
+        values: ['true', 'false'],
+        valueKind: 'enum',
+        description: 'Add bottom spacing.',
+      },
+    ],
+    snippet: {
+      code: '<ErrorMessage showIcon>Enter a valid email address.</ErrorMessage>',
+      description: 'Visible inline validation message.',
+    },
+  },
+  {
+    id: 'errorsummary',
+    name: 'ErrorSummary',
+    group: 'component',
+    status: 'current',
+    package: '@navikt/ds-react',
+    importName: 'ErrorSummary',
+    importGuidance: "import { ErrorSummary } from '@navikt/ds-react';",
+    docs: `${COMPONENT_DOCS_BASE}/errorsummary`,
+    description: 'Summary of validation errors with field links.',
+    keywords: ['error summary', 'validation', 'errors', 'form', 'summary'],
+    props: [
+      {
+        name: 'heading',
+        type: 'ReactNode',
+        description: 'Heading above the error links.',
+      },
+      {
+        name: 'headingTag',
+        type: 'ElementType',
+        description: 'Semantic heading tag for the summary title.',
+      },
+      {
+        name: 'size',
+        type: '"medium" | "small"',
+        values: ['medium', 'small'],
+        valueKind: 'enum',
+        default: 'medium',
+        description: 'Summary size.',
+      },
+    ],
+    snippet: {
+      code:
+        '<ErrorSummary heading="You must fix these errors before continuing:">\n' +
+        '  <ErrorSummary.Item href="#application-age">Enter an age before submitting.</ErrorSummary.Item>\n' +
+        '  <ErrorSummary.Item href="#application-email">Enter a valid email address.</ErrorSummary.Item>\n' +
+        '</ErrorSummary>',
+      description: 'Error summary with linked validation messages.',
+    },
+  },
+  {
+    id: 'fileupload',
+    name: 'FileUpload',
+    group: 'component',
+    status: 'current',
+    package: '@navikt/ds-react',
+    importName: 'FileUpload',
+    importGuidance: "import { FileUpload, VStack } from '@navikt/ds-react';",
+    docs: `${COMPONENT_DOCS_BASE}/fileupload`,
+    description: 'File upload dropzone with a listed example attachment.',
+    keywords: ['file upload', 'upload', 'dropzone', 'attachment', 'documents'],
+    props: [
+      {
+        name: 'accept',
+        type: 'string',
+        description: 'Accepted file extensions.',
+      },
+      {
+        name: 'fileLimit',
+        type: '{ max: number; current: number }',
+        description: 'Maximum number of files and current count.',
+      },
+      {
+        name: 'maxSizeInBytes',
+        type: 'number',
+        description: 'Maximum allowed file size.',
+      },
+    ],
+    snippet: {
+      code:
+        '<FileUpload>\n' +
+        '  <VStack gap="space-24">\n' +
+        '    <FileUpload.Dropzone\n' +
+        '      label="Upload supporting documents"\n' +
+        '      description="You can upload PDF or Word files. Maximum 3 files."\n' +
+        '      accept=".pdf,.doc,.docx"\n' +
+        '      fileLimit={{ max: 3, current: 1 }}\n' +
+        '      onSelect={() => {}}\n' +
+        '    />\n' +
+        '    <VStack as="ul" gap="space-8">\n' +
+        '      <FileUpload.Item\n' +
+        '        as="li"\n' +
+        '        file={{ name: "income-statement.pdf", size: 280000 }}\n' +
+        '        button={{ action: "delete", onClick: () => {} }}\n' +
+        '      />\n' +
+        '    </VStack>\n' +
+        '  </VStack>\n' +
+        '</FileUpload>',
+      description: 'Upload dropzone with an example attachment item.',
+    },
+  },
+  {
+    id: 'formsummary',
+    name: 'FormSummary',
+    group: 'component',
+    status: 'current',
+    package: '@navikt/ds-react',
+    importName: 'FormSummary',
+    importGuidance: "import { FormSummary } from '@navikt/ds-react';",
+    docs: `${COMPONENT_DOCS_BASE}/formsummary`,
+    description: 'Structured summary of completed form answers.',
+    keywords: ['form summary', 'summary', 'answers', 'review', 'application'],
+    props: [],
+    snippet: {
+      code:
+        '<FormSummary>\n' +
+        '  <FormSummary.Header>\n' +
+        '    <FormSummary.Heading level="2">Application summary</FormSummary.Heading>\n' +
+        '  </FormSummary.Header>\n' +
+        '  <FormSummary.Answers>\n' +
+        '    <FormSummary.Answer>\n' +
+        '      <FormSummary.Label>Name</FormSummary.Label>\n' +
+        '      <FormSummary.Value>Ola Nordmann</FormSummary.Value>\n' +
+        '    </FormSummary.Answer>\n' +
+        '    <FormSummary.Answer>\n' +
+        '      <FormSummary.Label>Preferred contact</FormSummary.Label>\n' +
+        '      <FormSummary.Value>Email</FormSummary.Value>\n' +
+        '      <FormSummary.Value>SMS</FormSummary.Value>\n' +
+        '    </FormSummary.Answer>\n' +
+        '  </FormSummary.Answers>\n' +
+        '  <FormSummary.Footer>\n' +
+        '    <FormSummary.EditLink href="#edit-contact-details" />\n' +
+        '  </FormSummary.Footer>\n' +
+        '</FormSummary>',
+      description: 'Structured summary with answers and edit link.',
+    },
+  },
+  {
     id: 'formprogress',
     name: 'FormProgress',
     group: 'component',
