@@ -29,6 +29,8 @@ const FUNCTION_COMPONENT_OPENING_PATTERNS = [
   /^(?:export\s+default\s+)?function\s+\w+\s*\([^)]*\)\s*\{/m,
   /^(?:export\s+)?(?:const|let|var)\s+\w+\s*=\s*(?:async\s*)?(?:\([^)]*\)|[A-Za-z_$][\w$]*)\s*(?::[^=]+)?=>\s*\{/m,
 ]
+const CONCISE_ARROW_COMPONENT_PATTERN =
+  /^((?:export\s+)?(?:const|let|var)\s+\w+\s*=\s*(?:async\s*)?(?:\([^)]*\)|[A-Za-z_$][\w$]*)\s*(?::[^=]+)?=>)\s*([\s\S]*?)(;?)(?=\n(?:export\b|const\b|let\b|var\b|function\b|class\b)|(?![\s\S]))/m
 
 function stripSnippetPlaceholders(template: string): string {
   return template.replace(
@@ -202,15 +204,33 @@ function applyFunctionComponentSetup(source: string, setupBlock: string): string
     return match ? [{ match, index: match.index ?? 0 }] : []
   }).sort((left, right) => left.index - right.index)[0]
 
-  if (!functionOpeningMatch) {
+  if (functionOpeningMatch) {
+    const functionOpening = functionOpeningMatch.match[0]
+    const functionOpeningEnd = functionOpeningMatch.index + functionOpening.length
+    const body = source.slice(functionOpeningEnd).trimStart()
+
+    return `${source.slice(0, functionOpeningEnd)}\n  ${COMPONENT_SETUP_MARKER}\n${indentBlock(setupBlock, '  ')}\n\n${body}`
+  }
+
+  const conciseArrowMatch = source.match(CONCISE_ARROW_COMPONENT_PATTERN)
+
+  if (!conciseArrowMatch || conciseArrowMatch.index === undefined) {
     return null
   }
 
-  const functionOpening = functionOpeningMatch.match[0]
-  const functionOpeningEnd = functionOpeningMatch.index + functionOpening.length
-  const body = source.slice(functionOpeningEnd).trimStart()
+  const concisePrefix = conciseArrowMatch[1]
+  const conciseExpression = conciseArrowMatch[2].trim()
+  const conciseTerminator = conciseArrowMatch[3] ?? ''
+  const conciseComponentSource =
+    `${concisePrefix} {\n` +
+    `  ${COMPONENT_SETUP_MARKER}\n` +
+    `${indentBlock(setupBlock, '  ')}\n\n` +
+    `  return ${conciseExpression}${conciseTerminator}\n` +
+    '}'
 
-  return `${source.slice(0, functionOpeningEnd)}\n  ${COMPONENT_SETUP_MARKER}\n${indentBlock(setupBlock, '  ')}\n\n${body}`
+  return `${source.slice(0, conciseArrowMatch.index)}${conciseComponentSource}${source.slice(
+    conciseArrowMatch.index + conciseArrowMatch[0].length
+  )}`
 }
 
 function applyComponentSetup(source: string, setupBlock: string): string {

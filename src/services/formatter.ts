@@ -32,6 +32,10 @@ async function loadPrettier() {
   return { prettier: prettierModule, parserBabel: prettierParserBabel, parserEstree: prettierParserEstree }
 }
 
+function getFormattingParser(parser?: FormatOptions['parser']): NonNullable<FormatOptions['parser']> {
+  return parser === 'babel' || !parser ? 'babel-ts' : parser
+}
+
 export interface FormatOptions {
   /** Parser to use (default: 'babel-ts') */
   parser?: 'babel' | 'babel-ts' | 'typescript'
@@ -94,11 +98,12 @@ function stripFragmentWrapper(code: string): string {
 export async function formatCode(code: string, options: FormatOptions = {}): Promise<string> {
   try {
     const { prettier, parserBabel, parserEstree } = await loadPrettier()
+    const parser = getFormattingParser(options.parser)
 
     if (looksLikeModuleSource(code)) {
       return (
         await prettier.format(code, {
-          parser: options.parser || 'babel',
+          parser,
           plugins: [parserEstree, parserBabel],
           printWidth: options.printWidth || 100,
           tabWidth: options.tabWidth || 2,
@@ -127,7 +132,7 @@ export async function formatCode(code: string, options: FormatOptions = {}): Pro
     const wrappedCode = `function Component() {\n  return (\n    ${codeToFormat}\n  )\n}`
 
     const formatted = await prettier.format(wrappedCode, {
-      parser: options.parser || 'babel',
+      parser,
       plugins: [parserEstree, parserBabel],
       printWidth: options.printWidth || 100,
       tabWidth: options.tabWidth || 2,

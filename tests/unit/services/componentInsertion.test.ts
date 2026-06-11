@@ -143,12 +143,10 @@ describe('component insertion service', () => {
     })
   })
 
-  it('injects component setup into exported arrow-function App modules without wrapping the file', async () => {
+  it('injects component setup into concise exported arrow-function App modules without wrapping the file', async () => {
     const source = createArcadeSourceFile(
       'import { VStack } from "@navikt/ds-react"\n' +
-        'export const App = (): JSX.Element => {\n' +
-        '  return <VStack></VStack>\n' +
-        '}\n' +
+        'export const App = () => <VStack></VStack>\n' +
         'export default App',
       ''
     )
@@ -160,7 +158,7 @@ describe('component insertion service', () => {
       to: insertionPoint,
     })
 
-    expect(nextSource.jsx).toContain('export const App = (): JSX.Element => {\n  // __AKSEL_ARCADE_COMPONENT_SETUP__')
+    expect(nextSource.jsx).toContain('export const App = () => {\n  // __AKSEL_ARCADE_COMPONENT_SETUP__')
     expect(nextSource.jsx).toContain('const [pageState, setPageState] = useState(1)')
     expect(nextSource.jsx).toContain('return <VStack><Pagination')
     expect(nextSource.jsx).not.toContain('(() => {')

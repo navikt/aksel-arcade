@@ -4,7 +4,7 @@ export interface JsxValidationSource {
 }
 
 const MODULE_SOURCE_PATTERN =
-  /^(?:import\b|export\b|(?:async\s+)?function\b|class\b|const\b|let\b|var\b)/
+  /^(?:import\b|export\b|(?:async\s+)?function\b|(?:abstract\s+)?class\b|const\b|let\b|var\b|type\b|interface\b|enum\b|namespace\b|declare\b)/
 
 function stripLeadingTrivia(sourceCode: string): string {
   let remainingSource = sourceCode

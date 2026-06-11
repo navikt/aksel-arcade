@@ -64,4 +64,16 @@ describe('buildJsxValidationSource', () => {
     expect(code).toBe(source)
     expect(sourceStartLine).toBe(1)
   })
+
+  it('treats type-led component modules as module sources', () => {
+    const source =
+      'type Props = { label: string }\n' +
+      'const App = ({ label }: Props) => <Button>{label}</Button>\n' +
+      'export default App'
+    const { code, sourceStartLine } = buildJsxValidationSource(source)
+
+    expect(looksLikeModuleSource(source)).toBe(true)
+    expect(code).toBe(source)
+    expect(sourceStartLine).toBe(1)
+  })
 })

@@ -36,4 +36,15 @@ describe('formatCode', () => {
       "import { VStack } from '@navikt/ds-react'"
     )
   })
+
+  it('formats type-led component modules directly', async () => {
+    const source =
+      'type Props = { label: string }\n' +
+      'const App = ({ label }: Props) => <Button>{label}</Button>\n' +
+      'export default App'
+
+    await expect(formatCode(source, { parser: 'babel' })).resolves.toContain(
+      'type Props = {'
+    )
+  })
 })
