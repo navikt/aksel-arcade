@@ -187,6 +187,9 @@ describe('Aksel catalog starter path', () => {
       '{...usePaginationState{{paginationSuffix}}()}'
     )
     expect(paginationEntry?.snippet.code).not.toContain('{(() => {')
+    expect(paginationEntry?.snippet.code).toContain(
+      'srHeading={{ tag: "h2", text: "Result pages" }}'
+    )
     expect(paginationEntry?.snippet.hooksCode).toContain(
       'export const usePaginationState{{paginationSuffix}} = (initialPage = 1) => {'
     )

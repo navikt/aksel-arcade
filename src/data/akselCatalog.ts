@@ -850,6 +850,7 @@ export const AKSEL_CATALOG: AkselCatalogEntry[] = [
         '  count={9}\n' +
         '  boundaryCount={1}\n' +
         '  siblingCount={1}\n' +
+        '  srHeading={{ tag: "h2", text: "Result pages" }}\n' +
         '/>',
       hooksCode:
         'export const usePaginationState{{paginationSuffix}} = (initialPage = 1) => {\n' +

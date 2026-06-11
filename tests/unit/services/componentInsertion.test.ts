@@ -9,6 +9,7 @@ const paginationInsertion = {
     '  count={9}\n' +
     '  boundaryCount={1}\n' +
     '  siblingCount={1}\n' +
+    '  srHeading={{ tag: "h2", text: "Result pages" }}\n' +
     '/>',
   hooks:
     'export const usePaginationState{{paginationSuffix}} = (initialPage = 1) => {\n' +
@@ -50,6 +51,7 @@ describe('component insertion service', () => {
     expect(nextSource.jsx).toContain('<BodyShort>Results</BodyShort>')
     expect(nextSource.jsx).toContain('{...usePaginationState()}')
     expect(nextSource.jsx).not.toContain('{(() => {')
+    expect(nextSource.jsx).toContain('srHeading={{ tag: "h2", text: "Result pages" }}')
     expect(nextSource.hooks).toBe(
       'const existing = true\n\n' +
         'export const usePaginationState = (initialPage = 1) => {\n' +
