@@ -2123,3 +2123,47 @@ Next note:
 
 - #207 can now focus narrowly on the author-facing `Combobox` / `UNSAFE_Combobox` alias cleanup, because the top-level autocomplete path now has an explicit catalog-first merge point instead of only the docs-derived list.
 - When browser-verifying this worktree, `4173`-`4180` were already serving other sessions; `4181` was the clean Vite port for this branch.
+
+### 2026-06-11 - Issue #207: Normalize Combobox authoring alias behavior
+
+Implemented:
+
+- Selected #207 as the highest-priority `ready-for-agent` feature from #207-#217 because the fresh #206 handoff explicitly identified it as the next narrow, unblocked fix now that top-level autocomplete has a catalog-first merge point.
+- Read issue #205, `CONTEXT.md`, and the existing `progress.txt` notes before changing code so the slice stayed aligned with the shared Aksel authoring PRD and recent catalog work.
+- Removed the autocomplete-only `UNSAFE_Combobox` alias generation in `src/services/akselAutocomplete.ts`, so top-level completion options now stay on the public `Combobox` name instead of synthesizing an internal runtime-only option.
+- Removed the autocomplete apply rewrite that previously turned a selected `Combobox` completion into `UNSAFE_Combobox`, keeping the public name in inserted editor source while leaving the runtime aliasing untouched in `src/sandboxAksel.ts`.
+- Tightened component prop lookup in `src/services/akselAutocomplete.ts` so prop and prop-value completions only resolve against the actual author-facing component name; `Combobox` keeps working, while `UNSAFE_Combobox` is no longer treated as a completion target.
+- Added focused regression coverage in `tests/unit/akselAutocomplete.test.ts` proving top-level autocomplete excludes `UNSAFE_Combobox`, selecting `Combobox` applies `Combobox`, `Combobox` still gets its prop suggestions, and `UNSAFE_Combobox` no longer gets prop or prop-value completions.
+
+Verification:
+
+- npm run lint (existing `.eslintignore` deprecation notice and existing `InspectionPopover` hook dependency warning only)
+- npm run build
+- npm run typecheck
+- npm run test -- --run
+- Browser check at `http://127.0.0.1:4182/aksel-arcade/`: confirmed the Add menu still shows `Combobox`; confirmed Add inserts `<Combobox label="Select option" options={[]}>` and the preview renders a real combobox without exposing `UNSAFE_Combobox`; confirmed typing `<Comb` in the editor shows only the `Combobox` completion option and accepting it inserts `<Combobox` rather than the unsafe runtime alias.
+
+Next note:
+
+- Keep `Combobox -> UNSAFE_Combobox` mapping inside `src/sandboxAksel.ts` only; this issue intentionally removed the alias from authoring surfaces, not the runtime compatibility layer.
+- #208 can centralize replacement/deprecation filtering next without needing to touch the Combobox alias path again; the browser Add menu still exposes deprecated `Alert` and replaced `Modal`, which matches the open follow-up.
+
+### 2026-06-11 - PR #220 review follow-up for Issue #207
+
+Fixed before merge:
+
+- A focused PR review caught one real regression in the first #207 patch: stored projects that still contain `<UNSAFE_Combobox ...>` lost Combobox prop and prop-value autocomplete even though the runtime alias still lets those pages render.
+- Restored alias-aware autocomplete lookup in `src/services/akselAutocomplete.ts` only for metadata resolution by normalizing `UNSAFE_Combobox` back to `Combobox` inside `getComponentProps()`. This keeps the unsafe name hidden from top-level authoring suggestions and insertions while preserving editor help for legacy stored source.
+- Updated `tests/unit/akselAutocomplete.test.ts` so the regression coverage now proves both sides of the contract together: top-level autocomplete still exposes only `Combobox`, and legacy `<UNSAFE_Combobox ...>` source still gets prop/value completions through the compatibility lookup path.
+
+Verification:
+
+- npm run lint (existing `.eslintignore` deprecation notice and existing `InspectionPopover` hook dependency warning only)
+- npm run build
+- npm run typecheck
+- npm run test -- --run
+- Browser check at `http://127.0.0.1:4183/aksel-arcade/`: confirmed typing `<Comb` in the editor still shows only the public `Combobox` completion with no unsafe alias surfaced in the UI; the legacy `UNSAFE_Combobox` compatibility path is now covered by the focused unit regression because the browser editor only surfaces the public-name flow for new authoring.
+
+Next note:
+
+- Do not remove the metadata-side `UNSAFE_Combobox -> Combobox` normalization until stored Arcade project source is migrated off the unsafe name. Runtime compatibility alone is not enough for legacy editor autocomplete.
