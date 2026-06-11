@@ -10,6 +10,7 @@ import {
   type AkselCatalogStatus,
 } from './akselCatalog'
 import { filterNewAuthoringEntries } from './akselAuthoringPolicy'
+import type { ComponentInsertion } from '@/types/snippets'
 
 export interface ComponentProp {
   name: string
@@ -30,6 +31,7 @@ export interface ComponentMetadata {
   snippet: string // Default code snippet
   description?: string
   docs?: string
+  insertion?: ComponentInsertion
 }
 
 // ===== LAYOUT COMPONENTS =====

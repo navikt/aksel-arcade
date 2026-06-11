@@ -1,6 +1,7 @@
-import { useContext, useMemo, useRef } from 'react'
+import { useCallback, useContext, useMemo, useRef } from 'react'
 import { Box, Button } from '@navikt/ds-react'
 import { SidebarLeftIcon } from '@navikt/aksel-icons'
+import type { ComponentMetadata } from '@/data/akselComponents'
 import { AppContext } from '@/hooks/useProject'
 import { useSettings } from '@/contexts/SettingsContext'
 import { CodeEditor, type CodeEditorRef } from './CodeEditor'
@@ -15,6 +16,7 @@ import {
   type DeletePageImpact,
 } from '@/services/pageReferences'
 import { getSourceForEditTarget, resolveSelectedEditTarget } from '@/services/projectSource'
+import { applyComponentInsertion, createJsxOnlyInsertion } from '@/services/componentInsertion'
 import type { ArcadePageId } from '@/types/project'
 import './EditorPane.css'
 
@@ -111,24 +113,51 @@ export const EditorPane = () => {
     updateEditorState({ activeTab: tabId as 'JSX' | 'Hooks' })
   }
 
-  const handleComponentInsert = (snippet: string) => {
-    // Close the component palette immediately
-    closeComponentPalette()
+  const handleAutocompleteInsertion = useCallback(
+    ({ insertion, from, to }: { insertion: Parameters<typeof applyComponentInsertion>[1]; from: number; to: number }) => {
+      const nextSource = applyComponentInsertion(activeSource, insertion, {
+        kind: 'autocomplete',
+        from,
+        to,
+      })
 
-    // Insert the snippet at the current cursor position
-    const currentContent = currentTab === 'JSX' ? activeSource.jsx : activeSource.hooks
-    const cursor = currentTab === 'JSX' ? editorState.jsxCursor : editorState.hooksCursor
+      updateProject({
+        jsxCode: nextSource.jsx,
+        hooksCode: nextSource.hooks,
+        editTarget: effectiveEditTarget,
+      })
+    },
+    [activeSource, effectiveEditTarget, updateProject]
+  )
 
-    // Simple insertion: add snippet at cursor or end of code
-    const lines = currentContent.split('\n')
-    const insertLine = cursor?.line ?? lines.length
+  const handleComponentInsert = useCallback(
+    (component: ComponentMetadata) => {
+      closeComponentPalette()
 
-    // Insert with proper indentation
-    lines.splice(insertLine, 0, snippet)
-    const newContent = lines.join('\n')
+      const insertion = component.insertion ?? createJsxOnlyInsertion(component.snippet)
+      const nextSource = applyComponentInsertion(activeSource, insertion, {
+        kind: 'palette',
+        activeTab: currentTab,
+        jsxCursor: editorState.jsxCursor,
+        hooksCursor: editorState.hooksCursor,
+      })
 
-    handleCodeChange(newContent)
-  }
+      updateProject({
+        jsxCode: nextSource.jsx,
+        hooksCode: nextSource.hooks,
+        editTarget: effectiveEditTarget,
+      })
+    },
+    [
+      activeSource,
+      closeComponentPalette,
+      currentTab,
+      editorState.hooksCursor,
+      editorState.jsxCursor,
+      effectiveEditTarget,
+      updateProject,
+    ]
+  )
 
   const handleFormat = async () => {
     try {
@@ -255,6 +284,7 @@ export const EditorPane = () => {
             onFormat={handleFormat}
             validPageIds={multiPageEnabled ? validPageIds : undefined}
             pageNavigationTargets={multiPageEnabled ? pageNavigationTargets : undefined}
+            onApplyCatalogInsertion={handleAutocompleteInsertion}
           />
         </Box>
       </Box>

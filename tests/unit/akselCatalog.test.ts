@@ -175,6 +175,47 @@ describe('Aksel catalog starter path', () => {
     )
   })
 
+  it('exposes Pagination as a catalog-backed multi-part insertion', () => {
+    const paginationEntry = getCatalogComponent('Pagination')
+    const paginationPaletteEntry = getComponentsByCategory('component').find(
+      (component) => component.name === 'Pagination'
+    )
+    const paginationSnippet = AKSEL_SNIPPETS.find((snippet) => snippet.name === 'Pagination')
+
+    expect(paginationEntry?.snippet.code).toContain(
+      'const paginationState{{paginationSuffix}} = usePaginationState{{paginationSuffix}}()'
+    )
+    expect(paginationEntry?.snippet.hooksCode).toContain(
+      'export const usePaginationState{{paginationSuffix}} = (initialPage = 1) => {'
+    )
+    expect(paginationPaletteEntry).toEqual(
+      expect.objectContaining({
+        snippet: expect.stringContaining(
+          'const paginationState{{paginationSuffix}} = usePaginationState{{paginationSuffix}}()'
+        ),
+        insertion: expect.objectContaining({
+          jsx: expect.stringContaining(
+            'const paginationState{{paginationSuffix}} = usePaginationState{{paginationSuffix}}()'
+          ),
+          hooks: expect.stringContaining(
+            'export const usePaginationState{{paginationSuffix}} = (initialPage = 1) => {'
+          ),
+        }),
+      })
+    )
+    expect(paginationSnippet?.insertion).toEqual(
+      expect.objectContaining({
+        jsx: expect.stringContaining(
+          'const paginationState{{paginationSuffix}} = usePaginationState{{paginationSuffix}}()'
+        ),
+        hooks: expect.stringContaining(
+          'export const usePaginationState{{paginationSuffix}} = (initialPage = 1) => {'
+        ),
+      })
+    )
+    expect(searchComponents('pager')).toContainEqual(expect.objectContaining({ name: 'Pagination' }))
+  })
+
   it('makes the editor snippet and prop metadata paths prefer the same catalog source', () => {
     const hstackSnippet = AKSEL_SNIPPETS.find((snippet) => snippet.name === 'HStack')
     const searchResult = searchSnippets('button').find((snippet) => snippet.name === 'Button')

@@ -11,6 +11,7 @@ import { tags as t } from '@lezer/highlight'
 import { forwardRef, useImperativeHandle, useRef, useMemo } from 'react'
 import type { ReactCodeMirrorRef } from '@uiw/react-codemirror'
 import {
+  type ApplyCatalogInsertion,
   getAkselCompletionForContext,
   isAkselPropValueCompletionContext,
   type PageNavigationCompletionTarget,
@@ -60,6 +61,7 @@ interface CodeEditorProps {
   language?: 'jsx' | 'typescript'
   validPageIds?: ArcadePageId[]
   pageNavigationTargets?: readonly PageNavigationCompletionTarget[]
+  onApplyCatalogInsertion?: ApplyCatalogInsertion
   readOnly?: boolean
 }
 
@@ -188,9 +190,12 @@ export const CodeEditor = forwardRef<CodeEditorRef, CodeEditorProps>(({
   language = 'jsx',
   validPageIds,
   pageNavigationTargets,
+  onApplyCatalogInsertion,
   readOnly = false,
 }, ref) => {
   const editorRef = useRef<ReactCodeMirrorRef>(null)
+  const applyCatalogInsertionRef = useRef(onApplyCatalogInsertion)
+  applyCatalogInsertionRef.current = onApplyCatalogInsertion
 
   // Expose undo/redo methods via ref
   useImperativeHandle(ref, () => ({
@@ -255,7 +260,14 @@ export const CodeEditor = forwardRef<CodeEditorRef, CodeEditorProps>(({
     return [
       javascript({ jsx: language === 'jsx', typescript: true }),
       autocompletion({
-        override: [(context) => getAkselCompletionForContext(context, pageNavigationTargets)],
+        override: [
+          (context) =>
+            getAkselCompletionForContext(
+              context,
+              pageNavigationTargets,
+              applyCatalogInsertionRef.current
+            ),
+        ],
         activateOnTyping: true,
         // Auto-trigger completion after selecting an option
         activateOnCompletion: () => true,
