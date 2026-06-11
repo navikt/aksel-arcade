@@ -1,6 +1,11 @@
 export type SnippetCategory = 'layout' | 'component' | 'icon'
 export type SnippetStatus = 'current' | 'experimental' | 'legacy'
 
+export interface ComponentInsertion {
+  jsx: string
+  hooks?: string
+}
+
 export interface ComponentSnippet {
   id: string // Unique identifier (e.g., "button")
   name: string // Display name (e.g., "Button")
@@ -11,4 +16,5 @@ export interface ComponentSnippet {
   import: string // Import statement (e.g., "import { Button } from '@navikt/ds-react';")
   status?: SnippetStatus
   docs?: string
+  insertion?: ComponentInsertion
 }

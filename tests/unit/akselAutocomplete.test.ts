@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import iconMetadata from '@navikt/aksel-icons/metadata'
 import { filterNewAuthoringEntries } from '../../src/data/akselAuthoringPolicy'
 import { AKSEL_AUTOCOMPLETE_ENTRIES, AKSEL_ICON_PROPS } from '../../src/data/akselAutocompleteData'
@@ -16,28 +16,37 @@ const PAGE_NAVIGATION_TARGETS = [
   { id: 'page02', name: 'Details' },
   { id: 'page03', name: 'Summary' },
 ] as const
+const NOOP_APPLY_CATALOG_INSERTION = () => {}
 
 function completionFor(
   source: string,
-  pageNavigationTargets?: Parameters<typeof getAkselCompletionForSource>[2]
+  pageNavigationTargets?: Parameters<typeof getAkselCompletionForSource>[2],
+  onApplyCatalogInsertion?: Parameters<typeof getAkselCompletionForSource>[3]
 ) {
-  return getAkselCompletionForSource(source, source.length, pageNavigationTargets)
+  return getAkselCompletionForSource(
+    source,
+    source.length,
+    pageNavigationTargets,
+    onApplyCatalogInsertion ?? NOOP_APPLY_CATALOG_INSERTION
+  )
 }
 
 function labelsFor(
   source: string,
-  pageNavigationTargets?: Parameters<typeof getAkselCompletionForSource>[2]
+  pageNavigationTargets?: Parameters<typeof getAkselCompletionForSource>[2],
+  onApplyCatalogInsertion?: Parameters<typeof getAkselCompletionForSource>[3]
 ): string[] {
-  const result = completionFor(source, pageNavigationTargets)
+  const result = completionFor(source, pageNavigationTargets, onApplyCatalogInsertion)
   return result?.options.map((option) => option.label) ?? []
 }
 
 function applyFor(
   source: string,
   label: string,
-  pageNavigationTargets?: Parameters<typeof getAkselCompletionForSource>[2]
+  pageNavigationTargets?: Parameters<typeof getAkselCompletionForSource>[2],
+  onApplyCatalogInsertion?: Parameters<typeof getAkselCompletionForSource>[3]
 ): string | undefined {
-  const apply = completionFor(source, pageNavigationTargets)?.options.find(
+  const apply = completionFor(source, pageNavigationTargets, onApplyCatalogInsertion)?.options.find(
     (option) => option.label === label
   )?.apply
   return typeof apply === 'string' ? apply : undefined
@@ -46,9 +55,10 @@ function applyFor(
 function optionFor(
   source: string,
   label: string,
-  pageNavigationTargets?: Parameters<typeof getAkselCompletionForSource>[2]
+  pageNavigationTargets?: Parameters<typeof getAkselCompletionForSource>[2],
+  onApplyCatalogInsertion?: Parameters<typeof getAkselCompletionForSource>[3]
 ) {
-  return completionFor(source, pageNavigationTargets)?.options.find(
+  return completionFor(source, pageNavigationTargets, onApplyCatalogInsertion)?.options.find(
     (option) => option.label === label
   )
 }
@@ -175,6 +185,37 @@ describe('Aksel-aware autocomplete contract', () => {
     expect(applyFor('<Tag', 'Tag')).toBe(
       'Tag variant="moderate" data-color="info">In progress</Tag>'
     )
+  })
+
+  it('routes Pagination through the catalog multi-part insertion callback', () => {
+    const onApplyCatalogInsertion = vi.fn()
+    const option = optionFor('<Pagi', 'Pagination', undefined, onApplyCatalogInsertion)
+
+    expect(option?.detail).toBe('Pagination controls with local page state.')
+    expect(typeof option?.apply).toBe('function')
+
+    if (typeof option?.apply !== 'function') {
+      throw new Error('Expected Pagination completion to use a custom apply callback')
+    }
+
+    option.apply({} as never, option as never, 0, 5)
+
+    expect(onApplyCatalogInsertion).toHaveBeenCalledWith({
+      from: 0,
+      to: 5,
+      insertion: expect.objectContaining({
+        jsx: expect.stringMatching(/^>\s*\{\(\(\) => \{/),
+        hooks: expect.stringContaining(
+          'export const usePaginationState{{paginationSuffix}} = (initialPage = 1) => {'
+        ),
+      }),
+    })
+  })
+
+  it('hides multi-part catalog insertions when the editor cannot apply them safely', () => {
+    const result = getAkselCompletionForSource('<Pagi', '<Pagi'.length, undefined, undefined)
+
+    expect(result?.options.find((option) => option.label === 'Pagination')).toBeUndefined()
   })
 
   it('keeps Combobox as the only author-facing autocomplete name', () => {

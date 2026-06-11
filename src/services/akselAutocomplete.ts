@@ -16,6 +16,7 @@ import {
   type AkselAutocompleteProp,
 } from '@/data/akselAutocompleteData'
 import type { ArcadePage } from '@/types/project'
+import type { ComponentInsertion } from '@/types/snippets'
 
 const COMPONENT_NAME_PATTERN = /^[A-Z][\w.]*$/
 const TAG_NAME_PATTERN = /^[A-Za-z][\w.]*$/
@@ -63,6 +64,14 @@ interface OpenTagContext {
 }
 
 export type PageNavigationCompletionTarget = Pick<ArcadePage, 'id' | 'name'>
+
+export interface ApplyCatalogInsertionArgs {
+  insertion: ComponentInsertion
+  from: number
+  to: number
+}
+
+export type ApplyCatalogInsertion = (args: ApplyCatalogInsertionArgs) => void
 
 function stripSnippetPlaceholders(template: string): string {
   return template.replace(
@@ -419,7 +428,36 @@ function getEntryApply(entry: CompletionEntry): string {
   return apply
 }
 
-function componentOption(entry: CompletionEntry): Completion {
+function getCatalogInsertion(entry: AkselCatalogEntry): ComponentInsertion {
+  return {
+    jsx: entry.snippet.code,
+    hooks: entry.snippet.hooksCode,
+  }
+}
+
+function getAutocompleteCatalogInsertion(entry: AkselCatalogEntry): ComponentInsertion {
+  const insertion = getCatalogInsertion(entry)
+
+  return {
+    ...insertion,
+    jsx: insertion.jsx.startsWith('<') ? insertion.jsx.slice(1) : insertion.jsx,
+  }
+}
+
+function supportsCatalogInsertion(
+  entry: CompletionEntry,
+  onApplyCatalogInsertion?: ApplyCatalogInsertion
+): boolean {
+  return !(entry.source === 'catalog' && entry.snippet.hooksCode && !onApplyCatalogInsertion)
+}
+
+function componentOption(
+  entry: CompletionEntry,
+  onApplyCatalogInsertion?: ApplyCatalogInsertion
+): Completion {
+  const catalogInsertion =
+    entry.source === 'catalog' ? getAutocompleteCatalogInsertion(entry) : undefined
+
   return {
     label: entry.name,
     type: entry.name.includes('.')
@@ -428,7 +466,16 @@ function componentOption(entry: CompletionEntry): Completion {
         ? 'function'
         : 'class',
     detail: getEntryDescription(entry),
-    apply: getEntryApply(entry),
+    apply:
+      catalogInsertion?.hooks && onApplyCatalogInsertion
+        ? (_view, _completion, from, to) => {
+            onApplyCatalogInsertion({
+              insertion: catalogInsertion,
+              from,
+              to,
+            })
+          }
+        : getEntryApply(entry),
   }
 }
 
@@ -575,7 +622,8 @@ function pageNavigationOptions(
 export function getAkselCompletionForSource(
   source: string,
   pos: number,
-  pageNavigationTargets?: readonly PageNavigationCompletionTarget[]
+  pageNavigationTargets?: readonly PageNavigationCompletionTarget[],
+  onApplyCatalogInsertion?: ApplyCatalogInsertion
 ): CompletionResult | null {
   const pageNavigationContext = getPageNavigationContext(source, pos)
   if (pageNavigationContext && pageNavigationTargets && pageNavigationTargets.length > 0) {
@@ -652,7 +700,8 @@ export function getAkselCompletionForSource(
         ? []
         : completionEntries
             .filter((entry) => matchesPartial(entry.name, tagNameContext.query))
-            .map(componentOption)
+            .filter((entry) => supportsCatalogInsertion(entry, onApplyCatalogInsertion))
+            .map((entry) => componentOption(entry, onApplyCatalogInsertion))
     const iconOptions =
       isIconPropTagContext || isIconLikeTagQuery(tagNameContext.query, componentOptions.length > 0)
         ? iconComponentOptions(tagNameContext.query, isIconPropTagContext ? 'icon-prop-tag' : 'tag')
@@ -678,12 +727,14 @@ export function getAkselCompletionForSource(
 
 export function getAkselCompletionForContext(
   context: CompletionContext,
-  pageNavigationTargets?: readonly PageNavigationCompletionTarget[]
+  pageNavigationTargets?: readonly PageNavigationCompletionTarget[],
+  onApplyCatalogInsertion?: ApplyCatalogInsertion
 ): CompletionResult | null {
   return getAkselCompletionForSource(
     context.state.doc.toString(),
     context.pos,
-    pageNavigationTargets
+    pageNavigationTargets,
+    onApplyCatalogInsertion
   )
 }
 

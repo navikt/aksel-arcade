@@ -1,5 +1,6 @@
 import { act, cleanup, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import userEvent from '@testing-library/user-event'
 import { ComponentPalette } from '@/components/ComponentPalette'
 
 describe('ComponentPalette', () => {
@@ -36,6 +37,32 @@ describe('ComponentPalette', () => {
 
     expect(componentNames).toEqual(
       [...componentNames].sort((left, right) => left.localeCompare(right))
+    )
+  })
+
+  it('passes Pagination insertion metadata through the Add menu boundary', async () => {
+    const user = userEvent.setup()
+    const onInsertComponent = vi.fn()
+
+    await act(async () => {
+      render(<ComponentPalette open onClose={vi.fn()} onInsertComponent={onInsertComponent} />)
+    })
+
+    await user.type(screen.getByRole('textbox', { name: /search components/i }), 'Pagination')
+    await user.click(screen.getByRole('link', { name: 'Pagination' }))
+
+    expect(onInsertComponent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: 'Pagination',
+        insertion: expect.objectContaining({
+          jsx: expect.stringContaining(
+            'const paginationState{{paginationSuffix}} = usePaginationState{{paginationSuffix}}()'
+          ),
+          hooks: expect.stringContaining(
+            'export const usePaginationState{{paginationSuffix}} = (initialPage = 1) => {'
+          ),
+        }),
+      })
     )
   })
 })

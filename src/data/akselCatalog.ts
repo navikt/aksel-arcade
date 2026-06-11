@@ -1,4 +1,4 @@
-import type { ComponentSnippet, SnippetCategory } from '@/types/snippets'
+import type { ComponentInsertion, ComponentSnippet, SnippetCategory } from '@/types/snippets'
 import iconMetadata from '@navikt/aksel-icons/metadata'
 import { filterNewAuthoringEntries } from '@/data/akselAuthoringPolicy'
 
@@ -28,6 +28,7 @@ export interface AkselCatalogProp {
 export interface AkselCatalogSnippet {
   code: string
   description: string
+  hooksCode?: string
 }
 
 export interface AkselCatalogEntry {
@@ -801,6 +802,73 @@ export const AKSEL_CATALOG: AkselCatalogEntry[] = [
     },
   },
   {
+    id: 'pagination',
+    name: 'Pagination',
+    group: 'component',
+    status: 'current',
+    package: '@navikt/ds-react',
+    importName: 'Pagination',
+    importGuidance: "import { Pagination } from '@navikt/ds-react';",
+    docs: `${COMPONENT_DOCS_BASE}/pagination`,
+    description: 'Pagination controls with local page state.',
+    keywords: ['pagination', 'paging', 'pager', 'pages', 'navigation', 'results'],
+    props: [
+      {
+        name: 'page',
+        type: 'number',
+        required: true,
+        description: 'Current page. Pagination indexing starts at 1.',
+      },
+      {
+        name: 'count',
+        type: 'number',
+        required: true,
+        description: 'Total number of pages.',
+      },
+      {
+        name: 'onPageChange',
+        type: '(page: number) => void',
+        description: 'Callback when the current page changes.',
+      },
+      {
+        name: 'size',
+        type: '"medium" | "small" | "xsmall"',
+        values: ['medium', 'small', 'xsmall'],
+        valueKind: 'enum',
+        description: 'Changes padding, height, and font-size.',
+      },
+      {
+        name: 'srHeading',
+        type: '{ tag: "h2" | "h3" | "h4" | "h5" | "h6"; text: string }',
+        description: 'Accessible heading for the pagination landmark.',
+      },
+    ],
+    snippet: {
+      code:
+        '<>\n' +
+        '{(() => {\n' +
+        '  const paginationState{{paginationSuffix}} = usePaginationState{{paginationSuffix}}()\n' +
+        '\n' +
+        '  return (\n' +
+        '    <Pagination\n' +
+        '      page={paginationState{{paginationSuffix}}.page}\n' +
+        '      count={10}\n' +
+        '      onPageChange={paginationState{{paginationSuffix}}.setPage}\n' +
+        '      srHeading={{ tag: "h2", text: "Result pages" }}\n' +
+        '    />\n' +
+        '  )\n' +
+        '})()}\n' +
+        '</>',
+      hooksCode:
+        'export const usePaginationState{{paginationSuffix}} = (initialPage = 1) => {\n' +
+        '  const [page, setPage] = useState(initialPage)\n' +
+        '\n' +
+        '  return { page, setPage }\n' +
+        '}',
+      description: 'Pagination with stateful page changes.',
+    },
+  },
+  {
     id: 'alert',
     name: 'Alert',
     group: 'component',
@@ -1025,17 +1093,24 @@ export function getCatalogSnippets(): ComponentSnippet[] {
       groups: ['layout', 'component'],
       statuses: DEFAULT_DISCOVERY_STATUSES,
     })
-  ).map((entry) => ({
-    id: entry.id,
-    name: entry.name,
-    category: entry.group as SnippetCategory,
-    keywords: entry.keywords,
-    template: entry.snippet.code,
-    description: entry.snippet.description,
-    import: entry.importGuidance,
-    status: entry.status,
-    docs: entry.docs,
-  }))
+  ).map((entry) => {
+    const insertion: ComponentInsertion = {
+      jsx: entry.snippet.code,
+      hooks: entry.snippet.hooksCode,
+    }
+    return {
+      id: entry.id,
+      name: entry.name,
+      category: entry.group as SnippetCategory,
+      keywords: entry.keywords,
+      template: entry.snippet.code,
+      description: entry.snippet.description,
+      import: entry.importGuidance,
+      status: entry.status,
+      docs: entry.docs,
+      insertion,
+    }
+  })
 }
 
 export function getCatalogPaletteComponents(): Array<{
@@ -1048,21 +1123,29 @@ export function getCatalogPaletteComponents(): Array<{
   snippet: string
   description: string
   docs: string
+  insertion: ComponentInsertion
 }> {
   return filterNewAuthoringEntries(
     listCatalogEntries({
       groups: ['layout', 'component', 'icon'],
       statuses: DEFAULT_DISCOVERY_STATUSES,
     })
-  ).map((entry) => ({
-    name: entry.name,
-    category: entry.group,
-    status: entry.status,
-    import: entry.importGuidance,
-    keywords: entry.keywords,
-    props: entry.props,
-    snippet: entry.snippet.code,
-    description: entry.description,
-    docs: entry.docs,
-  }))
+  ).map((entry) => {
+    const insertion: ComponentInsertion = {
+      jsx: entry.snippet.code,
+      hooks: entry.snippet.hooksCode,
+    }
+    return {
+      name: entry.name,
+      category: entry.group,
+      status: entry.status,
+      import: entry.importGuidance,
+      keywords: entry.keywords,
+      props: entry.props,
+      snippet: entry.snippet.code,
+      description: entry.description,
+      docs: entry.docs,
+      insertion,
+    }
+  })
 }

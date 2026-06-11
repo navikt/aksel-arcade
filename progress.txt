@@ -2193,3 +2193,45 @@ Verification:
 Next note:
 
 - #215 can now add Dialog and the current feedback/form-shell replacements without reopening this filtering work; keep using `src/data/akselAuthoringPolicy.ts` if future deprecations/replacements need to disappear from new authoring surfaces.
+
+### 2026-06-11 - Issue #211: Multi-part insertion into JSX and Hooks
+
+Implemented:
+
+- Selected #211 as the highest-priority `ready-for-agent` feature from #209-#217 because #206-#208 are already complete in this file, and #211 is the shared insertion foundation that unblocks the later stateful component slices more directly than another one-off catalog entry.
+- Re-read issue #205, `CONTEXT.md`, and the recent `progress.txt` notes before changing code so the fix stayed aligned with the Aksel authoring PRD and the catalog/autocomplete work already landed.
+- Added `src/services/componentInsertion.ts` plus a shared `ComponentInsertion` type so insertion can update JSX only or JSX plus Hooks together, with separate Add-menu vs autocomplete placement handling.
+- Added collision-safe suffix replacement for support helpers such as `usePaginationState`, scanning both JSX and Hooks source together so repeated insertions become `usePaginationState2`, `usePaginationState3`, and so on instead of clobbering earlier support code.
+- Extended the catalog/component metadata path to preserve insertion metadata end-to-end instead of flattening everything to a single snippet string, so the active Add dialog can now drive shared multi-part insertion.
+- Updated `src/components/Editor/CodeEditor.tsx` and `src/services/akselAutocomplete.ts` so catalog-backed completions with support code go through a stable callback bridge into React state without recreating CodeMirror extensions or reintroducing the known autocomplete focus bug.
+- Added `Pagination` as the stateful tracer entry. Its JSX insertion now uses a fragment-wrapped IIFE, and its Hooks insertion exports `usePaginationState{{paginationSuffix}}(...)`, matching the existing import-free Arcade custom-hook pattern instead of using invalid top-level hook calls.
+- Added focused regression coverage in `tests/unit/services/componentInsertion.test.ts`, `tests/unit/akselCatalog.test.ts`, `tests/unit/akselAutocomplete.test.ts`, and `tests/integration/component-palette.test.tsx` for JSX-only insertion, JSX-plus-Hooks insertion, repeated tracer insertion, autocomplete apply shape, and Add-menu metadata wiring.
+
+Verification:
+
+- npm run lint (existing `.eslintignore` deprecation notice and existing `InspectionPopover` hook dependency warning only)
+- npm run typecheck
+- npm run test -- --run
+- npm run build
+- Browser check at `http://127.0.0.1:4311/aksel-arcade/`: after clearing the persisted working copy, confirmed Add -> `Pagination` inserts the fragment-wrapped Pagination JSX plus exported hook support, the preview renders pagination controls and advances from page 1 to page 2, typing `<Pagi` and accepting `Pagination` inserts the same multi-part structure with collision-safe `usePaginationState2`, and a clean reload of the saved state shows no console errors.
+
+Next note:
+
+- Future stateful catalog entries should reuse `src/services/componentInsertion.ts` and the catalog `snippet.code` + `snippet.hooksCode` contract instead of reintroducing one-off editor mutations. The first browser check accidentally hit another worktree on port `4191`; the verified current worktree server for this branch was `4311`, so confirm the serving cwd before trusting browser results if multiple Vite sessions are running.
+
+### 2026-06-11 - PR #222 review follow-up for Issue #211
+
+Fixed before merge:
+
+- A focused PR review found one real regression in the first #211 patch: `Pagination` autocomplete still appeared in the Hooks editor, but accepting that multi-part completion would target JSX ranges and corrupt the wrong buffer.
+- Limited `EditorPane` to pass the multi-part catalog insertion callback only on the JSX tab, so the Hooks editor no longer advertises completions it cannot apply safely.
+- Filtered catalog entries with `snippet.hooksCode` out of autocomplete result sets whenever the editor cannot apply the shared insertion callback, keeping normal JSX component discovery intact while preventing unsafe Hooks-tab multi-part insertions.
+- Added regression coverage in `tests/unit/akselAutocomplete.test.ts` proving `Pagination` is still available when the JSX insertion callback is present and disappears when the editor cannot apply multi-part insertions safely.
+
+Verification:
+
+- npm run lint (existing `.eslintignore` deprecation notice and existing `InspectionPopover` hook dependency warning only)
+- npm run typecheck
+- npm run test -- --run
+- npm run build
+- Browser check at `http://127.0.0.1:4311/aksel-arcade/`: confirmed typing `<Pagi` in the Hooks tab shows no `Pagination` completion, typing `<Pagi` in JSX still offers `Pagination`, accepting it still renders the preview pagination controls, the hook support code lands in the Hooks tab, and the clean verified session had no browser console errors.

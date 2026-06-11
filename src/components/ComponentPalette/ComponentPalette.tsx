@@ -22,7 +22,7 @@ import './ComponentPalette.css'
 interface ComponentPaletteProps {
   open: boolean
   onClose: () => void
-  onInsertComponent: (snippet: string) => void
+  onInsertComponent: (component: ComponentMetadata) => void
 }
 
 export const ComponentPalette = ({ open, onClose, onInsertComponent }: ComponentPaletteProps) => {
@@ -56,7 +56,7 @@ export const ComponentPalette = ({ open, onClose, onInsertComponent }: Component
   }, [searchQuery, activeTab])
 
   const handleInsert = (component: ComponentMetadata) => {
-    onInsertComponent(component.snippet)
+    onInsertComponent(component)
   }
 
   const handleClose = () => {
