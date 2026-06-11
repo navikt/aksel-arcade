@@ -16,6 +16,7 @@ const PAGE_NAVIGATION_TARGETS = [
   { id: 'page02', name: 'Details' },
   { id: 'page03', name: 'Summary' },
 ] as const
+const NOOP_APPLY_CATALOG_INSERTION = () => {}
 
 function completionFor(
   source: string,
@@ -26,7 +27,7 @@ function completionFor(
     source,
     source.length,
     pageNavigationTargets,
-    onApplyCatalogInsertion
+    onApplyCatalogInsertion ?? NOOP_APPLY_CATALOG_INSERTION
   )
 }
 
@@ -209,6 +210,12 @@ describe('Aksel-aware autocomplete contract', () => {
         ),
       }),
     })
+  })
+
+  it('hides multi-part catalog insertions when the editor cannot apply them safely', () => {
+    const result = getAkselCompletionForSource('<Pagi', '<Pagi'.length, undefined, undefined)
+
+    expect(result?.options.find((option) => option.label === 'Pagination')).toBeUndefined()
   })
 
   it('keeps Combobox as the only author-facing autocomplete name', () => {

@@ -444,6 +444,13 @@ function getAutocompleteCatalogInsertion(entry: AkselCatalogEntry): ComponentIns
   }
 }
 
+function supportsCatalogInsertion(
+  entry: CompletionEntry,
+  onApplyCatalogInsertion?: ApplyCatalogInsertion
+): boolean {
+  return !(entry.source === 'catalog' && entry.snippet.hooksCode && !onApplyCatalogInsertion)
+}
+
 function componentOption(
   entry: CompletionEntry,
   onApplyCatalogInsertion?: ApplyCatalogInsertion
@@ -693,6 +700,7 @@ export function getAkselCompletionForSource(
         ? []
         : completionEntries
             .filter((entry) => matchesPartial(entry.name, tagNameContext.query))
+            .filter((entry) => supportsCatalogInsertion(entry, onApplyCatalogInsertion))
             .map((entry) => componentOption(entry, onApplyCatalogInsertion))
     const iconOptions =
       isIconPropTagContext || isIconLikeTagQuery(tagNameContext.query, componentOptions.length > 0)

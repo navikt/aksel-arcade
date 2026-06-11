@@ -284,7 +284,7 @@ export const EditorPane = () => {
             onFormat={handleFormat}
             validPageIds={multiPageEnabled ? validPageIds : undefined}
             pageNavigationTargets={multiPageEnabled ? pageNavigationTargets : undefined}
-            onApplyCatalogInsertion={handleAutocompleteInsertion}
+            onApplyCatalogInsertion={currentTab === 'JSX' ? handleAutocompleteInsertion : undefined}
           />
         </Box>
       </Box>
