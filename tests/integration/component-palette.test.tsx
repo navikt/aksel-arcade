@@ -55,13 +55,30 @@ describe('ComponentPalette', () => {
       expect.objectContaining({
         name: 'Pagination',
         insertion: expect.objectContaining({
-          jsx: expect.stringContaining(
-            'const paginationState{{paginationSuffix}} = usePaginationState{{paginationSuffix}}()'
-          ),
-          hooks: expect.stringContaining(
-            'export const usePaginationState{{paginationSuffix}} = (initialPage = 1) => {'
+          jsx: expect.stringContaining('page={pageState{{paginationSuffix}}}'),
+          componentSetup: expect.stringContaining(
+            'const [pageState{{paginationSuffix}}, setPageState{{paginationSuffix}}] = useState(1)'
           ),
         }),
+      })
+    )
+  })
+
+  it('passes an uncontrolled Tabs snippet through the Add menu boundary', async () => {
+    const user = userEvent.setup()
+    const onInsertComponent = vi.fn()
+
+    await act(async () => {
+      render(<ComponentPalette open onClose={vi.fn()} onInsertComponent={onInsertComponent} />)
+    })
+
+    await user.type(screen.getByRole('textbox', { name: /search components/i }), 'Tabs')
+    await user.click(screen.getByRole('link', { name: /^Tabs$/ }))
+
+    expect(onInsertComponent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: 'Tabs',
+        snippet: expect.stringContaining('<Tabs defaultValue="tab1">'),
       })
     )
   })

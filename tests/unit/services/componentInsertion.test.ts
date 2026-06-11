@@ -4,25 +4,22 @@ import { applyComponentInsertion, createJsxOnlyInsertion } from '@/services/comp
 
 const paginationInsertion = {
   jsx:
-    '<>\n' +
-    '{(() => {\n' +
-    '  const paginationState{{paginationSuffix}} = usePaginationState{{paginationSuffix}}()\n' +
-    '\n' +
-    '  return (\n' +
-    '    <Pagination\n' +
-    '      page={paginationState{{paginationSuffix}}.page}\n' +
-    '      count={10}\n' +
-    '      onPageChange={paginationState{{paginationSuffix}}.setPage}\n' +
-    '      srHeading={{ tag: "h2", text: "Result pages" }}\n' +
-    '    />\n' +
-    '  )\n' +
-    '})()}\n' +
-    '</>',
+    '<Pagination\n' +
+    '  page={pageState{{paginationSuffix}}}\n' +
+    '  onPageChange={setPageState{{paginationSuffix}}}\n' +
+    '  count={9}\n' +
+    '  boundaryCount={1}\n' +
+    '  siblingCount={1}\n' +
+    '/>',
+  componentSetup:
+    'const [pageState{{paginationSuffix}}, setPageState{{paginationSuffix}}] = useState(1)',
+}
+
+const hookBackedInsertion = {
+  jsx: '<BodyShort>{statusLabel}</BodyShort>',
   hooks:
-    'export const usePaginationState{{paginationSuffix}} = (initialPage = 1) => {\n' +
-    '  const [page, setPage] = useState(initialPage)\n' +
-    '\n' +
-    '  return { page, setPage }\n' +
+    'export const useStatusLabel = () => {\n' +
+    '  return "Ready"\n' +
     '}',
 }
 
@@ -42,10 +39,10 @@ describe('component insertion service', () => {
     )
   })
 
-  it('applies multi-part insertions to JSX and Hooks together', () => {
+  it('applies hook-backed insertions to JSX and Hooks together', () => {
     const source = createArcadeSourceFile('<BodyShort>Results</BodyShort>', 'const existing = true')
 
-    const nextSource = applyComponentInsertion(source, paginationInsertion, {
+    const nextSource = applyComponentInsertion(source, hookBackedInsertion, {
       kind: 'palette',
       activeTab: 'JSX',
       jsxCursor: { line: 1, column: 0 },
@@ -53,57 +50,73 @@ describe('component insertion service', () => {
     })
 
     expect(nextSource.jsx).toContain('<BodyShort>Results</BodyShort>')
-    expect(nextSource.jsx).toContain('usePaginationState()')
+    expect(nextSource.jsx).toContain('{statusLabel}')
     expect(nextSource.hooks).toBe(
       'const existing = true\n\n' +
-        'export const usePaginationState = (initialPage = 1) => {\n' +
-        '  const [page, setPage] = useState(initialPage)\n' +
-        '\n' +
-        '  return { page, setPage }\n' +
+        'export const useStatusLabel = () => {\n' +
+        '  return "Ready"\n' +
         '}'
     )
   })
 
-  it('avoids support-name collisions when the same multi-part insertion is repeated', () => {
-    const firstSource = applyComponentInsertion(createArcadeSourceFile('', ''), paginationInsertion, {
+  it('wraps the page once and keeps Pagination insertions composable inside primitives', () => {
+    const source = createArcadeSourceFile('<VStack><BodyShort>Before</BodyShort></VStack>', '')
+
+    const nextSource = applyComponentInsertion(source, paginationInsertion, {
       kind: 'palette',
       activeTab: 'JSX',
-      jsxCursor: { line: 0, column: 0 },
+      jsxCursor: { line: 0, column: '<VStack><BodyShort>Before</BodyShort>'.length },
       hooksCursor: { line: 0, column: 0 },
     })
+
+    expect(nextSource.jsx).toContain('const [pageState, setPageState] = useState(1)')
+    expect(nextSource.jsx).toContain(
+      '<VStack><BodyShort>Before</BodyShort><Pagination'
+    )
+    expect(nextSource.jsx).toContain('page={pageState}')
+    expect(nextSource.jsx).toContain('onPageChange={setPageState}')
+    expect(nextSource.hooks).toBe('')
+  })
+
+  it('avoids setup-name collisions when the same Pagination insertion is repeated', () => {
+    const firstSource = applyComponentInsertion(
+      createArcadeSourceFile('<VStack></VStack>', ''),
+      paginationInsertion,
+      {
+        kind: 'autocomplete',
+        from: '<VStack>'.length,
+        to: '<VStack>'.length,
+      }
+    )
+
+    const secondInsertionPoint = firstSource.jsx.indexOf('</VStack>')
 
     const secondSource = applyComponentInsertion(firstSource, paginationInsertion, {
-      kind: 'palette',
-      activeTab: 'JSX',
-      jsxCursor: { line: 1, column: 0 },
-      hooksCursor: { line: 0, column: 0 },
+      kind: 'autocomplete',
+      from: secondInsertionPoint,
+      to: secondInsertionPoint,
     })
 
-    expect(secondSource.jsx).toContain('usePaginationState()')
-    expect(secondSource.jsx).toContain('usePaginationState2()')
-    expect(secondSource.hooks).toContain('export const usePaginationState = (initialPage = 1) => {')
-    expect(secondSource.hooks).toContain(
-      'export const usePaginationState2 = (initialPage = 1) => {'
-    )
+    expect(secondSource.jsx).toContain('const [pageState, setPageState] = useState(1)')
+    expect(secondSource.jsx).toContain('const [pageState2, setPageState2] = useState(1)')
+    expect(secondSource.jsx).toContain('page={pageState}')
+    expect(secondSource.jsx).toContain('page={pageState2}')
   })
 
   it('replaces JSX completion ranges and preserves existing Hooks code', () => {
     const source = createArcadeSourceFile('<Pagi', 'const selectedFilter = "all"')
 
-    const nextSource = applyComponentInsertion(source, paginationInsertion, {
+    const autocompleteNextSource = applyComponentInsertion(source, hookBackedInsertion, {
       kind: 'autocomplete',
       from: 0,
       to: 5,
     })
 
-    expect(nextSource.jsx).toContain('<Pagination')
-    expect(nextSource.jsx).toContain('usePaginationState()')
-    expect(nextSource.hooks).toBe(
+    expect(autocompleteNextSource.jsx).toContain('<BodyShort>{statusLabel}</BodyShort>')
+    expect(autocompleteNextSource.hooks).toBe(
       'const selectedFilter = "all"\n\n' +
-        'export const usePaginationState = (initialPage = 1) => {\n' +
-        '  const [page, setPage] = useState(initialPage)\n' +
-        '\n' +
-        '  return { page, setPage }\n' +
+        'export const useStatusLabel = () => {\n' +
+        '  return "Ready"\n' +
         '}'
     )
   })

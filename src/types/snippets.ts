@@ -4,6 +4,7 @@ export type SnippetStatus = 'current' | 'experimental' | 'legacy'
 export interface ComponentInsertion {
   jsx: string
   hooks?: string
+  componentSetup?: string
 }
 
 export interface ComponentSnippet {

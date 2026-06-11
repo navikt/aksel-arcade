@@ -182,34 +182,29 @@ describe('Aksel catalog starter path', () => {
     )
     const paginationSnippet = AKSEL_SNIPPETS.find((snippet) => snippet.name === 'Pagination')
 
+    expect(paginationEntry?.snippet.code).toContain('page={pageState{{paginationSuffix}}}')
     expect(paginationEntry?.snippet.code).toContain(
-      'const paginationState{{paginationSuffix}} = usePaginationState{{paginationSuffix}}()'
+      'onPageChange={setPageState{{paginationSuffix}}}'
     )
-    expect(paginationEntry?.snippet.hooksCode).toContain(
-      'export const usePaginationState{{paginationSuffix}} = (initialPage = 1) => {'
+    expect(paginationEntry?.snippet.componentSetup).toContain(
+      'const [pageState{{paginationSuffix}}, setPageState{{paginationSuffix}}] = useState(1)'
     )
     expect(paginationPaletteEntry).toEqual(
       expect.objectContaining({
-        snippet: expect.stringContaining(
-          'const paginationState{{paginationSuffix}} = usePaginationState{{paginationSuffix}}()'
-        ),
+        snippet: expect.stringContaining('page={pageState{{paginationSuffix}}}'),
         insertion: expect.objectContaining({
-          jsx: expect.stringContaining(
-            'const paginationState{{paginationSuffix}} = usePaginationState{{paginationSuffix}}()'
-          ),
-          hooks: expect.stringContaining(
-            'export const usePaginationState{{paginationSuffix}} = (initialPage = 1) => {'
+          jsx: expect.stringContaining('page={pageState{{paginationSuffix}}}'),
+          componentSetup: expect.stringContaining(
+            'const [pageState{{paginationSuffix}}, setPageState{{paginationSuffix}}] = useState(1)'
           ),
         }),
       })
     )
     expect(paginationSnippet?.insertion).toEqual(
       expect.objectContaining({
-        jsx: expect.stringContaining(
-          'const paginationState{{paginationSuffix}} = usePaginationState{{paginationSuffix}}()'
-        ),
-        hooks: expect.stringContaining(
-          'export const usePaginationState{{paginationSuffix}} = (initialPage = 1) => {'
+        jsx: expect.stringContaining('page={pageState{{paginationSuffix}}}'),
+        componentSetup: expect.stringContaining(
+          'const [pageState{{paginationSuffix}}, setPageState{{paginationSuffix}}] = useState(1)'
         ),
       })
     )

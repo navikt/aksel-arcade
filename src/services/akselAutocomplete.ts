@@ -432,6 +432,7 @@ function getCatalogInsertion(entry: AkselCatalogEntry): ComponentInsertion {
   return {
     jsx: entry.snippet.code,
     hooks: entry.snippet.hooksCode,
+    componentSetup: entry.snippet.componentSetup,
   }
 }
 
@@ -448,7 +449,11 @@ function supportsCatalogInsertion(
   entry: CompletionEntry,
   onApplyCatalogInsertion?: ApplyCatalogInsertion
 ): boolean {
-  return !(entry.source === 'catalog' && entry.snippet.hooksCode && !onApplyCatalogInsertion)
+  return !(
+    entry.source === 'catalog' &&
+    (entry.snippet.hooksCode || entry.snippet.componentSetup) &&
+    !onApplyCatalogInsertion
+  )
 }
 
 function componentOption(
@@ -467,7 +472,7 @@ function componentOption(
         : 'class',
     detail: getEntryDescription(entry),
     apply:
-      catalogInsertion?.hooks && onApplyCatalogInsertion
+      (catalogInsertion?.hooks || catalogInsertion?.componentSetup) && onApplyCatalogInsertion
         ? (_view, _completion, from, to) => {
             onApplyCatalogInsertion({
               insertion: catalogInsertion,

@@ -204,9 +204,9 @@ describe('Aksel-aware autocomplete contract', () => {
       from: 0,
       to: 5,
       insertion: expect.objectContaining({
-        jsx: expect.stringMatching(/^>\s*\{\(\(\) => \{/),
-        hooks: expect.stringContaining(
-          'export const usePaginationState{{paginationSuffix}} = (initialPage = 1) => {'
+        jsx: expect.stringContaining('page={pageState{{paginationSuffix}}}'),
+        componentSetup: expect.stringContaining(
+          'const [pageState{{paginationSuffix}}, setPageState{{paginationSuffix}}] = useState(1)'
         ),
       }),
     })

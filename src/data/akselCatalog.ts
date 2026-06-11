@@ -29,6 +29,7 @@ export interface AkselCatalogSnippet {
   code: string
   description: string
   hooksCode?: string
+  componentSetup?: string
 }
 
 export interface AkselCatalogEntry {
@@ -845,26 +846,15 @@ export const AKSEL_CATALOG: AkselCatalogEntry[] = [
     ],
     snippet: {
       code:
-        '<>\n' +
-        '{(() => {\n' +
-        '  const paginationState{{paginationSuffix}} = usePaginationState{{paginationSuffix}}()\n' +
-        '\n' +
-        '  return (\n' +
-        '    <Pagination\n' +
-        '      page={paginationState{{paginationSuffix}}.page}\n' +
-        '      count={10}\n' +
-        '      onPageChange={paginationState{{paginationSuffix}}.setPage}\n' +
-        '      srHeading={{ tag: "h2", text: "Result pages" }}\n' +
-        '    />\n' +
-        '  )\n' +
-        '})()}\n' +
-        '</>',
-      hooksCode:
-        'export const usePaginationState{{paginationSuffix}} = (initialPage = 1) => {\n' +
-        '  const [page, setPage] = useState(initialPage)\n' +
-        '\n' +
-        '  return { page, setPage }\n' +
-        '}',
+        '<Pagination\n' +
+        '  page={pageState{{paginationSuffix}}}\n' +
+        '  onPageChange={setPageState{{paginationSuffix}}}\n' +
+        '  count={9}\n' +
+        '  boundaryCount={1}\n' +
+        '  siblingCount={1}\n' +
+        '/>',
+      componentSetup:
+        'const [pageState{{paginationSuffix}}, setPageState{{paginationSuffix}}] = useState(1)',
       description: 'Pagination with stateful page changes.',
     },
   },
@@ -1097,6 +1087,7 @@ export function getCatalogSnippets(): ComponentSnippet[] {
     const insertion: ComponentInsertion = {
       jsx: entry.snippet.code,
       hooks: entry.snippet.hooksCode,
+      componentSetup: entry.snippet.componentSetup,
     }
     return {
       id: entry.id,
@@ -1134,6 +1125,7 @@ export function getCatalogPaletteComponents(): Array<{
     const insertion: ComponentInsertion = {
       jsx: entry.snippet.code,
       hooks: entry.snippet.hooksCode,
+      componentSetup: entry.snippet.componentSetup,
     }
     return {
       name: entry.name,

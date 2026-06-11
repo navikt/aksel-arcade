@@ -21,6 +21,11 @@ interface AutocompleteInsertionLocation {
 
 export type ComponentInsertionLocation = PaletteInsertionLocation | AutocompleteInsertionLocation
 
+const COMPONENT_SETUP_MARKER = '// __AKSEL_ARCADE_COMPONENT_SETUP__'
+const COMPONENT_SETUP_WRAPPER_PATTERN = new RegExp(
+  String.raw`^\(\(\) => \{\n {2}\/\/ __AKSEL_ARCADE_COMPONENT_SETUP__\n([\s\S]*?)\n\n {2}return \(\n {4}<>\n([\s\S]*?)\n {4}<\/>\n {2}\)\n\}\)\(\)$`
+)
+
 function stripSnippetPlaceholders(template: string): string {
   return template.replace(
     SNIPPET_PLACEHOLDER_PATTERN,
@@ -60,7 +65,7 @@ function getTokenReplacements(
   insertion: ComponentInsertion,
   source: ArcadeSourceFile
 ): Map<string, string> {
-  const templates = [insertion.jsx, insertion.hooks ?? '']
+  const templates = [insertion.jsx, insertion.hooks ?? '', insertion.componentSetup ?? '']
   const existingSource = `${source.jsx}\n${source.hooks}`
   const replacements = new Map<string, string>()
 
@@ -102,15 +107,34 @@ function applyTokenReplacements(template: string, replacements: Map<string, stri
   return nextTemplate
 }
 
-function insertBlockAtLine(source: string, line: number, block: string): string {
+function getOffsetForCursor(source: string, cursor: CursorPosition): number {
+  const lines = source.split('\n')
+  const targetLine = Math.max(0, Math.min(cursor.line, lines.length - 1))
+  const targetColumn = Math.max(0, Math.min(cursor.column, lines[targetLine]?.length ?? 0))
+  let offset = 0
+
+  for (let index = 0; index < targetLine; index += 1) {
+    offset += lines[index].length + 1
+  }
+
+  return offset + targetColumn
+}
+
+function insertBlockAtCursor(source: string, cursor: CursorPosition, block: string): string {
   if (!source) {
     return block
   }
 
   const lines = source.split('\n')
-  const insertIndex = Math.max(0, Math.min(line, lines.length))
-  lines.splice(insertIndex, 0, block)
-  return lines.join('\n')
+  const offset = getOffsetForCursor(source, cursor)
+  const currentLine = lines[Math.max(0, Math.min(cursor.line, lines.length - 1))] ?? ''
+  const isLineBoundary = cursor.column === 0 || cursor.column === currentLine.length
+  const prefix =
+    isLineBoundary && offset > 0 && source[offset - 1] !== '\n' ? '\n' : ''
+  const suffix =
+    isLineBoundary && offset < source.length && source[offset] !== '\n' ? '\n' : ''
+
+  return `${source.slice(0, offset)}${prefix}${block}${suffix}${source.slice(offset)}`
 }
 
 function appendBlock(source: string, block: string): string {
@@ -123,6 +147,50 @@ function appendBlock(source: string, block: string): string {
 
 function replaceRange(source: string, from: number, to: number, block: string): string {
   return `${source.slice(0, from)}${block}${source.slice(to)}`
+}
+
+function indentBlock(source: string, prefix: string): string {
+  return source
+    .split('\n')
+    .map((line) => `${prefix}${line}`)
+    .join('\n')
+}
+
+function unindentBlock(source: string, prefix: string): string {
+  return source
+    .split('\n')
+    .map((line) => (line.startsWith(prefix) ? line.slice(prefix.length) : line))
+    .join('\n')
+}
+
+function buildComponentSetupWrappedSource(body: string, setup: string): string {
+  return `(() => {\n  ${COMPONENT_SETUP_MARKER}\n${indentBlock(setup, '  ')}\n\n  return (\n    <>\n${indentBlock(body, '      ')}\n    </>\n  )\n})()`
+}
+
+function parseComponentSetupWrappedSource(source: string): { setup: string; body: string } | null {
+  const match = source.match(COMPONENT_SETUP_WRAPPER_PATTERN)
+
+  if (!match) {
+    return null
+  }
+
+  return {
+    setup: unindentBlock(match[1], '  '),
+    body: unindentBlock(match[2], '      '),
+  }
+}
+
+function applyComponentSetup(source: string, setupBlock: string): string {
+  const existingWrapper = parseComponentSetupWrappedSource(source)
+
+  if (!existingWrapper) {
+    return buildComponentSetupWrappedSource(source, setupBlock)
+  }
+
+  return buildComponentSetupWrappedSource(
+    existingWrapper.body,
+    `${existingWrapper.setup}\n${setupBlock}`
+  )
 }
 
 export function createJsxOnlyInsertion(jsx: string): ComponentInsertion {
@@ -139,17 +207,23 @@ export function applyComponentInsertion(
   const hooksBlock = insertion.hooks
     ? applyTokenReplacements(insertion.hooks, replacements)
     : undefined
+  const componentSetupBlock = insertion.componentSetup
+    ? applyTokenReplacements(insertion.componentSetup, replacements)
+    : undefined
+
+  const applyJsxSetup = (jsxSource: string) =>
+    componentSetupBlock ? applyComponentSetup(jsxSource, componentSetupBlock) : jsxSource
 
   if (location.kind === 'autocomplete') {
     return {
-      jsx: replaceRange(source.jsx, location.from, location.to, jsxBlock),
+      jsx: applyJsxSetup(replaceRange(source.jsx, location.from, location.to, jsxBlock)),
       hooks: hooksBlock ? appendBlock(source.hooks, hooksBlock) : source.hooks,
     }
   }
 
   if (hooksBlock) {
     return {
-      jsx: insertBlockAtLine(source.jsx, location.jsxCursor.line, jsxBlock),
+      jsx: applyJsxSetup(insertBlockAtCursor(source.jsx, location.jsxCursor, jsxBlock)),
       hooks: appendBlock(source.hooks, hooksBlock),
     }
   }
@@ -157,12 +231,12 @@ export function applyComponentInsertion(
   if (location.activeTab === 'Hooks') {
     return {
       jsx: source.jsx,
-      hooks: insertBlockAtLine(source.hooks, location.hooksCursor.line, jsxBlock),
+      hooks: insertBlockAtCursor(source.hooks, location.hooksCursor, jsxBlock),
     }
   }
 
   return {
-    jsx: insertBlockAtLine(source.jsx, location.jsxCursor.line, jsxBlock),
+    jsx: applyJsxSetup(insertBlockAtCursor(source.jsx, location.jsxCursor, jsxBlock)),
     hooks: source.hooks,
   }
 }

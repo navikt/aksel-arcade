@@ -2235,3 +2235,25 @@ Verification:
 - npm run test -- --run
 - npm run build
 - Browser check at `http://127.0.0.1:4311/aksel-arcade/`: confirmed typing `<Pagi` in the Hooks tab shows no `Pagination` completion, typing `<Pagi` in JSX still offers `Pagination`, accepting it still renders the preview pagination controls, the hook support code lands in the Hooks tab, and the clean verified session had no browser console errors.
+
+### 2026-06-11 - Issue #211 follow-up: Tabs interactivity and composable Pagination insertion
+
+Implemented:
+
+- Diagnosed the post-merge regressions with browser repro loops before changing code: Tabs rendered but would not switch panels, and Add -> `Pagination` inserted outside single-line primitives such as `VStack`.
+- Fixed the Tabs snippet in both `src/data/akselComponents.ts` and `src/services/componentLibrary.ts` by switching from controlled `value="tab1"` markup to uncontrolled `defaultValue="tab1"`, so the preview example is interactive without extra state.
+- Changed `src/services/componentInsertion.ts` from line-based Add-menu placement to cursor-offset insertion, while still preserving clean line insertion when the cursor is at a line boundary so normal block insertion does not get jammed onto adjacent JSX.
+- Reworked the catalog-backed `Pagination` insertion contract to keep the inserted child JSX composable inside primitives: the component now inserts as a clean `<Pagination ... />` block, and its local `useState` support is emitted through a generated component-setup wrapper outside the component tag instead of the old child-local fragment/IIFE.
+- Extended the catalog/autocomplete insertion metadata with `componentSetup` and updated regression coverage in `tests/unit/services/componentInsertion.test.ts`, `tests/unit/akselCatalog.test.ts`, `tests/unit/akselAutocomplete.test.ts`, and `tests/integration/component-palette.test.tsx`.
+
+Verification:
+
+- npm run lint (existing `.eslintignore` deprecation notice and existing `InspectionPopover` hook dependency warning only)
+- npm run typecheck
+- npm run test -- --run
+- npm run build
+- Browser check at `http://127.0.0.1:4311/aksel-arcade/`: confirmed Add -> `Tabs` now switches from Tab 1 to Tab 2 in preview, Add -> `Pagination` inside `<VStack><BodyShort>Before</BodyShort></VStack>` keeps the `Pagination` JSX inside the `VStack`, advances from page 1 to page 2 in preview, and the verified flow produced no browser console errors.
+
+Next note:
+
+- Stateful catalog entries that must stay insertable inside primitives should prefer the new `componentSetup` path until the runtime model changes and Hooks-tab code can execute inside component scope. Keep browser/stateful insertion checks focused on exact cursor placement inside single-line parents, because that was the real regression behind the failed `VStack` insertion.
