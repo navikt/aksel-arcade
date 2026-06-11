@@ -139,8 +139,11 @@ describe('Aksel-aware autocomplete contract', () => {
     const documentedNames = filterNewAuthoringEntries(AKSEL_AUTOCOMPLETE_ENTRIES).map(
       (entry) => entry.name
     )
+    const topLevelDocumentedNames = documentedNames.filter(
+      (name) => COMPONENT_COMPLETION_NAME.test(name) && !name.includes('.')
+    )
 
-    expect(labels).toEqual(expect.arrayContaining(documentedNames))
+    expect(labels).toEqual(expect.arrayContaining(topLevelDocumentedNames))
     expect(labels).toEqual(
       expect.arrayContaining([
         'Page',
@@ -268,10 +271,50 @@ describe('Aksel-aware autocomplete contract', () => {
     expect(labelsFor('<LinkIcon')).toContain('LinkIcon')
   })
 
-  it('suggests catalog subcomponents in JSX tag context', () => {
+  it('keeps curated dotted top-level entries while hiding contextual-only subcomponents at top level', () => {
     expect(labelsFor('<Page.')).toContain('Page.Block')
-    expect(labelsFor('<Accordion.')).toEqual(
-      expect.arrayContaining(['Accordion.Item', 'Accordion.Header', 'Accordion.Content'])
+    expect(labelsFor('<Accordion.')).toEqual([])
+    expect(labelsFor('<ActionMenu.')).toEqual([])
+    expect(labelsFor('<Dropdown.')).toEqual([])
+    expect(labelsFor('<Tabs.')).toEqual([])
+  })
+
+  it('shows contextual subcomponents inside matching parent ancestry', () => {
+    expect(labelsFor('<Accordion>\n  <')).toEqual(['Accordion.Item'])
+    expect(labelsFor('<Accordion>\n  <Accordion.Item>\n    <')).toEqual([
+      'Accordion.Header',
+      'Accordion.Content',
+    ])
+    expect(labelsFor('<ActionMenu>\n  <')).toEqual(['ActionMenu.Trigger', 'ActionMenu.Content'])
+    expect(labelsFor('<Dropdown>\n  <')).toEqual(['Dropdown.Toggle', 'Dropdown.Menu'])
+    expect(labelsFor('<Tabs>\n  <')).toEqual(['Tabs.List', 'Tabs.Panel'])
+  })
+
+  it('matches contextual subcomponents by their relative child name', () => {
+    expect(labelsFor('<Accordion>\n  <Accordion.Item>\n    <H')).toContain('Accordion.Header')
+    expect(labelsFor('<ActionMenu>\n  <ActionMenu.Content>\n    <I')).toContain('ActionMenu.Item')
+    expect(labelsFor('<Tabs>\n  <Tabs.List>\n    <T')).toContain('Tabs.Tab')
+  })
+
+  it('shows parent-bound child suggestions only inside useful group contexts', () => {
+    expect(labelsFor('<RadioGroup legend="Pick one">\n  <')).toEqual(['Radio'])
+    expect(labelsFor('<CheckboxGroup legend="Select">\n  <')).toEqual(['Checkbox'])
+  })
+
+  it('suppresses generic child-level suggestions in constrained compound positions', () => {
+    expect(labelsFor('<Accordion>\n  <')).not.toContain('Box')
+    expect(labelsFor('<ActionMenu>\n  <ActionMenu.Content>\n    <')).not.toContain('Button')
+    expect(labelsFor('<Tabs>\n  <Tabs.List>\n    <')).not.toContain('Box')
+    expect(labelsFor('<Dropdown>\n  <Dropdown.Menu.List>\n    <')).toEqual([
+      'Dropdown.Menu.List.Item',
+    ])
+  })
+
+  it('removes generic docs-only detail text from autocomplete options', () => {
+    expect(optionFor('<Accordion', 'Accordion')?.detail).toBe('')
+    expect(optionFor('<ActionMenu', 'ActionMenu')?.detail).toBe('')
+    expect(optionFor('<Box', 'Box')?.detail).toBe(
+      'Generic container with spacing, color, border, radius, and shadow tokens.'
     )
   })
 
