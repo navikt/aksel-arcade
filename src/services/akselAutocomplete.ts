@@ -1,5 +1,9 @@
 import type { Completion, CompletionContext, CompletionResult } from '@codemirror/autocomplete'
 import {
+  filterNewAuthoringEntries,
+  isHiddenFromNewAuthoring,
+} from '@/data/akselAuthoringPolicy'
+import {
   getCatalogComponent,
   listCatalogEntries,
   type AkselCatalogEntry,
@@ -43,8 +47,13 @@ const docsEntries = AKSEL_AUTOCOMPLETE_ENTRIES.map((entry) => ({
 const iconEntries = catalogEntries
   .filter((entry) => entry.group === 'icon')
   .map((entry) => ({ ...entry, source: 'catalog' as const }))
-const fallbackDocsEntries = docsEntries.filter((entry) => !catalogEntryNames.has(entry.name))
-const completionEntries: CompletionEntry[] = [...catalogCompletionEntries, ...fallbackDocsEntries]
+const fallbackDocsEntries = filterNewAuthoringEntries(
+  docsEntries.filter((entry) => !catalogEntryNames.has(entry.name))
+)
+const completionEntries: CompletionEntry[] = [
+  ...filterNewAuthoringEntries(catalogCompletionEntries),
+  ...fallbackDocsEntries,
+]
 const docsEntriesByName = new Map(docsEntries.map((entry) => [entry.name, entry]))
 
 interface OpenTagContext {
@@ -350,6 +359,10 @@ function normalizeComponentLookupName(componentName: string): string {
 
 function getComponentProps(componentName: string): CompletionProp[] {
   const normalizedComponentName = normalizeComponentLookupName(componentName)
+
+  if (isHiddenFromNewAuthoring(normalizedComponentName)) {
+    return []
+  }
 
   if (isIconComponent(normalizedComponentName)) {
     return AKSEL_ICON_PROPS

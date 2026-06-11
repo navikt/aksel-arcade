@@ -47,10 +47,10 @@ export const INTRO_JSX_CODE = `<Box
       </List>
     </VStack>
 
-    <Alert variant="info">
+    <InlineMessage status="info">
       <strong>Quick tip:</strong> Delete this intro and start coding! You can always reset via
       Settings → Reset editor.
-    </Alert>
+    </InlineMessage>
   </VStack>
 </Box>`
 
@@ -68,7 +68,7 @@ export const HOOKS_DEMO_HOOKS_CODE = `// Custom hook for form state management
 export const useForm = (initialValues = {}) => {
   const [values, setValues] = useState(initialValues);
   const [errors, setErrors] = useState({});
-  const [showAlert, setShowAlert] = useState(false);
+  const [showConfirmation, setShowConfirmation] = useState(false);
 
   const handleChange = (name, value) => {
     setValues(prev => ({ ...prev, [name]: value }));
@@ -97,11 +97,20 @@ export const useForm = (initialValues = {}) => {
     setErrors({});
   };
 
-  const closeAlert = () => {
-    setShowAlert(false);
+  const dismissConfirmation = () => {
+    setShowConfirmation(false);
   };
 
-  return { values, errors, handleChange, validate, reset, showAlert, setShowAlert, closeAlert };
+  return {
+    values,
+    errors,
+    handleChange,
+    validate,
+    reset,
+    showConfirmation,
+    setShowConfirmation,
+    dismissConfirmation,
+  };
 };
 
 // Custom hook for toggling visibility
@@ -133,12 +142,12 @@ export const HOOKS_DEMO_JSX_CODE = `(() => {
   const likes = useCounter(0, 0, 999);
   
   const handleSubmit = () => {
-    // Don't submit if Alert is already shown
-    if (form.showAlert) {
+    // Don't resubmit if the confirmation message is already shown
+    if (form.showConfirmation) {
       return;
     }
     if (form.validate()) {
-      form.setShowAlert(true);
+      form.setShowConfirmation(true);
     }
   };
 
@@ -198,17 +207,15 @@ export const HOOKS_DEMO_JSX_CODE = `(() => {
             </HStack>
             
             {details.isOn && (
-              <Alert variant="info">
-                <Heading size="small" level="3" spacing>
-                  Om custom hooks
-                </Heading>
-                <BodyShort spacing>
+              <InlineMessage status="info">
+                <strong>Om custom hooks:</strong>{' '}
+                <span>
                   Custom hooks lat deg gjenbruke stateful logikk mellom komponenter.
-                </BodyShort>
-                <BodyShort>
+                </span>{' '}
+                <span>
                   De starter alltid med <code>use</code> og kan kalle andre hooks.
-                </BodyShort>
-              </Alert>
+                </span>
+              </InlineMessage>
             )}
           </VStack>
         </Box>
@@ -258,29 +265,32 @@ export const HOOKS_DEMO_JSX_CODE = `(() => {
                 </Button>
               </HStack>
               
-              {form.showAlert && (
-                <Alert variant="info" size="medium" closeButton onClose={form.closeAlert}>
-                  <Heading size="small" level="3" spacing>
-                    Kamelåså!
-                  </Heading>
-                  <BodyShort>
-                    Now you just ordered thousands liters of milk!
-                  </BodyShort>
-                </Alert>
+              {form.showConfirmation && (
+                <VStack gap="space-4">
+                  <InlineMessage status="success">
+                    <strong>Kamelåså!</strong> Now you just ordered thousands liters of milk!
+                  </InlineMessage>
+                  <Button
+                    type="button"
+                    variant="tertiary"
+                    size="small"
+                    onClick={form.dismissConfirmation}
+                  >
+                    Lukk meldingen
+                  </Button>
+                </VStack>
               )}
             </VStack>
           </form>
         </Box>
 
-        <Alert variant="success">
-          <Heading size="small" level="3" spacing>
-            ✨ Prøv å interagere!
-          </Heading>
-          <BodyShort>
+        <InlineMessage status="success">
+          <strong>✨ Prøv å interagere!</strong>{' '}
+          <span>
             Klikk på knappene, skriv i skjemaet, og slå av/på detaljer. 
             All state blir håndtert av custom hooks definert i Hooks-fanen.
-          </BodyShort>
-        </Alert>
+          </span>
+        </InlineMessage>
       </VStack>
     </Box>
   );

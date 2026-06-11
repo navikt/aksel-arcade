@@ -1,5 +1,6 @@
 import type { ComponentSnippet, SnippetCategory } from '@/types/snippets'
 import iconMetadata from '@navikt/aksel-icons/metadata'
+import { filterNewAuthoringEntries } from '@/data/akselAuthoringPolicy'
 
 export const AKSEL_CATALOG_VERSION = '8.11.0'
 
@@ -803,7 +804,7 @@ export const AKSEL_CATALOG: AkselCatalogEntry[] = [
     id: 'alert',
     name: 'Alert',
     group: 'component',
-    status: 'current',
+    status: 'legacy',
     package: '@navikt/ds-react',
     importName: 'Alert',
     importGuidance: "import { Alert } from '@navikt/ds-react';",
@@ -1019,10 +1020,12 @@ export function getCatalogTokenValues(tokenKey: keyof typeof AKSEL_TOKEN_METADAT
 }
 
 export function getCatalogSnippets(): ComponentSnippet[] {
-  return listCatalogEntries({
-    groups: ['layout', 'component'],
-    statuses: DEFAULT_DISCOVERY_STATUSES,
-  }).map((entry) => ({
+  return filterNewAuthoringEntries(
+    listCatalogEntries({
+      groups: ['layout', 'component'],
+      statuses: DEFAULT_DISCOVERY_STATUSES,
+    })
+  ).map((entry) => ({
     id: entry.id,
     name: entry.name,
     category: entry.group as SnippetCategory,
@@ -1046,10 +1049,12 @@ export function getCatalogPaletteComponents(): Array<{
   description: string
   docs: string
 }> {
-  return listCatalogEntries({
-    groups: ['layout', 'component', 'icon'],
-    statuses: DEFAULT_DISCOVERY_STATUSES,
-  }).map((entry) => ({
+  return filterNewAuthoringEntries(
+    listCatalogEntries({
+      groups: ['layout', 'component', 'icon'],
+      statuses: DEFAULT_DISCOVERY_STATUSES,
+    })
+  ).map((entry) => ({
     name: entry.name,
     category: entry.group,
     status: entry.status,

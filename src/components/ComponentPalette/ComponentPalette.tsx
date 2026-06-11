@@ -1,16 +1,16 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
-  Modal,
+  Dialog,
   Tabs,
   TextField,
   VStack,
   Box,
   HGrid,
-  Heading,
   BodyShort,
   LinkCard,
+  Button,
 } from '@navikt/ds-react'
-import { MagnifyingGlassIcon } from '@navikt/aksel-icons'
+import { MagnifyingGlassIcon, XMarkIcon } from '@navikt/aksel-icons'
 import {
   ComponentMetadata,
   getComponentsByCategory,
@@ -65,72 +65,87 @@ export const ComponentPalette = ({ open, onClose, onInsertComponent }: Component
   }
 
   return (
-    <Modal
+    <Dialog
       open={open}
-      onClose={handleClose}
-      className="component-palette-modal"
-      closeOnBackdropClick
-      aria-label="Add Component"
-      data-testid="component-palette"
+      onOpenChange={(nextOpen) => {
+        if (!nextOpen) {
+          handleClose()
+        }
+      }}
     >
-      <Modal.Header>
-        <Heading level="2" size="medium">
-          Add Component
-        </Heading>
-      </Modal.Header>
+      <Dialog.Popup
+        className="component-palette-modal"
+        closeOnOutsideClick
+        aria-label="Add Component"
+        data-testid="component-palette"
+      >
+        <Dialog.Header>
+          <Dialog.Title>Add Component</Dialog.Title>
+          <Dialog.CloseTrigger>
+            <Button
+              type="button"
+              variant="tertiary"
+              data-color="neutral"
+              size="small"
+              icon={<XMarkIcon aria-hidden />}
+              aria-label="Close Add Component"
+            />
+          </Dialog.CloseTrigger>
+        </Dialog.Header>
 
-      <Modal.Body className="component-palette-body">
-        <VStack gap="space-16" className="component-palette-content">
-          {/* Search Field */}
-          <TextField
-            label="Search components"
-            hideLabel
-            placeholder="Search Aksel building blocks..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            // @ts-expect-error - icon prop exists
-            icon={<MagnifyingGlassIcon />}
-            ref={searchInputRef}
-            size="small"
-            autoFocus
-          />
+        <Dialog.Body className="component-palette-body">
+          <VStack gap="space-16" className="component-palette-content">
+            {/* Search Field */}
+            <TextField
+              label="Search components"
+              hideLabel
+              placeholder="Search Aksel building blocks..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              // @ts-expect-error - icon prop exists
+              icon={<MagnifyingGlassIcon />}
+              ref={searchInputRef}
+              size="small"
+              autoFocus
+            />
 
-          {/* Tabs */}
-          <div className="component-palette-tabs">
-            <Tabs value={activeTab} onChange={(value) => setActiveTab(value as AkselCatalogGroup)}>
-              <Tabs.List>
-                <Tabs.Tab value="layout" label="Layout" />
-                <Tabs.Tab value="component" label="Components" />
-                <Tabs.Tab value="icon" label="Icons" />
-              </Tabs.List>
-            </Tabs>
-          </div>
+            {/* Tabs */}
+            <div className="component-palette-tabs">
+              <Tabs value={activeTab} onChange={(value) => setActiveTab(value as AkselCatalogGroup)}>
+                <Tabs.List>
+                  <Tabs.Tab value="layout" label="Layout" />
+                  <Tabs.Tab value="component" label="Components" />
+                  <Tabs.Tab value="icon" label="Icons" />
+                </Tabs.List>
+              </Tabs>
+            </div>
 
-          {/* Component Grid */}
-          <div className="component-grid-wrapper">
-            <HGrid
-              columns="repeat(auto-fill, minmax(280px, 1fr))"
-              gap="space-16"
-              className="component-grid"
-            >
-              {filteredComponents.length === 0 ? (
-                <Box padding="space-16" className="no-results">
-                  <BodyShort>No components found matching "{searchQuery}"</BodyShort>
-                </Box>
-              ) : (
-                filteredComponents.map((component) => (
-                  <ComponentCard
-                    key={component.name}
-                    component={component}
-                    onInsert={handleInsert}
-                  />
-                ))
-              )}
-            </HGrid>
-          </div>
-        </VStack>
-      </Modal.Body>
-    </Modal>
+            {/* Component Grid */}
+            <div className="component-grid-wrapper">
+              <HGrid
+                columns="repeat(auto-fill, minmax(280px, 1fr))"
+                gap="space-16"
+                className="component-grid"
+              >
+                {filteredComponents.length === 0 ? (
+                  <Box padding="space-16" className="no-results">
+                    <BodyShort>No components found matching "{searchQuery}"</BodyShort>
+                  </Box>
+                ) : (
+                  filteredComponents.map((component) => (
+                    <ComponentCard
+                      key={component.name}
+                      component={component}
+                      onInsert={handleInsert}
+                    />
+                  ))
+                )}
+              </HGrid>
+            </div>
+          </VStack>
+        </Dialog.Body>
+      </Dialog.Popup>
+    </Dialog>
   )
 }
 

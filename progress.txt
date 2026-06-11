@@ -2167,3 +2167,29 @@ Verification:
 Next note:
 
 - Do not remove the metadata-side `UNSAFE_Combobox -> Combobox` normalization until stored Arcade project source is migrated off the unsafe name. Runtime compatibility alone is not enough for legacy editor autocomplete.
+
+### 2026-06-11 - Issue #208: Remove deprecated and replaced authoring entries
+
+Implemented:
+
+- Selected #208 as the highest-priority `ready-for-agent` feature from #208-#217 because the fresh #207 handoff identified deprecated `Alert` / replaced `Modal` exposure as the next unblocked authoring problem still steering new work toward the wrong APIs, and fixing that shared policy also clears the way for the later Dialog/form and audit follow-ups.
+- Read issue #205, `CONTEXT.md`, and the existing `progress.txt` notes before changing code so the replacement/deprecation filter stayed aligned with the shared Aksel authoring PRD and recent catalog-first handoffs.
+- Added `src/data/akselAuthoringPolicy.ts` as the shared new-authoring filter for deprecated/replaced roots, and wired it through catalog discovery plus autocomplete so `Alert`/`Modal` no longer appear in Add-menu data, top-level autocomplete, contextual subcomponent autocomplete, prop completions, or prop-value completions.
+- Marked the catalog `Alert` entry as legacy and filtered manual palette/snippet metadata in `src/data/akselComponents.ts` and `src/services/componentLibrary.ts`, so the hidden-policy behavior now stays consistent across both the active Add dialog and the older snippet search helpers.
+- Kept runtime compatibility intact by leaving the raw catalog/manual metadata and sandbox runtime support in place; old/manual `Alert` and `Modal` source can still render, but new authoring aids stop suggesting them.
+- Replaced deprecated built-in `Alert` usage in `src/utils/projectDefaults.ts` with current `InlineMessage` examples, including the intro template and the hooks demo confirmation/details blocks, so fresh projects no longer teach deprecated feedback APIs.
+- Migrated the active Add-component chrome in `src/components/ComponentPalette/ComponentPalette.tsx` from `Modal` to `Dialog`, keeping the same search/tabs/card workflow while removing the local authoring-UX use of the replaced overlay component.
+- Added regression coverage in `tests/unit/akselCatalog.test.ts`, `tests/unit/akselAutocomplete.test.ts`, `tests/unit/projectDefaults.test.ts`, and `tests/integration/component-palette.test.tsx` for the shared hidden-entry policy, Add/autocomplete filtering, built-in template updates, and the Dialog-backed palette portal DOM.
+
+Verification:
+
+- npm install
+- npm run lint (existing `.eslintignore` deprecation notice and existing `InspectionPopover` hook dependency warning only)
+- npm run typecheck
+- npm run test -- --run
+- npm run build
+- Browser check at `http://127.0.0.1:4183/aksel-arcade/`: confirmed the default project now renders `InlineMessage` instead of `Alert`, the Add dialog opens as a dialog and shows no `Alert` or `Modal` entry, searching `modal` reports no matching component, and there were no browser console errors during the authoring flow.
+
+Next note:
+
+- #215 can now add Dialog and the current feedback/form-shell replacements without reopening this filtering work; keep using `src/data/akselAuthoringPolicy.ts` if future deprecations/replacements need to disappear from new authoring surfaces.

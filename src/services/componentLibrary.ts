@@ -1,5 +1,6 @@
 import type { ComponentSnippet, SnippetCategory } from '@/types/snippets'
 import { getCatalogSnippets, listCatalogEntries } from '@/data/akselCatalog'
+import { filterNewAuthoringEntries } from '@/data/akselAuthoringPolicy'
 
 const CATALOG_SNIPPETS = getCatalogSnippets()
 const LEGACY_SNIPPET_NAMES = new Set(
@@ -578,12 +579,12 @@ const MANUAL_AKSEL_SNIPPETS: ComponentSnippet[] = [
 
 const catalogSnippetNames = new Set(CATALOG_SNIPPETS.map((snippet) => snippet.name))
 
-export const AKSEL_SNIPPETS: ComponentSnippet[] = [
+export const AKSEL_SNIPPETS: ComponentSnippet[] = filterNewAuthoringEntries([
   ...CATALOG_SNIPPETS,
   ...MANUAL_AKSEL_SNIPPETS.filter(
     (snippet) => !catalogSnippetNames.has(snippet.name) && !LEGACY_SNIPPET_NAMES.has(snippet.name)
   ),
-]
+])
 
 interface SearchOptions {
   category?: SnippetCategory

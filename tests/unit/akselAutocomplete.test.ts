@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import iconMetadata from '@navikt/aksel-icons/metadata'
+import { filterNewAuthoringEntries } from '../../src/data/akselAuthoringPolicy'
 import { AKSEL_AUTOCOMPLETE_ENTRIES, AKSEL_ICON_PROPS } from '../../src/data/akselAutocompleteData'
 import { listCatalogEntries } from '../../src/data/akselCatalog'
 import { getAkselCompletionForSource } from '../../src/services/akselAutocomplete'
@@ -100,7 +101,7 @@ function booleanLikePropCases(): Array<[componentName: string, propName: string]
     cases.set(`${componentName}.${prop.name}`, [componentName, prop.name])
   }
 
-  for (const entry of AKSEL_AUTOCOMPLETE_ENTRIES) {
+  for (const entry of filterNewAuthoringEntries(AKSEL_AUTOCOMPLETE_ENTRIES)) {
     for (const prop of entry.props) {
       addProp(entry.name, prop)
     }
@@ -123,9 +124,11 @@ function booleanLikePropCases(): Array<[componentName: string, propName: string]
 }
 
 describe('Aksel-aware autocomplete contract', () => {
-  it('suggests every documented Aksel primitive and component tag', () => {
+  it('suggests every documented Aksel primitive and component tag still valid for new authoring', () => {
     const labels = labelsFor('<')
-    const documentedNames = AKSEL_AUTOCOMPLETE_ENTRIES.map((entry) => entry.name)
+    const documentedNames = filterNewAuthoringEntries(AKSEL_AUTOCOMPLETE_ENTRIES).map(
+      (entry) => entry.name
+    )
 
     expect(labels).toEqual(expect.arrayContaining(documentedNames))
     expect(labels).toEqual(
@@ -146,6 +149,17 @@ describe('Aksel-aware autocomplete contract', () => {
       ])
     )
     expect(labels).not.toContain('UNSAFE_Combobox')
+  })
+
+  it('hides deprecated Alert and replaced Modal from new authoring autocomplete surfaces', () => {
+    expect(labelsFor('<A')).toContain('ActionMenu')
+    expect(labelsFor('<A')).not.toContain('Alert')
+    expect(labelsFor('<M')).toContain('MonthPicker')
+    expect(labelsFor('<M')).not.toContain('Modal')
+    expect(labelsFor('<Modal.')).toEqual([])
+    expect(labelsFor('<Alert v')).toEqual([])
+    expect(labelsFor('<Alert variant="i')).toEqual([])
+    expect(labelsFor('<Modal o')).toEqual([])
   })
 
   it('prefers catalog-backed tracer details and insertions for top-level BodyShort, Heading, and Tag', () => {
