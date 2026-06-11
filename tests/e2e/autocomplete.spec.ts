@@ -63,15 +63,21 @@ test.describe('Aksel autocomplete', () => {
     await page.waitForLoadState('networkidle')
   })
 
-  test('suggests component and subcomponent tags in the browser editor', async ({ page }) => {
+  test('suggests top-level tags and only contextual child tags in the browser editor', async ({ page }) => {
     const componentAutocomplete = await openAutocompleteFor(page, '', '<But')
     await expect(componentAutocomplete).toContainText('Button')
     await expect(componentAutocomplete).not.toContainText('PlusIcon')
 
     await page.keyboard.press('Escape')
 
-    const subcomponentAutocomplete = await openAutocompleteFor(page, '', '<Page.')
-    await expect(subcomponentAutocomplete).toContainText('Page.Block')
+    const curatedDottedAutocomplete = await openAutocompleteFor(page, '', '<Page.')
+    await expect(curatedDottedAutocomplete).toContainText('Page.Block')
+
+    await page.keyboard.press('Escape')
+
+    const contextualAutocomplete = await openAutocompleteFor(page, '<Accordion>\n  ', '<')
+    await expect(contextualAutocomplete).toContainText('Accordion.Item')
+    await expect(contextualAutocomplete).not.toContainText('Button')
   })
 
   test('suggests props and enum values across formatted JSX tags', async ({ page }) => {

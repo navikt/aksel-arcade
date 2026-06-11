@@ -46,6 +46,19 @@ export interface AkselCatalogEntry {
   snippet: AkselCatalogSnippet
 }
 
+export type AkselAutocompleteDiscovery = 'contextual-only' | 'top-level'
+
+export interface AkselContextualAutocompleteChild {
+  name: string
+  discovery?: AkselAutocompleteDiscovery
+}
+
+export interface AkselContextualAutocompleteRule {
+  parent: string
+  children: AkselContextualAutocompleteChild[]
+  exclusive?: boolean
+}
+
 export interface AkselTokenMetadata {
   kind: AkselValueKind
   docs: string
@@ -241,6 +254,129 @@ export const AKSEL_TOKEN_METADATA: Record<string, AkselTokenMetadata> = {
 const spacingValues = AKSEL_TOKEN_METADATA.spacing.values
 const spacingWithAutoValues = AKSEL_TOKEN_METADATA.spacingWithAuto.values
 const dataColorValues = AKSEL_TOKEN_METADATA.dataColor.values
+
+const AKSEL_CONTEXTUAL_AUTOCOMPLETE_RULES: AkselContextualAutocompleteRule[] = [
+  {
+    parent: 'Accordion',
+    children: [{ name: 'Accordion.Item' }],
+    exclusive: true,
+  },
+  {
+    parent: 'Accordion.Item',
+    children: [{ name: 'Accordion.Header' }, { name: 'Accordion.Content' }],
+    exclusive: true,
+  },
+  {
+    parent: 'ActionMenu',
+    children: [{ name: 'ActionMenu.Trigger' }, { name: 'ActionMenu.Content' }],
+    exclusive: true,
+  },
+  {
+    parent: 'ActionMenu.Content',
+    children: [
+      { name: 'ActionMenu.Item' },
+      { name: 'ActionMenu.Group' },
+      { name: 'ActionMenu.Label' },
+      { name: 'ActionMenu.Divider' },
+      { name: 'ActionMenu.CheckboxItem' },
+      { name: 'ActionMenu.RadioGroup' },
+      { name: 'ActionMenu.Sub' },
+    ],
+    exclusive: true,
+  },
+  {
+    parent: 'ActionMenu.Group',
+    children: [
+      { name: 'ActionMenu.Label' },
+      { name: 'ActionMenu.Item' },
+      { name: 'ActionMenu.Divider' },
+      { name: 'ActionMenu.CheckboxItem' },
+      { name: 'ActionMenu.RadioGroup' },
+      { name: 'ActionMenu.Sub' },
+    ],
+    exclusive: true,
+  },
+  {
+    parent: 'ActionMenu.RadioGroup',
+    children: [{ name: 'ActionMenu.RadioItem' }],
+    exclusive: true,
+  },
+  {
+    parent: 'ActionMenu.Sub',
+    children: [{ name: 'ActionMenu.SubTrigger' }, { name: 'ActionMenu.SubContent' }],
+    exclusive: true,
+  },
+  {
+    parent: 'ActionMenu.SubContent',
+    children: [
+      { name: 'ActionMenu.Item' },
+      { name: 'ActionMenu.Group' },
+      { name: 'ActionMenu.Label' },
+      { name: 'ActionMenu.Divider' },
+      { name: 'ActionMenu.CheckboxItem' },
+      { name: 'ActionMenu.RadioGroup' },
+      { name: 'ActionMenu.Sub' },
+    ],
+    exclusive: true,
+  },
+  {
+    parent: 'Dropdown',
+    children: [{ name: 'Dropdown.Toggle' }, { name: 'Dropdown.Menu' }],
+    exclusive: true,
+  },
+  {
+    parent: 'Dropdown.Menu',
+    children: [
+      { name: 'Dropdown.Menu.List' },
+      { name: 'Dropdown.Menu.GroupedList' },
+      { name: 'Dropdown.Divider' },
+    ],
+    exclusive: true,
+  },
+  {
+    parent: 'Dropdown.Menu.List',
+    children: [{ name: 'Dropdown.Menu.List.Item' }],
+    exclusive: true,
+  },
+  {
+    parent: 'Dropdown.Menu.GroupedList',
+    children: [
+      { name: 'Dropdown.Menu.GroupedList.Heading' },
+      { name: 'Dropdown.Menu.GroupedList.Item' },
+    ],
+    exclusive: true,
+  },
+  {
+    parent: 'Tabs',
+    children: [{ name: 'Tabs.List' }, { name: 'Tabs.Panel' }],
+    exclusive: true,
+  },
+  {
+    parent: 'Tabs.List',
+    children: [{ name: 'Tabs.Tab' }],
+    exclusive: true,
+  },
+  {
+    parent: 'RadioGroup',
+    children: [{ name: 'Radio', discovery: 'top-level' }],
+    exclusive: true,
+  },
+  {
+    parent: 'CheckboxGroup',
+    children: [{ name: 'Checkbox', discovery: 'top-level' }],
+    exclusive: true,
+  },
+]
+const contextualAutocompleteRulesByParent = new Map(
+  AKSEL_CONTEXTUAL_AUTOCOMPLETE_RULES.map((rule) => [rule.parent, rule])
+)
+const contextualOnlyAutocompleteNames = new Set(
+  AKSEL_CONTEXTUAL_AUTOCOMPLETE_RULES.flatMap((rule) =>
+    rule.children
+      .filter((child) => child.discovery !== 'top-level')
+      .map((child) => child.name)
+  )
+)
 
 const layoutShellProps: AkselCatalogProp[] = [
   {
@@ -1107,6 +1243,16 @@ export function getCatalogSnippets(): ComponentSnippet[] {
       insertion,
     }
   })
+}
+
+export function getContextualAutocompleteRule(
+  parentName: string
+): AkselContextualAutocompleteRule | undefined {
+  return contextualAutocompleteRulesByParent.get(parentName)
+}
+
+export function isContextualOnlyAutocompleteEntry(componentName: string): boolean {
+  return contextualOnlyAutocompleteNames.has(componentName)
 }
 
 export function getCatalogPaletteComponents(): Array<{

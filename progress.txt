@@ -2258,3 +2258,29 @@ Next note:
 - #210 should preserve the same contract for autocomplete-triggered compound insertions: if a completion needs helper code, the JSX apply string still has to remain composable at the insertion point.
 - #213 should explicitly audit for this rule when comparing docs/runtime/catalog snippets, because wrapper-based JSX insertions are now a known system-level regression class.
 - #212 looks mostly static (`content`, `typography`, `link`) and probably does not need special handling beyond the normal composable-snippet expectation, unless one of its target components later grows Hooks-backed support code.
+
+### 2026-06-11 - Issue #210: Add contextual autocomplete for compound children
+
+Implemented:
+
+- Selected #210 as the highest-priority `ready-for-agent` feature from #209-#217 because it is the only remaining unblocked autocomplete foundation and it directly gates the later menu/overlay, form/input, and workflow/navigation insertion fixes in #214, #216, and #217.
+- Re-read issue #205, `CONTEXT.md`, and the latest `progress.txt` notes before changing code so the autocomplete behavior stayed aligned with the shared **Aksel insertion catalog** contract and the newer composable multi-part insertion rules.
+- Added narrow contextual autocomplete metadata in `src/data/akselCatalog.ts` for the representative compound/parent-bound structures needed by this slice: Accordion, ActionMenu, Dropdown, Tabs, RadioGroup, and CheckboxGroup. The metadata now distinguishes contextual-only children from top-level entries that can also be suggested contextually, which keeps `Page.Block` available as a curated top-level choice while hiding compound children such as `Accordion.Item` or `Dropdown.Menu.List` from global discovery.
+- Reworked `src/services/akselAutocomplete.ts` so top-level tag suggestions are limited to real top-level JSX authoring choices: catalog-backed entries plus non-dotted documented component tags. Raw docs-only subcomponents and lowercase helper exports no longer leak into top-level autocomplete.
+- Added a lightweight JSX ancestor scanner in `src/services/akselAutocomplete.ts` that computes the open component stack at the current tag position, then uses the new catalog metadata to offer context-specific children only inside the matching parent ancestry.
+- Made contextual child matching work on both full and relative names, so typing `<Accordion>` then `<H` inside `Accordion.Item` now surfaces `Accordion.Header`, while constrained parents suppress generic child suggestions instead of mixing in unrelated primitives or icons.
+- Removed the noisy generic docs fallback detail text from autocomplete options. Catalog-backed entries still show meaningful descriptions, but raw docs-backed entries no longer render placeholder text like `Documented Aksel component.`.
+- Added focused regression coverage in `tests/unit/akselAutocomplete.test.ts` for top-level subcomponent suppression, `Page.Block` staying top-level, contextual child suggestions inside representative parents, parent-bound Radio/Checkbox suggestions, constrained-context suppression, relative child-name matching, and the detail-text cleanup. Updated `tests/e2e/autocomplete.spec.ts` so the browser coverage now checks the same user-facing contract.
+
+Verification:
+
+- npm run typecheck
+- npm test -- --run
+- npm run build
+- npm run lint (existing `.eslintignore` deprecation notice and existing `InspectionPopover` hook dependency warning only)
+- Browser check at `http://127.0.0.1:4321/aksel-arcade/`: confirmed top-level `<Page.` still offers `Page.Block`; confirmed top-level `<Accordion.` shows no autocomplete list; confirmed typing `<` inside `<Accordion>` offers only `Accordion.Item`; confirmed the constrained contextual list does not leak unrelated suggestions such as `Button`; confirmed no browser console errors or warnings during the verified flow
+
+Next note:
+
+- Extend `AKSEL_CONTEXTUAL_AUTOCOMPLETE_RULES` in `src/data/akselCatalog.ts` for later compound slices instead of adding one-off autocomplete branches. The `exclusive` flag now controls whether a parent should suppress generic child suggestions completely, and the child `discovery` flag preserves intentional top-level exceptions such as Radio/Checkbox-style catalog choices.
+- Keep the top-level autocomplete filter strict: catalog exceptions like `Page.Block` stay allowed, but docs-only dotted subcomponents and lowercase helper exports should remain hidden from global discovery unless a future catalog decision makes them an intentional top-level insertion choice.

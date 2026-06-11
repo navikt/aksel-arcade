@@ -5,6 +5,8 @@ import {
 } from '@/data/akselAuthoringPolicy'
 import {
   getCatalogComponent,
+  getContextualAutocompleteRule,
+  isContextualOnlyAutocompleteEntry,
   listCatalogEntries,
   type AkselCatalogEntry,
   type AkselCatalogProp,
@@ -51,10 +53,17 @@ const iconEntries = catalogEntries
 const fallbackDocsEntries = filterNewAuthoringEntries(
   docsEntries.filter((entry) => !catalogEntryNames.has(entry.name))
 )
-const completionEntries: CompletionEntry[] = [
+const allCompletionEntries: CompletionEntry[] = [
   ...filterNewAuthoringEntries(catalogCompletionEntries),
   ...fallbackDocsEntries,
 ]
+const topLevelCompletionEntries = allCompletionEntries.filter(
+  (entry) =>
+    COMPONENT_NAME_PATTERN.test(entry.name) &&
+    !isContextualOnlyAutocompleteEntry(entry.name) &&
+    (entry.source === 'catalog' || !entry.name.includes('.'))
+)
+const completionEntriesByName = new Map(allCompletionEntries.map((entry) => [entry.name, entry]))
 const docsEntriesByName = new Map(docsEntries.map((entry) => [entry.name, entry]))
 
 interface OpenTagContext {
@@ -261,22 +270,6 @@ function matchesCaseSensitivePrefix(value: string, partial: string): boolean {
   return value.startsWith(partial)
 }
 
-function hasComponentPrefix(query: string): boolean {
-  return completionEntries.some((entry) => matchesCaseSensitivePrefix(entry.name, query))
-}
-
-function componentTagValidFor(text: string): boolean {
-  return TAG_NAME_VALID_FOR.test(text) && (text === '' || hasComponentPrefix(text))
-}
-
-function iconTagValidFor(text: string): boolean {
-  return (
-    TAG_NAME_VALID_FOR.test(text) &&
-    isIconLikeTagQuery(text, hasComponentPrefix(text)) &&
-    iconEntries.some((entry) => matchesPartial(entry.name, text))
-  )
-}
-
 function dedupeValues(values: Array<string | undefined>): string[] {
   return Array.from(new Set(values.filter((value): value is string => Boolean(value)))).sort(
     (a, b) => a.localeCompare(b)
@@ -336,6 +329,348 @@ function isIconLikeTagQuery(query: string, hasComponentMatches: boolean): boolea
     !hasComponentMatches &&
     iconEntries.some((entry) => entry.name.toLowerCase().startsWith(normalizedQuery))
   )
+}
+
+function isTagNameStart(char: string | undefined): boolean {
+  return Boolean(char && /[A-Za-z]/.test(char))
+}
+
+function isLikelyJsxTagStart(source: string, index: number): boolean {
+  const next = source[index + 1]
+  return next === '/' || next === '>' || isTagNameStart(next)
+}
+
+function skipQuotedText(source: string, start: number, quote: '"' | "'" | '`'): number {
+  for (let index = start + 1; index < source.length; index += 1) {
+    const char = source[index]
+    if (char === '\\') {
+      index += 1
+      continue
+    }
+
+    if (quote === '`' && char === '$' && source[index + 1] === '{') {
+      index = skipBraceExpression(source, index + 2) - 1
+      continue
+    }
+
+    if (char === quote) {
+      return index + 1
+    }
+  }
+
+  return source.length
+}
+
+function skipBalancedComment(source: string, start: number): number {
+  if (source[start + 1] === '/') {
+    for (let index = start + 2; index < source.length; index += 1) {
+      if (source[index] === '\n') {
+        return index
+      }
+    }
+    return source.length
+  }
+
+  for (let index = start + 2; index < source.length; index += 1) {
+    if (source[index] === '*' && source[index + 1] === '/') {
+      return index + 2
+    }
+  }
+
+  return source.length
+}
+
+interface JsxTagToken {
+  name?: string
+  closing: boolean
+  selfClosing: boolean
+  end: number
+}
+
+function readJsxTagToken(source: string, start: number): JsxTagToken | null {
+  if (source[start] !== '<' || !isLikelyJsxTagStart(source, start)) {
+    return null
+  }
+
+  let index = start + 1
+  let closing = false
+
+  if (source[index] === '/') {
+    closing = true
+    index += 1
+  }
+
+  if (source[index] === '>') {
+    return {
+      closing,
+      selfClosing: false,
+      end: index + 1,
+    }
+  }
+
+  const nameStart = index
+  while (index < source.length && /[\w.:-]/.test(source[index])) {
+    index += 1
+  }
+
+  if (index === nameStart) {
+    return null
+  }
+
+  const name = source.slice(nameStart, index)
+  let selfClosing = false
+
+  while (index < source.length) {
+    const char = source[index]
+
+    if (char === '"' || char === "'" || char === '`') {
+      index = skipQuotedText(source, index, char as '"' | "'" | '`')
+      continue
+    }
+
+    if (char === '{') {
+      index = skipBraceExpression(source, index + 1)
+      continue
+    }
+
+    if (char === '/' && source[index + 1] === '>') {
+      selfClosing = true
+      return {
+        name,
+        closing,
+        selfClosing,
+        end: index + 2,
+      }
+    }
+
+    if (char === '>') {
+      return {
+        name,
+        closing,
+        selfClosing,
+        end: index + 1,
+      }
+    }
+
+    index += 1
+  }
+
+  return null
+}
+
+function skipJsxSubtree(source: string, start: number): number {
+  const openingToken = readJsxTagToken(source, start)
+  if (!openingToken || openingToken.closing || openingToken.selfClosing) {
+    return openingToken?.end ?? start + 1
+  }
+
+  const targetName = openingToken.name
+  let index = openingToken.end
+
+  while (index < source.length) {
+    if (source[index] === '<' && isLikelyJsxTagStart(source, index)) {
+      const token = readJsxTagToken(source, index)
+      if (!token) {
+        index += 1
+        continue
+      }
+
+      if (token.name === targetName && token.closing) {
+        return token.end
+      }
+
+      if (!token.closing && !token.selfClosing) {
+        index = skipJsxSubtree(source, index)
+        continue
+      }
+
+      index = token.end
+      continue
+    }
+
+    if (source[index] === '{') {
+      index = skipBraceExpression(source, index + 1)
+      continue
+    }
+
+    if (source[index] === '"' || source[index] === "'" || source[index] === '`') {
+      index = skipQuotedText(source, index, source[index] as '"' | "'" | '`')
+      continue
+    }
+
+    index += 1
+  }
+
+  return source.length
+}
+
+function skipBraceExpression(source: string, start: number): number {
+  let depth = 1
+
+  for (let index = start; index < source.length; index += 1) {
+    const char = source[index]
+
+    if (char === '"' || char === "'" || char === '`') {
+      index = skipQuotedText(source, index, char as '"' | "'" | '`') - 1
+      continue
+    }
+
+    if (char === '/' && (source[index + 1] === '/' || source[index + 1] === '*')) {
+      index = skipBalancedComment(source, index) - 1
+      continue
+    }
+
+    if (char === '<' && isLikelyJsxTagStart(source, index)) {
+      index = skipJsxSubtree(source, index) - 1
+      continue
+    }
+
+    if (char === '{') {
+      depth += 1
+      continue
+    }
+
+    if (char === '}') {
+      depth -= 1
+      if (depth === 0) {
+        return index + 1
+      }
+    }
+  }
+
+  return source.length
+}
+
+function getJsxAncestorStack(source: string, end: number): string[] {
+  const stack: string[] = []
+
+  for (let index = 0; index < end; ) {
+    if (source[index] !== '<' || !isLikelyJsxTagStart(source, index)) {
+      index += 1
+      continue
+    }
+
+    const token = readJsxTagToken(source, index)
+    if (!token) {
+      index += 1
+      continue
+    }
+
+    if (!token.name) {
+      index = token.end
+      continue
+    }
+
+    if (token.closing) {
+      const lastMatchIndex = [...stack].reverse().findIndex((name) => name === token.name)
+      if (lastMatchIndex !== -1) {
+        stack.length = stack.length - lastMatchIndex - 1
+      }
+    } else if (!token.selfClosing) {
+      stack.push(token.name)
+    }
+
+    index = token.end
+  }
+
+  return stack
+}
+
+function getContextualRelativeName(parentName: string, componentName: string): string {
+  if (componentName.startsWith(`${parentName}.`)) {
+    return componentName.slice(parentName.length + 1)
+  }
+
+  const segments = componentName.split('.')
+  return segments[segments.length - 1] ?? componentName
+}
+
+function matchesContextualName(parentName: string, componentName: string, query: string): boolean {
+  const relativeName = getContextualRelativeName(parentName, componentName)
+  return matchesPartial(componentName, query) || matchesPartial(relativeName, query)
+}
+
+function getCompletionEntry(componentName: string): CompletionEntry | undefined {
+  return completionEntriesByName.get(componentName)
+}
+
+function contextualComponentOptions(
+  parentName: string,
+  query: string,
+  onApplyCatalogInsertion?: ApplyCatalogInsertion
+): {
+  options: Completion[]
+  exclusive: boolean
+  names: Array<{ name: string; aliases: string[] }>
+} {
+  const rule = getContextualAutocompleteRule(parentName)
+  if (!rule) {
+    return {
+      options: [],
+      exclusive: false,
+      names: [],
+    }
+  }
+
+  const contextualEntries = rule.children
+    .map((child) => {
+      const entry = getCompletionEntry(child.name)
+      if (!entry || !supportsCatalogInsertion(entry, onApplyCatalogInsertion)) {
+        return null
+      }
+
+      return {
+        entry,
+        name: child.name,
+        aliases: [child.name, getContextualRelativeName(parentName, child.name)],
+      }
+    })
+    .filter((child): child is NonNullable<typeof child> => Boolean(child))
+    .filter((child) => matchesContextualName(parentName, child.name, query))
+
+  return {
+    exclusive: Boolean(rule.exclusive),
+    names: contextualEntries.map((child) => ({
+      name: child.name,
+      aliases: child.aliases,
+    })),
+    options: contextualEntries.map((child, index) => ({
+      ...componentOption(child.entry, onApplyCatalogInsertion),
+      boost: 100 - index,
+    })),
+  }
+}
+
+function createTagValidFor(
+  componentNames: Array<{ name: string; aliases: string[] }>,
+  allowIcons: boolean
+): (text: string) => boolean {
+  return (text) => {
+    if (!TAG_NAME_VALID_FOR.test(text)) {
+      return false
+    }
+
+    if (text === '') {
+      return true
+    }
+
+    const hasComponentMatches = componentNames.some((entry) =>
+      entry.aliases.some((alias) => matchesCaseSensitivePrefix(alias, text))
+    )
+
+    if (hasComponentMatches) {
+      return true
+    }
+
+    if (!allowIcons) {
+      return false
+    }
+
+    return (
+      isIconLikeTagQuery(text, hasComponentMatches) &&
+      iconEntries.some((entry) => matchesPartial(entry.name, text))
+    )
+  }
 }
 
 function compareIconEntries(
@@ -407,15 +742,7 @@ function getEntryDescription(entry: CompletionEntry): string {
     return entry.description
   }
 
-  if (entry.group === 'legacy') {
-    return 'Documented legacy Aksel component.'
-  }
-
-  if (entry.group === 'primitive') {
-    return 'Documented Aksel layout primitive.'
-  }
-
-  return 'Documented Aksel component.'
+  return ''
 }
 
 function getEntryApply(entry: CompletionEntry): string {
@@ -693,17 +1020,39 @@ export function getAkselCompletionForSource(
   const tagNameContext = getTagNameContext(openTag)
   if (tagNameContext) {
     const isIconPropTagContext = isInsideIconPropExpression(source, openTag.tagStart)
+    const parentStack = getJsxAncestorStack(source, openTag.tagStart)
+    const directParent = parentStack[parentStack.length - 1]
+    const contextualOptions = directParent
+      ? contextualComponentOptions(directParent, tagNameContext.query, onApplyCatalogInsertion)
+      : { options: [], exclusive: false, names: [] as Array<{ name: string; aliases: string[] }> }
+    const allowIconTagSuggestions = !contextualOptions.exclusive
     const shouldSuggestComponents =
       tagNameContext.query === '' || COMPONENT_NAME_PATTERN.test(tagNameContext.query)
-    const componentOptions =
+    const topLevelOptions =
       isIconPropTagContext || !shouldSuggestComponents
         ? []
-        : completionEntries
+        : topLevelCompletionEntries
             .filter((entry) => matchesPartial(entry.name, tagNameContext.query))
             .filter((entry) => supportsCatalogInsertion(entry, onApplyCatalogInsertion))
             .map((entry) => componentOption(entry, onApplyCatalogInsertion))
+    const componentOptions =
+      contextualOptions.exclusive || !shouldSuggestComponents
+        ? contextualOptions.options
+        : [...contextualOptions.options, ...topLevelOptions]
+    const componentNames =
+      contextualOptions.exclusive || !shouldSuggestComponents
+        ? contextualOptions.names
+        : [
+            ...contextualOptions.names,
+            ...topLevelCompletionEntries.map((entry) => ({
+              name: entry.name,
+              aliases: [entry.name],
+            })),
+          ]
     const iconOptions =
-      isIconPropTagContext || isIconLikeTagQuery(tagNameContext.query, componentOptions.length > 0)
+      isIconPropTagContext ||
+      (allowIconTagSuggestions &&
+        isIconLikeTagQuery(tagNameContext.query, componentOptions.length > 0))
         ? iconComponentOptions(tagNameContext.query, isIconPropTagContext ? 'icon-prop-tag' : 'tag')
         : []
     const options = [...componentOptions, ...iconOptions]
@@ -711,8 +1060,8 @@ export function getAkselCompletionForSource(
     if (options.length > 0) {
       const validFor =
         iconOptions.length > 0 && componentOptions.length === 0
-          ? iconTagValidFor
-          : componentTagValidFor
+          ? createTagValidFor([], true)
+          : createTagValidFor(componentNames, !isIconPropTagContext && allowIconTagSuggestions)
 
       return {
         from: tagNameContext.from,
