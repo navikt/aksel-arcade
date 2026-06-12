@@ -200,7 +200,10 @@ describe('Aksel catalog starter path', () => {
         'Tag',
       ])
     )
-    expect(chipsToggleEntry?.snippet.code).toContain('<Chips data-color="neutral">')
+    expect(chipsToggleEntry?.snippet.code).toContain('<Chips>')
+    expect(chipsToggleEntry?.snippet.code).toContain('<Chips.Toggle')
+    expect(chipsToggleEntry?.snippet.code).toContain('data-color="neutral"')
+    expect(chipsToggleEntry?.snippet.code).not.toContain('<Chips data-color="neutral">')
     expect(chipsToggleEntry?.snippet.code).toContain(
       '{options{{chipsToggleSuffix}}.map((label, id) => ('
     )
@@ -215,6 +218,9 @@ describe('Aksel catalog starter path', () => {
     expect(chipsRemovableEntry?.snippet.code).toContain(
       '{filter{{chipsRemovableSuffix}}.map((c) => ('
     )
+    expect(chipsRemovableEntry?.snippet.code).toContain('<Chips.Removable')
+    expect(chipsRemovableEntry?.snippet.code).toContain('data-color="neutral"')
+    expect(chipsRemovableEntry?.snippet.code).not.toContain('<Chips data-color="neutral">')
     expect(chipsRemovableEntry?.snippet.code).toContain('setFilter{{chipsRemovableSuffix}}((x) =>')
     expect(chipsRemovableEntry?.snippet.code).toContain('x.length === 1')
     expect(chipsRemovableEntry?.snippet.code).toContain('? options{{chipsRemovableSuffix}}')
@@ -230,7 +236,10 @@ describe('Aksel catalog starter path', () => {
       '<Loader size="xlarge" title="Loading case details" />'
     )
     expect(progressBarEntry?.snippet.code).toContain(
-      '<ProgressBar value={5} valueMax={7} aria-labelledby="application-progress-label" />'
+      'id="applicationProgressLabel{{progressBarLabelSuffix}}"'
+    )
+    expect(progressBarEntry?.snippet.code).toContain(
+      'aria-labelledby="applicationProgressLabel{{progressBarLabelSuffix}}"'
     )
     expect(skeletonEntry?.snippet.code).toContain('<Skeleton variant="rounded" height={80} />')
     expect(tableEntry?.snippet.code).toContain(
@@ -238,7 +247,7 @@ describe('Aksel catalog starter path', () => {
     )
     expect(chipsTogglePaletteEntry?.insertion).toEqual(
       expect.objectContaining({
-        jsx: expect.stringContaining('<Chips data-color="neutral">'),
+        jsx: expect.stringContaining('<Chips.Toggle'),
         hooks: expect.stringContaining(
           'const [selected{{chipsToggleSuffix}}, setSelected{{chipsToggleSuffix}}] = useState(0)'
         ),

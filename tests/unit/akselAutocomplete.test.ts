@@ -213,9 +213,6 @@ describe('Aksel-aware autocomplete contract', () => {
     expect(optionFor('<Prog', 'ProgressBar')?.detail).toBe(
       'Progress bar with a visible accessible label.'
     )
-    expect(applyFor('<Prog', 'ProgressBar')).toContain(
-      'ProgressBar value={5} valueMax={7} aria-labelledby="application-progress-label"'
-    )
     expect(optionFor('<Skel', 'Skeleton')?.detail).toBe(
       'Skeleton stack for a loading card placeholder.'
     )
@@ -492,6 +489,33 @@ describe('Aksel-aware autocomplete contract', () => {
     )
     expect(onApplyCatalogInsertion.mock.calls[1]?.[0]?.insertion.jsx).not.toContain(
       'ChipsRemovableExample'
+    )
+  })
+
+  it('routes ProgressBar through the catalog insertion callback with unique label ids', () => {
+    const onApplyCatalogInsertion = vi.fn()
+    const option = optionFor('<Prog', 'ProgressBar', undefined, onApplyCatalogInsertion)
+
+    expect(option?.detail).toBe('Progress bar with a visible accessible label.')
+    expect(typeof option?.apply).toBe('function')
+
+    if (typeof option?.apply !== 'function') {
+      throw new Error('Expected ProgressBar completion to use a custom apply callback')
+    }
+
+    option.apply({} as never, option as never, 0, '<Prog'.length)
+
+    expect(onApplyCatalogInsertion).toHaveBeenCalledWith({
+      from: 0,
+      to: '<Prog'.length,
+      insertion: expect.objectContaining({
+        jsx: expect.stringContaining(
+          'aria-labelledby="applicationProgressLabel{{progressBarLabelSuffix}}"'
+        ),
+      }),
+    })
+    expect(onApplyCatalogInsertion.mock.calls[0]?.[0]?.insertion.jsx).not.toContain(
+      'application-progress-label'
     )
   })
 

@@ -2500,3 +2500,19 @@ Verification:
 - npm run typecheck
 - npm run test -- --run
 - Browser check at `http://127.0.0.1:5182/aksel-arcade/`: confirmed Add -> `Chips Toggle` inserts visible `<Chips.Toggle>` JSX into the JSX tab, confirmed Add -> `Chips Removable` inserts visible `<Chips.Removable>` JSX and suffixes the second example’s support identifiers in the Hooks tab, and confirmed the preview renders both chips examples without runtime console errors or warnings.
+
+### 2026-06-12 - PR #230 review follow-up for issue #209 insertion polish
+
+Fixed before merge:
+
+- Moved the `neutral` color contract onto `Chips.Toggle` and `Chips.Removable` themselves instead of the outer `<Chips>` wrapper so the generated examples match Aksel’s supported API.
+- Made the shared `ProgressBar` snippet use collision-safe label ids (`applicationProgressLabel`, `applicationProgressLabel2`, ...) so repeated insertions do not create duplicate `aria-labelledby` targets.
+- Updated `insertionNeedsEditorApply` so catalog snippets with collision tokens also route through the editor-apply path even when they do not need Hooks-tab support, which keeps repeated pure-JSX insertions safe.
+- Added/updated regression coverage across `tests/unit/services/componentInsertion.test.ts`, `tests/unit/akselCatalog.test.ts`, `tests/unit/akselAutocomplete.test.ts`, and `tests/integration/component-palette.test.tsx` for the Chips child `data-color` contract plus repeated `ProgressBar` id deconfliction.
+
+Verification:
+
+- npm run typecheck
+- npm run lint (passes with the existing `.eslintignore` deprecation notice and existing `InspectionPopover` hook-dependency warning only)
+- npm run test -- --run
+- Browser check at `http://127.0.0.1:5183/aksel-arcade/`: confirmed the JSX tab shows direct `Chips.Toggle` / `Chips.Removable` markup with `data-color="neutral"` on each child, the Hooks tab still contains support state only, repeated Add -> `ProgressBar` insertions render two labeled progress bars in the preview with distinct ids, and the verified session showed no browser console errors (only the pre-existing form-field accessibility issue).

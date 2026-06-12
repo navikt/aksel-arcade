@@ -1397,9 +1397,10 @@ export const AKSEL_CATALOG: AkselCatalogEntry[] = [
     ],
     snippet: {
       code:
-        '<Chips data-color="neutral">\n' +
+        '<Chips>\n' +
         '  {options{{chipsToggleSuffix}}.map((label, id) => (\n' +
         '    <Chips.Toggle\n' +
+        '      data-color="neutral"\n' +
         '      checkmark={false}\n' +
         '      key={label}\n' +
         '      selected={selected{{chipsToggleSuffix}} === id}\n' +
@@ -1455,9 +1456,10 @@ export const AKSEL_CATALOG: AkselCatalogEntry[] = [
     ],
     snippet: {
       code:
-        '<Chips data-color="neutral">\n' +
+        '<Chips>\n' +
         '  {filter{{chipsRemovableSuffix}}.map((c) => (\n' +
         '    <Chips.Removable\n' +
+        '      data-color="neutral"\n' +
         '      key={c}\n' +
         '      onClick={() =>\n' +
         '        setFilter{{chipsRemovableSuffix}}((x) =>\n' +
@@ -2157,8 +2159,8 @@ export const AKSEL_CATALOG: AkselCatalogEntry[] = [
     snippet: {
       code:
         '<VStack gap="space-8" width="300px">\n' +
-        '  <BodyShort id="application-progress-label">Application progress</BodyShort>\n' +
-        '  <ProgressBar value={5} valueMax={7} aria-labelledby="application-progress-label" />\n' +
+        '  <BodyShort id="applicationProgressLabel{{progressBarLabelSuffix}}">Application progress</BodyShort>\n' +
+        '  <ProgressBar value={5} valueMax={7} aria-labelledby="applicationProgressLabel{{progressBarLabelSuffix}}" />\n' +
         '</VStack>',
       description: 'Visible progress bar with an accessible label.',
     },

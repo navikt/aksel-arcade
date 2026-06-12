@@ -173,7 +173,7 @@ describe('ComponentPalette', () => {
       expect.objectContaining({
         name: 'Chips Toggle',
         insertion: expect.objectContaining({
-          jsx: expect.stringContaining('<Chips data-color="neutral">'),
+          jsx: expect.stringContaining('<Chips.Toggle'),
           hooks: expect.stringContaining(
             'const [selected{{chipsToggleSuffix}}, setSelected{{chipsToggleSuffix}}] = useState(0)'
           ),

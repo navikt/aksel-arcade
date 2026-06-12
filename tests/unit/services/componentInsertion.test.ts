@@ -203,7 +203,9 @@ describe('component insertion service', () => {
       }
     )
 
-    expect(toggleSource.jsx).toContain('<Chips data-color="neutral">')
+    expect(toggleSource.jsx).toContain('<Chips>')
+    expect(toggleSource.jsx).toContain('<Chips.Toggle')
+    expect(toggleSource.jsx).toContain('data-color="neutral"')
     expect(toggleSource.jsx).toContain('{options.map((label, id) => (')
     expect(toggleSource.jsx).toContain('selected={selected === id}')
     expect(toggleSource.jsx).toContain('onClick={() => setSelected(id)}')
@@ -227,6 +229,8 @@ describe('component insertion service', () => {
     )
 
     expect(removableSource.jsx).toContain('{filter2.map((c) => (')
+    expect(removableSource.jsx).toContain('<Chips.Removable')
+    expect(removableSource.jsx).toContain('data-color="neutral"')
     expect(removableSource.jsx).toContain('setFilter2((x) =>')
     expect(removableSource.jsx).toContain('x.length === 1')
     expect(removableSource.jsx).toContain('? options2')
@@ -235,6 +239,42 @@ describe('component insertion service', () => {
     expect(removableSource.hooks).toContain('const options2 = ["Housing", "Income", "Work"]')
     expect(removableSource.hooks).toContain('const [filter2, setFilter2] = useState(options2)')
     expect(removableSource.hooks).not.toContain('ChipsRemovableExample')
+  })
+
+  it('deconflicts ProgressBar label ids when the snippet is inserted more than once', () => {
+    const progressBarEntry = getCatalogComponent('ProgressBar')
+
+    if (!progressBarEntry) {
+      throw new Error('Expected ProgressBar catalog entry to exist')
+    }
+
+    const firstSource = applyComponentInsertion(
+      createArcadeSourceFile('', ''),
+      { jsx: progressBarEntry.snippet.code },
+      {
+        kind: 'palette',
+        activeTab: 'JSX',
+        jsxCursor: { line: 0, column: 0 },
+        hooksCursor: { line: 0, column: 0 },
+      }
+    )
+
+    const secondSource = applyComponentInsertion(
+      firstSource,
+      { jsx: progressBarEntry.snippet.code },
+      {
+        kind: 'palette',
+        activeTab: 'JSX',
+        jsxCursor: { line: firstSource.jsx.split('\n').length, column: 0 },
+        hooksCursor: { line: 0, column: 0 },
+      }
+    )
+
+    expect(secondSource.jsx).toContain('id="applicationProgressLabel"')
+    expect(secondSource.jsx).toContain('aria-labelledby="applicationProgressLabel"')
+    expect(secondSource.jsx).toContain('id="applicationProgressLabel2"')
+    expect(secondSource.jsx).toContain('aria-labelledby="applicationProgressLabel2"')
+    expect(secondSource.jsx).not.toContain('{{progressBarLabelSuffix}}')
   })
 
   it('avoids support-name collisions when the same multi-part insertion is repeated', () => {
