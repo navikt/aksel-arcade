@@ -222,16 +222,6 @@ const MANUAL_AKSEL_SNIPPETS: ComponentSnippet[] = [
     import: "import { FileUpload } from '@navikt/ds-react';",
   },
   {
-    id: 'chips',
-    name: 'Chips',
-    category: 'component',
-    keywords: ['chips', 'tags', 'filter', 'toggle', 'select'],
-    template:
-      '<Chips>\n  <Chips.Toggle>${1:Chip 1}</Chips.Toggle>\n  <Chips.Toggle>${2:Chip 2}</Chips.Toggle>\n</Chips>',
-    description: 'Selectable chips/tags',
-    import: "import { Chips } from '@navikt/ds-react';",
-  },
-  {
     id: 'togglegroup',
     name: 'ToggleGroup',
     category: 'component',
@@ -253,33 +243,6 @@ const MANUAL_AKSEL_SNIPPETS: ComponentSnippet[] = [
     import: "import { Alert } from '@navikt/ds-react';",
   },
   {
-    id: 'loader',
-    name: 'Loader',
-    category: 'component',
-    keywords: ['loader', 'loading', 'spinner', 'progress', 'wait'],
-    template: '<Loader title="${1:Loading...}" />',
-    description: 'Loading spinner',
-    import: "import { Loader } from '@navikt/ds-react';",
-  },
-  {
-    id: 'skeleton',
-    name: 'Skeleton',
-    category: 'component',
-    keywords: ['skeleton', 'loading', 'placeholder', 'shimmer'],
-    template: '<Skeleton variant="text" width="100%" />',
-    description: 'Loading skeleton placeholder',
-    import: "import { Skeleton } from '@navikt/ds-react';",
-  },
-  {
-    id: 'progressbar',
-    name: 'ProgressBar',
-    category: 'component',
-    keywords: ['progress', 'bar', 'loading', 'percentage'],
-    template: '<ProgressBar value={50}>${1:50%}</ProgressBar>',
-    description: 'Progress indicator bar',
-    import: "import { ProgressBar } from '@navikt/ds-react';",
-  },
-  {
     id: 'errorsummary',
     name: 'ErrorSummary',
     category: 'component',
@@ -289,16 +252,6 @@ const MANUAL_AKSEL_SNIPPETS: ComponentSnippet[] = [
     description: 'Summary of form errors',
     import: "import { ErrorSummary } from '@navikt/ds-react';",
   },
-  {
-    id: 'tag',
-    name: 'Tag',
-    category: 'component',
-    keywords: ['tag', 'label', 'badge', 'status', 'chip'],
-    template: '<Tag variant="info">${1:Tag label}</Tag>',
-    description: 'Tag label component',
-    import: "import { Tag } from '@navikt/ds-react';",
-  },
-
   // Navigation Components
   {
     id: 'link',
@@ -457,16 +410,6 @@ const MANUAL_AKSEL_SNIPPETS: ComponentSnippet[] = [
       '<Chat variant="left" name="${1:User}">\n  <Chat.Bubble>${2:Message text}</Chat.Bubble>\n</Chat>',
     description: 'Chat message bubbles',
     import: "import { Chat } from '@navikt/ds-react';",
-  },
-  {
-    id: 'table',
-    name: 'Table',
-    category: 'component',
-    keywords: ['table', 'data', 'grid', 'list', 'rows'],
-    template:
-      '<Table>\n  <Table.Header>\n    <Table.Row>\n      <Table.HeaderCell>${1:Header}</Table.HeaderCell>\n    </Table.Row>\n  </Table.Header>\n  <Table.Body>\n    <Table.Row>\n      <Table.DataCell>${2:Data}</Table.DataCell>\n    </Table.Row>\n  </Table.Body>\n</Table>',
-    description: 'Data table',
-    import: "import { Table } from '@navikt/ds-react';",
   },
   {
     id: 'list',

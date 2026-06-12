@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { getCatalogComponent } from '@/data/akselCatalog'
 import { createArcadeSourceFile } from '@/services/projectSource'
 import { applyComponentInsertion, createJsxOnlyInsertion } from '@/services/componentInsertion'
 
@@ -178,6 +179,102 @@ describe('component insertion service', () => {
         '  }\n' +
         '}'
     )
+  })
+
+  it('keeps Chips insertion JSX visible while moving support code into Hooks', () => {
+    const chipsToggleEntry = getCatalogComponent('Chips Toggle')
+    const chipsRemovableEntry = getCatalogComponent('Chips Removable')
+
+    if (!chipsToggleEntry?.snippet.hooksCode || !chipsRemovableEntry?.snippet.hooksCode) {
+      throw new Error('Expected Chips catalog entries to expose hooks-backed insertion snippets')
+    }
+
+    const toggleSource = applyComponentInsertion(
+      createArcadeSourceFile('<BodyShort>Results</BodyShort>', ''),
+      {
+        jsx: chipsToggleEntry.snippet.code,
+        hooks: chipsToggleEntry.snippet.hooksCode,
+      },
+      {
+        kind: 'palette',
+        activeTab: 'JSX',
+        jsxCursor: { line: 0, column: 0 },
+        hooksCursor: { line: 0, column: 0 },
+      }
+    )
+
+    expect(toggleSource.jsx).toContain('<Chips>')
+    expect(toggleSource.jsx).toContain('<Chips.Toggle')
+    expect(toggleSource.jsx).toContain('data-color="neutral"')
+    expect(toggleSource.jsx).toContain('{options.map((label, id) => (')
+    expect(toggleSource.jsx).toContain('selected={selected === id}')
+    expect(toggleSource.jsx).toContain('onClick={() => setSelected(id)}')
+    expect(toggleSource.jsx).not.toContain('ChipsToggleExample')
+    expect(toggleSource.hooks).toContain('const options = [')
+    expect(toggleSource.hooks).toContain('const [selected, setSelected] = useState(0)')
+    expect(toggleSource.hooks).not.toContain('ChipsToggleExample')
+
+    const removableSource = applyComponentInsertion(
+      toggleSource,
+      {
+        jsx: chipsRemovableEntry.snippet.code,
+        hooks: chipsRemovableEntry.snippet.hooksCode,
+      },
+      {
+        kind: 'palette',
+        activeTab: 'JSX',
+        jsxCursor: { line: toggleSource.jsx.split('\n').length, column: 0 },
+        hooksCursor: { line: 0, column: 0 },
+      }
+    )
+
+    expect(removableSource.jsx).toContain('{filter2.map((c) => (')
+    expect(removableSource.jsx).toContain('<Chips.Removable')
+    expect(removableSource.jsx).toContain('data-color="neutral"')
+    expect(removableSource.jsx).toContain('setFilter2((x) =>')
+    expect(removableSource.jsx).toContain('x.length === 1')
+    expect(removableSource.jsx).toContain('? options2')
+    expect(removableSource.jsx).toContain(': x.filter((y) => y !== c)')
+    expect(removableSource.jsx).not.toContain('ChipsRemovableExample')
+    expect(removableSource.hooks).toContain('const options2 = ["Housing", "Income", "Work"]')
+    expect(removableSource.hooks).toContain('const [filter2, setFilter2] = useState(options2)')
+    expect(removableSource.hooks).not.toContain('ChipsRemovableExample')
+  })
+
+  it('deconflicts ProgressBar label ids when the snippet is inserted more than once', () => {
+    const progressBarEntry = getCatalogComponent('ProgressBar')
+
+    if (!progressBarEntry) {
+      throw new Error('Expected ProgressBar catalog entry to exist')
+    }
+
+    const firstSource = applyComponentInsertion(
+      createArcadeSourceFile('', ''),
+      { jsx: progressBarEntry.snippet.code },
+      {
+        kind: 'palette',
+        activeTab: 'JSX',
+        jsxCursor: { line: 0, column: 0 },
+        hooksCursor: { line: 0, column: 0 },
+      }
+    )
+
+    const secondSource = applyComponentInsertion(
+      firstSource,
+      { jsx: progressBarEntry.snippet.code },
+      {
+        kind: 'palette',
+        activeTab: 'JSX',
+        jsxCursor: { line: firstSource.jsx.split('\n').length, column: 0 },
+        hooksCursor: { line: 0, column: 0 },
+      }
+    )
+
+    expect(secondSource.jsx).toContain('id="applicationProgressLabel"')
+    expect(secondSource.jsx).toContain('aria-labelledby="applicationProgressLabel"')
+    expect(secondSource.jsx).toContain('id="applicationProgressLabel2"')
+    expect(secondSource.jsx).toContain('aria-labelledby="applicationProgressLabel2"')
+    expect(secondSource.jsx).not.toContain('{{progressBarLabelSuffix}}')
   })
 
   it('avoids support-name collisions when the same multi-part insertion is repeated', () => {

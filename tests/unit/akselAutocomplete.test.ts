@@ -136,11 +136,20 @@ function booleanLikePropCases(): Array<[componentName: string, propName: string]
 describe('Aksel-aware autocomplete contract', () => {
   it('suggests every documented Aksel primitive and component tag still valid for new authoring', () => {
     const labels = labelsFor('<')
+    const variantImportNames = new Set(
+      listCatalogEntries({
+        groups: ['layout', 'component'],
+        statuses: ['current', 'experimental'],
+      })
+        .filter((entry) => entry.name.includes(' '))
+        .map((entry) => entry.importName)
+    )
     const documentedNames = filterNewAuthoringEntries(AKSEL_AUTOCOMPLETE_ENTRIES).map(
       (entry) => entry.name
     )
     const topLevelDocumentedNames = documentedNames.filter(
-      (name) => COMPONENT_COMPLETION_NAME.test(name) && !name.includes('.')
+      (name) =>
+        COMPONENT_COMPLETION_NAME.test(name) && !name.includes('.') && !variantImportNames.has(name)
     )
 
     expect(labels).toEqual(expect.arrayContaining(topLevelDocumentedNames))
@@ -150,6 +159,8 @@ describe('Aksel-aware autocomplete contract', () => {
         'Box',
         'Accordion',
         'ActionMenu',
+        'Chips Toggle',
+        'Chips Removable',
         'Combobox',
         'DataGrid',
         'Dialog',
@@ -187,6 +198,30 @@ describe('Aksel-aware autocomplete contract', () => {
     expect(optionFor('<Tag', 'Tag')?.detail).toBe('Tag label component.')
     expect(applyFor('<Tag', 'Tag')).toBe(
       'Tag variant="moderate" data-color="info">In progress</Tag>'
+    )
+  })
+
+  it('prefers catalog-backed Issue 209 details and insertions for top-level targets', () => {
+    expect(labelsFor('<Chips')).toEqual(expect.arrayContaining(['Chips Toggle', 'Chips Removable']))
+    expect(labelsFor('<Chips')).not.toContain('Chips')
+    expect(labelsFor('<ChipsT')).toContain('Chips Toggle')
+    expect(labelsFor('<ChipsR')).toContain('Chips Removable')
+    expect(optionFor('<Load', 'Loader')?.detail).toBe('Loading spinner with visible status text.')
+    expect(applyFor('<Load', 'Loader')).toContain(
+      '<Loader size="xlarge" title="Loading case details" />'
+    )
+    expect(optionFor('<Prog', 'ProgressBar')?.detail).toBe(
+      'Progress bar with a visible accessible label.'
+    )
+    expect(optionFor('<Skel', 'Skeleton')?.detail).toBe(
+      'Skeleton stack for a loading card placeholder.'
+    )
+    expect(applyFor('<Skel', 'Skeleton')).toContain('<Skeleton variant="rounded" height={80} />')
+    expect(optionFor('<Tabl', 'Table')?.detail).toBe(
+      'Complete table with headers and visible data rows.'
+    )
+    expect(applyFor('<Tabl', 'Table')).toContain(
+      '<Table.HeaderCell scope="row">Payments</Table.HeaderCell>'
     )
   })
 
@@ -401,6 +436,87 @@ describe('Aksel-aware autocomplete contract', () => {
         ),
       }),
     })
+  })
+
+  it('routes Chips Toggle and Chips Removable through the catalog insertion callback', () => {
+    const onApplyCatalogInsertion = vi.fn()
+    const cases = [
+      {
+        source: '<ChipsT',
+        label: 'Chips Toggle',
+      },
+      {
+        source: '<ChipsR',
+        label: 'Chips Removable',
+      },
+    ] as const
+
+    for (const { source, label } of cases) {
+      const option = optionFor(source, label, undefined, onApplyCatalogInsertion)
+
+      expect(option?.detail).not.toBeUndefined()
+      expect(typeof option?.apply).toBe('function')
+
+      if (typeof option?.apply !== 'function') {
+        throw new Error(`Expected ${label} completion to use a custom apply callback`)
+      }
+
+      option.apply({} as never, option as never, 0, source.length)
+    }
+
+    expect(onApplyCatalogInsertion).toHaveBeenNthCalledWith(1, {
+      from: 0,
+      to: '<ChipsT'.length,
+      insertion: expect.objectContaining({
+        jsx: expect.stringContaining('selected={selected{{chipsToggleSuffix}} === id}'),
+        hooks: expect.stringContaining(
+          'const [selected{{chipsToggleSuffix}}, setSelected{{chipsToggleSuffix}}] = useState(0)'
+        ),
+      }),
+    })
+    expect(onApplyCatalogInsertion).toHaveBeenNthCalledWith(2, {
+      from: 0,
+      to: '<ChipsR'.length,
+      insertion: expect.objectContaining({
+        jsx: expect.stringContaining('setFilter{{chipsRemovableSuffix}}((x) =>'),
+        hooks: expect.stringContaining(
+          'const [filter{{chipsRemovableSuffix}}, setFilter{{chipsRemovableSuffix}}] = useState(options{{chipsRemovableSuffix}})'
+        ),
+      }),
+    })
+    expect(onApplyCatalogInsertion.mock.calls[0]?.[0]?.insertion.jsx).not.toContain(
+      'ChipsToggleExample'
+    )
+    expect(onApplyCatalogInsertion.mock.calls[1]?.[0]?.insertion.jsx).not.toContain(
+      'ChipsRemovableExample'
+    )
+  })
+
+  it('routes ProgressBar through the catalog insertion callback with unique label ids', () => {
+    const onApplyCatalogInsertion = vi.fn()
+    const option = optionFor('<Prog', 'ProgressBar', undefined, onApplyCatalogInsertion)
+
+    expect(option?.detail).toBe('Progress bar with a visible accessible label.')
+    expect(typeof option?.apply).toBe('function')
+
+    if (typeof option?.apply !== 'function') {
+      throw new Error('Expected ProgressBar completion to use a custom apply callback')
+    }
+
+    option.apply({} as never, option as never, 0, '<Prog'.length)
+
+    expect(onApplyCatalogInsertion).toHaveBeenCalledWith({
+      from: 0,
+      to: '<Prog'.length,
+      insertion: expect.objectContaining({
+        jsx: expect.stringContaining(
+          'aria-labelledby="applicationProgressLabel{{progressBarLabelSuffix}}"'
+        ),
+      }),
+    })
+    expect(onApplyCatalogInsertion.mock.calls[0]?.[0]?.insertion.jsx).not.toContain(
+      'application-progress-label'
+    )
   })
 
   it('routes Dialog through the catalog insertion callback with trigger and close support', () => {

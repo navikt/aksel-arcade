@@ -173,6 +173,119 @@ describe('Aksel catalog starter path', () => {
     )
   })
 
+  it('routes Issue 209 chips and status/data display examples through the shared catalog', () => {
+    const componentEntries = listCatalogEntries({ groups: ['component'], statuses: ['current'] })
+    const paletteComponents = getComponentsByCategory('component')
+    const chipsToggleEntry = getCatalogComponent('Chips Toggle')
+    const chipsRemovableEntry = getCatalogComponent('Chips Removable')
+    const loaderEntry = getCatalogComponent('Loader')
+    const progressBarEntry = getCatalogComponent('ProgressBar')
+    const skeletonEntry = getCatalogComponent('Skeleton')
+    const tableEntry = getCatalogComponent('Table')
+    const chipsTogglePaletteEntry = paletteComponents.find(
+      (component) => component.name === 'Chips Toggle'
+    )
+    const chipsRemovablePaletteEntry = paletteComponents.find(
+      (component) => component.name === 'Chips Removable'
+    )
+
+    expect(componentEntries.map((entry) => entry.name)).toEqual(
+      expect.arrayContaining([
+        'Chips Toggle',
+        'Chips Removable',
+        'Loader',
+        'ProgressBar',
+        'Skeleton',
+        'Table',
+        'Tag',
+      ])
+    )
+    expect(chipsToggleEntry?.snippet.code).toContain('<Chips>')
+    expect(chipsToggleEntry?.snippet.code).toContain('<Chips.Toggle')
+    expect(chipsToggleEntry?.snippet.code).toContain('data-color="neutral"')
+    expect(chipsToggleEntry?.snippet.code).not.toContain('<Chips data-color="neutral">')
+    expect(chipsToggleEntry?.snippet.code).toContain(
+      '{options{{chipsToggleSuffix}}.map((label, id) => ('
+    )
+    expect(chipsToggleEntry?.snippet.code).toContain(
+      'selected={selected{{chipsToggleSuffix}} === id}'
+    )
+    expect(chipsToggleEntry?.snippet.code).not.toContain('ChipsToggleExample')
+    expect(chipsToggleEntry?.snippet.hooksCode).toContain(
+      'const [selected{{chipsToggleSuffix}}, setSelected{{chipsToggleSuffix}}] = useState(0)'
+    )
+    expect(chipsToggleEntry?.snippet.hooksCode).toContain('const options{{chipsToggleSuffix}} = [')
+    expect(chipsRemovableEntry?.snippet.code).toContain(
+      '{filter{{chipsRemovableSuffix}}.map((c) => ('
+    )
+    expect(chipsRemovableEntry?.snippet.code).toContain('<Chips.Removable')
+    expect(chipsRemovableEntry?.snippet.code).toContain('data-color="neutral"')
+    expect(chipsRemovableEntry?.snippet.code).not.toContain('<Chips data-color="neutral">')
+    expect(chipsRemovableEntry?.snippet.code).toContain('setFilter{{chipsRemovableSuffix}}((x) =>')
+    expect(chipsRemovableEntry?.snippet.code).toContain('x.length === 1')
+    expect(chipsRemovableEntry?.snippet.code).toContain('? options{{chipsRemovableSuffix}}')
+    expect(chipsRemovableEntry?.snippet.code).toContain(': x.filter((y) => y !== c)')
+    expect(chipsRemovableEntry?.snippet.code).not.toContain('ChipsRemovableExample')
+    expect(chipsRemovableEntry?.snippet.hooksCode).toContain(
+      'const [filter{{chipsRemovableSuffix}}, setFilter{{chipsRemovableSuffix}}] = useState(options{{chipsRemovableSuffix}})'
+    )
+    expect(chipsRemovableEntry?.snippet.hooksCode).toContain(
+      'const options{{chipsRemovableSuffix}} = ["Housing", "Income", "Work"]'
+    )
+    expect(loaderEntry?.snippet.code).toContain(
+      '<Loader size="xlarge" title="Loading case details" />'
+    )
+    expect(progressBarEntry?.snippet.code).toContain(
+      'id="applicationProgressLabel{{progressBarLabelSuffix}}"'
+    )
+    expect(progressBarEntry?.snippet.code).toContain(
+      'aria-labelledby="applicationProgressLabel{{progressBarLabelSuffix}}"'
+    )
+    expect(skeletonEntry?.snippet.code).toContain('<Skeleton variant="rounded" height={80} />')
+    expect(tableEntry?.snippet.code).toContain(
+      '<Table.HeaderCell scope="row">Payments</Table.HeaderCell>'
+    )
+    expect(chipsTogglePaletteEntry?.insertion).toEqual(
+      expect.objectContaining({
+        jsx: expect.stringContaining('<Chips.Toggle'),
+        hooks: expect.stringContaining(
+          'const [selected{{chipsToggleSuffix}}, setSelected{{chipsToggleSuffix}}] = useState(0)'
+        ),
+      })
+    )
+    expect(chipsRemovablePaletteEntry?.insertion).toEqual(
+      expect.objectContaining({
+        jsx: expect.stringContaining('{filter{{chipsRemovableSuffix}}.map((c) => ('),
+        hooks: expect.stringContaining(
+          'const [filter{{chipsRemovableSuffix}}, setFilter{{chipsRemovableSuffix}}] = useState(options{{chipsRemovableSuffix}})'
+        ),
+      })
+    )
+    expect(chipsTogglePaletteEntry?.insertion?.jsx).not.toContain('ChipsToggleExample')
+    expect(chipsRemovablePaletteEntry?.insertion?.jsx).not.toContain('ChipsRemovableExample')
+    expect(searchComponents('chips')).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ name: 'Chips Toggle' }),
+        expect.objectContaining({ name: 'Chips Removable' }),
+      ])
+    )
+    expect(searchComponents('remove')).toContainEqual(
+      expect.objectContaining({ name: 'Chips Removable' })
+    )
+    expect(searchComponents('loading')).toContainEqual(expect.objectContaining({ name: 'Loader' }))
+    expect(searchComponents('progress')).toContainEqual(
+      expect.objectContaining({ name: 'ProgressBar' })
+    )
+    expect(searchComponents('skeleton')).toContainEqual(
+      expect.objectContaining({ name: 'Skeleton' })
+    )
+    expect(searchComponents('table')).toContainEqual(expect.objectContaining({ name: 'Table' }))
+    expect(
+      getComponentsByCategory('component').some((component) => component.name === 'Chips')
+    ).toBe(false)
+    expect(AKSEL_SNIPPETS.some((snippet) => snippet.name === 'Chips')).toBe(false)
+  })
+
   it('routes form and input examples through the shared catalog for Add menu data', () => {
     const componentEntries = listCatalogEntries({ groups: ['component'], statuses: ['current'] })
     const paletteComponents = getComponentsByCategory('component')
@@ -504,6 +617,8 @@ describe('Aksel catalog starter path', () => {
     }).filter((entry) => entry.snippet.hooksCode)
 
     expect(hooksBackedEntries.map((entry) => entry.name).sort()).toEqual([
+      'Chips Removable',
+      'Chips Toggle',
       'DatePicker',
       'Dialog',
       'MonthPicker',
@@ -534,7 +649,9 @@ describe('Aksel catalog starter path', () => {
     expect(tabsSnippet?.template).toContain('<Tabs {...useTabsState{{tabsSuffix}}()}>')
     expect(tabsPaletteEntry?.insertion).toEqual(
       expect.objectContaining({
-        hooks: expect.stringContaining('const [selectedTab, setSelectedTab] = useState(initialValue)'),
+        hooks: expect.stringContaining(
+          'const [selectedTab, setSelectedTab] = useState(initialValue)'
+        ),
       })
     )
   })

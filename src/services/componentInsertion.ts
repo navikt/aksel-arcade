@@ -149,6 +149,8 @@ export function createJsxOnlyInsertion(jsx: string): ComponentInsertion {
 export function insertionNeedsEditorApply(insertion: ComponentInsertion): boolean {
   return Boolean(
     insertion.hooks ||
+    insertion.jsx.match(COLLISION_TOKEN_PATTERN) ||
+    insertion.hooks?.match(COLLISION_TOKEN_PATTERN) ||
     insertion.jsx.includes(TABS_VALUE_PLACEHOLDER) ||
     insertion.jsx.includes(TABS_LABEL_PLACEHOLDER) ||
     insertion.jsx.includes(TABS_CONTENT_PLACEHOLDER)

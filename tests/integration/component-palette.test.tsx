@@ -151,6 +151,49 @@ describe('ComponentPalette', () => {
     )
   })
 
+  it('shows separate Chips Toggle and Chips Removable Add-menu entries from the shared catalog', async () => {
+    const user = userEvent.setup()
+    const onInsertComponent = vi.fn()
+
+    await act(async () => {
+      render(<ComponentPalette open onClose={vi.fn()} onInsertComponent={onInsertComponent} />)
+    })
+
+    await user.type(screen.getByRole('textbox', { name: /search components/i }), 'Chips')
+
+    expect(screen.getByRole('heading', { name: 'Chips Toggle' })).toBeTruthy()
+    expect(screen.getByRole('heading', { name: 'Chips Removable' })).toBeTruthy()
+    expect(screen.queryByRole('heading', { name: 'Chips' })).toBeNull()
+
+    await user.click(screen.getByRole('link', { name: 'Chips Toggle' }))
+    await user.click(screen.getByRole('link', { name: 'Chips Removable' }))
+
+    expect(onInsertComponent).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({
+        name: 'Chips Toggle',
+        insertion: expect.objectContaining({
+          jsx: expect.stringContaining('<Chips.Toggle'),
+          hooks: expect.stringContaining(
+            'const [selected{{chipsToggleSuffix}}, setSelected{{chipsToggleSuffix}}] = useState(0)'
+          ),
+        }),
+      })
+    )
+    expect(onInsertComponent).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        name: 'Chips Removable',
+        insertion: expect.objectContaining({
+          jsx: expect.stringContaining('{filter{{chipsRemovableSuffix}}.map((c) => ('),
+          hooks: expect.stringContaining(
+            'const [filter{{chipsRemovableSuffix}}, setFilter{{chipsRemovableSuffix}}] = useState(options{{chipsRemovableSuffix}})'
+          ),
+        }),
+      })
+    )
+  })
+
   it('passes hook-backed Tabs insertion metadata through the Add menu boundary', async () => {
     const user = userEvent.setup()
     const onInsertComponent = vi.fn()
