@@ -191,7 +191,28 @@ describe('ComponentPalette', () => {
           '<InternalHeader.UserButton name="Ola N." description="Enhet: Skien" />'
         ),
         insertion: expect.objectContaining({
-          hooks: "const resolvedTheme{{internalHeaderSuffix}} = 'light'",
+          hooks:
+            'const useResolvedTheme{{internalHeaderSuffix}} = () => {\n' +
+            '  const readResolvedTheme = () =>\n' +
+            '    document.documentElement.classList.contains("dark") ? "dark" : "light"\n' +
+            '  const [resolvedTheme, setResolvedTheme] = useState<"light" | "dark">(() => readResolvedTheme())\n' +
+            '\n' +
+            '  useEffect(() => {\n' +
+            '    const observer = new MutationObserver(() => {\n' +
+            '      setResolvedTheme(readResolvedTheme())\n' +
+            '    })\n' +
+            '\n' +
+            '    observer.observe(document.documentElement, {\n' +
+            '      attributes: true,\n' +
+            '      attributeFilter: ["class"],\n' +
+            '    })\n' +
+            '\n' +
+            '    return () => observer.disconnect()\n' +
+            '  }, [])\n' +
+            '\n' +
+            '  return resolvedTheme\n' +
+            '}\n' +
+            'const resolvedTheme{{internalHeaderSuffix}} = useResolvedTheme{{internalHeaderSuffix}}()',
         }),
       })
     )

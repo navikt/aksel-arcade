@@ -229,7 +229,27 @@ describe('Aksel catalog starter path', () => {
       '<Theme theme={resolvedTheme{{internalHeaderSuffix}} as "light" | "dark"}>'
     )
     expect(internalHeaderEntry?.snippet.hooksCode).toBe(
-      "const resolvedTheme{{internalHeaderSuffix}} = 'light'"
+      'const useResolvedTheme{{internalHeaderSuffix}} = () => {\n' +
+        '  const readResolvedTheme = () =>\n' +
+        '    document.documentElement.classList.contains("dark") ? "dark" : "light"\n' +
+        '  const [resolvedTheme, setResolvedTheme] = useState<"light" | "dark">(() => readResolvedTheme())\n' +
+        '\n' +
+        '  useEffect(() => {\n' +
+        '    const observer = new MutationObserver(() => {\n' +
+        '      setResolvedTheme(readResolvedTheme())\n' +
+        '    })\n' +
+        '\n' +
+        '    observer.observe(document.documentElement, {\n' +
+        '      attributes: true,\n' +
+        '      attributeFilter: ["class"],\n' +
+        '    })\n' +
+        '\n' +
+        '    return () => observer.disconnect()\n' +
+        '  }, [])\n' +
+        '\n' +
+        '  return resolvedTheme\n' +
+        '}\n' +
+        'const resolvedTheme{{internalHeaderSuffix}} = useResolvedTheme{{internalHeaderSuffix}}()'
     )
     expect(linkEntry?.snippet.code).toBe(
       '<Link href="#">Read the guide to sick leave follow-up</Link>'

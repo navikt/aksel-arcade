@@ -2554,3 +2554,19 @@ Verification:
 - npm run test -- --run
 - npm run build (passes with the existing Vite/browser-compatibility and chunk-size warnings only)
 - Browser check at `http://127.0.0.1:4387/aksel-arcade/`: confirmed Add -> `InternalHeader` inserts the updated JSX plus Hooks helper, confirmed the preview renders the `Sykepenger` header and `Ola N.` user button, confirmed opening the user menu shows `Ola Normann`, `D123456`, and `Logg ut`, and confirmed the verified session showed no browser console warnings or errors.
+
+### 2026-06-12 - PR #231 review fix for InternalHeader theme syncing
+
+Implemented:
+
+- Code review found one real PR-scoped regression in the new `InternalHeader` insertion: the ActionMenu content theme stayed locked to the initial preview theme instead of following later light/dark toggles.
+- Reworked the Hooks-tab helper so the inserted example now uses a collision-safe `useResolvedTheme{{internalHeaderSuffix}}` custom hook, with a `MutationObserver` that watches the sandbox document class and updates `resolvedTheme{{internalHeaderSuffix}}` when the preview theme changes.
+- Kept the requested JSX structure intact while fixing the runtime behavior, and updated the catalog/autocomplete/Add-menu expectations to match the new helper shape.
+
+Verification:
+
+- npm run typecheck
+- npm run lint (passes with the existing `.eslintignore` deprecation notice and existing `InspectionPopover` hook-dependency warning only)
+- npm run test -- --run
+- npm run build (passes with the existing Vite/browser-compatibility and chunk-size warnings only)
+- Browser check at `http://127.0.0.1:4387/aksel-arcade/`: confirmed the inserted `InternalHeader` menu opens in dark mode with a dark theme wrapper, confirmed switching the preview theme through Settings -> `Switch to light theme` flips the preview root and the visible ActionMenu wrapper to light before reopening the menu, and confirmed the verified session showed no browser console warnings or errors.

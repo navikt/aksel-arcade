@@ -293,7 +293,28 @@ describe('Aksel-aware autocomplete contract', () => {
           '    </Theme>\n' +
           '  </ActionMenu>\n' +
           '</InternalHeader>',
-        hooks: "const resolvedTheme{{internalHeaderSuffix}} = 'light'",
+        hooks:
+          'const useResolvedTheme{{internalHeaderSuffix}} = () => {\n' +
+          '  const readResolvedTheme = () =>\n' +
+          '    document.documentElement.classList.contains("dark") ? "dark" : "light"\n' +
+          '  const [resolvedTheme, setResolvedTheme] = useState<"light" | "dark">(() => readResolvedTheme())\n' +
+          '\n' +
+          '  useEffect(() => {\n' +
+          '    const observer = new MutationObserver(() => {\n' +
+          '      setResolvedTheme(readResolvedTheme())\n' +
+          '    })\n' +
+          '\n' +
+          '    observer.observe(document.documentElement, {\n' +
+          '      attributes: true,\n' +
+          '      attributeFilter: ["class"],\n' +
+          '    })\n' +
+          '\n' +
+          '    return () => observer.disconnect()\n' +
+          '  }, [])\n' +
+          '\n' +
+          '  return resolvedTheme\n' +
+          '}\n' +
+          'const resolvedTheme{{internalHeaderSuffix}} = useResolvedTheme{{internalHeaderSuffix}}()',
       },
     })
     expect(optionFor('<Link', 'Link')?.detail).toBe('Safe visible link example.')
