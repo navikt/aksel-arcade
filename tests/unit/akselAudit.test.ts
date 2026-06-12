@@ -202,4 +202,225 @@ describe('Aksel audit workflow helpers', () => {
     expect(formatted).toContain('Navpoleonskake is documented for current authoring but missing from the curated insertion catalog')
     expect(formatted).toContain('ask the user before encoding them as accepted Arcade policy')
   })
+
+  it('does not auto-accept a runtime alias exception when the alias target changes', () => {
+    const report = runAkselAudit({
+      targetVersion: '8.11.0',
+      packageJsonVersions: {
+        '@navikt/ds-react': '8.11.0',
+        '@navikt/ds-css': '8.11.0',
+        '@navikt/aksel-icons': '8.11.0',
+      },
+      lockfileVersions: {
+        '@navikt/ds-react': '8.11.0',
+        '@navikt/ds-css': '8.11.0',
+        '@navikt/aksel-icons': '8.11.0',
+      },
+      metadataVersions: {
+        '@navikt/ds-react': '8.11.0',
+        '@navikt/ds-css': '8.11.0',
+        '@navikt/aksel-icons': '8.11.0',
+      },
+      catalogVersion: '8.11.0',
+      runtimeAliases: { Combobox: 'DIFFERENT_ALIAS' },
+      safeCompatibilityAliases: {},
+      runtimeComponentExports: ['DIFFERENT_ALIAS'],
+      runtimeIconExports: [],
+      freshDocsEntries: [
+        {
+          name: 'Combobox',
+          group: 'component',
+          status: 'current',
+          docs: 'https://aksel.nav.no/komponenter/core/combobox',
+          props: [],
+        },
+      ],
+      docsCoverageEntries: [
+        {
+          name: 'Combobox',
+          group: 'component',
+          status: 'current',
+          docs: 'https://aksel.nav.no/komponenter/core/combobox',
+          props: [],
+        },
+      ],
+      generatedDocsEntries: [
+        {
+          name: 'Combobox',
+          group: 'component',
+          status: 'current',
+          docs: 'https://aksel.nav.no/komponenter/core/combobox',
+          props: [],
+        },
+      ],
+      catalogEntries: [
+        {
+          name: 'Combobox',
+          group: 'component',
+          status: 'current',
+          package: '@navikt/ds-react',
+          importName: 'Combobox',
+          importGuidance: "import { Combobox } from '@navikt/ds-react';",
+          docs: 'https://aksel.nav.no/komponenter/core/combobox',
+          description: 'Combobox example.',
+          props: [],
+          snippet: {
+            code: '<Combobox label="Select" options={[]} />',
+            description: 'Combobox example.',
+          },
+        },
+      ],
+      addMenuNames: [],
+      snippetNames: [],
+      autocompleteNames: [],
+      iconCatalogNames: [],
+      hiddenNewAuthoringRoots: ['Alert', 'Modal'],
+      authoringPropsByComponent: {
+        Combobox: [],
+      },
+      acceptedDocsExceptions: ACCEPTED_DOCS_EXCEPTIONS,
+      acceptedCatalogExceptions: ACCEPTED_CATALOG_EXCEPTIONS,
+    })
+
+    expect(report.acceptedFindings).not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          category: 'runtime',
+          name: 'Combobox',
+          exceptionId: 'combobox-runtime-alias',
+        }),
+      ])
+    )
+    expect(report.potentialFindings).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          category: 'runtime',
+          name: 'Combobox',
+          message:
+            'Combobox is only runtime-supported through the alias DIFFERENT_ALIAS.',
+        }),
+      ])
+    )
+  })
+
+  it('does not let a compound entry inherit the parent docs status through importName matching', () => {
+    const report = runAkselAudit({
+      targetVersion: '8.11.0',
+      packageJsonVersions: {
+        '@navikt/ds-react': '8.11.0',
+        '@navikt/ds-css': '8.11.0',
+        '@navikt/aksel-icons': '8.11.0',
+      },
+      lockfileVersions: {
+        '@navikt/ds-react': '8.11.0',
+        '@navikt/ds-css': '8.11.0',
+        '@navikt/aksel-icons': '8.11.0',
+      },
+      metadataVersions: {
+        '@navikt/ds-react': '8.11.0',
+        '@navikt/ds-css': '8.11.0',
+        '@navikt/aksel-icons': '8.11.0',
+      },
+      catalogVersion: '8.11.0',
+      runtimeAliases: {},
+      safeCompatibilityAliases: {},
+      runtimeComponentExports: ['Page'],
+      runtimeIconExports: [],
+      freshDocsEntries: [
+        {
+          name: 'Page',
+          group: 'primitive',
+          status: 'current',
+          docs: 'https://aksel.nav.no/komponenter/primitives/page',
+          props: [],
+        },
+        {
+          name: 'Page.Block',
+          group: 'primitive',
+          status: 'deprecated',
+          docs: 'https://aksel.nav.no/komponenter/primitives/page',
+          props: [],
+        },
+      ],
+      docsCoverageEntries: [
+        {
+          name: 'Page',
+          group: 'primitive',
+          status: 'current',
+          docs: 'https://aksel.nav.no/komponenter/primitives/page',
+          props: [],
+        },
+      ],
+      generatedDocsEntries: [
+        {
+          name: 'Page',
+          group: 'primitive',
+          status: 'current',
+          docs: 'https://aksel.nav.no/komponenter/primitives/page',
+          props: [],
+        },
+        {
+          name: 'Page.Block',
+          group: 'primitive',
+          status: 'deprecated',
+          docs: 'https://aksel.nav.no/komponenter/primitives/page',
+          props: [],
+        },
+      ],
+      catalogEntries: [
+        {
+          name: 'Page',
+          group: 'layout',
+          status: 'current',
+          package: '@navikt/ds-react',
+          importName: 'Page',
+          importGuidance: "import { Page } from '@navikt/ds-react';",
+          docs: 'https://aksel.nav.no/komponenter/primitives/page',
+          description: 'Page example.',
+          props: [],
+          snippet: {
+            code: '<Page>Content</Page>',
+            description: 'Page example.',
+          },
+        },
+        {
+          name: 'Page.Block',
+          group: 'layout',
+          status: 'current',
+          package: '@navikt/ds-react',
+          importName: 'Page',
+          importGuidance: "import { Page } from '@navikt/ds-react';",
+          docs: 'https://aksel.nav.no/komponenter/primitives/page',
+          description: 'Page block example.',
+          props: [],
+          snippet: {
+            code: '<Page.Block width="lg">Content</Page.Block>',
+            description: 'Page block example.',
+          },
+        },
+      ],
+      addMenuNames: [],
+      snippetNames: [],
+      autocompleteNames: [],
+      iconCatalogNames: [],
+      hiddenNewAuthoringRoots: ['Alert', 'Modal'],
+      authoringPropsByComponent: {
+        Page: [],
+        'Page.Block': [],
+      },
+      acceptedDocsExceptions: ACCEPTED_DOCS_EXCEPTIONS,
+      acceptedCatalogExceptions: ACCEPTED_CATALOG_EXCEPTIONS,
+    })
+
+    expect(report.potentialFindings).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          category: 'catalog',
+          name: 'Page.Block',
+          message:
+            'Page.Block is cataloged as current, but fresh docs now report status deprecated.',
+        }),
+      ])
+    )
+  })
 })

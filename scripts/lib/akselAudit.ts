@@ -5,18 +5,30 @@ import type {
 
 export type AuditCatalogGroup = 'layout' | 'component' | 'icon'
 export type AuditCatalogStatus = 'current' | 'experimental' | 'legacy'
+export type AuditExceptionItemType = 'component' | 'primitive' | 'icon'
 export type AuditExceptionMatchKind =
   | 'catalog-coverage'
   | 'catalog-stale'
   | 'runtime-alias'
   | 'runtime-compat'
   | 'docs-noise'
+export type AuditExceptionSurface =
+  | 'components'
+  | 'primitives'
+  | 'icons'
+  | 'props'
+  | 'prop-values'
+  | 'snippets'
+  | 'aliases'
+  | 'replacement-policy'
 
 export interface AuditDocsException {
   id: string
   docsName: string
   reason: string
   matchKinds: AuditExceptionMatchKind[]
+  affects: AuditExceptionSurface[]
+  itemType: AuditExceptionItemType
   runtimeName?: string
 }
 
@@ -25,6 +37,9 @@ export interface AuditCatalogException {
   catalogEntryName: string
   reason: string
   matchKinds: AuditExceptionMatchKind[]
+  affects: AuditExceptionSurface[]
+  itemType: AuditExceptionItemType
+  docsName?: string
   runtimeName?: string
 }
 
@@ -101,6 +116,12 @@ export interface AkselAuditReport {
   acceptedFindings: AuditFinding[]
 }
 
+interface AuditExceptionContext {
+  itemType: AuditExceptionItemType
+  surface: AuditExceptionSurface
+  runtimeName?: string
+}
+
 const TRACKED_PACKAGES = ['@navikt/ds-react', '@navikt/ds-css', '@navikt/aksel-icons'] as const
 const CURRENT_DISCOVERY_STATUSES = new Set(['current', 'experimental'])
 
@@ -163,18 +184,51 @@ function resolveRuntimeSupport(
   return { supported: false }
 }
 
-function matchesCatalogEntry(entry: AuditCatalogEntry, docsName: string): boolean {
-  return entry.name === docsName || entry.importName === docsName
+function isVariantCatalogEntry(entry: AuditCatalogEntry): boolean {
+  return entry.name.includes(' ') && entry.name !== entry.importName
+}
+
+function matchesCatalogCoverageEntry(entry: AuditCatalogEntry, docsName: string): boolean {
+  return entry.name === docsName || (isVariantCatalogEntry(entry) && entry.importName === docsName)
+}
+
+function matchesCatalogStatusEntry(entry: AuditCatalogEntry, docsName: string): boolean {
+  return entry.name === docsName || (isVariantCatalogEntry(entry) && entry.importName === docsName)
+}
+
+function getDocsEntryContext(entry: AkselAutocompleteEntry): AuditExceptionContext {
+  return {
+    itemType: entry.group === 'primitive' ? 'primitive' : 'component',
+    surface: entry.group === 'primitive' ? 'primitives' : 'components',
+  }
+}
+
+function getCatalogEntryContext(
+  entry: AuditCatalogEntry,
+  runtimeName?: string
+): AuditExceptionContext {
+  const itemType: AuditExceptionItemType =
+    entry.group === 'layout' ? 'primitive' : entry.group === 'icon' ? 'icon' : 'component'
+  const surface: AuditExceptionSurface =
+    entry.group === 'layout' ? 'primitives' : entry.group === 'icon' ? 'icons' : 'components'
+
+  return { itemType, surface, runtimeName }
 }
 
 function withDocsException(
   finding: Omit<AuditFinding, 'status'>,
   docsName: string,
   matchKind: AuditExceptionMatchKind,
-  exceptions: AuditDocsException[]
+  exceptions: AuditDocsException[],
+  context: AuditExceptionContext
 ): AuditFinding {
   const exception = exceptions.find(
-    (entry) => entry.docsName === docsName && entry.matchKinds.includes(matchKind)
+    (entry) =>
+      entry.docsName === docsName &&
+      entry.matchKinds.includes(matchKind) &&
+      entry.itemType === context.itemType &&
+      entry.affects.includes(context.surface) &&
+      (entry.runtimeName === undefined || entry.runtimeName === context.runtimeName)
   )
 
   return exception
@@ -194,10 +248,16 @@ function withCatalogException(
   finding: Omit<AuditFinding, 'status'>,
   catalogEntryName: string,
   matchKind: AuditExceptionMatchKind,
-  exceptions: AuditCatalogException[]
+  exceptions: AuditCatalogException[],
+  context: AuditExceptionContext
 ): AuditFinding {
   const exception = exceptions.find(
-    (entry) => entry.catalogEntryName === catalogEntryName && entry.matchKinds.includes(matchKind)
+    (entry) =>
+      entry.catalogEntryName === catalogEntryName &&
+      entry.matchKinds.includes(matchKind) &&
+      entry.itemType === context.itemType &&
+      entry.affects.includes(context.surface) &&
+      (entry.runtimeName === undefined || entry.runtimeName === context.runtimeName)
   )
 
   return exception
@@ -265,10 +325,12 @@ function buildCatalogFindings(input: AkselAuditInput): AuditFinding[] {
   const findings: AuditFinding[] = []
   const catalogEntries = input.catalogEntries.filter((entry) => entry.group !== 'icon')
   const docsCoverageEntries = input.docsCoverageEntries
+  const runtimeExports = new Set(input.runtimeComponentExports)
 
   for (const docsEntry of docsCoverageEntries) {
-    const covered = catalogEntries.some((entry) => matchesCatalogEntry(entry, docsEntry.name))
+    const covered = catalogEntries.some((entry) => matchesCatalogCoverageEntry(entry, docsEntry.name))
     if (!covered) {
+      const context = getDocsEntryContext(docsEntry)
       findings.push(
         withDocsException(
           {
@@ -278,14 +340,25 @@ function buildCatalogFindings(input: AkselAuditInput): AuditFinding[] {
           },
           docsEntry.name,
           'catalog-coverage',
-          input.acceptedDocsExceptions
+          input.acceptedDocsExceptions,
+          context
         )
       )
     }
   }
 
   for (const entry of catalogEntries) {
-    const matchingDocsEntry = input.freshDocsEntries.find((docsEntry) => matchesCatalogEntry(entry, docsEntry.name))
+    const runtimeSupport = resolveRuntimeSupport(
+      entry.importName,
+      runtimeExports,
+      input.runtimeAliases,
+      input.safeCompatibilityAliases
+    )
+    const runtimeName = runtimeSupport.aliasTarget ?? rootName(entry.importName)
+    const context = getCatalogEntryContext(entry, runtimeName)
+    const matchingDocsEntry = input.freshDocsEntries.find((docsEntry) =>
+      matchesCatalogStatusEntry(entry, docsEntry.name)
+    )
     if (!matchingDocsEntry) {
       findings.push(
         withCatalogException(
@@ -296,7 +369,8 @@ function buildCatalogFindings(input: AkselAuditInput): AuditFinding[] {
           },
           entry.name,
           'catalog-stale',
-          input.acceptedCatalogExceptions
+          input.acceptedCatalogExceptions,
+          context
         )
       )
       continue
@@ -315,7 +389,8 @@ function buildCatalogFindings(input: AkselAuditInput): AuditFinding[] {
           },
           entry.name,
           'catalog-stale',
-          input.acceptedCatalogExceptions
+          input.acceptedCatalogExceptions,
+          context
         )
       )
     }
@@ -337,6 +412,7 @@ function buildRuntimeFindings(input: AkselAuditInput): AuditFinding[] {
     )
 
     if (!support.supported) {
+      const context = getDocsEntryContext(docsEntry)
       findings.push(
         withDocsException(
           {
@@ -346,13 +422,19 @@ function buildRuntimeFindings(input: AkselAuditInput): AuditFinding[] {
           },
           docsEntry.name,
           'docs-noise',
-          input.acceptedDocsExceptions
+          input.acceptedDocsExceptions,
+          context
         )
       )
       continue
     }
 
     if (support.aliasTarget) {
+      const context = {
+        ...getDocsEntryContext(docsEntry),
+        surface: 'aliases' as const,
+        runtimeName: support.aliasTarget,
+      }
       findings.push(
         withDocsException(
           {
@@ -362,7 +444,8 @@ function buildRuntimeFindings(input: AkselAuditInput): AuditFinding[] {
           },
           docsEntry.name,
           'runtime-alias',
-          input.acceptedDocsExceptions
+          input.acceptedDocsExceptions,
+          context
         )
       )
     }
@@ -375,6 +458,10 @@ function buildRuntimeFindings(input: AkselAuditInput): AuditFinding[] {
       input.runtimeAliases,
       input.safeCompatibilityAliases
     )
+    const context = getCatalogEntryContext(
+      entry,
+      support.aliasTarget ?? rootName(entry.importName)
+    )
     if (!support.supported) {
       findings.push(
         withCatalogException(
@@ -385,7 +472,8 @@ function buildRuntimeFindings(input: AkselAuditInput): AuditFinding[] {
           },
           entry.name,
           'runtime-compat',
-          input.acceptedCatalogExceptions
+          input.acceptedCatalogExceptions,
+          context
         )
       )
     }
