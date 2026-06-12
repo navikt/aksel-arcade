@@ -327,18 +327,19 @@ describe('Aksel catalog starter path', () => {
     expect(dropdownEntry?.snippet.code).toContain('<Dropdown.Menu.Divider />')
     expect(helpTextEntry?.snippet.code).toContain('<HStack gap="space-4" align="center">')
     expect(helpTextEntry?.snippet.code).toContain('<HelpText title="How is this calculated?">')
-    expect(popoverEntry?.snippet.code).toBe('<DeadlinePopover{{popoverSuffix}} />')
+    expect(popoverEntry?.snippet.code).toContain('<Button')
+    expect(popoverEntry?.snippet.code).toContain('ref={setAnchorEl{{popoverSuffix}}}')
+    expect(popoverEntry?.snippet.code).toContain('Åpne popover')
+    expect(popoverEntry?.snippet.code).toContain('<Popover.Content>Innhold her!</Popover.Content>')
     expect(popoverEntry?.snippet.hooksCode).toContain(
-      'const deadlinePopoverId{{popoverSuffix}} = useId()'
+      'const [openState{{popoverSuffix}}, setOpenState{{popoverSuffix}}] = useState(false)'
     )
-    expect(popoverEntry?.snippet.hooksCode).toContain(
-      'ref={(element) => setAnchorEl{{popoverSuffix}}(element)}'
-    )
+    expect(popoverEntry?.snippet.hooksCode).toContain('const popoverId{{popoverSuffix}} = useId()')
     expect(tooltipEntry?.snippet.code).toContain('describesChild')
     expect(paletteComponents.find((component) => component.name === 'Popover')?.insertion).toEqual(
       expect.objectContaining({
-        jsx: '<DeadlinePopover{{popoverSuffix}} />',
-        hooks: expect.stringContaining('const deadlinePopoverId{{popoverSuffix}} = useId()'),
+        jsx: expect.stringContaining('<Button'),
+        hooks: expect.stringContaining('const popoverId{{popoverSuffix}} = useId()'),
       })
     )
     expect(

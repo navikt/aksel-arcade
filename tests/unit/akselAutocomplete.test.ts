@@ -306,8 +306,8 @@ describe('Aksel-aware autocomplete contract', () => {
       from: 0,
       to: '<Pop'.length,
       insertion: expect.objectContaining({
-        jsx: 'DeadlinePopover{{popoverSuffix}} />',
-        hooks: expect.stringContaining('const deadlinePopoverId{{popoverSuffix}} = useId()'),
+        jsx: expect.stringContaining('Button\n  ref={setAnchorEl{{popoverSuffix}}}'),
+        hooks: expect.stringContaining('const popoverId{{popoverSuffix}} = useId()'),
       }),
     })
   })

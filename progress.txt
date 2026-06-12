@@ -1556,6 +1556,23 @@ Next note:
 
 - The docs-derived autocomplete dataset still contains `Dropdown.Divider`, so the runtime now aliases that docs entry to the author-facing `Dropdown.Menu.Divider` name. If the generator is ever refreshed against corrected upstream docs, keep the alias path or remove it only after confirming contextual autocomplete still surfaces the runtime name and insertion.
 
+### 2026-06-12 - PR #228 follow-up for Issue #214
+
+Fixed after user feedback:
+
+- The first `Popover` insertion shipped too much pre-baked behavior by hiding the actual Aksel structure behind `<DeadlinePopover{{popoverSuffix}} />`.
+- Replaced that helper-component insertion with the direct `Button` + `Popover` JSX structure the user asked for, keeping only the required `anchorEl`, `openState`, and `popoverId` bindings in the Hooks tab.
+- Taught the preview transpiler to lift bare top-level hook bindings like `const [openState, setOpenState] = useState(false)` and `const popoverId = useId()` from page Hooks into the generated page component, so the direct Popover snippet renders without wrapper components or extra editor mutations.
+- Added follow-up regression coverage in `tests/integration/transpiler.test.ts` alongside the catalog/autocomplete/palette/component-insertion assertions to lock down the new direct Popover insertion shape.
+
+Verification:
+
+- npm run typecheck
+- npm run lint (existing `.eslintignore` deprecation notice and existing `InspectionPopover` hook dependency warning only)
+- npm run test -- --run
+- npm run build
+- Browser check at `http://127.0.0.1:4321/aksel-arcade/`: after clearing the saved JSX/Hooks state, confirmed Add -> `Popover` inserts the direct `Button` + `Popover` JSX plus raw hook bindings, a reload preserves that shape, clicking `Åpne popover` reveals `Innhold her!`, and the clean reloaded session shows no console errors beyond the pre-existing form-field issue
+
 ### 2026-05-31 - Issue #147: Unsigned PR Desktop packaging checks
 
 Implemented:

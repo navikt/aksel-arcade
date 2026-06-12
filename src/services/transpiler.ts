@@ -39,6 +39,8 @@ const DEFAULT_EXPORT_DECLARATION_PATTERN =
   /export\s+default\s+(function|class)\s+([A-Za-z_$][\w$]*)/
 const EXPORT_NAMED_DECLARATION_PATTERN = /export\s+(const|let|var|function|class)\s+/g
 const EXPORT_NAMED_LIST_PATTERN = /export\s*\{[^}]+\}\s*;?\n?/g
+const TOP_LEVEL_COMPONENT_HOOK_DECLARATION_PATTERN =
+  /^\s*(?:const|let)\s+(?:\[[^\]]+\]|\{[^}]+\}|[A-Za-z_$][\w$]*)\s*=\s*use[A-Z][\w$]*(?:<[^>\n]+>)?\(.*\)\s*;?\s*$/
 
 const getSupportedImportModule = (source: string): SupportedImportModule | null => {
   if (source === 'react') return 'react'
@@ -280,6 +282,136 @@ const stripNamedExports = (sourceCode: string): string =>
     .replace(EXPORT_NAMED_DECLARATION_PATTERN, '$1 ')
     .replace(EXPORT_NAMED_LIST_PATTERN, '')
 
+const countLineBreaks = (sourceCode: string): number => sourceCode.split('\n').length
+
+const normalizeBlankLines = (sourceCode: string): string =>
+  sourceCode
+    .replace(/\n{3,}/g, '\n\n')
+    .replace(/^\n+/, '')
+    .replace(/\n+$/, '')
+
+const countBraceDelta = (sourceCode: string): number =>
+  Array.from(sourceCode).reduce((depth, char) => {
+    if (char === '{') {
+      return depth + 1
+    }
+
+    if (char === '}') {
+      return depth - 1
+    }
+
+    return depth
+  }, 0)
+
+const extractComponentHookStatements = (
+  sourceCode: string
+): {
+  moduleCode: string
+  componentHookStatements: string
+} => {
+  const lines = sourceCode.split('\n')
+  const moduleLines: string[] = []
+  const componentHookLines: string[] = []
+  let braceDepth = 0
+
+  for (const line of lines) {
+    const isComponentHookLine =
+      braceDepth === 0 && TOP_LEVEL_COMPONENT_HOOK_DECLARATION_PATTERN.test(line)
+
+    if (isComponentHookLine) {
+      componentHookLines.push(line.trimEnd())
+    } else {
+      moduleLines.push(line)
+    }
+
+    braceDepth = Math.max(0, braceDepth + countBraceDelta(line))
+  }
+
+  return {
+    moduleCode: normalizeBlankLines(moduleLines.join('\n')),
+    componentHookStatements: componentHookLines.join('\n'),
+  }
+}
+
+const escapeRegExp = (value: string): string => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+
+const injectComponentHookStatements = (
+  sourceCode: string,
+  componentName: string,
+  componentHookStatements: string
+): {
+  code: string
+  addedLineCount: number
+} => {
+  if (!componentHookStatements.trim()) {
+    return {
+      code: sourceCode,
+      addedLineCount: 0,
+    }
+  }
+
+  const injectedStatements = componentHookStatements
+    .split('\n')
+    .map((line) => `  ${line}`)
+    .join('\n')
+  const addedLineCount = countLineBreaks(componentHookStatements)
+
+  const injectIntoBlockBody = (pattern: RegExp) => {
+    const match = pattern.exec(sourceCode)
+    if (!match || match.index === undefined) {
+      return null
+    }
+
+    const bodyOpenIndex = match.index + match[0].length - 1
+    return {
+      code: `${sourceCode.slice(0, bodyOpenIndex + 1)}\n${injectedStatements}${sourceCode.slice(
+        bodyOpenIndex + 1
+      )}`,
+      addedLineCount,
+    }
+  }
+
+  const functionDeclarationResult = injectIntoBlockBody(
+    new RegExp(`function\\s+${escapeRegExp(componentName)}\\s*\\([^)]*\\)\\s*\\{`)
+  )
+
+  if (functionDeclarationResult) {
+    return functionDeclarationResult
+  }
+
+  const blockBodyVariableResult = injectIntoBlockBody(
+    new RegExp(
+      `(?:const|let|var)\\s+${escapeRegExp(componentName)}\\s*=\\s*(?:async\\s*)?(?:function\\s*\\([^)]*\\)\\s*\\{|(?:\\([^)]*\\)|[A-Za-z_$][\\w$]*)\\s*=>\\s*\\{)`
+    )
+  )
+
+  if (blockBodyVariableResult) {
+    return blockBodyVariableResult
+  }
+
+  const expressionArrowMatch = new RegExp(
+    `((?:const|let|var)\\s+${escapeRegExp(componentName)}\\s*=\\s*(?:async\\s*)?(?:\\([^)]*\\)|[A-Za-z_$][\\w$]*)\\s*=>\\s*)(?!\\{)`
+  ).exec(sourceCode)
+
+  if (expressionArrowMatch && expressionArrowMatch.index !== undefined) {
+    const expressionStart = expressionArrowMatch.index + expressionArrowMatch[1].length
+    const expressionBody = sourceCode.slice(expressionStart).replace(/;\s*$/, '').trim()
+    const trailingSemicolon = /;\s*$/.test(sourceCode) ? ';' : ''
+
+    return {
+      code:
+        `${sourceCode.slice(0, expressionStart)}{\n${injectedStatements}\n  return ${expressionBody};\n}` +
+        trailingSemicolon,
+      addedLineCount: addedLineCount + 1,
+    }
+  }
+
+  return {
+    code: sourceCode,
+    addedLineCount: 0,
+  }
+}
+
 const normalizeModuleDeclarations = (
   sourceCode: string,
   defaultExportIdentifier: string
@@ -292,7 +424,8 @@ const normalizeModuleDeclarations = (
 
 const createComponentEntrySource = (
   sourceCode: string,
-  componentName: string
+  componentName: string,
+  componentHookStatements = ''
 ): ComponentEntrySource => {
   const trimmedJsx = sourceCode.trim()
 
@@ -304,28 +437,38 @@ const createComponentEntrySource = (
   }
 
   const hasExportDefault = /export\s+default\s+(function|class|\(|const|let|var)/.test(sourceCode)
+  let componentCode: string
+  let wrapperPrefixLines: number
+  let componentImplementationName = componentName
 
   if (hasExportDefault) {
-    return {
-      code: createDefaultExportComponent(sourceCode, componentName),
-      wrapperPrefixLines: 0,
+    const defaultDeclarationMatch = sourceCode.match(DEFAULT_EXPORT_DECLARATION_PATTERN)
+    componentImplementationName = defaultDeclarationMatch?.[2] ?? componentName
+    componentCode = createDefaultExportComponent(sourceCode, componentName)
+    wrapperPrefixLines = 0
+  } else {
+    const rootElementMatches = trimmedJsx.match(/^\s*</gm)
+    const hasMultipleRoots =
+      trimmedJsx.startsWith('<') && rootElementMatches && rootElementMatches.length > 1
+
+    if (hasMultipleRoots) {
+      componentCode = `function ${componentName}() {\n  return (\n    <>\n${sourceCode}\n    </>\n  );\n}`
+      wrapperPrefixLines = 3
+    } else {
+      componentCode = `function ${componentName}() {\n  return (\n    ${sourceCode}\n  );\n}`
+      wrapperPrefixLines = 2
     }
   }
 
-  const rootElementMatches = trimmedJsx.match(/^\s*</gm)
-  const hasMultipleRoots =
-    trimmedJsx.startsWith('<') && rootElementMatches && rootElementMatches.length > 1
-
-  if (hasMultipleRoots) {
-    return {
-      code: `function ${componentName}() {\n  return (\n    <>\n${sourceCode}\n    </>\n  );\n}`,
-      wrapperPrefixLines: 3,
-    }
-  }
+  const injectedComponentCode = injectComponentHookStatements(
+    componentCode,
+    componentImplementationName,
+    componentHookStatements
+  )
 
   return {
-    code: `function ${componentName}() {\n  return (\n    ${sourceCode}\n  );\n}`,
-    wrapperPrefixLines: 2,
+    code: injectedComponentCode.code,
+    wrapperPrefixLines: wrapperPrefixLines + injectedComponentCode.addedLineCount,
   }
 }
 
@@ -382,11 +525,16 @@ const buildSinglePageCombinedSource = (
     }
   }
 
+  const extractedHooks = extractComponentHookStatements(strippedHooks.code)
   const processedHooksCode = normalizeModuleDeclarations(
-    strippedHooks.code,
+    extractedHooks.moduleCode,
     '__AkselArcadeHooksDefault'
   )
-  const processedJsxCode = createComponentEntrySource(strippedJsx.code, 'App')
+  const processedJsxCode = createComponentEntrySource(
+    strippedJsx.code,
+    'App',
+    extractedHooks.componentHookStatements
+  )
   const jsxRuntimePrelude = removeDuplicateRuntimePreludeStatements(
     strippedJsx.runtimePrelude,
     strippedHooks.runtimePrelude
@@ -522,11 +670,16 @@ const buildProjectSourceCombinedCode = (
   const pageBlocks = preparedPages.map(({ page, strippedHooks, strippedJsx }) => {
     const pageComponentName = getPageComponentName(page.id)
     const pageModuleName = getPageModuleName(page.id)
+    const extractedPageHooks = extractComponentHookStatements(strippedHooks.code)
     const processedPageHooks = normalizeModuleDeclarations(
-      strippedHooks.code,
+      extractedPageHooks.moduleCode,
       `${pageComponentName}HooksDefault`
     )
-    const processedPageJsx = createComponentEntrySource(strippedJsx.code, pageComponentName)
+    const processedPageJsx = createComponentEntrySource(
+      strippedJsx.code,
+      pageComponentName,
+      extractedPageHooks.componentHookStatements
+    )
     const pageJsxRuntimePrelude = removeDuplicateRuntimePreludeStatements(
       strippedJsx.runtimePrelude,
       strippedHooks.runtimePrelude

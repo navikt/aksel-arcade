@@ -1008,7 +1008,7 @@ export const AKSEL_CATALOG: AkselCatalogEntry[] = [
     status: 'current',
     package: '@navikt/ds-react',
     importName: 'Popover',
-    importGuidance: "import { BodyShort, Button, Heading, Popover, VStack } from '@navikt/ds-react';",
+    importGuidance: "import { Button, Popover } from '@navikt/ds-react';",
     docs: `${COMPONENT_DOCS_BASE}/popover`,
     description: 'Controlled popover with trigger, anchor, and close behavior.',
     keywords: ['popover', 'overlay', 'floating panel', 'anchor', 'details'],
@@ -1051,53 +1051,29 @@ export const AKSEL_CATALOG: AkselCatalogEntry[] = [
       },
     ],
     snippet: {
-      code: '<DeadlinePopover{{popoverSuffix}} />',
-      hooksCode:
-        'export const DeadlinePopover{{popoverSuffix}} = () => {\n' +
-        '  const [anchorEl{{popoverSuffix}}, setAnchorEl{{popoverSuffix}}] = useState<HTMLButtonElement | null>(null)\n' +
-        '  const [popoverOpen{{popoverSuffix}}, setPopoverOpen{{popoverSuffix}}] = useState(false)\n' +
-        '  const deadlinePopoverId{{popoverSuffix}} = useId()\n' +
+      code:
+        '<Button\n' +
+        '  ref={setAnchorEl{{popoverSuffix}}}\n' +
+        '  onClick={() => setOpenState{{popoverSuffix}}(!openState{{popoverSuffix}})}\n' +
+        '  aria-expanded={openState{{popoverSuffix}}}\n' +
+        '  aria-controls={openState{{popoverSuffix}} ? popoverId{{popoverSuffix}} : undefined}\n' +
+        '>\n' +
+        '  Åpne popover\n' +
+        '</Button>\n' +
         '\n' +
-        '  return (\n' +
-        '    <>\n' +
-        '      <Button\n' +
-        '        ref={(element) => setAnchorEl{{popoverSuffix}}(element)}\n' +
-        '        type="button"\n' +
-        '        variant="secondary"\n' +
-        '        onClick={() => setPopoverOpen{{popoverSuffix}}((openState) => !openState)}\n' +
-        '        aria-expanded={popoverOpen{{popoverSuffix}}}\n' +
-        '        aria-controls={popoverOpen{{popoverSuffix}} ? deadlinePopoverId{{popoverSuffix}} : undefined}\n' +
-        '      >\n' +
-        '        Show deadline details\n' +
-        '      </Button>\n' +
-        '      <Popover\n' +
-        '        open={popoverOpen{{popoverSuffix}}}\n' +
-        '        onClose={() => setPopoverOpen{{popoverSuffix}}(false)}\n' +
-        '        anchorEl={anchorEl{{popoverSuffix}}}\n' +
-        '        placement="bottom"\n' +
-        '        id={deadlinePopoverId{{popoverSuffix}}}\n' +
-        '      >\n' +
-        '        <Popover.Content>\n' +
-        '          <VStack gap="space-8">\n' +
-        '            <Heading level="2" size="xsmall" spacing>\n' +
-        '              Next deadline\n' +
-        '            </Heading>\n' +
-        '            <BodyShort>Send the supporting documents before Friday at 12:00.</BodyShort>\n' +
-        '            <Button\n' +
-        '              type="button"\n' +
-        '              size="small"\n' +
-        '              variant="secondary"\n' +
-        '              onClick={() => setPopoverOpen{{popoverSuffix}}(false)}\n' +
-        '            >\n' +
-        '              Close details\n' +
-        '            </Button>\n' +
-        '          </VStack>\n' +
-        '        </Popover.Content>\n' +
-        '      </Popover>\n' +
-        '    </>\n' +
-        '  )\n' +
-        '}',
-      description: 'Popover with a trigger button and close action.',
+        '<Popover\n' +
+        '  open={openState{{popoverSuffix}}}\n' +
+        '  onClose={() => setOpenState{{popoverSuffix}}(false)}\n' +
+        '  anchorEl={anchorEl{{popoverSuffix}}}\n' +
+        '  id={popoverId{{popoverSuffix}}}\n' +
+        '>\n' +
+        '  <Popover.Content>Innhold her!</Popover.Content>\n' +
+        '</Popover>',
+      hooksCode:
+        'const [anchorEl{{popoverSuffix}}, setAnchorEl{{popoverSuffix}}] = useState<HTMLButtonElement | null>(null)\n' +
+        'const [openState{{popoverSuffix}}, setOpenState{{popoverSuffix}}] = useState(false)\n' +
+        'const popoverId{{popoverSuffix}} = useId()',
+      description: 'Trigger button with inline popover content.',
     },
   },
   {

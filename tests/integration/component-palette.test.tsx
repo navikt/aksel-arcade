@@ -123,8 +123,8 @@ describe('ComponentPalette', () => {
       expect.objectContaining({
         name: 'Popover',
         insertion: expect.objectContaining({
-          jsx: '<DeadlinePopover{{popoverSuffix}} />',
-          hooks: expect.stringContaining('const deadlinePopoverId{{popoverSuffix}} = useId()'),
+          jsx: expect.stringContaining('<Button'),
+          hooks: expect.stringContaining('const popoverId{{popoverSuffix}} = useId()'),
         }),
       })
     )

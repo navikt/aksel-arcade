@@ -79,29 +79,28 @@ const dialogInsertion = {
 }
 
 const popoverInsertion = {
-  jsx: '<DeadlinePopover{{popoverSuffix}} />',
-  hooks:
-    'export const DeadlinePopover{{popoverSuffix}} = () => {\n' +
-    '  const [anchorEl{{popoverSuffix}}, setAnchorEl{{popoverSuffix}}] = useState<HTMLButtonElement | null>(null)\n' +
-    '  const [popoverOpen{{popoverSuffix}}, setPopoverOpen{{popoverSuffix}}] = useState(false)\n' +
-    '  const deadlinePopoverId{{popoverSuffix}} = useId()\n' +
+  jsx:
+    '<Button\n' +
+    '  ref={setAnchorEl{{popoverSuffix}}}\n' +
+    '  onClick={() => setOpenState{{popoverSuffix}}(!openState{{popoverSuffix}})}\n' +
+    '  aria-expanded={openState{{popoverSuffix}}}\n' +
+    '  aria-controls={openState{{popoverSuffix}} ? popoverId{{popoverSuffix}} : undefined}\n' +
+    '>\n' +
+    '  Åpne popover\n' +
+    '</Button>\n' +
     '\n' +
-    '  return (\n' +
-    '    <>\n' +
-    '      <Button ref={(element) => setAnchorEl{{popoverSuffix}}(element)}>Show deadline details</Button>\n' +
-    '      <Popover\n' +
-    '        open={popoverOpen{{popoverSuffix}}}\n' +
-    '        onClose={() => setPopoverOpen{{popoverSuffix}}(false)}\n' +
-    '        anchorEl={anchorEl{{popoverSuffix}}}\n' +
-    '        id={deadlinePopoverId{{popoverSuffix}}}\n' +
-    '      >\n' +
-    '        <Popover.Content>\n' +
-    '          <BodyShort>Send the supporting documents before Friday at 12:00.</BodyShort>\n' +
-    '        </Popover.Content>\n' +
-    '      </Popover>\n' +
-    '    </>\n' +
-    '  )\n' +
-    '}',
+    '<Popover\n' +
+    '  open={openState{{popoverSuffix}}}\n' +
+    '  onClose={() => setOpenState{{popoverSuffix}}(false)}\n' +
+    '  anchorEl={anchorEl{{popoverSuffix}}}\n' +
+    '  id={popoverId{{popoverSuffix}}}\n' +
+    '>\n' +
+    '  <Popover.Content>Innhold her!</Popover.Content>\n' +
+    '</Popover>',
+  hooks:
+    'const [anchorEl{{popoverSuffix}}, setAnchorEl{{popoverSuffix}}] = useState<HTMLButtonElement | null>(null)\n' +
+    'const [openState{{popoverSuffix}}, setOpenState{{popoverSuffix}}] = useState(false)\n' +
+    'const popoverId{{popoverSuffix}} = useId()',
 }
 
 describe('component insertion service', () => {
@@ -229,16 +228,18 @@ describe('component insertion service', () => {
       hooksCursor: { line: 0, column: 0 },
     })
 
-    expect(secondSource.jsx).toContain('<DeadlinePopover />')
-    expect(secondSource.jsx).toContain('<DeadlinePopover2 />')
+    expect(secondSource.jsx).toContain('ref={setAnchorEl}')
+    expect(secondSource.jsx).toContain('ref={setAnchorEl2}')
     expect(secondSource.hooks).toContain(
       'const [anchorEl, setAnchorEl] = useState<HTMLButtonElement | null>(null)'
     )
     expect(secondSource.hooks).toContain(
       'const [anchorEl2, setAnchorEl2] = useState<HTMLButtonElement | null>(null)'
     )
-    expect(secondSource.hooks).toContain('const deadlinePopoverId = useId()')
-    expect(secondSource.hooks).toContain('const deadlinePopoverId2 = useId()')
+    expect(secondSource.hooks).toContain('const [openState, setOpenState] = useState(false)')
+    expect(secondSource.hooks).toContain('const [openState2, setOpenState2] = useState(false)')
+    expect(secondSource.hooks).toContain('const popoverId = useId()')
+    expect(secondSource.hooks).toContain('const popoverId2 = useId()')
   })
 
   it('ignores unrelated popup identifiers when inserting the first dialog helper', () => {
