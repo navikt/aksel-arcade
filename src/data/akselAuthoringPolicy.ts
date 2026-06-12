@@ -15,6 +15,10 @@ function hasHiddenNewAuthoringRoot(componentName: string): componentName is Hidd
 
 export type HiddenNewAuthoringRoot = keyof typeof HIDDEN_NEW_AUTHORING_ROOTS
 
+export function listHiddenNewAuthoringRoots(): HiddenNewAuthoringRoot[] {
+  return Object.keys(HIDDEN_NEW_AUTHORING_ROOTS) as HiddenNewAuthoringRoot[]
+}
+
 export function getNewAuthoringRootName(componentName: string): string {
   return componentName.split('.')[0] ?? componentName
 }

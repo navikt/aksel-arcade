@@ -28,7 +28,9 @@
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "format": "prettier --write \"src/**/*.{ts,tsx,css}\"",
-    "share-strategy-bench": "node scripts/share-strategy-bench.mjs"
+    "share-strategy-bench": "node scripts/share-strategy-bench.mjs",
+    "aksel:refresh-docs": "tsx --tsconfig tsconfig.node.json scripts/generate-aksel-autocomplete-data.ts --write src/data/akselAutocompleteData.ts",
+    "aksel:audit": "tsx --tsconfig tsconfig.node.json scripts/aksel-audit.ts"
   },
   "dependencies": {
     "@babel/standalone": "^7.28.5",
@@ -73,6 +75,7 @@
     "typescript": "~5.6.2",
     "typescript-eslint": "^8.11.0",
     "vite": "^7.3.3",
-    "vitest": "^4.0.8"
+    "vitest": "^4.0.8",
+    "tsx": "^4.20.6"
   }
 }

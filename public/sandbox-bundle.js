@@ -74017,7 +74017,7 @@ Element: `, elementRef.current);
   LinkPanel.Description = LinkPanelDescription;
   var LinkPanel_default = LinkPanel;
 
-  // src/sandboxAksel.ts
+  // src/data/akselRuntimeCompatibility.ts
   var AKSEL_SAFE_COMPATIBILITY_ALIASES = {
     BoxNew: "Box"
   };
@@ -74028,6 +74028,8 @@ Element: `, elementRef.current);
     Grid: "Grid is a legacy Aksel layout name and is not automatically aliased because grid migration can change layout behavior. Use HGrid with current v8 props instead.",
     Stack: "Stack is a legacy Aksel layout name and is not automatically aliased because direction and spacing migration can change layout behavior. Use HStack or VStack with current v8 props instead."
   };
+
+  // src/sandboxAksel.ts
   function createUnsupportedAkselComponent(name, message2) {
     const UnsupportedAkselComponent = () => {
       throw new Error(message2);
