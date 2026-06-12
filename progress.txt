@@ -1534,6 +1534,28 @@ Verification:
 - DESKTOP_RELEASE_CHANGED_FILES='vite.config.ts' DESKTOP_RELEASE_TAGS='desktop-v0.2.6' npm run desktop:release-plan
 - Browser smoke check at `http://127.0.0.1:5174/aksel-arcade/`
 
+### 2026-06-12 - Issue #214: Fix menu, overlay, and help component insertions
+
+Implemented:
+
+- Selected #214 as the highest-priority open `ready-for-agent` feature from #209-#217 after checking #205, `CONTEXT.md`, and the existing `progress.txt` notes; it was the most user-blocking remaining authoring slice because `ActionMenu`, `Dropdown`, `Popover`, `Tooltip`, and `HelpText` insertion paths were still incomplete.
+- Added shared catalog-backed insertion coverage for `ActionMenu`, `Dropdown`, `HelpText`, `Popover`, and `Tooltip` in `src/data/akselCatalog.ts`, including shared placement/strategy value sets for the overlay/help entries.
+- Kept `Popover` composable by making it a Hooks-backed helper insertion (`<DeadlinePopover{{popoverSuffix}} />`) instead of inserting stateful wrapper JSX directly into the authoring surface.
+- Added regression coverage across autocomplete, catalog, component insertion, and Add-menu boundaries in `tests/unit/akselAutocomplete.test.ts`, `tests/unit/akselCatalog.test.ts`, `tests/unit/services/componentInsertion.test.ts`, and `tests/integration/component-palette.test.tsx`.
+- Fixed one leftover contextual autocomplete mismatch before closing the issue: `Dropdown.Menu` children now suggest `Dropdown.Menu.Divider` with the correct inserted JSX even though the upstream docs dataset still exposes the older `Dropdown.Divider` entry name.
+
+Verification:
+
+- npm run typecheck
+- npm run lint (existing `InspectionPopover` hook dependency warning only)
+- npm run test -- --run
+- npm run build
+- Browser check at `http://127.0.0.1:4321/aksel-arcade/` verified Add-menu insertion plus working preview interactions for `ActionMenu`, `Dropdown`, `Popover`, `Tooltip`, and `HelpText`; clean runtime interactions had no console errors after insertion
+
+Next note:
+
+- The docs-derived autocomplete dataset still contains `Dropdown.Divider`, so the runtime now aliases that docs entry to the author-facing `Dropdown.Menu.Divider` name. If the generator is ever refreshed against corrected upstream docs, keep the alias path or remove it only after confirming contextual autocomplete still surfaces the runtime name and insertion.
+
 ### 2026-05-31 - Issue #147: Unsigned PR Desktop packaging checks
 
 Implemented:

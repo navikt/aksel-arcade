@@ -8,6 +8,7 @@ import {
   getContextualAutocompleteRule,
   isContextualOnlyAutocompleteEntry,
   listCatalogEntries,
+  resolveContextualAutocompleteEntryName,
   type AkselCatalogEntry,
   type AkselCatalogProp,
 } from '@/data/akselCatalog'
@@ -591,7 +592,10 @@ function matchesContextualName(parentName: string, componentName: string, query:
 }
 
 function getCompletionEntry(componentName: string): CompletionEntry | undefined {
-  return completionEntriesByName.get(componentName)
+  const resolvedName = resolveContextualAutocompleteEntryName(componentName)
+  const entry = completionEntriesByName.get(resolvedName)
+
+  return entry && resolvedName !== componentName ? { ...entry, name: componentName } : entry
 }
 
 function contextualComponentOptions(
@@ -703,7 +707,9 @@ function normalizeComponentLookupName(componentName: string): string {
 }
 
 function getComponentProps(componentName: string): CompletionProp[] {
-  const normalizedComponentName = normalizeComponentLookupName(componentName)
+  const normalizedComponentName = normalizeComponentLookupName(
+    resolveContextualAutocompleteEntryName(componentName)
+  )
 
   if (isHiddenFromNewAuthoring(normalizedComponentName)) {
     return []
@@ -747,8 +753,9 @@ function getEntryDescription(entry: CompletionEntry): string {
 }
 
 function getEntryApply(entry: CompletionEntry): string {
-  const catalogEntry = catalogEntriesByName.get(entry.name)
-  let apply = catalogEntry ? stripSnippetPlaceholders(catalogEntry.snippet.code) : entry.name
+  const resolvedName = resolveContextualAutocompleteEntryName(entry.name)
+  const catalogEntry = catalogEntriesByName.get(resolvedName)
+  let apply = catalogEntry ? stripSnippetPlaceholders(catalogEntry.snippet.code) : resolvedName
   if (apply.startsWith('<')) {
     apply = apply.slice(1)
   }
@@ -799,6 +806,11 @@ function componentOption(
 ): Completion {
   const catalogInsertion =
     entry.source === 'catalog' ? getAutocompleteCatalogInsertion(entry, insertionOverride) : undefined
+  const overrideApply = insertionOverride
+    ? insertionOverride.jsx.startsWith('<')
+      ? insertionOverride.jsx.slice(1)
+      : insertionOverride.jsx
+    : undefined
   let apply: Completion['apply'] = getEntryApply(entry)
 
   if (catalogInsertion?.hooks && onApplyCatalogInsertion) {
@@ -815,8 +827,10 @@ function componentOption(
       })
     }
     apply = applyCatalogInsertion
-  } else if (insertionOverride && catalogInsertion) {
+  } else if (catalogInsertion) {
     apply = catalogInsertion.jsx
+  } else if (overrideApply) {
+    apply = overrideApply
   }
 
   return {

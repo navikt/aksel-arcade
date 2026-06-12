@@ -50,6 +50,7 @@ export type AkselAutocompleteDiscovery = 'contextual-only' | 'top-level'
 
 export interface AkselContextualAutocompleteChild {
   name: string
+  entryName?: string
   discovery?: AkselAutocompleteDiscovery
   insertion?: ComponentInsertion
 }
@@ -255,6 +256,22 @@ export const AKSEL_TOKEN_METADATA: Record<string, AkselTokenMetadata> = {
 const spacingValues = AKSEL_TOKEN_METADATA.spacing.values
 const spacingWithAutoValues = AKSEL_TOKEN_METADATA.spacingWithAuto.values
 const dataColorValues = AKSEL_TOKEN_METADATA.dataColor.values
+const floatingPlacementValues = [
+  'top',
+  'bottom',
+  'right',
+  'left',
+  'top-start',
+  'top-end',
+  'bottom-start',
+  'bottom-end',
+  'right-start',
+  'right-end',
+  'left-start',
+  'left-end',
+]
+const floatingStrategyValues = ['absolute', 'fixed']
+const tooltipPlacementValues = ['top', 'right', 'bottom', 'left']
 
 const AKSEL_CONTEXTUAL_AUTOCOMPLETE_RULES: AkselContextualAutocompleteRule[] = [
   {
@@ -330,7 +347,13 @@ const AKSEL_CONTEXTUAL_AUTOCOMPLETE_RULES: AkselContextualAutocompleteRule[] = [
     children: [
       { name: 'Dropdown.Menu.List' },
       { name: 'Dropdown.Menu.GroupedList' },
-      { name: 'Dropdown.Divider' },
+      {
+        name: 'Dropdown.Menu.Divider',
+        entryName: 'Dropdown.Divider',
+        insertion: {
+          jsx: '<Dropdown.Menu.Divider />',
+        },
+      },
     ],
     exclusive: true,
   },
@@ -386,6 +409,13 @@ const AKSEL_CONTEXTUAL_AUTOCOMPLETE_RULES: AkselContextualAutocompleteRule[] = [
 ]
 const contextualAutocompleteRulesByParent = new Map(
   AKSEL_CONTEXTUAL_AUTOCOMPLETE_RULES.map((rule) => [rule.parent, rule])
+)
+const contextualAutocompleteEntryNamesByComponent = new Map(
+  AKSEL_CONTEXTUAL_AUTOCOMPLETE_RULES.flatMap((rule) =>
+    rule.children
+      .filter((child) => child.entryName && child.entryName !== child.name)
+      .map((child) => [child.name, child.entryName!])
+  )
 )
 const contextualOnlyAutocompleteNames = new Set(
   AKSEL_CONTEXTUAL_AUTOCOMPLETE_RULES.flatMap((rule) =>
@@ -804,6 +834,319 @@ export const AKSEL_CATALOG: AkselCatalogEntry[] = [
     snippet: {
       code: '<Button variant="primary">Button text</Button>',
       description: 'Primary action button.',
+    },
+  },
+  {
+    id: 'actionmenu',
+    name: 'ActionMenu',
+    group: 'component',
+    status: 'current',
+    package: '@navikt/ds-react',
+    importName: 'ActionMenu',
+    importGuidance: "import { ActionMenu, Button } from '@navikt/ds-react';",
+    docs: `${COMPONENT_DOCS_BASE}/actionmenu`,
+    description: 'Action menu with trigger button and grouped actions.',
+    keywords: ['action menu', 'menu', 'actions', 'overflow', 'dropdown'],
+    props: [
+      {
+        name: 'open',
+        type: 'boolean',
+        values: ['true', 'false'],
+        valueKind: 'enum',
+        description: 'Controlled open state.',
+      },
+      {
+        name: 'onOpenChange',
+        type: '(open: boolean) => void',
+        description: 'Callback when the menu opens or closes.',
+      },
+    ],
+    snippet: {
+      code:
+        '<ActionMenu>\n' +
+        '  <ActionMenu.Trigger>\n' +
+        '    <Button type="button" variant="secondary">Actions</Button>\n' +
+        '  </ActionMenu.Trigger>\n' +
+        '  <ActionMenu.Content>\n' +
+        '    <ActionMenu.Group label="Case actions">\n' +
+        '      <ActionMenu.Item onSelect={() => {}}>Open details</ActionMenu.Item>\n' +
+        '      <ActionMenu.Item onSelect={() => {}}>Send reminder</ActionMenu.Item>\n' +
+        '    </ActionMenu.Group>\n' +
+        '  </ActionMenu.Content>\n' +
+        '</ActionMenu>',
+      description: 'Trigger button with grouped action items.',
+    },
+  },
+  {
+    id: 'dropdown',
+    name: 'Dropdown',
+    group: 'component',
+    status: 'current',
+    package: '@navikt/ds-react',
+    importName: 'Dropdown',
+    importGuidance: "import { Button, Dropdown } from '@navikt/ds-react';",
+    docs: `${COMPONENT_DOCS_BASE}/dropdown`,
+    description: 'Dropdown menu with grouped and simple item lists.',
+    keywords: ['dropdown', 'menu', 'grouped list', 'shortcuts', 'actions'],
+    props: [
+      {
+        name: 'onSelect',
+        type: '(element: React.MouseEvent) => void',
+        description: 'Handler called when an item is selected.',
+      },
+      {
+        name: 'closeOnSelect',
+        type: 'boolean',
+        values: ['true', 'false'],
+        valueKind: 'enum',
+        default: 'true',
+        description: 'Close the menu after an item is selected.',
+      },
+      {
+        name: 'defaultOpen',
+        type: 'boolean',
+        values: ['true', 'false'],
+        valueKind: 'enum',
+        default: 'false',
+        description: 'Start with the menu open.',
+      },
+      {
+        name: 'open',
+        type: 'boolean',
+        values: ['true', 'false'],
+        valueKind: 'enum',
+        description: 'Controlled open state.',
+      },
+      {
+        name: 'onOpenChange',
+        type: '(open: boolean) => void',
+        description: 'Callback when the menu opens or closes.',
+      },
+    ],
+    snippet: {
+      code:
+        '<Dropdown>\n' +
+        '  <Button as={Dropdown.Toggle} type="button" variant="secondary">\n' +
+        '    Open shortcuts\n' +
+        '  </Button>\n' +
+        '  <Dropdown.Menu>\n' +
+        '    <Dropdown.Menu.GroupedList>\n' +
+        '      <Dropdown.Menu.GroupedList.Heading>\n' +
+        '        Shortcuts\n' +
+        '      </Dropdown.Menu.GroupedList.Heading>\n' +
+        '      <Dropdown.Menu.GroupedList.Item onClick={() => {}}>\n' +
+        '        Activity plan\n' +
+        '      </Dropdown.Menu.GroupedList.Item>\n' +
+        '      <Dropdown.Menu.GroupedList.Item onClick={() => {}}>\n' +
+        '        Case overview\n' +
+        '      </Dropdown.Menu.GroupedList.Item>\n' +
+        '    </Dropdown.Menu.GroupedList>\n' +
+        '    <Dropdown.Menu.Divider />\n' +
+        '    <Dropdown.Menu.List>\n' +
+        '      <Dropdown.Menu.List.Item onClick={() => {}}>\n' +
+        '        Contact the user\n' +
+        '      </Dropdown.Menu.List.Item>\n' +
+        '      <Dropdown.Menu.List.Item onClick={() => {}}>\n' +
+        '        Open payment details\n' +
+        '      </Dropdown.Menu.List.Item>\n' +
+        '    </Dropdown.Menu.List>\n' +
+        '  </Dropdown.Menu>\n' +
+        '</Dropdown>',
+      description: 'Dropdown with grouped shortcuts and actions.',
+    },
+  },
+  {
+    id: 'helptext',
+    name: 'HelpText',
+    group: 'component',
+    status: 'current',
+    package: '@navikt/ds-react',
+    importName: 'HelpText',
+    importGuidance: "import { BodyShort, HStack, HelpText } from '@navikt/ds-react';",
+    docs: `${COMPONENT_DOCS_BASE}/helptext`,
+    description: 'Inline help trigger with explanatory text.',
+    keywords: ['help text', 'helptext', 'help', 'info', 'question'],
+    props: [
+      {
+        name: 'title',
+        type: 'string',
+        default: 'Mer informasjon',
+        description: 'Tooltip title for the help button.',
+      },
+      {
+        name: 'placement',
+        type: '"top" | "bottom" | "right" | "left" | "top-start" | "top-end" | "bottom-start" | "bottom-end" | "right-start" | "right-end" | "left-start" | "left-end"',
+        values: floatingPlacementValues,
+        valueKind: 'enum',
+        default: 'top',
+        description: 'Preferred popover placement.',
+      },
+      {
+        name: 'strategy',
+        type: '"absolute" | "fixed"',
+        values: floatingStrategyValues,
+        valueKind: 'enum',
+        default: 'absolute',
+        description: 'Floating-position strategy.',
+      },
+    ],
+    snippet: {
+      code:
+        '<HStack gap="space-4" align="center">\n' +
+        '  <BodyShort>Estimated payout</BodyShort>\n' +
+        '  <HelpText title="How is this calculated?">\n' +
+        '    The estimate is based on the latest approved information in your case.\n' +
+        '  </HelpText>\n' +
+        '</HStack>',
+      description: 'Label with inline help explanation.',
+    },
+  },
+  {
+    id: 'popover',
+    name: 'Popover',
+    group: 'component',
+    status: 'current',
+    package: '@navikt/ds-react',
+    importName: 'Popover',
+    importGuidance: "import { BodyShort, Button, Heading, Popover, VStack } from '@navikt/ds-react';",
+    docs: `${COMPONENT_DOCS_BASE}/popover`,
+    description: 'Controlled popover with trigger, anchor, and close behavior.',
+    keywords: ['popover', 'overlay', 'floating panel', 'anchor', 'details'],
+    props: [
+      {
+        name: 'anchorEl',
+        type: 'Element | null',
+        required: true,
+        description: 'Element the popover anchors to.',
+      },
+      {
+        name: 'open',
+        type: 'boolean',
+        values: ['true', 'false'],
+        valueKind: 'enum',
+        required: true,
+        description: 'Controlled open state.',
+      },
+      {
+        name: 'onClose',
+        type: '() => void',
+        required: true,
+        description: 'Callback used to close the popover.',
+      },
+      {
+        name: 'placement',
+        type: '"top" | "bottom" | "right" | "left" | "top-start" | "top-end" | "bottom-start" | "bottom-end" | "right-start" | "right-end" | "left-start" | "left-end"',
+        values: floatingPlacementValues,
+        valueKind: 'enum',
+        default: 'top',
+        description: 'Preferred popover placement.',
+      },
+      {
+        name: 'strategy',
+        type: '"absolute" | "fixed"',
+        values: floatingStrategyValues,
+        valueKind: 'enum',
+        default: 'absolute',
+        description: 'Floating-position strategy.',
+      },
+    ],
+    snippet: {
+      code: '<DeadlinePopover{{popoverSuffix}} />',
+      hooksCode:
+        'export const DeadlinePopover{{popoverSuffix}} = () => {\n' +
+        '  const [anchorEl{{popoverSuffix}}, setAnchorEl{{popoverSuffix}}] = useState<HTMLButtonElement | null>(null)\n' +
+        '  const [popoverOpen{{popoverSuffix}}, setPopoverOpen{{popoverSuffix}}] = useState(false)\n' +
+        '  const deadlinePopoverId{{popoverSuffix}} = useId()\n' +
+        '\n' +
+        '  return (\n' +
+        '    <>\n' +
+        '      <Button\n' +
+        '        ref={(element) => setAnchorEl{{popoverSuffix}}(element)}\n' +
+        '        type="button"\n' +
+        '        variant="secondary"\n' +
+        '        onClick={() => setPopoverOpen{{popoverSuffix}}((openState) => !openState)}\n' +
+        '        aria-expanded={popoverOpen{{popoverSuffix}}}\n' +
+        '        aria-controls={popoverOpen{{popoverSuffix}} ? deadlinePopoverId{{popoverSuffix}} : undefined}\n' +
+        '      >\n' +
+        '        Show deadline details\n' +
+        '      </Button>\n' +
+        '      <Popover\n' +
+        '        open={popoverOpen{{popoverSuffix}}}\n' +
+        '        onClose={() => setPopoverOpen{{popoverSuffix}}(false)}\n' +
+        '        anchorEl={anchorEl{{popoverSuffix}}}\n' +
+        '        placement="bottom"\n' +
+        '        id={deadlinePopoverId{{popoverSuffix}}}\n' +
+        '      >\n' +
+        '        <Popover.Content>\n' +
+        '          <VStack gap="space-8">\n' +
+        '            <Heading level="2" size="xsmall" spacing>\n' +
+        '              Next deadline\n' +
+        '            </Heading>\n' +
+        '            <BodyShort>Send the supporting documents before Friday at 12:00.</BodyShort>\n' +
+        '            <Button\n' +
+        '              type="button"\n' +
+        '              size="small"\n' +
+        '              variant="secondary"\n' +
+        '              onClick={() => setPopoverOpen{{popoverSuffix}}(false)}\n' +
+        '            >\n' +
+        '              Close details\n' +
+        '            </Button>\n' +
+        '          </VStack>\n' +
+        '        </Popover.Content>\n' +
+        '      </Popover>\n' +
+        '    </>\n' +
+        '  )\n' +
+        '}',
+      description: 'Popover with a trigger button and close action.',
+    },
+  },
+  {
+    id: 'tooltip',
+    name: 'Tooltip',
+    group: 'component',
+    status: 'current',
+    package: '@navikt/ds-react',
+    importName: 'Tooltip',
+    importGuidance: "import { Button, Tooltip } from '@navikt/ds-react';",
+    docs: `${COMPONENT_DOCS_BASE}/tooltip`,
+    description: 'Tooltip around a visible trigger button.',
+    keywords: ['tooltip', 'hover', 'hint', 'shortcut', 'help'],
+    props: [
+      {
+        name: 'content',
+        type: 'string',
+        required: true,
+        description: 'Tooltip text content.',
+      },
+      {
+        name: 'describesChild',
+        type: 'boolean',
+        values: ['true', 'false'],
+        valueKind: 'enum',
+        default: 'false',
+        description: 'Expose the tooltip as additional information instead of the only label.',
+      },
+      {
+        name: 'placement',
+        type: '"top" | "right" | "bottom" | "left"',
+        values: tooltipPlacementValues,
+        valueKind: 'enum',
+        default: 'top',
+        description: 'Tooltip placement.',
+      },
+      {
+        name: 'delay',
+        type: 'number',
+        default: '150',
+        description: 'Delay before the tooltip opens.',
+      },
+    ],
+    snippet: {
+      code:
+        '<Tooltip content="Opens a printer-friendly summary" describesChild>\n' +
+        '  <Button type="button" size="small" variant="secondary">Print summary</Button>\n' +
+        '</Tooltip>',
+      description: 'Tooltip with a focusable button trigger.',
     },
   },
   {
@@ -2214,6 +2557,10 @@ export function getContextualAutocompleteRule(
   parentName: string
 ): AkselContextualAutocompleteRule | undefined {
   return contextualAutocompleteRulesByParent.get(parentName)
+}
+
+export function resolveContextualAutocompleteEntryName(componentName: string): string {
+  return contextualAutocompleteEntryNamesByComponent.get(componentName) ?? componentName
 }
 
 export function isContextualOnlyAutocompleteEntry(componentName: string): boolean {

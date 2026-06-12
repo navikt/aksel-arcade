@@ -239,6 +239,29 @@ describe('Aksel-aware autocomplete contract', () => {
     )
   })
 
+  it('prefers catalog-backed menu, overlay, and help details and insertions for top-level targets', () => {
+    expect(optionFor('<Action', 'ActionMenu')?.detail).toBe(
+      'Action menu with trigger button and grouped actions.'
+    )
+    expect(applyFor('<Action', 'ActionMenu')).toContain('<ActionMenu.Trigger>')
+    expect(applyFor('<Action', 'ActionMenu')).toContain(
+      '<ActionMenu.Group label="Case actions">'
+    )
+    expect(optionFor('<Drop', 'Dropdown')?.detail).toBe(
+      'Dropdown menu with grouped and simple item lists.'
+    )
+    expect(applyFor('<Drop', 'Dropdown')).toContain('<Dropdown.Menu.GroupedList>')
+    expect(applyFor('<Drop', 'Dropdown')).toContain('<Dropdown.Menu.Divider />')
+    expect(optionFor('<Help', 'HelpText')?.detail).toBe(
+      'Inline help trigger with explanatory text.'
+    )
+    expect(applyFor('<Help', 'HelpText')).toContain('HStack gap="space-4" align="center">')
+    expect(optionFor('<Tool', 'Tooltip')?.detail).toBe(
+      'Tooltip around a visible trigger button.'
+    )
+    expect(applyFor('<Tool', 'Tooltip')).toContain('describesChild')
+  })
+
   it('routes Pagination through the catalog insertion callback with composable JSX', () => {
     const onApplyCatalogInsertion = vi.fn()
     const option = optionFor('<Pagi', 'Pagination', undefined, onApplyCatalogInsertion)
@@ -262,6 +285,29 @@ describe('Aksel-aware autocomplete contract', () => {
         hooks: expect.stringContaining(
           'export const usePaginationState{{paginationSuffix}} = (initialPage = 1) => {'
         ),
+      }),
+    })
+  })
+
+  it('routes Popover through the catalog insertion callback with composable JSX', () => {
+    const onApplyCatalogInsertion = vi.fn()
+    const option = optionFor('<Pop', 'Popover', undefined, onApplyCatalogInsertion)
+
+    expect(option?.detail).toBe('Controlled popover with trigger, anchor, and close behavior.')
+    expect(typeof option?.apply).toBe('function')
+
+    if (typeof option?.apply !== 'function') {
+      throw new Error('Expected Popover completion to use a custom apply callback')
+    }
+
+    option.apply({} as never, option as never, 0, '<Pop'.length)
+
+    expect(onApplyCatalogInsertion).toHaveBeenCalledWith({
+      from: 0,
+      to: '<Pop'.length,
+      insertion: expect.objectContaining({
+        jsx: 'DeadlinePopover{{popoverSuffix}} />',
+        hooks: expect.stringContaining('const deadlinePopoverId{{popoverSuffix}} = useId()'),
       }),
     })
   })
@@ -445,6 +491,17 @@ describe('Aksel-aware autocomplete contract', () => {
     expect(labelsFor('<Tabs>\n  <Tabs.List>\n    <T')).toContain('Tabs.Tab')
   })
 
+  it('keeps contextual Dropdown divider suggestions aligned with the runtime subcomponent name', () => {
+    expect(labelsFor('<Dropdown>\n  <Dropdown.Menu>\n    <')).toEqual([
+      'Dropdown.Menu.List',
+      'Dropdown.Menu.GroupedList',
+      'Dropdown.Menu.Divider',
+    ])
+    expect(applyFor('<Dropdown>\n  <Dropdown.Menu>\n    <D', 'Dropdown.Menu.Divider')).toBe(
+      'Dropdown.Menu.Divider />'
+    )
+  })
+
   it('shows parent-bound child suggestions only inside useful group contexts', () => {
     expect(labelsFor('<RadioGroup legend="Pick one">\n  <')).toEqual(['Radio'])
     expect(labelsFor('<CheckboxGroup legend="Select">\n  <')).toEqual(['Checkbox'])
@@ -470,7 +527,9 @@ describe('Aksel-aware autocomplete contract', () => {
 
   it('removes generic docs-only detail text from autocomplete options', () => {
     expect(optionFor('<Accordion', 'Accordion')?.detail).toBe('')
-    expect(optionFor('<ActionMenu', 'ActionMenu')?.detail).toBe('')
+    expect(optionFor('<ActionMenu', 'ActionMenu')?.detail).toBe(
+      'Action menu with trigger button and grouped actions.'
+    )
     expect(optionFor('<Box', 'Box')?.detail).toBe(
       'Generic container with spacing, color, border, radius, and shadow tokens.'
     )

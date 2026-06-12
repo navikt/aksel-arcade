@@ -309,6 +309,47 @@ describe('Aksel catalog starter path', () => {
     )
   })
 
+  it('routes menu, overlay, and help examples through the shared catalog for Add menu data', () => {
+    const componentEntries = listCatalogEntries({ groups: ['component'], statuses: ['current'] })
+    const paletteComponents = getComponentsByCategory('component')
+    const actionMenuEntry = getCatalogComponent('ActionMenu')
+    const dropdownEntry = getCatalogComponent('Dropdown')
+    const helpTextEntry = getCatalogComponent('HelpText')
+    const popoverEntry = getCatalogComponent('Popover')
+    const tooltipEntry = getCatalogComponent('Tooltip')
+
+    expect(componentEntries.map((entry) => entry.name)).toEqual(
+      expect.arrayContaining(['ActionMenu', 'Dropdown', 'HelpText', 'Popover', 'Tooltip'])
+    )
+    expect(actionMenuEntry?.snippet.code).toContain('<ActionMenu.Trigger>')
+    expect(actionMenuEntry?.snippet.code).toContain('<ActionMenu.Group label="Case actions">')
+    expect(dropdownEntry?.snippet.code).toContain('<Dropdown.Menu.GroupedList>')
+    expect(dropdownEntry?.snippet.code).toContain('<Dropdown.Menu.Divider />')
+    expect(helpTextEntry?.snippet.code).toContain('<HStack gap="space-4" align="center">')
+    expect(helpTextEntry?.snippet.code).toContain('<HelpText title="How is this calculated?">')
+    expect(popoverEntry?.snippet.code).toBe('<DeadlinePopover{{popoverSuffix}} />')
+    expect(popoverEntry?.snippet.hooksCode).toContain(
+      'const deadlinePopoverId{{popoverSuffix}} = useId()'
+    )
+    expect(popoverEntry?.snippet.hooksCode).toContain(
+      'ref={(element) => setAnchorEl{{popoverSuffix}}(element)}'
+    )
+    expect(tooltipEntry?.snippet.code).toContain('describesChild')
+    expect(paletteComponents.find((component) => component.name === 'Popover')?.insertion).toEqual(
+      expect.objectContaining({
+        jsx: '<DeadlinePopover{{popoverSuffix}} />',
+        hooks: expect.stringContaining('const deadlinePopoverId{{popoverSuffix}} = useId()'),
+      })
+    )
+    expect(
+      paletteComponents.find((component) => component.name === 'ActionMenu')?.snippet
+    ).toContain('<ActionMenu.Trigger>')
+    expect(searchComponents('overflow')).toContainEqual(
+      expect.objectContaining({ name: 'ActionMenu' })
+    )
+    expect(searchComponents('anchor')).toContainEqual(expect.objectContaining({ name: 'Popover' }))
+  })
+
   it('exposes Pagination as a catalog-backed multi-part insertion', () => {
     const paginationEntry = getCatalogComponent('Pagination')
     const paginationPaletteEntry = getComponentsByCategory('component').find(
@@ -406,6 +447,7 @@ describe('Aksel catalog starter path', () => {
       'Dialog',
       'MonthPicker',
       'Pagination',
+      'Popover',
       'ToggleGroup',
     ])
 
