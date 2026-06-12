@@ -2444,3 +2444,21 @@ Verification:
 Next note:
 
 - The remaining open ready-for-agent issues in this range are narrower follow-ups (`#209`, `#212`, and `#213`). If a later slice needs more interactive workflow/navigation examples, reuse the #211/#215/#217 composable-root rule: keep authored JSX insertable inside surrounding layouts and move supporting state into Hooks instead of wrapper fragments or inline IIFEs.
+
+### 2026-06-12 - PR #229 review follow-up for issue #217
+
+Implemented:
+
+- PR review found one real correctness bug in the new contextual `Tabs` child insertions: repeated `Tabs.Tab` / `Tabs.Panel` autocomplete insertions reused the same `value` key, which can break Aksel tab-panel pairing and generate duplicate ids within a single `Tabs` instance.
+- Changed the contextual `Tabs.List`, `Tabs.Tab`, and `Tabs.Panel` insertion templates to route through the editor-apply path instead of raw string insertion when they need source-aware transformation.
+- Added `Tabs`-specific autocomplete insertion resolution in `src/services/componentInsertion.ts` so contextual `Tabs` children now reuse an unpaired sibling value when possible and otherwise generate the next sequential `tabN` value within the current `Tabs` block.
+- Added regression coverage in `tests/unit/services/componentInsertion.test.ts` for list/tab/panel pairing and next-value generation, and extended `tests/unit/akselAutocomplete.test.ts` so the contextual `Tabs` child completions stay callback-backed instead of falling back to unsafe direct string insertion.
+
+Verification:
+
+- npm run test -- --run tests/unit/akselAutocomplete.test.ts tests/unit/services/componentInsertion.test.ts
+- npm run typecheck
+- npm run lint (existing `.eslintignore` deprecation notice and existing `InspectionPopover` hook dependency warning only)
+- npm run test -- --run
+- npm run build
+- Browser check at `http://127.0.0.1:4184/aksel-arcade/`: confirmed Add -> `Tabs` still renders and switches panels in preview, confirmed the browser-loaded autocomplete/component-insertion modules now resolve a contextual `Tabs.Panel` insertion to the next matching `timeline` value instead of duplicating `overview`, and confirmed the verified session had no browser console errors.

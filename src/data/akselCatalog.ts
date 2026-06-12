@@ -474,8 +474,7 @@ const AKSEL_CONTEXTUAL_AUTOCOMPLETE_RULES: AkselContextualAutocompleteRule[] = [
         insertion: {
           jsx:
             '<Tabs.List>\n' +
-            '  <Tabs.Tab value="overview" label="Overview" />\n' +
-            '  <Tabs.Tab value="timeline" label="Timeline" />\n' +
+            '  <Tabs.Tab value="__AX_TAB_VALUE__" label="__AX_TAB_LABEL__" />\n' +
             '</Tabs.List>',
         },
       },
@@ -483,9 +482,7 @@ const AKSEL_CONTEXTUAL_AUTOCOMPLETE_RULES: AkselContextualAutocompleteRule[] = [
         name: 'Tabs.Panel',
         insertion: {
           jsx:
-            '<Tabs.Panel value="overview">\n' +
-            '  Overview of the application.\n' +
-            '</Tabs.Panel>',
+            '<Tabs.Panel value="__AX_TAB_VALUE__">\n' + '  __AX_TAB_CONTENT__\n' + '</Tabs.Panel>',
         },
       },
     ],
@@ -497,7 +494,7 @@ const AKSEL_CONTEXTUAL_AUTOCOMPLETE_RULES: AkselContextualAutocompleteRule[] = [
       {
         name: 'Tabs.Tab',
         insertion: {
-          jsx: '<Tabs.Tab value="overview" label="Overview" />',
+          jsx: '<Tabs.Tab value="__AX_TAB_VALUE__" label="__AX_TAB_LABEL__" />',
         },
       },
     ],

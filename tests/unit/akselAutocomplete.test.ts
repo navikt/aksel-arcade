@@ -610,9 +610,6 @@ describe('Aksel-aware autocomplete contract', () => {
     expect(applyFor('<Stepper>\n  <', 'Stepper.Step')).toBe(
       'Stepper.Step href="#">Choose support</Stepper.Step>'
     )
-    expect(applyFor('<Tabs>\n  <', 'Tabs.List')).toContain(
-      'Tabs.Tab value="overview" label="Overview"'
-    )
     expect(applyFor('<Timeline>\n  <', 'Timeline.Pin')).toContain(
       'Timeline.Pin date={new Date("2025-05-12")}'
     )
@@ -620,6 +617,63 @@ describe('Aksel-aware autocomplete contract', () => {
     expect(
       applyFor('<Timeline>\n  <Timeline.Row label="Sick leave">\n    <', 'Timeline.Period')
     ).toContain('statusLabel="Sick leave"')
+  })
+
+  it('routes contextual Tabs child insertions through the catalog apply callback', () => {
+    const onApplyCatalogInsertion = vi.fn()
+    const tabsRootSource = '<Tabs>\n  <'
+    const tabsListSource = '<Tabs>\n  <Tabs.List>\n    <T'
+    const tabsListOption = optionFor(
+      tabsRootSource,
+      'Tabs.List',
+      undefined,
+      onApplyCatalogInsertion
+    )
+    const tabsPanelOption = optionFor(
+      tabsRootSource,
+      'Tabs.Panel',
+      undefined,
+      onApplyCatalogInsertion
+    )
+    const tabsTabOption = optionFor(tabsListSource, 'Tabs.Tab', undefined, onApplyCatalogInsertion)
+
+    expect(typeof tabsListOption?.apply).toBe('function')
+    expect(typeof tabsPanelOption?.apply).toBe('function')
+    expect(typeof tabsTabOption?.apply).toBe('function')
+
+    if (
+      typeof tabsListOption?.apply !== 'function' ||
+      typeof tabsPanelOption?.apply !== 'function' ||
+      typeof tabsTabOption?.apply !== 'function'
+    ) {
+      throw new Error('Expected contextual Tabs completions to use a custom apply callback')
+    }
+
+    tabsListOption.apply({} as never, tabsListOption as never, 0, tabsRootSource.length)
+    tabsPanelOption.apply({} as never, tabsPanelOption as never, 0, tabsRootSource.length)
+    tabsTabOption.apply({} as never, tabsTabOption as never, 0, tabsListSource.length)
+
+    expect(onApplyCatalogInsertion).toHaveBeenNthCalledWith(1, {
+      from: 0,
+      to: tabsRootSource.length,
+      insertion: expect.objectContaining({
+        jsx: expect.stringContaining('Tabs.Tab value="__AX_TAB_VALUE__"'),
+      }),
+    })
+    expect(onApplyCatalogInsertion).toHaveBeenNthCalledWith(2, {
+      from: 0,
+      to: tabsRootSource.length,
+      insertion: expect.objectContaining({
+        jsx: expect.stringContaining('Tabs.Panel value="__AX_TAB_VALUE__"'),
+      }),
+    })
+    expect(onApplyCatalogInsertion).toHaveBeenNthCalledWith(3, {
+      from: 0,
+      to: tabsListSource.length,
+      insertion: expect.objectContaining({
+        jsx: 'Tabs.Tab value="__AX_TAB_VALUE__" label="__AX_TAB_LABEL__" />',
+      }),
+    })
   })
 
   it('suppresses generic child-level suggestions in constrained compound positions', () => {
