@@ -1534,6 +1534,61 @@ Verification:
 - DESKTOP_RELEASE_CHANGED_FILES='vite.config.ts' DESKTOP_RELEASE_TAGS='desktop-v0.2.6' npm run desktop:release-plan
 - Browser smoke check at `http://127.0.0.1:5174/aksel-arcade/`
 
+### 2026-06-12 - Issue #214: Fix menu, overlay, and help component insertions
+
+Implemented:
+
+- Selected #214 as the highest-priority open `ready-for-agent` feature from #209-#217 after checking #205, `CONTEXT.md`, and the existing `progress.txt` notes; it was the most user-blocking remaining authoring slice because `ActionMenu`, `Dropdown`, `Popover`, `Tooltip`, and `HelpText` insertion paths were still incomplete.
+- Added shared catalog-backed insertion coverage for `ActionMenu`, `Dropdown`, `HelpText`, `Popover`, and `Tooltip` in `src/data/akselCatalog.ts`, including shared placement/strategy value sets for the overlay/help entries.
+- Kept `Popover` composable by making it a Hooks-backed helper insertion (`<DeadlinePopover{{popoverSuffix}} />`) instead of inserting stateful wrapper JSX directly into the authoring surface.
+- Added regression coverage across autocomplete, catalog, component insertion, and Add-menu boundaries in `tests/unit/akselAutocomplete.test.ts`, `tests/unit/akselCatalog.test.ts`, `tests/unit/services/componentInsertion.test.ts`, and `tests/integration/component-palette.test.tsx`.
+- Fixed one leftover contextual autocomplete mismatch before closing the issue: `Dropdown.Menu` children now suggest `Dropdown.Menu.Divider` with the correct inserted JSX even though the upstream docs dataset still exposes the older `Dropdown.Divider` entry name.
+
+Verification:
+
+- npm run typecheck
+- npm run lint (existing `InspectionPopover` hook dependency warning only)
+- npm run test -- --run
+- npm run build
+- Browser check at `http://127.0.0.1:4321/aksel-arcade/` verified Add-menu insertion plus working preview interactions for `ActionMenu`, `Dropdown`, `Popover`, `Tooltip`, and `HelpText`; clean runtime interactions had no console errors after insertion
+
+Next note:
+
+- The docs-derived autocomplete dataset still contains `Dropdown.Divider`, so the runtime now aliases that docs entry to the author-facing `Dropdown.Menu.Divider` name. If the generator is ever refreshed against corrected upstream docs, keep the alias path or remove it only after confirming contextual autocomplete still surfaces the runtime name and insertion.
+
+### 2026-06-12 - PR #228 follow-up for Issue #214
+
+Fixed after user feedback:
+
+- The first `Popover` insertion shipped too much pre-baked behavior by hiding the actual Aksel structure behind `<DeadlinePopover{{popoverSuffix}} />`.
+- Replaced that helper-component insertion with the direct `Button` + `Popover` JSX structure the user asked for, keeping only the required `anchorEl`, `openState`, and `popoverId` bindings in the Hooks tab.
+- Taught the preview transpiler to lift bare top-level hook bindings like `const [openState, setOpenState] = useState(false)` and `const popoverId = useId()` from page Hooks into the generated page component, so the direct Popover snippet renders without wrapper components or extra editor mutations.
+- Added follow-up regression coverage in `tests/integration/transpiler.test.ts` alongside the catalog/autocomplete/palette/component-insertion assertions to lock down the new direct Popover insertion shape.
+
+Verification:
+
+- npm run typecheck
+- npm run lint (existing `.eslintignore` deprecation notice and existing `InspectionPopover` hook dependency warning only)
+- npm run test -- --run
+- npm run build
+- Browser check at `http://127.0.0.1:4321/aksel-arcade/`: after clearing the saved JSX/Hooks state, confirmed Add -> `Popover` inserts the direct `Button` + `Popover` JSX plus raw hook bindings, a reload preserves that shape, clicking `Åpne popover` reveals `Innhold her!`, and the clean reloaded session shows no console errors beyond the pre-existing form-field issue
+
+### 2026-06-12 - PR #228 review follow-up for Issue #214
+
+Fixed before merge:
+
+- Replaced the first line-based page-Hooks lifting pass in `src/services/transpiler.ts` with top-level statement extraction backed by Babel's parser so multiline hook bindings also move into the generated page component instead of remaining at module scope.
+- Kept the lifting scope narrow to direct top-level hook-backed `const`/`let` declarations, preserving the earlier direct Popover insertion behavior while fixing the review-reported invalid-hook-call edge case.
+- Added a regression in `tests/integration/transpiler.test.ts` that exercises multiline top-level hook bindings in the Hooks tab, and confirmed the direct Popover snippet still renders correctly when those bindings span multiple lines.
+
+Verification:
+
+- npm run typecheck
+- npm run lint (existing `.eslintignore` deprecation notice and existing `InspectionPopover` hook dependency warning only)
+- npm run test -- --run
+- npm run build
+- Browser check at `http://127.0.0.1:4321/aksel-arcade/`: replaced the editor content with the direct Popover JSX plus multiline `useState` / `useId` hook bindings, confirmed the preview renders `Åpne popover`, and confirmed clicking it still shows `Innhold her!` with no new Popover/transpiler runtime errors
+
 ### 2026-05-31 - Issue #147: Unsigned PR Desktop packaging checks
 
 Implemented:

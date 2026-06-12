@@ -108,6 +108,28 @@ describe('ComponentPalette', () => {
     )
   })
 
+  it('passes hook-backed Popover insertion metadata through the Add menu boundary', async () => {
+    const user = userEvent.setup()
+    const onInsertComponent = vi.fn()
+
+    await act(async () => {
+      render(<ComponentPalette open onClose={vi.fn()} onInsertComponent={onInsertComponent} />)
+    })
+
+    await user.type(screen.getByRole('textbox', { name: /search components/i }), 'Popover')
+    await user.click(screen.getByRole('link', { name: 'Popover' }))
+
+    expect(onInsertComponent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: 'Popover',
+        insertion: expect.objectContaining({
+          jsx: expect.stringContaining('<Button'),
+          hooks: expect.stringContaining('const popoverId{{popoverSuffix}} = useId()'),
+        }),
+      })
+    )
+  })
+
   it('passes grouped Radio snippets through the Add menu boundary', async () => {
     const user = userEvent.setup()
     const onInsertComponent = vi.fn()

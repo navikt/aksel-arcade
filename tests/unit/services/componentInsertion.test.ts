@@ -78,6 +78,31 @@ const dialogInsertion = {
     '}',
 }
 
+const popoverInsertion = {
+  jsx:
+    '<Button\n' +
+    '  ref={setAnchorEl{{popoverSuffix}}}\n' +
+    '  onClick={() => setOpenState{{popoverSuffix}}(!openState{{popoverSuffix}})}\n' +
+    '  aria-expanded={openState{{popoverSuffix}}}\n' +
+    '  aria-controls={openState{{popoverSuffix}} ? popoverId{{popoverSuffix}} : undefined}\n' +
+    '>\n' +
+    '  Åpne popover\n' +
+    '</Button>\n' +
+    '\n' +
+    '<Popover\n' +
+    '  open={openState{{popoverSuffix}}}\n' +
+    '  onClose={() => setOpenState{{popoverSuffix}}(false)}\n' +
+    '  anchorEl={anchorEl{{popoverSuffix}}}\n' +
+    '  id={popoverId{{popoverSuffix}}}\n' +
+    '>\n' +
+    '  <Popover.Content>Innhold her!</Popover.Content>\n' +
+    '</Popover>',
+  hooks:
+    'const [anchorEl{{popoverSuffix}}, setAnchorEl{{popoverSuffix}}] = useState<HTMLButtonElement | null>(null)\n' +
+    'const [openState{{popoverSuffix}}, setOpenState{{popoverSuffix}}] = useState(false)\n' +
+    'const popoverId{{popoverSuffix}} = useId()',
+}
+
 describe('component insertion service', () => {
   it('preserves JSX-only Add menu insertion on the active JSX tab', () => {
     const source = createArcadeSourceFile('<Box>First</Box>\n<Box>Second</Box>', '')
@@ -186,6 +211,35 @@ describe('component insertion service', () => {
     expect(secondSource.hooks).toContain('export const ReviewDialog2 = () => {')
     expect(secondSource.hooks).toContain('id="review-dialog-popup"')
     expect(secondSource.hooks).toContain('id="review-dialog-popup2"')
+  })
+
+  it('avoids helper-component and anchor/id collisions for popover insertions', () => {
+    const firstSource = applyComponentInsertion(createArcadeSourceFile('', ''), popoverInsertion, {
+      kind: 'palette',
+      activeTab: 'JSX',
+      jsxCursor: { line: 0, column: 0 },
+      hooksCursor: { line: 0, column: 0 },
+    })
+
+    const secondSource = applyComponentInsertion(firstSource, popoverInsertion, {
+      kind: 'palette',
+      activeTab: 'JSX',
+      jsxCursor: { line: 1, column: 0 },
+      hooksCursor: { line: 0, column: 0 },
+    })
+
+    expect(secondSource.jsx).toContain('ref={setAnchorEl}')
+    expect(secondSource.jsx).toContain('ref={setAnchorEl2}')
+    expect(secondSource.hooks).toContain(
+      'const [anchorEl, setAnchorEl] = useState<HTMLButtonElement | null>(null)'
+    )
+    expect(secondSource.hooks).toContain(
+      'const [anchorEl2, setAnchorEl2] = useState<HTMLButtonElement | null>(null)'
+    )
+    expect(secondSource.hooks).toContain('const [openState, setOpenState] = useState(false)')
+    expect(secondSource.hooks).toContain('const [openState2, setOpenState2] = useState(false)')
+    expect(secondSource.hooks).toContain('const popoverId = useId()')
+    expect(secondSource.hooks).toContain('const popoverId2 = useId()')
   })
 
   it('ignores unrelated popup identifiers when inserting the first dialog helper', () => {
