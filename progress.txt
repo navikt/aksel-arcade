@@ -2516,3 +2516,25 @@ Verification:
 - npm run lint (passes with the existing `.eslintignore` deprecation notice and existing `InspectionPopover` hook-dependency warning only)
 - npm run test -- --run
 - Browser check at `http://127.0.0.1:5183/aksel-arcade/`: confirmed the JSX tab shows direct `Chips.Toggle` / `Chips.Removable` markup with `data-color="neutral"` on each child, the Hooks tab still contains support state only, repeated Add -> `ProgressBar` insertions render two labeled progress bars in the preview with distinct ids, and the verified session showed no browser console errors (only the pre-existing form-field accessibility issue).
+
+### 2026-06-12 - Issue #212 catalog-backed content, typography, and link insertions
+
+Implemented:
+
+- Picked `#212` as the highest-priority remaining `ready-for-agent` issue in the requested `#212`-`#213` range because it is the user-facing insertion slice, while `#213` is still the broader maintainer workflow/audit follow-up.
+- Moved the remaining issue-212 authoring targets onto the shared Aksel insertion catalog: `BodyLong`, `BodyShort`, `Chat`, `CopyButton`, `Detail`, `GuidePanel`, `Heading`, `InternalHeader`, `Label`, `Link`, `LinkCard`, and `List`, with visible composable snippets that can be inserted inside existing layouts without wrapper fragments or helper components.
+- Removed the matching legacy manual palette/snippet duplicates from `src/data/akselComponents.ts` and `src/services/componentLibrary.ts` so the Add menu, autocomplete, and snippet fallback all stay sourced from the shared catalog instead of diverging copies.
+- Kept the new snippets on supported runtime props (`data-color`, `textColor`, `position`, etc.) and added the missing preview iframe `allow="clipboard-write"` permission so sandboxed `CopyButton` examples can use the clipboard API without widening the iframe sandbox origin.
+- Added regression coverage in `tests/unit/akselCatalog.test.ts`, `tests/unit/akselAutocomplete.test.ts`, `tests/integration/component-palette.test.tsx`, and `tests/unit/sandboxSecurity.test.ts` for catalog presence, top-level autocomplete/apply strings, Add-menu insertion behavior, and the clipboard-write iframe permission.
+
+Verification:
+
+- npm run typecheck
+- npm run lint (passes with the existing `.eslintignore` deprecation notice and existing `InspectionPopover` hook-dependency warning only)
+- npm run test -- --run
+- npm run build (passes with the existing Vite/browser-compatibility and chunk-size warnings only)
+- Browser check at `http://127.0.0.1:4387/aksel-arcade/`: confirmed Add inserts the catalog-backed `BodyLong`, `Chat`, `CopyButton`, `GuidePanel`, `InternalHeader`, `LinkCard`, and `List` examples into the JSX editor, confirmed `CopyButton` changes to `Case number copied` after click when the verification browser context is granted clipboard permission, and confirmed the verified session showed no browser console warnings or errors.
+
+Next note:
+
+- The remaining open issue from the original `#212` / `#213` pair is `#213`. If a future slice needs more preview support for sandboxed interactive components, keep `sandbox="allow-scripts"` and add narrowly scoped iframe `allow` capabilities instead of broadening the sandbox origin or enabling modals.

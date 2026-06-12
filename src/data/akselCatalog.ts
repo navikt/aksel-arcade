@@ -256,6 +256,16 @@ export const AKSEL_TOKEN_METADATA: Record<string, AkselTokenMetadata> = {
 const spacingValues = AKSEL_TOKEN_METADATA.spacing.values
 const spacingWithAutoValues = AKSEL_TOKEN_METADATA.spacingWithAuto.values
 const dataColorValues = AKSEL_TOKEN_METADATA.dataColor.values
+const nonStatusDataColorValues = [
+  'neutral',
+  'accent',
+  'brand-magenta',
+  'brand-beige',
+  'brand-blue',
+  'meta-purple',
+  'meta-lime',
+]
+const textColorValues = ['default', 'subtle', 'contrast']
 const floatingPlacementValues = [
   'top',
   'bottom',
@@ -1911,6 +1921,61 @@ export const AKSEL_CATALOG: AkselCatalogEntry[] = [
     },
   },
   {
+    id: 'bodylong',
+    name: 'BodyLong',
+    group: 'component',
+    status: 'current',
+    package: '@navikt/ds-react',
+    importName: 'BodyLong',
+    importGuidance: "import { BodyLong } from '@navikt/ds-react';",
+    docs: `${COMPONENT_DOCS_BASE}/typography`,
+    description: 'Long body text with readable line height.',
+    keywords: ['bodylong', 'body long', 'text', 'typography', 'paragraph', 'copy'],
+    props: [
+      {
+        name: 'size',
+        type: '"large" | "medium" | "small"',
+        values: ['large', 'medium', 'small'],
+        valueKind: 'enum',
+        default: 'medium',
+        description: 'Typography size.',
+      },
+      {
+        name: 'weight',
+        type: '"regular" | "semibold"',
+        values: ['regular', 'semibold'],
+        valueKind: 'enum',
+        default: 'regular',
+        description: 'Typography weight.',
+      },
+      {
+        name: 'spacing',
+        type: 'boolean',
+        values: ['true', 'false'],
+        valueKind: 'enum',
+        description: 'Add bottom margin.',
+      },
+      {
+        name: 'data-color',
+        type: 'string',
+        values: dataColorValues,
+        valueKind: 'data-color',
+        description: 'Dynamic color context for the text.',
+      },
+      {
+        name: 'truncate',
+        type: 'boolean',
+        values: ['true', 'false'],
+        valueKind: 'enum',
+        description: 'Truncate text with ellipsis.',
+      },
+    ],
+    snippet: {
+      code: '<BodyLong spacing>Remember to attach the most recent payslip before you continue.</BodyLong>',
+      description: 'Long paragraph example.',
+    },
+  },
+  {
     id: 'bodyshort',
     name: 'BodyShort',
     group: 'component',
@@ -1961,8 +2026,8 @@ export const AKSEL_CATALOG: AkselCatalogEntry[] = [
       },
     ],
     snippet: {
-      code: '<BodyShort>Short text</BodyShort>',
-      description: 'Short paragraph text.',
+      code: '<BodyShort>You need to choose a filter before we can show results.</BodyShort>',
+      description: 'Short paragraph example.',
     },
   },
   {
@@ -2008,8 +2073,123 @@ export const AKSEL_CATALOG: AkselCatalogEntry[] = [
       },
     ],
     snippet: {
-      code: '<Heading level="1" size="large">Heading text</Heading>',
-      description: 'Visible heading example.',
+      code: '<Heading level="2" size="medium">Application overview</Heading>',
+      description: 'Section heading example.',
+    },
+  },
+  {
+    id: 'label',
+    name: 'Label',
+    group: 'component',
+    status: 'current',
+    package: '@navikt/ds-react',
+    importName: 'Label',
+    importGuidance: "import { Label } from '@navikt/ds-react';",
+    docs: `${COMPONENT_DOCS_BASE}/typography`,
+    description: 'Label text for short emphasized copy.',
+    keywords: ['label', 'typography', 'caption', 'text', 'meta'],
+    props: [
+      {
+        name: 'size',
+        type: '"medium" | "small"',
+        values: ['medium', 'small'],
+        valueKind: 'enum',
+        default: 'medium',
+        description: 'Typography size.',
+      },
+      {
+        name: 'textColor',
+        type: '"default" | "subtle" | "contrast"',
+        values: textColorValues,
+        valueKind: 'enum',
+        description: 'Adjust the text contrast.',
+      },
+      {
+        name: 'data-color',
+        type: 'string',
+        values: dataColorValues,
+        valueKind: 'data-color',
+        description: 'Dynamic color context for the label.',
+      },
+      {
+        name: 'spacing',
+        type: 'boolean',
+        values: ['true', 'false'],
+        valueKind: 'enum',
+        description: 'Add bottom margin.',
+      },
+      {
+        name: 'visuallyHidden',
+        type: 'boolean',
+        values: ['true', 'false'],
+        valueKind: 'enum',
+        description: 'Hide the label visually while keeping it accessible.',
+      },
+    ],
+    snippet: {
+      code: '<Label as="p" spacing>Employer phone number</Label>',
+      description: 'Standalone label example.',
+    },
+  },
+  {
+    id: 'detail',
+    name: 'Detail',
+    group: 'component',
+    status: 'current',
+    package: '@navikt/ds-react',
+    importName: 'Detail',
+    importGuidance: "import { Detail } from '@navikt/ds-react';",
+    docs: `${COMPONENT_DOCS_BASE}/typography`,
+    description: 'Small detail text for timestamps and metadata.',
+    keywords: ['detail', 'meta', 'small text', 'caption', 'typography'],
+    props: [
+      {
+        name: 'weight',
+        type: '"regular" | "semibold"',
+        values: ['regular', 'semibold'],
+        valueKind: 'enum',
+        default: 'regular',
+        description: 'Typography weight.',
+      },
+      {
+        name: 'uppercase',
+        type: 'boolean',
+        values: ['true', 'false'],
+        valueKind: 'enum',
+        description: 'Render the text in uppercase.',
+      },
+      {
+        name: 'textColor',
+        type: '"default" | "subtle" | "contrast"',
+        values: textColorValues,
+        valueKind: 'enum',
+        description: 'Adjust the text contrast.',
+      },
+      {
+        name: 'data-color',
+        type: 'string',
+        values: dataColorValues,
+        valueKind: 'data-color',
+        description: 'Dynamic color context for the detail text.',
+      },
+      {
+        name: 'spacing',
+        type: 'boolean',
+        values: ['true', 'false'],
+        valueKind: 'enum',
+        description: 'Add bottom spacing.',
+      },
+      {
+        name: 'truncate',
+        type: 'boolean',
+        values: ['true', 'false'],
+        valueKind: 'enum',
+        description: 'Truncate text with ellipsis.',
+      },
+    ],
+    snippet: {
+      code: '<Detail uppercase>Application details</Detail>',
+      description: 'Small detail text example.',
     },
   },
   {
@@ -2334,6 +2514,308 @@ export const AKSEL_CATALOG: AkselCatalogEntry[] = [
         '  }\n' +
         '}',
       description: 'Composable Pagination with Hooks-tab state.',
+    },
+  },
+  {
+    id: 'chat',
+    name: 'Chat',
+    group: 'component',
+    status: 'current',
+    package: '@navikt/ds-react',
+    importName: 'Chat',
+    importGuidance: "import { Chat } from '@navikt/ds-react';",
+    docs: `${COMPONENT_DOCS_BASE}/chat`,
+    description: 'Chat thread with sender, time, and visible bubbles.',
+    keywords: ['chat', 'message', 'conversation', 'bubble', 'dialogue', 'thread'],
+    props: [
+      {
+        name: 'position',
+        type: '"left" | "right"',
+        values: ['left', 'right'],
+        valueKind: 'enum',
+        default: 'left',
+        description: 'Positions the avatar and the message bubbles.',
+      },
+      {
+        name: 'name',
+        type: 'string',
+        description: 'Sender shown above the first bubble.',
+      },
+      {
+        name: 'timestamp',
+        type: 'string',
+        description: 'Time shown above the first bubble.',
+      },
+      {
+        name: 'size',
+        type: '"medium" | "small"',
+        values: ['medium', 'small'],
+        valueKind: 'enum',
+        default: 'medium',
+        description: 'Bubble size.',
+      },
+      {
+        name: 'data-color',
+        type: 'string',
+        values: nonStatusDataColorValues,
+        valueKind: 'data-color',
+        description: 'Overrides the inherited color context.',
+      },
+    ],
+    snippet: {
+      code:
+        '<Chat avatar={<span aria-hidden>SS</span>} name="Sara Caseworker" timestamp="09:41">\n' +
+        '  <Chat.Bubble>Hello! I need an updated income statement before I can review the application.</Chat.Bubble>\n' +
+        '  <Chat.Bubble>You can upload it here as soon as it is ready.</Chat.Bubble>\n' +
+        '</Chat>',
+      description: 'Visible chat example with two bubbles.',
+    },
+  },
+  {
+    id: 'copybutton',
+    name: 'CopyButton',
+    group: 'component',
+    status: 'current',
+    package: '@navikt/ds-react',
+    importName: 'CopyButton',
+    importGuidance: "import { CopyButton } from '@navikt/ds-react';",
+    docs: `${COMPONENT_DOCS_BASE}/copybutton`,
+    description: 'Copy button with visible button text and copied state.',
+    keywords: ['copy button', 'copy', 'clipboard', 'text', 'utility', 'case number'],
+    props: [
+      {
+        name: 'copyText',
+        type: 'string',
+        required: true,
+        description: 'Text copied to the clipboard.',
+      },
+      {
+        name: 'text',
+        type: 'string',
+        description: 'Visible button label before copying.',
+      },
+      {
+        name: 'activeText',
+        type: 'string',
+        description: 'Visible button label after copying.',
+      },
+      {
+        name: 'size',
+        type: '"medium" | "small" | "xsmall"',
+        values: ['medium', 'small', 'xsmall'],
+        valueKind: 'enum',
+        default: 'medium',
+        description: 'Button size.',
+      },
+      {
+        name: 'data-color',
+        type: 'string',
+        values: nonStatusDataColorValues,
+        valueKind: 'data-color',
+        description: 'Overrides the button color.',
+      },
+    ],
+    snippet: {
+      code:
+        '<CopyButton copyText="CASE-2048" text="Copy case number" activeText="Case number copied" />',
+      description: 'Copy button with a useful default payload.',
+    },
+  },
+  {
+    id: 'guidepanel',
+    name: 'GuidePanel',
+    group: 'component',
+    status: 'current',
+    package: '@navikt/ds-react',
+    importName: 'GuidePanel',
+    importGuidance: "import { BodyShort, GuidePanel, Heading } from '@navikt/ds-react';",
+    docs: `${COMPONENT_DOCS_BASE}/guidepanel`,
+    description: 'Guide panel with heading and supporting text.',
+    keywords: ['guide panel', 'guide', 'help', 'support', 'info', 'intro'],
+    props: [
+      {
+        name: 'poster',
+        type: 'boolean',
+        values: ['true', 'false'],
+        valueKind: 'enum',
+        description: 'Place the illustration above the content.',
+      },
+      {
+        name: 'illustration',
+        type: 'ReactNode',
+        description: 'Optional illustration element.',
+      },
+    ],
+    snippet: {
+      code:
+        '<GuidePanel>\n' +
+        '  <Heading level="2" size="small" spacing>Need help before you send the application?</Heading>\n' +
+        '  <BodyShort>Make sure every required document is uploaded and easy to read.</BodyShort>\n' +
+        '</GuidePanel>',
+      description: 'Visible guide content with heading and helper text.',
+    },
+  },
+  {
+    id: 'internalheader',
+    name: 'InternalHeader',
+    group: 'component',
+    status: 'current',
+    package: '@navikt/ds-react',
+    importName: 'InternalHeader',
+    importGuidance: "import { InternalHeader } from '@navikt/ds-react';",
+    docs: `${COMPONENT_DOCS_BASE}/i-header`,
+    description: 'Visible internal header with title and action button.',
+    keywords: ['internal header', 'header', 'app chrome', 'navigation', 'top bar'],
+    props: [],
+    snippet: {
+      code:
+        '<InternalHeader>\n' +
+        '  <InternalHeader.Title as="h1">Aksel Arcade</InternalHeader.Title>\n' +
+        '  <InternalHeader.Button>Log out</InternalHeader.Button>\n' +
+        '</InternalHeader>',
+      description: 'Internal application header example.',
+    },
+  },
+  {
+    id: 'link',
+    name: 'Link',
+    group: 'component',
+    status: 'current',
+    package: '@navikt/ds-react',
+    importName: 'Link',
+    importGuidance: "import { Link } from '@navikt/ds-react';",
+    docs: `${COMPONENT_DOCS_BASE}/link`,
+    description: 'Safe visible link example.',
+    keywords: ['link', 'anchor', 'href', 'navigation', 'url'],
+    props: [
+      {
+        name: 'href',
+        type: 'string',
+        required: true,
+        description: 'Destination URL.',
+      },
+      {
+        name: 'underline',
+        type: 'boolean',
+        values: ['true', 'false'],
+        valueKind: 'enum',
+        default: 'true',
+        description: 'Control underline behavior.',
+      },
+      {
+        name: 'inlineText',
+        type: 'boolean',
+        values: ['true', 'false'],
+        valueKind: 'enum',
+        description: 'Render inline for better wrapping inside text.',
+      },
+      {
+        name: 'data-color',
+        type: 'string',
+        values: nonStatusDataColorValues,
+        valueKind: 'data-color',
+        description: 'Overrides the inherited color context.',
+      },
+    ],
+    snippet: {
+      code: '<Link href="#">Read the guide to sick leave follow-up</Link>',
+      description: 'Visible link example that stays inside the preview.',
+    },
+  },
+  {
+    id: 'linkcard',
+    name: 'LinkCard',
+    group: 'component',
+    status: 'current',
+    package: '@navikt/ds-react',
+    importName: 'LinkCard',
+    importGuidance: "import { LinkCard } from '@navikt/ds-react';",
+    docs: `${COMPONENT_DOCS_BASE}/linkcard`,
+    description: 'Clickable card link with title and description.',
+    keywords: ['link card', 'linkcard', 'card link', 'card', 'navigation', 'cta'],
+    props: [
+      {
+        name: 'arrow',
+        type: 'boolean',
+        values: ['true', 'false'],
+        valueKind: 'enum',
+        default: 'true',
+        description: 'Show the arrow icon.',
+      },
+      {
+        name: 'arrowPosition',
+        type: '"baseline" | "center"',
+        values: ['baseline', 'center'],
+        valueKind: 'enum',
+        default: 'baseline',
+        description: 'Adjust the arrow position.',
+      },
+      {
+        name: 'size',
+        type: '"small" | "medium"',
+        values: ['small', 'medium'],
+        valueKind: 'enum',
+        default: 'medium',
+        description: 'Change spacing and typography sizing.',
+      },
+      {
+        name: 'data-color',
+        type: 'string',
+        values: dataColorValues,
+        valueKind: 'data-color',
+        description: 'Overrides the inherited color context.',
+      },
+    ],
+    snippet: {
+      code:
+        '<LinkCard>\n' +
+        '  <LinkCard.Title as="h2">\n' +
+        '    <LinkCard.Anchor href="#">Review sick pay application</LinkCard.Anchor>\n' +
+        '  </LinkCard.Title>\n' +
+        '  <LinkCard.Description>\n' +
+        '    Open the case to see uploaded documents and next steps before you send it.\n' +
+        '  </LinkCard.Description>\n' +
+        '</LinkCard>',
+      description: 'Visible link card example.',
+    },
+  },
+  {
+    id: 'list',
+    name: 'List',
+    group: 'component',
+    status: 'current',
+    package: '@navikt/ds-react',
+    importName: 'List',
+    importGuidance: "import { List } from '@navikt/ds-react';",
+    docs: `${COMPONENT_DOCS_BASE}/list`,
+    description: 'Ordered list with visible steps.',
+    keywords: ['list', 'ordered list', 'unordered list', 'steps', 'items', 'bullet'],
+    props: [
+      {
+        name: 'as',
+        type: '"ul" | "ol"',
+        values: ['ul', 'ol'],
+        valueKind: 'enum',
+        default: 'ul',
+        description: 'HTML list element to render.',
+      },
+      {
+        name: 'size',
+        type: '"small" | "medium" | "large"',
+        values: ['small', 'medium', 'large'],
+        valueKind: 'enum',
+        default: 'medium',
+        description: 'Adjust margin and font size.',
+      },
+    ],
+    snippet: {
+      code:
+        '<List as="ol">\n' +
+        '  <List.Item>Upload the income statement</List.Item>\n' +
+        '  <List.Item>Confirm the absence dates</List.Item>\n' +
+        '  <List.Item>Send the application for review</List.Item>\n' +
+        '</List>',
+      description: 'Visible ordered list example.',
     },
   },
   {

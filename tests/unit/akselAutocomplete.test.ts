@@ -190,14 +190,72 @@ describe('Aksel-aware autocomplete contract', () => {
     expect(optionFor('<Body', 'BodyShort')?.detail).toBe(
       'Short body text with compact line height.'
     )
-    expect(applyFor('<Body', 'BodyShort')).toBe('BodyShort>Short text</BodyShort>')
+    expect(applyFor('<Body', 'BodyShort')).toBe(
+      'BodyShort>You need to choose a filter before we can show results.</BodyShort>'
+    )
     expect(optionFor('<Head', 'Heading')?.detail).toBe('Heading text.')
     expect(applyFor('<Head', 'Heading')).toBe(
-      'Heading level="1" size="large">Heading text</Heading>'
+      'Heading level="2" size="medium">Application overview</Heading>'
     )
     expect(optionFor('<Tag', 'Tag')?.detail).toBe('Tag label component.')
     expect(applyFor('<Tag', 'Tag')).toBe(
       'Tag variant="moderate" data-color="info">In progress</Tag>'
+    )
+  })
+
+  it('prefers catalog-backed Issue 212 details and insertions for content, typography, and link targets', () => {
+    expect(optionFor('<BodyL', 'BodyLong')?.detail).toBe(
+      'Long body text with readable line height.'
+    )
+    expect(applyFor('<BodyL', 'BodyLong')).toBe(
+      'BodyLong spacing>Remember to attach the most recent payslip before you continue.</BodyLong>'
+    )
+    expect(optionFor('<Labe', 'Label')?.detail).toBe('Label text for short emphasized copy.')
+    expect(applyFor('<Labe', 'Label')).toBe(
+      'Label as="p" spacing>Employer phone number</Label>'
+    )
+    expect(optionFor('<Det', 'Detail')?.detail).toBe(
+      'Small detail text for timestamps and metadata.'
+    )
+    expect(applyFor('<Det', 'Detail')).toBe('Detail uppercase>Application details</Detail>')
+    expect(optionFor('<Chat', 'Chat')?.detail).toBe(
+      'Chat thread with sender, time, and visible bubbles.'
+    )
+    expect(applyFor('<Chat', 'Chat')).toContain('avatar={<span aria-hidden>SS</span>}')
+    expect(applyFor('<Chat', 'Chat')).toContain(
+      '<Chat.Bubble>Hello! I need an updated income statement before I can review the application.</Chat.Bubble>'
+    )
+    expect(optionFor('<Copy', 'CopyButton')?.detail).toBe(
+      'Copy button with visible button text and copied state.'
+    )
+    expect(applyFor('<Copy', 'CopyButton')).toBe(
+      'CopyButton copyText="CASE-2048" text="Copy case number" activeText="Case number copied" />'
+    )
+    expect(optionFor('<Guide', 'GuidePanel')?.detail).toBe(
+      'Guide panel with heading and supporting text.'
+    )
+    expect(applyFor('<Guide', 'GuidePanel')).toContain(
+      '<Heading level="2" size="small" spacing>Need help before you send the application?</Heading>'
+    )
+    expect(optionFor('<Inter', 'InternalHeader')?.detail).toBe(
+      'Visible internal header with title and action button.'
+    )
+    expect(applyFor('<Inter', 'InternalHeader')).toContain(
+      '<InternalHeader.Button>Log out</InternalHeader.Button>'
+    )
+    expect(optionFor('<Link', 'Link')?.detail).toBe('Safe visible link example.')
+    expect(applyFor('<Link', 'Link')).toBe(
+      'Link href="#">Read the guide to sick leave follow-up</Link>'
+    )
+    expect(optionFor('<LinkC', 'LinkCard')?.detail).toBe(
+      'Clickable card link with title and description.'
+    )
+    expect(applyFor('<LinkC', 'LinkCard')).toContain(
+      '<LinkCard.Anchor href="#">Review sick pay application</LinkCard.Anchor>'
+    )
+    expect(optionFor('<List', 'List')?.detail).toBe('Ordered list with visible steps.')
+    expect(applyFor('<List', 'List')).toContain(
+      '<List.Item>Send the application for review</List.Item>'
     )
   })
 

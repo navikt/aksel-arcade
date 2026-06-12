@@ -414,6 +414,7 @@ export const LivePreview = ({
         ref={iframeRef}
         className="live-preview__iframe"
         src={SANDBOX_IFRAME_SRC}
+        allow="clipboard-write"
         sandbox="allow-scripts"
         referrerPolicy="no-referrer"
         title="Live Preview Sandbox"

@@ -151,6 +151,47 @@ describe('ComponentPalette', () => {
     )
   })
 
+  it('shows issue 212 catalog entries in Add menu search and preserves curated snippets', async () => {
+    const user = userEvent.setup()
+    const onInsertComponent = vi.fn()
+
+    await act(async () => {
+      render(<ComponentPalette open onClose={vi.fn()} onInsertComponent={onInsertComponent} />)
+    })
+
+    const search = screen.getByRole('textbox', { name: /search components/i })
+
+    await user.type(search, 'Link')
+
+    expect(screen.getByRole('heading', { name: 'Link' })).toBeTruthy()
+    expect(screen.getByRole('heading', { name: 'LinkCard' })).toBeTruthy()
+
+    await user.clear(search)
+    await user.type(search, 'Copy')
+    await user.click(screen.getByRole('link', { name: 'CopyButton' }))
+
+    expect(onInsertComponent).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({
+        name: 'CopyButton',
+        snippet:
+          '<CopyButton copyText="CASE-2048" text="Copy case number" activeText="Case number copied" />',
+      })
+    )
+
+    await user.clear(search)
+    await user.type(search, 'Header')
+    await user.click(screen.getByRole('link', { name: 'InternalHeader' }))
+
+    expect(onInsertComponent).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        name: 'InternalHeader',
+        snippet: expect.stringContaining('<InternalHeader.Button>Log out</InternalHeader.Button>'),
+      })
+    )
+  })
+
   it('shows separate Chips Toggle and Chips Removable Add-menu entries from the shared catalog', async () => {
     const user = userEvent.setup()
     const onInsertComponent = vi.fn()
