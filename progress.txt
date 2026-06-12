@@ -2462,3 +2462,25 @@ Verification:
 - npm run test -- --run
 - npm run build
 - Browser check at `http://127.0.0.1:4184/aksel-arcade/`: confirmed Add -> `Tabs` still renders and switches panels in preview, confirmed the browser-loaded autocomplete/component-insertion modules now resolve a contextual `Tabs.Panel` insertion to the next matching `timeline` value instead of duplicating `overview`, and confirmed the verified session had no browser console errors.
+
+### 2026-06-12 - Issue #209 catalog-backed status/data-display insertions
+
+Implemented:
+
+- Picked #209 as the highest-priority still-open `ready-for-agent` issue in the requested `#209`-`#213` range after confirming `#210` and `#211` were already closed and `#212` / `#213` were narrower follow-ups.
+- Moved the remaining issue-209 authoring targets onto the shared Aksel insertion catalog: separate `Chips Toggle` and `Chips Removable` multi-part insertions, plus visible default snippets for `Loader`, `ProgressBar`, `Skeleton`, and `Table`, while keeping the existing catalog-backed `Tag`.
+- Removed the matching legacy palette/snippet duplicates from `src/data/akselComponents.ts` and `src/services/componentLibrary.ts` so the Add menu and snippet search stay sourced from the shared catalog instead of diverging manual copies.
+- Updated top-level autocomplete matching so catalog entries with spaced labels still resolve from component-like prefixes (`<Chips`, `<ChipsT`, `<ChipsR`) and the generic docs fallback `Chips` suggestion no longer competes with the curated split variants.
+- Added regression coverage in `tests/unit/akselCatalog.test.ts`, `tests/unit/akselAutocomplete.test.ts`, and `tests/integration/component-palette.test.tsx` for catalog visibility, Add-menu rendering, and callback-backed insertions for the new `Chips` variants.
+
+Verification:
+
+- npm run typecheck
+- npm run lint (passes with the existing `.eslintignore` deprecation warning and existing `InspectionPopover` hook-dependency warning only)
+- npm run test -- --run
+- npm run build (passes with existing Vite/browser-compatibility and chunk-size warnings only)
+- Browser check at `http://127.0.0.1:5178/aksel-arcade/`: confirmed Add shows `Chips Toggle` and `Chips Removable` instead of a generic `Chips`, confirmed both entries insert JSX plus matching Hooks helpers, confirmed Add inserts the visible `Loader`, `ProgressBar`, `Skeleton`, and `Table` snippets from the catalog, confirmed the preview renders the expected loading/progress/table text alongside both chips examples, and confirmed the verified session had no browser console warnings or errors.
+
+Next note:
+
+- The remaining open issues from this original range are `#212` and `#213`. If a follow-up keeps migrating palette/search/autocomplete surfaces, treat the shared catalog as the source of truth and remove matching legacy palette/snippet entries in the same slice to avoid duplicate authoring choices.

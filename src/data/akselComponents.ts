@@ -435,24 +435,6 @@ export const uiComponents: ComponentMetadata[] = [
     snippet: '<Checkbox>Checkbox label</Checkbox>',
   },
   {
-    name: 'Chips',
-    category: 'component',
-    import: '@navikt/ds-react',
-    description: 'Selectable chips/tags',
-    props: [
-      {
-        name: 'variant',
-        type: '"action" | "neutral"',
-        values: ['action', 'neutral'],
-        default: 'action',
-      },
-      { name: 'size', type: '"medium" | "small"', values: ['medium', 'small'], default: 'medium' },
-      { name: 'selected', type: 'boolean', description: 'Selected state' },
-    ],
-    snippet:
-      '<Chips>\n  <Chips.Toggle>Chip 1</Chips.Toggle>\n  <Chips.Toggle>Chip 2</Chips.Toggle>\n</Chips>',
-  },
-  {
     name: 'Combobox',
     category: 'component',
     import: '@navikt/ds-react',
@@ -660,28 +642,6 @@ export const uiComponents: ComponentMetadata[] = [
     snippet: '<List>\n  <List.Item>Item 1</List.Item>\n  <List.Item>Item 2</List.Item>\n</List>',
   },
   {
-    name: 'Loader',
-    category: 'component',
-    import: '@navikt/ds-react',
-    description: 'Loading spinner',
-    props: [
-      {
-        name: 'size',
-        type: '"3xlarge" | "2xlarge" | "xlarge" | "large" | "medium" | "small" | "xsmall"',
-        values: ['3xlarge', '2xlarge', 'xlarge', 'large', 'medium', 'small', 'xsmall'],
-        default: 'medium',
-      },
-      { name: 'title', type: 'string', description: 'Loading message' },
-      {
-        name: 'variant',
-        type: '"interaction" | "inverted" | "neutral"',
-        values: ['interaction', 'inverted', 'neutral'],
-        default: 'interaction',
-      },
-    ],
-    snippet: '<Loader title="Loading..." />',
-  },
-  {
     name: 'Modal',
     category: 'component',
     import: '@navikt/ds-react',
@@ -753,23 +713,6 @@ export const uiComponents: ComponentMetadata[] = [
       '<Process>\n  <Process.Step>Step 1</Process.Step>\n  <Process.Step>Step 2</Process.Step>\n</Process>',
   },
   {
-    name: 'ProgressBar',
-    category: 'component',
-    import: '@navikt/ds-react',
-    description: 'Progress indicator bar',
-    props: [
-      { name: 'value', type: 'number', required: true, description: 'Progress value (0-100)' },
-      {
-        name: 'variant',
-        type: '"default" | "success" | "warning" | "info"',
-        values: ['default', 'success', 'warning', 'info'],
-        default: 'default',
-      },
-      { name: 'size', type: '"medium" | "small"', values: ['medium', 'small'], default: 'medium' },
-    ],
-    snippet: '<ProgressBar value={50}>50%</ProgressBar>',
-  },
-  {
     name: 'Radio',
     category: 'component',
     import: '@navikt/ds-react',
@@ -826,23 +769,6 @@ export const uiComponents: ComponentMetadata[] = [
       '<Select label="Select option">\n  <option value="">Choose</option>\n  <option value="1">Option 1</option>\n</Select>',
   },
   {
-    name: 'Skeleton',
-    category: 'component',
-    import: '@navikt/ds-react',
-    description: 'Loading skeleton placeholder',
-    props: [
-      {
-        name: 'variant',
-        type: '"text" | "circle" | "rectangle" | "rounded"',
-        values: ['text', 'circle', 'rectangle', 'rounded'],
-        default: 'text',
-      },
-      { name: 'width', type: 'string | number', description: 'Skeleton width' },
-      { name: 'height', type: 'string | number', description: 'Skeleton height' },
-    ],
-    snippet: '<Skeleton variant="text" width="100%" />',
-  },
-  {
     name: 'Stepper',
     category: 'component',
     import: '@navikt/ds-react',
@@ -873,19 +799,6 @@ export const uiComponents: ComponentMetadata[] = [
     snippet: '<Switch>Toggle label</Switch>',
   },
   {
-    name: 'Table',
-    category: 'component',
-    import: '@navikt/ds-react',
-    description: 'Data table',
-    props: [
-      { name: 'size', type: '"medium" | "small"', values: ['medium', 'small'], default: 'medium' },
-      { name: 'zebraStripes', type: 'boolean', description: 'Alternating row colors' },
-      { name: 'sort', type: 'object', description: 'Sort configuration' },
-    ],
-    snippet:
-      '<Table>\n  <Table.Header>\n    <Table.Row>\n      <Table.HeaderCell>Header</Table.HeaderCell>\n    </Table.Row>\n  </Table.Header>\n  <Table.Body>\n    <Table.Row>\n      <Table.DataCell>Data</Table.DataCell>\n    </Table.Row>\n  </Table.Body>\n</Table>',
-  },
-  {
     name: 'Tabs',
     category: 'component',
     import: '@navikt/ds-react',
@@ -898,27 +811,6 @@ export const uiComponents: ComponentMetadata[] = [
     ],
     snippet:
       '<Tabs defaultValue="tab1">\n  <Tabs.List>\n    <Tabs.Tab value="tab1" label="Tab 1" />\n    <Tabs.Tab value="tab2" label="Tab 2" />\n  </Tabs.List>\n  <Tabs.Panel value="tab1">Content 1</Tabs.Panel>\n  <Tabs.Panel value="tab2">Content 2</Tabs.Panel>\n</Tabs>',
-  },
-  {
-    name: 'Tag',
-    category: 'component',
-    import: '@navikt/ds-react',
-    description: 'Tag label component',
-    props: [
-      {
-        name: 'variant',
-        type: 'string',
-        values: ['info', 'success', 'warning', 'error', 'alt1', 'alt2', 'alt3', 'neutral'],
-        default: 'info',
-      },
-      {
-        name: 'size',
-        type: '"medium" | "small" | "xsmall"',
-        values: ['medium', 'small', 'xsmall'],
-        default: 'medium',
-      },
-    ],
-    snippet: '<Tag variant="info">Tag label</Tag>',
   },
   {
     name: 'Textarea',

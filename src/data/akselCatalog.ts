@@ -1353,6 +1353,149 @@ export const AKSEL_CATALOG: AkselCatalogEntry[] = [
     },
   },
   {
+    id: 'chips-toggle',
+    name: 'Chips Toggle',
+    group: 'component',
+    status: 'current',
+    package: '@navikt/ds-react',
+    importName: 'Chips',
+    importGuidance: "import { Chips } from '@navikt/ds-react';",
+    docs: `${COMPONENT_DOCS_BASE}/chips`,
+    description: 'Toggle chips with selectable filter state.',
+    keywords: ['chips', 'toggle', 'filter', 'selected', 'tag', 'pill'],
+    props: [
+      {
+        name: 'size',
+        type: '"medium" | "small"',
+        values: ['medium', 'small'],
+        valueKind: 'enum',
+        default: 'medium',
+        description: 'Chip size.',
+      },
+      {
+        name: 'selected',
+        type: 'boolean',
+        values: ['true', 'false'],
+        valueKind: 'enum',
+        description: 'Show the selected chip state.',
+      },
+      {
+        name: 'checkmark',
+        type: 'boolean',
+        values: ['true', 'false'],
+        valueKind: 'enum',
+        default: 'true',
+        description: 'Show a checkmark when selected.',
+      },
+      {
+        name: 'data-color',
+        type: 'string',
+        values: dataColorValues,
+        valueKind: 'data-color',
+        description: 'Overrides the chip color.',
+      },
+    ],
+    snippet: {
+      code: '<ChipsToggleExample{{chipsToggleSuffix}} />',
+      hooksCode:
+        'export const ChipsToggleExample{{chipsToggleSuffix}} = () => {\n' +
+        '  const chipOptions{{chipsToggleSuffix}} = [\n' +
+        '    "Lillehammer",\n' +
+        '    "Nittedal",\n' +
+        '    "Enebakk",\n' +
+        '    "Arendal",\n' +
+        '  ]\n' +
+        '  const [selectedLocations{{chipsToggleSuffix}}, setSelectedLocations{{chipsToggleSuffix}}] = useState([\n' +
+        '    "Nittedal",\n' +
+        '    "Arendal",\n' +
+        '  ])\n' +
+        '\n' +
+        '  return (\n' +
+        '    <Chips>\n' +
+        '      {chipOptions{{chipsToggleSuffix}}.map((option) => (\n' +
+        '        <Chips.Toggle\n' +
+        '          key={option}\n' +
+        '          selected={selectedLocations{{chipsToggleSuffix}}.includes(option)}\n' +
+        '          onClick={() =>\n' +
+        '            setSelectedLocations{{chipsToggleSuffix}}((current) =>\n' +
+        '              current.includes(option)\n' +
+        '                ? current.filter((value) => value !== option)\n' +
+        '                : [...current, option]\n' +
+        '            )\n' +
+        '          }\n' +
+        '        >\n' +
+        '          {option}\n' +
+        '        </Chips.Toggle>\n' +
+        '      ))}\n' +
+        '    </Chips>\n' +
+        '  )\n' +
+        '}',
+      description: 'Toggle chips example with Hooks-tab state.',
+    },
+  },
+  {
+    id: 'chips-removable',
+    name: 'Chips Removable',
+    group: 'component',
+    status: 'current',
+    package: '@navikt/ds-react',
+    importName: 'Chips',
+    importGuidance: "import { Chips } from '@navikt/ds-react';",
+    docs: `${COMPONENT_DOCS_BASE}/chips`,
+    description: 'Removable chips for active filters.',
+    keywords: ['chips', 'removable', 'remove', 'delete', 'filter', 'tag', 'pill'],
+    props: [
+      {
+        name: 'size',
+        type: '"medium" | "small"',
+        values: ['medium', 'small'],
+        valueKind: 'enum',
+        default: 'medium',
+        description: 'Chip size.',
+      },
+      {
+        name: 'onDelete',
+        type: '() => void',
+        description: 'Callback used when the chip is removed.',
+      },
+      {
+        name: 'data-color',
+        type: 'string',
+        values: dataColorValues,
+        valueKind: 'data-color',
+        description: 'Overrides the chip color.',
+      },
+    ],
+    snippet: {
+      code: '<ChipsRemovableExample{{chipsRemovableSuffix}} />',
+      hooksCode:
+        'export const ChipsRemovableExample{{chipsRemovableSuffix}} = () => {\n' +
+        '  const defaultFilters{{chipsRemovableSuffix}} = ["Housing", "Income", "Work"]\n' +
+        '  const [activeFilters{{chipsRemovableSuffix}}, setActiveFilters{{chipsRemovableSuffix}}] = useState(defaultFilters{{chipsRemovableSuffix}})\n' +
+        '\n' +
+        '  return (\n' +
+        '    <Chips data-color="neutral">\n' +
+        '      {activeFilters{{chipsRemovableSuffix}}.map((filter) => (\n' +
+        '        <Chips.Removable\n' +
+        '          key={filter}\n' +
+        '          onDelete={() =>\n' +
+        '            setActiveFilters{{chipsRemovableSuffix}}((current) =>\n' +
+        '              current.length === 1\n' +
+        '                ? defaultFilters{{chipsRemovableSuffix}}\n' +
+        '                : current.filter((value) => value !== filter)\n' +
+        '            )\n' +
+        '          }\n' +
+        '        >\n' +
+        '          {filter}\n' +
+        '        </Chips.Removable>\n' +
+        '      ))}\n' +
+        '    </Chips>\n' +
+        '  )\n' +
+        '}',
+      description: 'Removable chips example with Hooks-tab state.',
+    },
+  },
+  {
     id: 'radio',
     name: 'Radio',
     group: 'component',
@@ -1929,6 +2072,221 @@ export const AKSEL_CATALOG: AkselCatalogEntry[] = [
     snippet: {
       code: '<Tag variant="moderate" data-color="info">In progress</Tag>',
       description: 'Visible status label.',
+    },
+  },
+  {
+    id: 'loader',
+    name: 'Loader',
+    group: 'component',
+    status: 'current',
+    package: '@navikt/ds-react',
+    importName: 'Loader',
+    importGuidance: "import { BodyShort, Loader, VStack } from '@navikt/ds-react';",
+    docs: `${COMPONENT_DOCS_BASE}/loader`,
+    description: 'Loading spinner with visible status text.',
+    keywords: ['loader', 'loading', 'spinner', 'progress', 'status', 'wait'],
+    props: [
+      {
+        name: 'size',
+        type: '"3xlarge" | "2xlarge" | "xlarge" | "large" | "medium" | "small" | "xsmall"',
+        values: ['3xlarge', '2xlarge', 'xlarge', 'large', 'medium', 'small', 'xsmall'],
+        valueKind: 'enum',
+        default: 'medium',
+        description: 'Changes loader width and height.',
+      },
+      {
+        name: 'title',
+        type: 'ReactNode',
+        description: 'Accessible title for the SVG loader.',
+      },
+      {
+        name: 'transparent',
+        type: 'boolean',
+        values: ['true', 'false'],
+        valueKind: 'enum',
+        description: 'Remove the default SVG background.',
+      },
+      {
+        name: 'data-color',
+        type: 'string',
+        values: dataColorValues,
+        valueKind: 'data-color',
+        description: 'Overrides the loader color.',
+      },
+    ],
+    snippet: {
+      code:
+        '<VStack gap="space-8" align="center">\n' +
+        '  <Loader size="xlarge" title="Loading case details" />\n' +
+        '  <BodyShort size="small">Loading case details...</BodyShort>\n' +
+        '</VStack>',
+      description: 'Visible loading spinner with helper text.',
+    },
+  },
+  {
+    id: 'progressbar',
+    name: 'ProgressBar',
+    group: 'component',
+    status: 'current',
+    package: '@navikt/ds-react',
+    importName: 'ProgressBar',
+    importGuidance: "import { BodyShort, ProgressBar, VStack } from '@navikt/ds-react';",
+    docs: `${COMPONENT_DOCS_BASE}/progressbar`,
+    description: 'Progress bar with a visible accessible label.',
+    keywords: ['progress', 'bar', 'status', 'steps', 'loading', 'meter'],
+    props: [
+      {
+        name: 'size',
+        type: '"large" | "medium" | "small"',
+        values: ['large', 'medium', 'small'],
+        valueKind: 'enum',
+        default: 'medium',
+        description: 'Changes height.',
+      },
+      {
+        name: 'value',
+        type: 'number',
+        description: 'Current progress value.',
+      },
+      {
+        name: 'valueMax',
+        type: 'number',
+        default: '100',
+        description: 'Maximum progress value.',
+      },
+      {
+        name: 'aria-labelledby',
+        type: 'string',
+        description: 'Element id used as the accessible label.',
+      },
+      {
+        name: 'aria-label',
+        type: 'string',
+        description: 'Inline accessible label for the progress bar.',
+      },
+      {
+        name: 'data-color',
+        type: 'string',
+        values: dataColorValues,
+        valueKind: 'data-color',
+        description: 'Overrides the progress bar color.',
+      },
+    ],
+    snippet: {
+      code:
+        '<VStack gap="space-8" width="300px">\n' +
+        '  <BodyShort id="application-progress-label">Application progress</BodyShort>\n' +
+        '  <ProgressBar value={5} valueMax={7} aria-labelledby="application-progress-label" />\n' +
+        '</VStack>',
+      description: 'Visible progress bar with an accessible label.',
+    },
+  },
+  {
+    id: 'skeleton',
+    name: 'Skeleton',
+    group: 'component',
+    status: 'current',
+    package: '@navikt/ds-react',
+    importName: 'Skeleton',
+    importGuidance: "import { Skeleton, VStack } from '@navikt/ds-react';",
+    docs: `${COMPONENT_DOCS_BASE}/skeleton`,
+    description: 'Skeleton stack for a loading card placeholder.',
+    keywords: ['skeleton', 'loading', 'placeholder', 'shimmer', 'pending'],
+    props: [
+      {
+        name: 'variant',
+        type: '"circle" | "rectangle" | "rounded" | "text"',
+        values: ['circle', 'rectangle', 'rounded', 'text'],
+        valueKind: 'enum',
+        default: 'text',
+        description: 'Skeleton shape.',
+      },
+      {
+        name: 'height',
+        type: 'string | number',
+        description: 'Explicit skeleton height.',
+      },
+      {
+        name: 'width',
+        type: 'string | number',
+        description: 'Explicit skeleton width.',
+      },
+    ],
+    snippet: {
+      code:
+        '<VStack gap="space-8" width="240px">\n' +
+        '  <Skeleton variant="text" height={24} width="55%" />\n' +
+        '  <Skeleton variant="rounded" height={80} />\n' +
+        '  <Skeleton variant="text" width="100%" />\n' +
+        '  <Skeleton variant="text" width="80%" />\n' +
+        '</VStack>',
+      description: 'Stacked skeleton placeholders for a loading summary.',
+    },
+  },
+  {
+    id: 'table',
+    name: 'Table',
+    group: 'component',
+    status: 'current',
+    package: '@navikt/ds-react',
+    importName: 'Table',
+    importGuidance: "import { Table } from '@navikt/ds-react';",
+    docs: `${COMPONENT_DOCS_BASE}/table`,
+    description: 'Complete table with headers and visible data rows.',
+    keywords: ['table', 'data', 'grid', 'rows', 'columns', 'status'],
+    props: [
+      {
+        name: 'size',
+        type: '"large" | "medium" | "small"',
+        values: ['large', 'medium', 'small'],
+        valueKind: 'enum',
+        default: 'medium',
+        description: 'Changes cell padding.',
+      },
+      {
+        name: 'zebraStripes',
+        type: 'boolean',
+        values: ['true', 'false'],
+        valueKind: 'enum',
+        description: 'Show alternating row backgrounds.',
+      },
+      {
+        name: 'stickyHeader',
+        type: 'boolean',
+        values: ['true', 'false'],
+        valueKind: 'enum',
+        description: 'Keep the header visible while scrolling.',
+      },
+      {
+        name: 'sort',
+        type: 'SortState',
+        description: 'Current sort state.',
+      },
+    ],
+    snippet: {
+      code:
+        '<Table size="small" zebraStripes>\n' +
+        '  <Table.Header>\n' +
+        '    <Table.Row>\n' +
+        '      <Table.HeaderCell scope="col">Team</Table.HeaderCell>\n' +
+        '      <Table.HeaderCell scope="col">Status</Table.HeaderCell>\n' +
+        '      <Table.HeaderCell scope="col">Updated</Table.HeaderCell>\n' +
+        '    </Table.Row>\n' +
+        '  </Table.Header>\n' +
+        '  <Table.Body>\n' +
+        '    <Table.Row>\n' +
+        '      <Table.HeaderCell scope="row">Payments</Table.HeaderCell>\n' +
+        '      <Table.DataCell>Ready</Table.DataCell>\n' +
+        '      <Table.DataCell>Today</Table.DataCell>\n' +
+        '    </Table.Row>\n' +
+        '    <Table.Row>\n' +
+        '      <Table.HeaderCell scope="row">Membership</Table.HeaderCell>\n' +
+        '      <Table.DataCell>Waiting</Table.DataCell>\n' +
+        '      <Table.DataCell>Tomorrow</Table.DataCell>\n' +
+        '    </Table.Row>\n' +
+        '  </Table.Body>\n' +
+        '</Table>',
+      description: 'Visible table example with header and body rows.',
     },
   },
   {

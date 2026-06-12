@@ -42,6 +42,7 @@ const catalogCompletionEntries = catalogEntries
   .filter((entry) => entry.group !== 'icon')
   .map((entry) => ({ ...entry, source: 'catalog' as const }))
 const catalogEntryNames = new Set(catalogCompletionEntries.map((entry) => entry.name))
+const catalogImportNames = new Set(catalogCompletionEntries.map((entry) => entry.importName))
 const docsEntries = AKSEL_AUTOCOMPLETE_ENTRIES.map((entry) => ({
   ...entry,
   source: 'docs' as const,
@@ -50,18 +51,25 @@ const iconEntries = catalogEntries
   .filter((entry) => entry.group === 'icon')
   .map((entry) => ({ ...entry, source: 'catalog' as const }))
 const fallbackDocsEntries = filterNewAuthoringEntries(
-  docsEntries.filter((entry) => !catalogEntryNames.has(entry.name))
+  docsEntries.filter(
+    (entry) => !catalogEntryNames.has(entry.name) && !catalogImportNames.has(entry.name)
+  )
 )
 const allCompletionEntries: CompletionEntry[] = [
   ...filterNewAuthoringEntries(catalogCompletionEntries),
   ...fallbackDocsEntries,
 ]
-const topLevelCompletionEntries = allCompletionEntries.filter(
-  (entry) =>
-    COMPONENT_NAME_PATTERN.test(entry.name) &&
-    !isContextualOnlyAutocompleteEntry(entry.name) &&
-    (entry.source === 'catalog' || !entry.name.includes('.'))
-)
+const topLevelCompletionEntries = allCompletionEntries.filter((entry) => {
+  if (isContextualOnlyAutocompleteEntry(entry.name)) {
+    return false
+  }
+
+  if (entry.source === 'catalog') {
+    return getCompletionAliases(entry).some((alias) => COMPONENT_NAME_PATTERN.test(alias))
+  }
+
+  return COMPONENT_NAME_PATTERN.test(entry.name) && !entry.name.includes('.')
+})
 const completionEntriesByName = new Map(allCompletionEntries.map((entry) => [entry.name, entry]))
 const docsEntriesByName = new Map(docsEntries.map((entry) => [entry.name, entry]))
 
@@ -267,6 +275,26 @@ function matchesPartial(value: string, partial: string): boolean {
 
 function matchesCaseSensitivePrefix(value: string, partial: string): boolean {
   return value.startsWith(partial)
+}
+
+function getCompletionAliases(entry: CompletionEntry): string[] {
+  if (entry.source !== 'catalog') {
+    return [entry.name]
+  }
+
+  return Array.from(
+    new Set(
+      [
+        entry.name,
+        entry.importName,
+        entry.name.includes(' ') ? entry.name.replace(/\s+/g, '') : undefined,
+      ].filter((alias): alias is string => Boolean(alias))
+    )
+  )
+}
+
+function matchesCompletionEntry(entry: CompletionEntry, partial: string): boolean {
+  return getCompletionAliases(entry).some((alias) => matchesPartial(alias, partial))
 }
 
 function dedupeValues(values: Array<string | undefined>): string[] {
@@ -1083,7 +1111,7 @@ export function getAkselCompletionForSource(
       isIconPropTagContext || !shouldSuggestComponents
         ? []
         : topLevelCompletionEntries
-            .filter((entry) => matchesPartial(entry.name, tagNameContext.query))
+            .filter((entry) => matchesCompletionEntry(entry, tagNameContext.query))
             .filter((entry) => supportsCatalogInsertion(entry, onApplyCatalogInsertion))
             .map((entry) => componentOption(entry, onApplyCatalogInsertion))
     const componentOptions =
@@ -1097,7 +1125,7 @@ export function getAkselCompletionForSource(
             ...contextualOptions.names,
             ...topLevelCompletionEntries.map((entry) => ({
               name: entry.name,
-              aliases: [entry.name],
+              aliases: getCompletionAliases(entry),
             })),
           ]
     const iconOptions =
