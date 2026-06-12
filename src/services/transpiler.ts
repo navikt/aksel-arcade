@@ -1,12 +1,71 @@
 import type { ArcadePageId, ProjectSource } from '@/types/project'
 import type { TranspileResult, CompileError } from '@/types/preview'
 
-// Lazy load Babel to avoid blocking initial page load
-let Babel: typeof import('@babel/standalone') | null = null
+interface BabelParserNode {
+  type: string
+  start?: number | null
+  end?: number | null
+  [key: string]: unknown
+}
 
-const loadBabel = async () => {
+interface BabelParserFile {
+  program: {
+    body: BabelParserNode[]
+  }
+}
+
+type BabelStandaloneWithParser = typeof import('@babel/standalone') & {
+  packages: {
+    parser: {
+      parse: (
+        code: string,
+        options: {
+          sourceType: 'module'
+          plugins: string[]
+        }
+      ) => BabelParserFile
+    }
+  }
+}
+
+const isBabelStandaloneWithParser = (value: unknown): value is BabelStandaloneWithParser => {
+  if (!value || typeof value !== 'object') {
+    return false
+  }
+
+  const candidate = value as Record<string, unknown>
+  if (typeof candidate.transform !== 'function') {
+    return false
+  }
+
+  const packages = candidate.packages
+  if (!packages || typeof packages !== 'object') {
+    return false
+  }
+
+  const parser = (packages as Record<string, unknown>).parser
+  return Boolean(parser) && typeof parser === 'object' && typeof (parser as Record<string, unknown>).parse === 'function'
+}
+
+// Lazy load Babel to avoid blocking initial page load
+let Babel: BabelStandaloneWithParser | null = null
+
+const loadBabel = async (): Promise<BabelStandaloneWithParser> => {
   if (!Babel) {
-    Babel = await import('@babel/standalone')
+    const loadedBabel = await import('@babel/standalone')
+    const defaultBabel =
+      'default' in loadedBabel ? (loadedBabel.default as unknown) : undefined
+    const standaloneBabel = isBabelStandaloneWithParser(loadedBabel)
+      ? loadedBabel
+      : isBabelStandaloneWithParser(defaultBabel)
+        ? defaultBabel
+        : null
+
+    if (!standaloneBabel) {
+      throw new Error('Failed to load Babel parser package')
+    }
+
+    Babel = standaloneBabel
   }
   return Babel
 }
@@ -39,8 +98,6 @@ const DEFAULT_EXPORT_DECLARATION_PATTERN =
   /export\s+default\s+(function|class)\s+([A-Za-z_$][\w$]*)/
 const EXPORT_NAMED_DECLARATION_PATTERN = /export\s+(const|let|var|function|class)\s+/g
 const EXPORT_NAMED_LIST_PATTERN = /export\s*\{[^}]+\}\s*;?\n?/g
-const TOP_LEVEL_COMPONENT_HOOK_DECLARATION_PATTERN =
-  /^\s*(?:const|let)\s+(?:\[[^\]]+\]|\{[^}]+\}|[A-Za-z_$][\w$]*)\s*=\s*use[A-Z][\w$]*(?:<[^>\n]+>)?\(.*\)\s*;?\s*$/
 
 const getSupportedImportModule = (source: string): SupportedImportModule | null => {
   if (source === 'react') return 'react'
@@ -290,46 +347,117 @@ const normalizeBlankLines = (sourceCode: string): string =>
     .replace(/^\n+/, '')
     .replace(/\n+$/, '')
 
-const countBraceDelta = (sourceCode: string): number =>
-  Array.from(sourceCode).reduce((depth, char) => {
-    if (char === '{') {
-      return depth + 1
-    }
+const isObjectNode = (value: unknown): value is Record<string, unknown> =>
+  Boolean(value) && typeof value === 'object'
 
-    if (char === '}') {
-      return depth - 1
-    }
-
-    return depth
-  }, 0)
-
-const extractComponentHookStatements = (
-  sourceCode: string
-): {
-  moduleCode: string
-  componentHookStatements: string
-} => {
-  const lines = sourceCode.split('\n')
-  const moduleLines: string[] = []
-  const componentHookLines: string[] = []
-  let braceDepth = 0
-
-  for (const line of lines) {
-    const isComponentHookLine =
-      braceDepth === 0 && TOP_LEVEL_COMPONENT_HOOK_DECLARATION_PATTERN.test(line)
-
-    if (isComponentHookLine) {
-      componentHookLines.push(line.trimEnd())
-    } else {
-      moduleLines.push(line)
-    }
-
-    braceDepth = Math.max(0, braceDepth + countBraceDelta(line))
+const isHookCallExpression = (expression: unknown): boolean => {
+  if (!isObjectNode(expression) || typeof expression.type !== 'string') {
+    return false
   }
 
-  return {
-    moduleCode: normalizeBlankLines(moduleLines.join('\n')),
-    componentHookStatements: componentHookLines.join('\n'),
+  if (expression.type === 'CallExpression') {
+    const callee = expression.callee
+    if (!isObjectNode(callee) || typeof callee.type !== 'string') {
+      return false
+    }
+
+    if (callee.type === 'Identifier') {
+      return typeof callee.name === 'string' && /^use[A-Z][\w$]*$/.test(callee.name)
+    }
+
+    const calleeObject = isObjectNode(callee.object) ? callee.object : null
+    const calleeProperty = isObjectNode(callee.property) ? callee.property : null
+
+    return (
+      callee.type === 'MemberExpression' &&
+      !callee.computed &&
+      calleeObject?.type === 'Identifier' &&
+      calleeObject.name === 'React' &&
+      calleeProperty?.type === 'Identifier' &&
+      typeof calleeProperty.name === 'string' &&
+      /^use[A-Z][\w$]*$/.test(calleeProperty.name)
+    )
+  }
+
+  return (
+    (expression.type === 'TSAsExpression' ||
+      expression.type === 'TSTypeAssertion' ||
+      expression.type === 'ParenthesizedExpression') &&
+    isHookCallExpression(expression.expression)
+  )
+}
+
+const isTopLevelComponentHookStatement = (statement: unknown): boolean => {
+  if (!isObjectNode(statement) || statement.type !== 'VariableDeclaration') {
+    return false
+  }
+
+  return (
+    (statement.kind === 'const' || statement.kind === 'let') &&
+    Array.isArray(statement.declarations) &&
+    statement.declarations.length > 0 &&
+    statement.declarations.every(
+      (declaration) => isObjectNode(declaration) && isHookCallExpression(declaration.init)
+    )
+  )
+}
+
+const extractComponentHookStatements = async (
+  sourceCode: string
+): Promise<{
+  moduleCode: string
+  componentHookStatements: string
+}> => {
+  if (!sourceCode.trim()) {
+    return {
+      moduleCode: sourceCode,
+      componentHookStatements: '',
+    }
+  }
+
+  try {
+    const babel = await loadBabel()
+    const ast = babel.packages.parser.parse(sourceCode, {
+      sourceType: 'module',
+      plugins: ['typescript', 'jsx'],
+    })
+    const statementRanges = ast.program.body
+      .filter((statement) => isTopLevelComponentHookStatement(statement))
+      .map((statement) => ({
+        start: statement.start ?? 0,
+        end: statement.end ?? 0,
+      }))
+      .filter((range) => range.end > range.start)
+      .sort((first, second) => first.start - second.start)
+
+    if (statementRanges.length === 0) {
+      return {
+        moduleCode: sourceCode,
+        componentHookStatements: '',
+      }
+    }
+
+    const moduleParts: string[] = []
+    const componentHookStatements: string[] = []
+    let currentIndex = 0
+
+    for (const range of statementRanges) {
+      moduleParts.push(sourceCode.slice(currentIndex, range.start))
+      componentHookStatements.push(sourceCode.slice(range.start, range.end).trim())
+      currentIndex = range.end
+    }
+
+    moduleParts.push(sourceCode.slice(currentIndex))
+
+    return {
+      moduleCode: normalizeBlankLines(moduleParts.join('')),
+      componentHookStatements: componentHookStatements.join('\n'),
+    }
+  } catch {
+    return {
+      moduleCode: sourceCode,
+      componentHookStatements: '',
+    }
   }
 }
 
@@ -510,10 +638,10 @@ const createPreparedSourceBlock = (label: string, sourceCode: string): PreparedS
   ...stripSupportedImports(sourceCode),
 })
 
-const buildSinglePageCombinedSource = (
+const buildSinglePageCombinedSource = async (
   jsxCode: string,
   hooksCode: string
-): BuildCombinedSourceResult => {
+): Promise<BuildCombinedSourceResult> => {
   const strippedJsx = createPreparedSourceBlock('page JSX', jsxCode)
   const strippedHooks = createPreparedSourceBlock('page Hooks', hooksCode)
   const unsupportedImport = getFirstUnsupportedImport([strippedJsx, strippedHooks])
@@ -525,7 +653,7 @@ const buildSinglePageCombinedSource = (
     }
   }
 
-  const extractedHooks = extractComponentHookStatements(strippedHooks.code)
+  const extractedHooks = await extractComponentHookStatements(strippedHooks.code)
   const processedHooksCode = normalizeModuleDeclarations(
     extractedHooks.moduleCode,
     '__AkselArcadeHooksDefault'
@@ -616,10 +744,10 @@ const appendMappedLines = (
   })
 }
 
-const buildProjectSourceCombinedCode = (
+const buildProjectSourceCombinedCode = async (
   source: ProjectSource,
   { previewSessionKey }: ProjectSourceTranspileOptions = {}
-): BuildCombinedSourceResult => {
+): Promise<BuildCombinedSourceResult> => {
   const firstPage = source.pages[0]
   if (!firstPage) {
     return {
@@ -667,10 +795,10 @@ const buildProjectSourceCombinedCode = (
     strippedGlobalJsx.runtimePrelude,
     strippedGlobalHooks.runtimePrelude
   )
-  const pageBlocks = preparedPages.map(({ page, strippedHooks, strippedJsx }) => {
+  const pageBlocks = await Promise.all(preparedPages.map(async ({ page, strippedHooks, strippedJsx }) => {
     const pageComponentName = getPageComponentName(page.id)
     const pageModuleName = getPageModuleName(page.id)
-    const extractedPageHooks = extractComponentHookStatements(strippedHooks.code)
+    const extractedPageHooks = await extractComponentHookStatements(strippedHooks.code)
     const processedPageHooks = normalizeModuleDeclarations(
       extractedPageHooks.moduleCode,
       `${pageComponentName}HooksDefault`
@@ -694,7 +822,7 @@ const buildProjectSourceCombinedCode = (
       strippedJsx,
       processedPageJsx,
     }
-  })
+  }))
   const startPageId = source.pages.some((page) => page.id === source.startPageId)
     ? source.startPageId
     : firstPage.id
@@ -1004,7 +1132,7 @@ export const transpileCode = async (
   jsxCode: string,
   hooksCode: string
 ): Promise<TranspileResult> => {
-  const combinedSource = buildSinglePageCombinedSource(jsxCode, hooksCode)
+  const combinedSource = await buildSinglePageCombinedSource(jsxCode, hooksCode)
   if (combinedSource.error || !combinedSource.code) {
     return {
       success: false,
@@ -1020,7 +1148,7 @@ export const transpileProjectSource = async (
   source: ProjectSource,
   options?: ProjectSourceTranspileOptions
 ): Promise<TranspileResult> => {
-  const combinedSource = buildProjectSourceCombinedCode(source, options)
+  const combinedSource = await buildProjectSourceCombinedCode(source, options)
   if (combinedSource.error || !combinedSource.code) {
     return {
       success: false,

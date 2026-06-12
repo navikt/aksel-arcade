@@ -244,6 +244,29 @@ const popoverId = useId()`
     expect(result.code).toContain('const popoverId = useId();')
   })
 
+  it('injects multiline top-level page Hooks bindings into implicit Arcade page wrappers', async () => {
+    const hooksCode = `const [openState, setOpenState] = useState(
+  false
+)
+const popoverId = useId()`
+
+    const jsxCode = `<Button
+  onClick={() => setOpenState(!openState)}
+  aria-expanded={openState}
+  aria-controls={openState ? popoverId : undefined}
+>
+  Åpne popover
+</Button>`
+
+    const result = await transpileCode(jsxCode, hooksCode)
+
+    expect(result.success).toBe(true)
+    expect(result.code).toContain('function App() {')
+    expect(result.code).toContain('const [openState, setOpenState] = useState(false);')
+    expect(result.code).toContain('const popoverId = useId();')
+    expect(result.code).not.toContain('const [openState, setOpenState] = useState(false);\n\nfunction App()')
+  })
+
   it('should report syntax errors', async () => {
     const jsxCode = `export default function App() {
   return <Button>Unclosed

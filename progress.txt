@@ -1573,6 +1573,22 @@ Verification:
 - npm run build
 - Browser check at `http://127.0.0.1:4321/aksel-arcade/`: after clearing the saved JSX/Hooks state, confirmed Add -> `Popover` inserts the direct `Button` + `Popover` JSX plus raw hook bindings, a reload preserves that shape, clicking `Åpne popover` reveals `Innhold her!`, and the clean reloaded session shows no console errors beyond the pre-existing form-field issue
 
+### 2026-06-12 - PR #228 review follow-up for Issue #214
+
+Fixed before merge:
+
+- Replaced the first line-based page-Hooks lifting pass in `src/services/transpiler.ts` with top-level statement extraction backed by Babel's parser so multiline hook bindings also move into the generated page component instead of remaining at module scope.
+- Kept the lifting scope narrow to direct top-level hook-backed `const`/`let` declarations, preserving the earlier direct Popover insertion behavior while fixing the review-reported invalid-hook-call edge case.
+- Added a regression in `tests/integration/transpiler.test.ts` that exercises multiline top-level hook bindings in the Hooks tab, and confirmed the direct Popover snippet still renders correctly when those bindings span multiple lines.
+
+Verification:
+
+- npm run typecheck
+- npm run lint (existing `.eslintignore` deprecation notice and existing `InspectionPopover` hook dependency warning only)
+- npm run test -- --run
+- npm run build
+- Browser check at `http://127.0.0.1:4321/aksel-arcade/`: replaced the editor content with the direct Popover JSX plus multiline `useState` / `useId` hook bindings, confirmed the preview renders `Åpne popover`, and confirmed clicking it still shows `Innhold her!` with no new Popover/transpiler runtime errors
+
 ### 2026-05-31 - Issue #147: Unsigned PR Desktop packaging checks
 
 Implemented:
