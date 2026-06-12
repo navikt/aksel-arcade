@@ -407,20 +407,6 @@ export const uiComponents: ComponentMetadata[] = [
     snippet: '<Button>Click me</Button>',
   },
   {
-    name: 'Chat',
-    category: 'component',
-    import: '@navikt/ds-react',
-    description: 'Chat message bubbles',
-    props: [
-      { name: 'variant', type: '"left" | "right"', values: ['left', 'right'] },
-      { name: 'avatar', type: 'string', description: 'Avatar image URL' },
-      { name: 'name', type: 'string', description: 'Sender name' },
-      { name: 'timestamp', type: 'string', description: 'Message timestamp' },
-    ],
-    snippet:
-      '<Chat variant="left" name="User">\n  <Chat.Bubble>Message text</Chat.Bubble>\n</Chat>',
-  },
-  {
     name: 'Checkbox',
     category: 'component',
     import: '@navikt/ds-react',
@@ -447,30 +433,6 @@ export const uiComponents: ComponentMetadata[] = [
       { name: 'description', type: 'string', description: 'Helper text' },
     ],
     snippet: '<Combobox label="Select option" options={[]}>\n</Combobox>',
-  },
-  {
-    name: 'CopyButton',
-    category: 'component',
-    import: '@navikt/ds-react',
-    description: 'Button to copy text to clipboard',
-    props: [
-      { name: 'copyText', type: 'string', required: true, description: 'Text to copy' },
-      { name: 'text', type: 'string', description: 'Button text' },
-      { name: 'activeText', type: 'string', description: 'Text when copied' },
-      {
-        name: 'size',
-        type: '"medium" | "small" | "xsmall"',
-        values: ['medium', 'small', 'xsmall'],
-        default: 'medium',
-      },
-      {
-        name: 'variant',
-        type: 'string',
-        values: ['primary', 'secondary', 'tertiary'],
-        default: 'primary',
-      },
-    ],
-    snippet: '<CopyButton copyText="Text to copy" />',
   },
   {
     name: 'DatePicker',
@@ -549,17 +511,9 @@ export const uiComponents: ComponentMetadata[] = [
     category: 'component',
     import: '@navikt/ds-react',
     description: 'Form submission summary',
-    props: [{ name: 'heading', type: 'string', description: 'Summary heading' }],
+    props: [{ name: 'heading', type: 'string', description: 'Summary heading' }    ],
     snippet:
       '<FormSummary>\n  <FormSummary.Header>\n    <FormSummary.Heading>Summary</FormSummary.Heading>\n  </FormSummary.Header>\n  <FormSummary.Answers>\n    <FormSummary.Answer>\n      <FormSummary.Label>Label</FormSummary.Label>\n      <FormSummary.Value>Value</FormSummary.Value>\n    </FormSummary.Answer>\n  </FormSummary.Answers>\n</FormSummary>',
-  },
-  {
-    name: 'GuidePanel',
-    category: 'component',
-    import: '@navikt/ds-react',
-    description: 'Informational guide panel',
-    props: [{ name: 'poster', type: 'boolean', description: 'Show as poster variant' }],
-    snippet: '<GuidePanel>\n  Guide content\n</GuidePanel>',
   },
   {
     name: 'HelpText',
@@ -571,75 +525,6 @@ export const uiComponents: ComponentMetadata[] = [
       { name: 'placement', type: 'string', description: 'Popover placement' },
     ],
     snippet: '<HelpText title="Help title">Help content</HelpText>',
-  },
-  {
-    name: 'InternalHeader',
-    category: 'component',
-    import: '@navikt/ds-react',
-    description: 'Internal application header',
-    props: [],
-    snippet:
-      '<InternalHeader>\n  <InternalHeader.Title>App Title</InternalHeader.Title>\n</InternalHeader>',
-  },
-  {
-    name: 'Link',
-    category: 'component',
-    import: '@navikt/ds-react',
-    description: 'Styled link component',
-    props: [
-      { name: 'href', type: 'string', required: true, description: 'Link URL' },
-      {
-        name: 'variant',
-        type: '"action" | "neutral"',
-        values: ['action', 'neutral'],
-        default: 'action',
-      },
-      { name: 'underline', type: 'boolean', description: 'Show underline', default: 'true' },
-    ],
-    snippet: '<Link href="#">Link text</Link>',
-  },
-  {
-    name: 'LinkCard',
-    category: 'component',
-    import: '@navikt/ds-react',
-    description: 'Clickable card link',
-    props: [
-      { name: 'arrow', type: 'boolean', description: 'Show arrow icon', default: 'true' },
-      {
-        name: 'arrowPosition',
-        type: 'string',
-        values: ['baseline', 'center'],
-        default: 'baseline',
-        description: 'Adjusts arrow position',
-      },
-      {
-        name: 'size',
-        type: 'string',
-        values: ['small', 'medium'],
-        default: 'medium',
-        description: 'Changes padding and typo sizes',
-      },
-      { name: 'className', type: 'string', description: 'Additional CSS class names' },
-      {
-        name: 'data-color',
-        type: 'string',
-        values: ['neutral', 'accent', 'success', 'warning', 'danger', 'info'],
-        description: 'Color theme for the card',
-      },
-    ],
-    snippet:
-      '<LinkCard>\n  <LinkCard.Title>\n    <LinkCard.Anchor href="">Datasikkerheit er ivareteken gjennom kryptert overføring.</LinkCard.Anchor>\n  </LinkCard.Title>\n  <LinkCard.Description>\n    I samband med systemvedlikehald kan tenesta vere utilgjengeleg sundag mellom klokka 22 og 02. Planlagde avbrot vert varsla på framsida minst 48 timar før nedetid tek til å gjelde.\n  </LinkCard.Description>\n</LinkCard>',
-  },
-  {
-    name: 'List',
-    category: 'component',
-    import: '@navikt/ds-react',
-    description: 'Styled list component',
-    props: [
-      { name: 'as', type: '"ul" | "ol"', values: ['ul', 'ol'], default: 'ul' },
-      { name: 'size', type: '"medium" | "small"', values: ['medium', 'small'], default: 'medium' },
-    ],
-    snippet: '<List>\n  <List.Item>Item 1</List.Item>\n  <List.Item>Item 2</List.Item>\n</List>',
   },
   {
     name: 'Modal',
@@ -883,91 +768,6 @@ export const uiComponents: ComponentMetadata[] = [
     snippet: '<Tooltip content="Tooltip text">\n  <span>Hover me</span>\n</Tooltip>',
   },
   // Typography components
-  {
-    name: 'Heading',
-    category: 'component',
-    import: '@navikt/ds-react',
-    description: 'Heading text',
-    props: [
-      {
-        name: 'level',
-        type: '"1" | "2" | "3" | "4" | "5"',
-        values: ['1', '2', '3', '4', '5'],
-        required: true,
-      },
-      { name: 'size', type: 'string', values: ['xlarge', 'large', 'medium', 'small', 'xsmall'] },
-      { name: 'spacing', type: 'boolean', description: 'Add bottom margin' },
-    ],
-    snippet: '<Heading level="1" size="large">Heading text</Heading>',
-  },
-  {
-    name: 'BodyLong',
-    category: 'component',
-    import: '@navikt/ds-react',
-    description: 'Long body text with optimized line height',
-    props: [
-      {
-        name: 'size',
-        type: '"large" | "medium" | "small"',
-        values: ['large', 'medium', 'small'],
-        default: 'medium',
-      },
-      { name: 'spacing', type: 'boolean', description: 'Add bottom margin' },
-      { name: 'weight', type: '"regular" | "semibold"', values: ['regular', 'semibold'] },
-    ],
-    snippet: '<BodyLong>Body text</BodyLong>',
-  },
-  {
-    name: 'BodyShort',
-    category: 'component',
-    import: '@navikt/ds-react',
-    description: 'Short body text with compact line height',
-    props: [
-      {
-        name: 'size',
-        type: '"large" | "medium" | "small"',
-        values: ['large', 'medium', 'small'],
-        default: 'medium',
-      },
-      { name: 'spacing', type: 'boolean', description: 'Add bottom margin' },
-      { name: 'weight', type: '"regular" | "semibold"', values: ['regular', 'semibold'] },
-    ],
-    snippet: '<BodyShort>Short text</BodyShort>',
-  },
-  {
-    name: 'Label',
-    category: 'component',
-    import: '@navikt/ds-react',
-    description: 'Label text',
-    props: [
-      {
-        name: 'size',
-        type: '"large" | "medium" | "small"',
-        values: ['large', 'medium', 'small'],
-        default: 'medium',
-      },
-      { name: 'spacing', type: 'boolean', description: 'Add bottom margin' },
-      { name: 'as', type: 'string', description: 'HTML element to render' },
-    ],
-    snippet: '<Label>Label text</Label>',
-  },
-  {
-    name: 'Detail',
-    category: 'component',
-    import: '@navikt/ds-react',
-    description: 'Small detail text',
-    props: [
-      {
-        name: 'size',
-        type: '"large" | "medium" | "small"',
-        values: ['large', 'medium', 'small'],
-        default: 'medium',
-      },
-      { name: 'spacing', type: 'boolean', description: 'Add bottom margin' },
-      { name: 'uppercase', type: 'boolean', description: 'Transform to uppercase' },
-    ],
-    snippet: '<Detail>Detail text</Detail>',
-  },
   {
     name: 'ErrorMessage',
     category: 'component',

@@ -254,15 +254,6 @@ const MANUAL_AKSEL_SNIPPETS: ComponentSnippet[] = [
   },
   // Navigation Components
   {
-    id: 'link',
-    name: 'Link',
-    category: 'component',
-    keywords: ['link', 'anchor', 'navigate', 'url', 'href'],
-    template: '<Link href="${1:#}">${2:Link text}</Link>',
-    description: 'Styled link component',
-    import: "import { Link } from '@navikt/ds-react';",
-  },
-  {
     id: 'tabs',
     name: 'Tabs',
     category: 'component',
@@ -393,45 +384,6 @@ const MANUAL_AKSEL_SNIPPETS: ComponentSnippet[] = [
     import: "import { ReadMore } from '@navikt/ds-react';",
   },
   {
-    id: 'guidepanel',
-    name: 'GuidePanel',
-    category: 'component',
-    keywords: ['guide', 'panel', 'info', 'help', 'content'],
-    template: '<GuidePanel>\n  ${1:Guide content}\n</GuidePanel>',
-    description: 'Informational guide panel',
-    import: "import { GuidePanel } from '@navikt/ds-react';",
-  },
-  {
-    id: 'chat',
-    name: 'Chat',
-    category: 'component',
-    keywords: ['chat', 'message', 'bubble', 'conversation'],
-    template:
-      '<Chat variant="left" name="${1:User}">\n  <Chat.Bubble>${2:Message text}</Chat.Bubble>\n</Chat>',
-    description: 'Chat message bubbles',
-    import: "import { Chat } from '@navikt/ds-react';",
-  },
-  {
-    id: 'list',
-    name: 'List',
-    category: 'component',
-    keywords: ['list', 'items', 'ul', 'ol', 'bullet'],
-    template:
-      '<List>\n  <List.Item>${1:Item 1}</List.Item>\n  <List.Item>${2:Item 2}</List.Item>\n</List>',
-    description: 'Styled list component',
-    import: "import { List } from '@navikt/ds-react';",
-  },
-  {
-    id: 'linkcard',
-    name: 'LinkCard',
-    category: 'component',
-    keywords: ['link', 'card', 'navigate', 'clickable'],
-    template:
-      '<LinkCard>\n  <LinkCard.Title>\n    <LinkCard.Anchor href="${1:}">${2:Datasikkerheit er ivareteken gjennom kryptert overføring.}</LinkCard.Anchor>\n  </LinkCard.Title>\n  <LinkCard.Description>\n    ${3:I samband med systemvedlikehald kan tenesta vere utilgjengeleg sundag mellom klokka 22 og 02. Planlagde avbrot vert varsla på framsida minst 48 timar før nedetid tek til å gjelde.}\n  </LinkCard.Description>\n</LinkCard>',
-    description: 'Clickable card link',
-    import: "import { LinkCard } from '@navikt/ds-react';",
-  },
-  {
     id: 'formsummary',
     name: 'FormSummary',
     category: 'component',
@@ -444,51 +396,6 @@ const MANUAL_AKSEL_SNIPPETS: ComponentSnippet[] = [
 
   // Typography Components
   {
-    id: 'heading',
-    name: 'Heading',
-    category: 'component',
-    keywords: ['heading', 'title', 'h1', 'h2', 'h3', 'text'],
-    template: '<Heading level="1" size="large">${1:Heading text}</Heading>',
-    description: 'Heading text',
-    import: "import { Heading } from '@navikt/ds-react';",
-  },
-  {
-    id: 'bodylong',
-    name: 'BodyLong',
-    category: 'component',
-    keywords: ['body', 'text', 'paragraph', 'long'],
-    template: '<BodyLong>${1:Body text}</BodyLong>',
-    description: 'Long body text',
-    import: "import { BodyLong } from '@navikt/ds-react';",
-  },
-  {
-    id: 'bodyshort',
-    name: 'BodyShort',
-    category: 'component',
-    keywords: ['body', 'text', 'paragraph', 'short'],
-    template: '<BodyShort>${1:Short text}</BodyShort>',
-    description: 'Short body text',
-    import: "import { BodyShort } from '@navikt/ds-react';",
-  },
-  {
-    id: 'label',
-    name: 'Label',
-    category: 'component',
-    keywords: ['label', 'text', 'caption'],
-    template: '<Label>${1:Label text}</Label>',
-    description: 'Label text',
-    import: "import { Label } from '@navikt/ds-react';",
-  },
-  {
-    id: 'detail',
-    name: 'Detail',
-    category: 'component',
-    keywords: ['detail', 'small', 'text', 'caption'],
-    template: '<Detail>${1:Detail text}</Detail>',
-    description: 'Small detail text',
-    import: "import { Detail } from '@navikt/ds-react';",
-  },
-  {
     id: 'errormessage',
     name: 'ErrorMessage',
     category: 'component',
@@ -499,25 +406,6 @@ const MANUAL_AKSEL_SNIPPETS: ComponentSnippet[] = [
   },
 
   // Other Components
-  {
-    id: 'copybutton',
-    name: 'CopyButton',
-    category: 'component',
-    keywords: ['copy', 'clipboard', 'button', 'text'],
-    template: '<CopyButton copyText="${1:Text to copy}" />',
-    description: 'Copy to clipboard button',
-    import: "import { CopyButton } from '@navikt/ds-react';",
-  },
-  {
-    id: 'internalheader',
-    name: 'InternalHeader',
-    category: 'component',
-    keywords: ['header', 'navigation', 'internal', 'app'],
-    template:
-      '<InternalHeader>\n  <InternalHeader.Title>${1:App Title}</InternalHeader.Title>\n</InternalHeader>',
-    description: 'Internal application header',
-    import: "import { InternalHeader } from '@navikt/ds-react';",
-  },
 ]
 
 const catalogSnippetNames = new Set(CATALOG_SNIPPETS.map((snippet) => snippet.name))

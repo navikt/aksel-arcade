@@ -17,6 +17,7 @@ describe('sandbox security boundaries', () => {
   it('runs the preview iframe with an opaque sandbox origin', () => {
     const livePreview = readProjectFile('src/components/Preview/LivePreview.tsx')
 
+    expect(livePreview).toContain('allow="clipboard-write"')
     expect(livePreview).toContain('sandbox="allow-scripts"')
     expect(livePreview).not.toContain('allow-same-origin')
   })

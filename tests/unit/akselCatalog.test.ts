@@ -153,9 +153,11 @@ describe('Aksel catalog starter path', () => {
     expect(componentEntries.map((entry) => entry.name)).toEqual(
       expect.arrayContaining(['BodyShort', 'Heading', 'Tag'])
     )
-    expect(bodyShortEntry?.snippet.code).toBe('<BodyShort>Short text</BodyShort>')
+    expect(bodyShortEntry?.snippet.code).toBe(
+      '<BodyShort>You need to choose a filter before we can show results.</BodyShort>'
+    )
     expect(headingEntry?.snippet.code).toBe(
-      '<Heading level="1" size="large">Heading text</Heading>'
+      '<Heading level="2" size="medium">Application overview</Heading>'
     )
     expect(tagEntry?.snippet.code).toBe(
       '<Tag variant="moderate" data-color="info">In progress</Tag>'
@@ -170,6 +172,118 @@ describe('Aksel catalog starter path', () => {
     expect(searchComponents('badge')).toContainEqual(expect.objectContaining({ name: 'Tag' }))
     expect(AKSEL_SNIPPETS.find((snippet) => snippet.name === 'Tag')?.template).toBe(
       '<Tag variant="moderate" data-color="info">In progress</Tag>'
+    )
+  })
+
+  it('routes Issue 212 content, typography, and link examples through the shared catalog', () => {
+    const componentEntries = listCatalogEntries({ groups: ['component'], statuses: ['current'] })
+    const paletteComponents = getComponentsByCategory('component')
+    const bodyLongEntry = getCatalogComponent('BodyLong')
+    const labelEntry = getCatalogComponent('Label')
+    const detailEntry = getCatalogComponent('Detail')
+    const chatEntry = getCatalogComponent('Chat')
+    const copyButtonEntry = getCatalogComponent('CopyButton')
+    const guidePanelEntry = getCatalogComponent('GuidePanel')
+    const internalHeaderEntry = getCatalogComponent('InternalHeader')
+    const linkEntry = getCatalogComponent('Link')
+    const linkCardEntry = getCatalogComponent('LinkCard')
+    const listEntry = getCatalogComponent('List')
+    const copyButtonPaletteEntry = paletteComponents.find((component) => component.name === 'CopyButton')
+    const linkCardPaletteEntry = paletteComponents.find((component) => component.name === 'LinkCard')
+
+    expect(componentEntries.map((entry) => entry.name)).toEqual(
+      expect.arrayContaining([
+        'BodyLong',
+        'BodyShort',
+        'Chat',
+        'CopyButton',
+        'Detail',
+        'GuidePanel',
+        'Heading',
+        'InternalHeader',
+        'Label',
+        'Link',
+        'LinkCard',
+        'List',
+      ])
+    )
+    expect(bodyLongEntry?.snippet.code).toBe(
+      '<BodyLong spacing>Remember to attach the most recent payslip before you continue.</BodyLong>'
+    )
+    expect(labelEntry?.snippet.code).toBe('<Label as="p" spacing>Employer phone number</Label>')
+    expect(detailEntry?.snippet.code).toBe('<Detail uppercase>Application details</Detail>')
+    expect(chatEntry?.snippet.code).toContain('avatar={<span aria-hidden>SS</span>}')
+    expect(chatEntry?.snippet.code).toContain(
+      '<Chat.Bubble>You can upload it here as soon as it is ready.</Chat.Bubble>'
+    )
+    expect(copyButtonEntry?.snippet.code).toBe(
+      '<CopyButton copyText="CASE-2048" text="Copy case number" activeText="Case number copied" />'
+    )
+    expect(guidePanelEntry?.snippet.code).toContain(
+      '<Heading level="2" size="small" spacing>Need help before you send the application?</Heading>'
+    )
+    expect(internalHeaderEntry?.snippet.code).toContain(
+      '<InternalHeader.UserButton name="Ola N." description="Enhet: Skien" />'
+    )
+    expect(internalHeaderEntry?.snippet.code).toContain(
+      '<Theme theme={resolvedTheme{{internalHeaderSuffix}} as "light" | "dark"}>'
+    )
+    expect(internalHeaderEntry?.snippet.hooksCode).toBe(
+      'const useResolvedTheme{{internalHeaderSuffix}} = () => {\n' +
+        '  const readResolvedTheme = () =>\n' +
+        '    document.documentElement.classList.contains("dark") ? "dark" : "light"\n' +
+        '  const [resolvedTheme, setResolvedTheme] = useState<"light" | "dark">(() => readResolvedTheme())\n' +
+        '\n' +
+        '  useEffect(() => {\n' +
+        '    const observer = new MutationObserver(() => {\n' +
+        '      setResolvedTheme(readResolvedTheme())\n' +
+        '    })\n' +
+        '\n' +
+        '    observer.observe(document.documentElement, {\n' +
+        '      attributes: true,\n' +
+        '      attributeFilter: ["class"],\n' +
+        '    })\n' +
+        '\n' +
+        '    return () => observer.disconnect()\n' +
+        '  }, [])\n' +
+        '\n' +
+        '  return resolvedTheme\n' +
+        '}\n' +
+        'const resolvedTheme{{internalHeaderSuffix}} = useResolvedTheme{{internalHeaderSuffix}}()'
+    )
+    expect(linkEntry?.snippet.code).toBe(
+      '<Link href="#">Read the guide to sick leave follow-up</Link>'
+    )
+    expect(linkCardEntry?.snippet.code).toContain(
+      '<LinkCard.Anchor href="#">Review sick pay application</LinkCard.Anchor>'
+    )
+    expect(listEntry?.snippet.code).toContain(
+      '<List.Item>Send the application for review</List.Item>'
+    )
+    expect(copyButtonPaletteEntry).toEqual(
+      expect.objectContaining({
+        snippet:
+          '<CopyButton copyText="CASE-2048" text="Copy case number" activeText="Case number copied" />',
+        description: 'Copy button with visible button text and copied state.',
+        keywords: expect.arrayContaining(['clipboard', 'utility']),
+      })
+    )
+    expect(linkCardPaletteEntry).toEqual(
+      expect.objectContaining({
+        snippet: expect.stringContaining(
+          '<LinkCard.Anchor href="#">Review sick pay application</LinkCard.Anchor>'
+        ),
+        description: 'Clickable card link with title and description.',
+      })
+    )
+    expect(searchComponents('clipboard')).toContainEqual(
+      expect.objectContaining({ name: 'CopyButton' })
+    )
+    expect(searchComponents('conversation')).toContainEqual(
+      expect.objectContaining({ name: 'Chat' })
+    )
+    expect(AKSEL_SNIPPETS.find((snippet) => snippet.name === 'LinkCard')?.template).toContain(
+      '<LinkCard.Anchor href="#">Review sick pay application</LinkCard.Anchor>'
     )
   })
 
@@ -621,6 +735,7 @@ describe('Aksel catalog starter path', () => {
       'Chips Toggle',
       'DatePicker',
       'Dialog',
+      'InternalHeader',
       'MonthPicker',
       'Pagination',
       'Popover',
