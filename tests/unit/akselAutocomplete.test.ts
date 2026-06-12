@@ -471,9 +471,9 @@ describe('Aksel-aware autocomplete contract', () => {
       from: 0,
       to: '<ChipsT'.length,
       insertion: expect.objectContaining({
-        jsx: 'ChipsToggleExample{{chipsToggleSuffix}} />',
+        jsx: expect.stringContaining('selected={selected{{chipsToggleSuffix}} === id}'),
         hooks: expect.stringContaining(
-          'const [selectedLocations{{chipsToggleSuffix}}, setSelectedLocations{{chipsToggleSuffix}}] = useState(['
+          'const [selected{{chipsToggleSuffix}}, setSelected{{chipsToggleSuffix}}] = useState(0)'
         ),
       }),
     })
@@ -481,12 +481,18 @@ describe('Aksel-aware autocomplete contract', () => {
       from: 0,
       to: '<ChipsR'.length,
       insertion: expect.objectContaining({
-        jsx: 'ChipsRemovableExample{{chipsRemovableSuffix}} />',
+        jsx: expect.stringContaining('setFilter{{chipsRemovableSuffix}}((x) =>'),
         hooks: expect.stringContaining(
-          'const [activeFilters{{chipsRemovableSuffix}}, setActiveFilters{{chipsRemovableSuffix}}]'
+          'const [filter{{chipsRemovableSuffix}}, setFilter{{chipsRemovableSuffix}}] = useState(options{{chipsRemovableSuffix}})'
         ),
       }),
     })
+    expect(onApplyCatalogInsertion.mock.calls[0]?.[0]?.insertion.jsx).not.toContain(
+      'ChipsToggleExample'
+    )
+    expect(onApplyCatalogInsertion.mock.calls[1]?.[0]?.insertion.jsx).not.toContain(
+      'ChipsRemovableExample'
+    )
   })
 
   it('routes Dialog through the catalog insertion callback with trigger and close support', () => {

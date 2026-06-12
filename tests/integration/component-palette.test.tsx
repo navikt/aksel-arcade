@@ -173,8 +173,10 @@ describe('ComponentPalette', () => {
       expect.objectContaining({
         name: 'Chips Toggle',
         insertion: expect.objectContaining({
-          jsx: '<ChipsToggleExample{{chipsToggleSuffix}} />',
-          hooks: expect.stringContaining('chipOptions{{chipsToggleSuffix}}'),
+          jsx: expect.stringContaining('<Chips data-color="neutral">'),
+          hooks: expect.stringContaining(
+            'const [selected{{chipsToggleSuffix}}, setSelected{{chipsToggleSuffix}}] = useState(0)'
+          ),
         }),
       })
     )
@@ -183,8 +185,10 @@ describe('ComponentPalette', () => {
       expect.objectContaining({
         name: 'Chips Removable',
         insertion: expect.objectContaining({
-          jsx: '<ChipsRemovableExample{{chipsRemovableSuffix}} />',
-          hooks: expect.stringContaining('defaultFilters{{chipsRemovableSuffix}}'),
+          jsx: expect.stringContaining('{filter{{chipsRemovableSuffix}}.map((c) => ('),
+          hooks: expect.stringContaining(
+            'const [filter{{chipsRemovableSuffix}}, setFilter{{chipsRemovableSuffix}}] = useState(options{{chipsRemovableSuffix}})'
+          ),
         }),
       })
     )

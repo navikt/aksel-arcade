@@ -200,14 +200,32 @@ describe('Aksel catalog starter path', () => {
         'Tag',
       ])
     )
-    expect(chipsToggleEntry?.snippet.code).toBe('<ChipsToggleExample{{chipsToggleSuffix}} />')
+    expect(chipsToggleEntry?.snippet.code).toContain('<Chips data-color="neutral">')
+    expect(chipsToggleEntry?.snippet.code).toContain(
+      '{options{{chipsToggleSuffix}}.map((label, id) => ('
+    )
+    expect(chipsToggleEntry?.snippet.code).toContain(
+      'selected={selected{{chipsToggleSuffix}} === id}'
+    )
+    expect(chipsToggleEntry?.snippet.code).not.toContain('ChipsToggleExample')
     expect(chipsToggleEntry?.snippet.hooksCode).toContain(
-      'const [selectedLocations{{chipsToggleSuffix}}, setSelectedLocations{{chipsToggleSuffix}}] = useState(['
+      'const [selected{{chipsToggleSuffix}}, setSelected{{chipsToggleSuffix}}] = useState(0)'
     )
-    expect(chipsRemovableEntry?.snippet.code).toBe(
-      '<ChipsRemovableExample{{chipsRemovableSuffix}} />'
+    expect(chipsToggleEntry?.snippet.hooksCode).toContain('const options{{chipsToggleSuffix}} = [')
+    expect(chipsRemovableEntry?.snippet.code).toContain(
+      '{filter{{chipsRemovableSuffix}}.map((c) => ('
     )
-    expect(chipsRemovableEntry?.snippet.hooksCode).toContain('onDelete={() =>')
+    expect(chipsRemovableEntry?.snippet.code).toContain('setFilter{{chipsRemovableSuffix}}((x) =>')
+    expect(chipsRemovableEntry?.snippet.code).toContain('x.length === 1')
+    expect(chipsRemovableEntry?.snippet.code).toContain('? options{{chipsRemovableSuffix}}')
+    expect(chipsRemovableEntry?.snippet.code).toContain(': x.filter((y) => y !== c)')
+    expect(chipsRemovableEntry?.snippet.code).not.toContain('ChipsRemovableExample')
+    expect(chipsRemovableEntry?.snippet.hooksCode).toContain(
+      'const [filter{{chipsRemovableSuffix}}, setFilter{{chipsRemovableSuffix}}] = useState(options{{chipsRemovableSuffix}})'
+    )
+    expect(chipsRemovableEntry?.snippet.hooksCode).toContain(
+      'const options{{chipsRemovableSuffix}} = ["Housing", "Income", "Work"]'
+    )
     expect(loaderEntry?.snippet.code).toContain(
       '<Loader size="xlarge" title="Loading case details" />'
     )
@@ -220,16 +238,22 @@ describe('Aksel catalog starter path', () => {
     )
     expect(chipsTogglePaletteEntry?.insertion).toEqual(
       expect.objectContaining({
-        jsx: '<ChipsToggleExample{{chipsToggleSuffix}} />',
-        hooks: expect.stringContaining('chipOptions{{chipsToggleSuffix}}'),
+        jsx: expect.stringContaining('<Chips data-color="neutral">'),
+        hooks: expect.stringContaining(
+          'const [selected{{chipsToggleSuffix}}, setSelected{{chipsToggleSuffix}}] = useState(0)'
+        ),
       })
     )
     expect(chipsRemovablePaletteEntry?.insertion).toEqual(
       expect.objectContaining({
-        jsx: '<ChipsRemovableExample{{chipsRemovableSuffix}} />',
-        hooks: expect.stringContaining('defaultFilters{{chipsRemovableSuffix}}'),
+        jsx: expect.stringContaining('{filter{{chipsRemovableSuffix}}.map((c) => ('),
+        hooks: expect.stringContaining(
+          'const [filter{{chipsRemovableSuffix}}, setFilter{{chipsRemovableSuffix}}] = useState(options{{chipsRemovableSuffix}})'
+        ),
       })
     )
+    expect(chipsTogglePaletteEntry?.insertion?.jsx).not.toContain('ChipsToggleExample')
+    expect(chipsRemovablePaletteEntry?.insertion?.jsx).not.toContain('ChipsRemovableExample')
     expect(searchComponents('chips')).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ name: 'Chips Toggle' }),

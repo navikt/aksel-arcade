@@ -2484,3 +2484,19 @@ Verification:
 Next note:
 
 - The remaining open issues from this original range are `#212` and `#213`. If a follow-up keeps migrating palette/search/autocomplete surfaces, treat the shared catalog as the source of truth and remove matching legacy palette/snippet entries in the same slice to avoid duplicate authoring choices.
+
+### 2026-06-12 - PR #230 follow-up for issue #209 Chips visibility
+
+Implemented:
+
+- Followed up on review feedback that the first `Chips Toggle` / `Chips Removable` version hid the actual JSX behind helper component tags such as `<ChipsToggleExample />`, which made the editor harder to read and broke the intended insertion contract.
+- Changed both shared-catalog `Chips` insertions so the JSX editor now gets the real visible markup (`<Chips>`, `<Chips.Toggle>`, `<Chips.Removable>`) while the Hooks tab only receives the supporting `options` and `useState` declarations.
+- Kept collision safety for repeated insertions: when both examples coexist, the second insertion now suffixes its support identifiers (`options2`, `filter2`, `setFilter2`) instead of reintroducing helper wrappers.
+- Added a focused regression at the editor-apply seam in `tests/unit/services/componentInsertion.test.ts` and updated the catalog/autocomplete/Add-menu assertions so they now fail if a future change collapses the Chips JSX back into helper tags.
+
+Verification:
+
+- npm run test -- --run tests/unit/services/componentInsertion.test.ts tests/unit/akselCatalog.test.ts tests/unit/akselAutocomplete.test.ts tests/integration/component-palette.test.tsx
+- npm run typecheck
+- npm run test -- --run
+- Browser check at `http://127.0.0.1:5182/aksel-arcade/`: confirmed Add -> `Chips Toggle` inserts visible `<Chips.Toggle>` JSX into the JSX tab, confirmed Add -> `Chips Removable` inserts visible `<Chips.Removable>` JSX and suffixes the second example’s support identifiers in the Hooks tab, and confirmed the preview renders both chips examples without runtime console errors or warnings.

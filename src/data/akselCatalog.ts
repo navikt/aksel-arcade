@@ -1396,41 +1396,28 @@ export const AKSEL_CATALOG: AkselCatalogEntry[] = [
       },
     ],
     snippet: {
-      code: '<ChipsToggleExample{{chipsToggleSuffix}} />',
+      code:
+        '<Chips data-color="neutral">\n' +
+        '  {options{{chipsToggleSuffix}}.map((label, id) => (\n' +
+        '    <Chips.Toggle\n' +
+        '      checkmark={false}\n' +
+        '      key={label}\n' +
+        '      selected={selected{{chipsToggleSuffix}} === id}\n' +
+        '      onClick={() => setSelected{{chipsToggleSuffix}}(id)}\n' +
+        '    >\n' +
+        '      {label}\n' +
+        '    </Chips.Toggle>\n' +
+        '  ))}\n' +
+        '</Chips>',
       hooksCode:
-        'export const ChipsToggleExample{{chipsToggleSuffix}} = () => {\n' +
-        '  const chipOptions{{chipsToggleSuffix}} = [\n' +
-        '    "Lillehammer",\n' +
-        '    "Nittedal",\n' +
-        '    "Enebakk",\n' +
-        '    "Arendal",\n' +
-        '  ]\n' +
-        '  const [selectedLocations{{chipsToggleSuffix}}, setSelectedLocations{{chipsToggleSuffix}}] = useState([\n' +
-        '    "Nittedal",\n' +
-        '    "Arendal",\n' +
-        '  ])\n' +
-        '\n' +
-        '  return (\n' +
-        '    <Chips>\n' +
-        '      {chipOptions{{chipsToggleSuffix}}.map((option) => (\n' +
-        '        <Chips.Toggle\n' +
-        '          key={option}\n' +
-        '          selected={selectedLocations{{chipsToggleSuffix}}.includes(option)}\n' +
-        '          onClick={() =>\n' +
-        '            setSelectedLocations{{chipsToggleSuffix}}((current) =>\n' +
-        '              current.includes(option)\n' +
-        '                ? current.filter((value) => value !== option)\n' +
-        '                : [...current, option]\n' +
-        '            )\n' +
-        '          }\n' +
-        '        >\n' +
-        '          {option}\n' +
-        '        </Chips.Toggle>\n' +
-        '      ))}\n' +
-        '    </Chips>\n' +
-        '  )\n' +
-        '}',
-      description: 'Toggle chips example with Hooks-tab state.',
+        'const options{{chipsToggleSuffix}} = [\n' +
+        '  "Lillehammer",\n' +
+        '  "Nittedal",\n' +
+        '  "Enebakk",\n' +
+        '  "Arendal",\n' +
+        ']\n' +
+        'const [selected{{chipsToggleSuffix}}, setSelected{{chipsToggleSuffix}}] = useState(0)',
+      description: 'Toggle chips example with visible JSX and Hooks-tab state.',
     },
   },
   {
@@ -1454,9 +1441,9 @@ export const AKSEL_CATALOG: AkselCatalogEntry[] = [
         description: 'Chip size.',
       },
       {
-        name: 'onDelete',
+        name: 'onClick',
         type: '() => void',
-        description: 'Callback used when the chip is removed.',
+        description: 'Callback used when the chip is clicked and removed.',
       },
       {
         name: 'data-color',
@@ -1467,32 +1454,27 @@ export const AKSEL_CATALOG: AkselCatalogEntry[] = [
       },
     ],
     snippet: {
-      code: '<ChipsRemovableExample{{chipsRemovableSuffix}} />',
+      code:
+        '<Chips data-color="neutral">\n' +
+        '  {filter{{chipsRemovableSuffix}}.map((c) => (\n' +
+        '    <Chips.Removable\n' +
+        '      key={c}\n' +
+        '      onClick={() =>\n' +
+        '        setFilter{{chipsRemovableSuffix}}((x) =>\n' +
+        '          x.length === 1\n' +
+        '            ? options{{chipsRemovableSuffix}}\n' +
+        '            : x.filter((y) => y !== c)\n' +
+        '        )\n' +
+        '      }\n' +
+        '    >\n' +
+        '      {c}\n' +
+        '    </Chips.Removable>\n' +
+        '  ))}\n' +
+        '</Chips>',
       hooksCode:
-        'export const ChipsRemovableExample{{chipsRemovableSuffix}} = () => {\n' +
-        '  const defaultFilters{{chipsRemovableSuffix}} = ["Housing", "Income", "Work"]\n' +
-        '  const [activeFilters{{chipsRemovableSuffix}}, setActiveFilters{{chipsRemovableSuffix}}] = useState(defaultFilters{{chipsRemovableSuffix}})\n' +
-        '\n' +
-        '  return (\n' +
-        '    <Chips data-color="neutral">\n' +
-        '      {activeFilters{{chipsRemovableSuffix}}.map((filter) => (\n' +
-        '        <Chips.Removable\n' +
-        '          key={filter}\n' +
-        '          onDelete={() =>\n' +
-        '            setActiveFilters{{chipsRemovableSuffix}}((current) =>\n' +
-        '              current.length === 1\n' +
-        '                ? defaultFilters{{chipsRemovableSuffix}}\n' +
-        '                : current.filter((value) => value !== filter)\n' +
-        '            )\n' +
-        '          }\n' +
-        '        >\n' +
-        '          {filter}\n' +
-        '        </Chips.Removable>\n' +
-        '      ))}\n' +
-        '    </Chips>\n' +
-        '  )\n' +
-        '}',
-      description: 'Removable chips example with Hooks-tab state.',
+        'const options{{chipsRemovableSuffix}} = ["Housing", "Income", "Work"]\n' +
+        'const [filter{{chipsRemovableSuffix}}, setFilter{{chipsRemovableSuffix}}] = useState(options{{chipsRemovableSuffix}})',
+      description: 'Removable chips example with visible JSX and Hooks-tab state.',
     },
   },
   {
