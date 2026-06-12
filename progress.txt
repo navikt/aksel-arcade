@@ -2570,3 +2570,46 @@ Verification:
 - npm run test -- --run
 - npm run build (passes with the existing Vite/browser-compatibility and chunk-size warnings only)
 - Browser check at `http://127.0.0.1:4387/aksel-arcade/`: confirmed the inserted `InternalHeader` menu opens in dark mode with a dark theme wrapper, confirmed switching the preview theme through Settings -> `Switch to light theme` flips the preview root and the visible ActionMenu wrapper to light before reopening the menu, and confirmed the verified session showed no browser console warnings or errors.
+
+### 2026-06-12 - Issue #213: Aksel update and docs/runtime catalog audit workflow
+
+Implemented:
+
+- Worked only on `#213` after re-reading issue `#205`, `CONTEXT.md`, and the latest `progress.txt` notes so the maintainer workflow stayed aligned with the shared **Aksel insertion catalog** contract instead of turning into a second authoring feature slice.
+- Added explicit maintainer commands in `package.json`: `npm run aksel:refresh-docs -- --write src/data/akselAutocompleteData.ts` to fetch fresh `https://aksel.nav.no/llm.md` data and rewrite the checked-in docs metadata, and `npm run aksel:audit -- --target X.Y.Z` to run the manual docs/runtime/catalog drift audit against a visible target Aksel version.
+- Extracted the docs parser/generator into `scripts/lib/akselDocs.ts`, kept the legacy `scripts/generate-aksel-autocomplete-data.mjs` path as a wrapper to the new TypeScript entrypoint, and added fixture-backed parser coverage in `tests/unit/akselDocs.test.ts` plus `tests/fixtures/aksel-audit/` so normal validation stays network-independent.
+- Added `scripts/lib/akselAudit.ts` and `scripts/aksel-audit.ts` to compare fresh docs against pinned package versions, lockfile versions, `AKSEL_METADATA`, runtime exports, icon exports, the curated catalog, and the checked-in docs metadata, while separating accepted local exceptions from new potential drift.
+- Added the explicit local exceptions ledger in `src/data/akselAuditExceptions.ts` for the currently intentional Arcade-specific differences that the audit should not silently reclassify: `Combobox` -> `UNSAFE_Combobox`, `Modal` hidden behind replacement policy, `Navpoleonskake` docs noise, and the retained legacy compatibility entries for `Alert`, `BoxNew`, `Stack`, and `Grid`.
+- Moved the sandbox compatibility constants into `src/data/akselRuntimeCompatibility.ts`, re-exported them from `src/sandboxAksel.ts`, and updated the sandbox import to a relative path so the same compatibility data works in the app, the audit CLI, and the standalone sandbox build.
+- Added a dedicated `tsconfig.scripts.json` so the new TypeScript CLI scripts are checked by `tsc -b` without dragging unrelated experimental scripts through the wrong compiler config, and documented the full maintainer flow in `README.md`: update exact Aksel package pins and lockfile, refresh docs metadata, run the audit, review potential drift, clarify any new/changed exceptions with a human, then rerun normal validation.
+- Added fixture-based audit coverage in `tests/unit/akselAudit.test.ts` for comparison/classification/report generation, including the requirement that new or changed potential exceptions stay non-zero and instruct the operator to ask a human before encoding them.
+
+Verification:
+
+- npm run typecheck
+- npm run lint (passes with the existing `.eslintignore` deprecation notice and existing `InspectionPopover` hook-dependency warning only)
+- npm run test -- --run
+- npm run build (passes with the existing Vite/browser-compatibility and chunk-size warnings only)
+- Browser check at `http://127.0.0.1:4186/aksel-arcade/`: confirmed the app shell and default preview render, confirmed the sandbox iframe shows the default intro content, and confirmed the verified session had no browser console errors or warnings (only the pre-existing form-field accessibility issue reported as a DevTools issue).
+
+Next note:
+
+- `npm run aksel:audit -- --target 8.11.0` now runs successfully and intentionally exits non-zero because it found current potential drift that should be reviewed instead of silently whitelisted. The focused report currently points at three main buckets: top-level catalog coverage gaps (`Bleed`, `Combobox`, `Hide`, `InfoCard`, `Provider`, `RadioGroup`, `Show`), docs-metadata/authoring prop drift around `ActionMenu` and a couple of stale generated props, and deprecated/preview autocomplete exposure (`ConfirmationPanel`, `DataGrid`, `Ingress`, `LinkPanel`, `Panel`).
+- Do not add new accepted exceptions for those findings without human confirmation. The issue-213 workflow is now in place specifically so the next maintainer can review that report, decide which items should become intentional Arcade policy, and then update the catalog/docs metadata in a separate follow-up.
+
+### 2026-06-12 - PR #232 review follow-up for issue #213
+
+Implemented:
+
+- PR review found two real audit correctness bugs before merge.
+- Tightened accepted-exception matching in `scripts/lib/akselAudit.ts` so accepted entries no longer match on name + match kind alone; the audit now also checks the exception item type, affected surface, and pinned runtime alias target when that metadata is present. This keeps changed alias/runtime conditions from being silently auto-whitelisted.
+- Split docs matching into a coverage path and a status path so user-facing variant labels can still map to their parent docs entry where intended, but compound entries such as `Page.Block` no longer inherit status from `Page` through `importName` matching.
+- Added focused regressions in `tests/unit/akselAudit.test.ts` for both review findings: changed runtime alias targets must stay potential drift, and compound catalog entries must report their own deprecated/stale docs status instead of borrowing the parent component status.
+
+Verification:
+
+- npm run test -- --run tests/unit/akselAudit.test.ts
+- npm run typecheck
+- npm run lint (passes with the existing `.eslintignore` deprecation notice and existing `InspectionPopover` hook-dependency warning only)
+- npm run test -- --run
+- npm run build (passes with the existing Vite/browser-compatibility and chunk-size warnings only)

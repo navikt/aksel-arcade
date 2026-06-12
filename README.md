@@ -154,7 +154,49 @@ npm run test:e2e         # Run end-to-end tests
 npm run type-check       # TypeScript type checking
 npm run lint             # Run ESLint
 npm run format           # Format code with Prettier
+npm run aksel:refresh-docs -- --write src/data/akselAutocompleteData.ts
+                         # Fetch fresh Aksel docs and rewrite checked-in docs metadata
+npm run aksel:audit -- --target 8.11.0
+                         # Run the manual Aksel docs/runtime/catalog drift audit
 ```
+
+### Manual Aksel upgrade and audit workflow
+
+Ordinary `npm run typecheck`, `npm run lint`, and `npm test` stay network-independent. Fresh `https://aksel.nav.no/llm.md` data is only fetched by the explicit maintainer commands above.
+
+When you intentionally upgrade Arcade to a new Aksel version:
+
+1. Update the pinned runtime packages and lockfile:
+
+   ```bash
+   npm install --save-exact @navikt/ds-react@X.Y.Z @navikt/ds-css@X.Y.Z @navikt/aksel-icons@X.Y.Z
+   ```
+
+2. Refresh the checked-in docs metadata from fresh Aksel docs:
+
+   ```bash
+   npm run aksel:refresh-docs -- --write src/data/akselAutocompleteData.ts
+   ```
+
+3. Run the focused drift audit for the same target version:
+
+   ```bash
+   npm run aksel:audit -- --target X.Y.Z
+   ```
+
+4. Review the report before changing policy:
+   - **Potential findings** are new or changed drift that still needs human review.
+   - **Accepted exceptions** come from the explicit local ledger for known Arcade-specific differences such as runtime aliases or legacy compatibility entries.
+
+5. If the audit surfaces a new or changed potential local exception, stop and clarify that policy with a human before encoding it as an accepted Arcade exception.
+
+6. After any intentional catalog/docs updates, run the normal validation loop again:
+
+   ```bash
+   npm run typecheck
+   npm run lint
+   npm test -- --run
+   ```
 
 ### Shell capability modes
 
