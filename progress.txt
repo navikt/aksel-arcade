@@ -2422,3 +2422,25 @@ Verification:
 - npm run test -- --run
 - npm run build
 - Browser check at `http://127.0.0.1:4327/aksel-arcade/`: with Hooks set to `const popup = true`, confirmed Add -> `Dialog` inserts unsuffixed `<ReviewDialog />`, keeps the helper as `export const ReviewDialog = () => { ... }`, keeps `id="review-dialog-popup"`, opens in preview, and produces no browser console errors.
+
+### 2026-06-12 - Issue #217: Fix compound workflow and navigation insertions
+
+Implemented:
+
+- Selected #217 as the highest-priority open `ready-for-agent` feature from #209-#217 after checking #205, `CONTEXT.md`, and the existing `progress.txt` notes; it was the most user-blocking remaining authoring slice because compound workflow/navigation examples still had broken or missing insertion paths, especially for `Tabs`, `Process`, and `Timeline`.
+- Expanded `src/data/akselCatalog.ts` with catalog-backed top-level entries for `Accordion`, `ExpansionCard`, `Process`, `ReadMore`, `Stepper`, `Tabs`, and `Timeline`, and added matching contextual child rules for `Accordion.*`, `ExpansionCard.*`, `Process.Event`, `Stepper.Step`, `Tabs.*`, and `Timeline.*`.
+- Switched `Tabs` from the earlier temporary uncontrolled example to a proper Hooks-backed multi-part insertion using `useTabsState{{tabsSuffix}}`, keeping the inserted JSX composable while moving state into Hooks in line with the post-#211 insertion contract.
+- Kept `Process`, `Timeline`, `Accordion`, `ExpansionCard`, `ReadMore`, and `Stepper` as valid JSX-first insertions with behavior-complete default structures, including real `Process.Event` children and a dated `Timeline` example that renders rows, periods, and a pin against the pinned 8.11.0 runtime.
+- Added regression coverage in `tests/unit/akselCatalog.test.ts`, `tests/unit/akselAutocomplete.test.ts`, `tests/integration/component-palette.test.tsx`, and the new `tests/integration/compound-insertions-runtime.test.tsx` for Add/autocomplete parity, contextual subcomponent suggestions, Tabs hook insertion, and runtime rendering/switching for the highest-risk snippets.
+
+Verification:
+
+- npm run typecheck
+- npm run lint (existing `.eslintignore` deprecation notice and existing `InspectionPopover` hook dependency warning only)
+- npm run test -- --run
+- npm run build
+- Browser check at `http://127.0.0.1:4182/aksel-arcade/`: confirmed Add -> `Tabs` inserts `<Tabs {...useTabsState()}>` plus a matching Hooks helper, confirmed preview tab clicks switch panels, confirmed Add -> `Process` renders the inserted event list, confirmed Add -> `Timeline` renders rows/periods/pin cleanly, and confirmed the verified session had no browser console errors.
+
+Next note:
+
+- The remaining open ready-for-agent issues in this range are narrower follow-ups (`#209`, `#212`, and `#213`). If a later slice needs more interactive workflow/navigation examples, reuse the #211/#215/#217 composable-root rule: keep authored JSX insertable inside surrounding layouts and move supporting state into Hooks instead of wrapper fragments or inline IIFEs.

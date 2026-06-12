@@ -276,12 +276,89 @@ const tooltipPlacementValues = ['top', 'right', 'bottom', 'left']
 const AKSEL_CONTEXTUAL_AUTOCOMPLETE_RULES: AkselContextualAutocompleteRule[] = [
   {
     parent: 'Accordion',
-    children: [{ name: 'Accordion.Item' }],
+    children: [
+      {
+        name: 'Accordion.Item',
+        insertion: {
+          jsx:
+            '<Accordion.Item>\n' +
+            '  <Accordion.Header>When will I get an answer?</Accordion.Header>\n' +
+            '  <Accordion.Content>\n' +
+            '    We usually reply within five working days after we receive all documents.\n' +
+            '  </Accordion.Content>\n' +
+            '</Accordion.Item>',
+        },
+      },
+    ],
     exclusive: true,
   },
   {
     parent: 'Accordion.Item',
-    children: [{ name: 'Accordion.Header' }, { name: 'Accordion.Content' }],
+    children: [
+      {
+        name: 'Accordion.Header',
+        insertion: {
+          jsx: '<Accordion.Header>When will I get an answer?</Accordion.Header>',
+        },
+      },
+      {
+        name: 'Accordion.Content',
+        insertion: {
+          jsx:
+            '<Accordion.Content>\n' +
+            '  We usually reply within five working days after we receive all documents.\n' +
+            '</Accordion.Content>',
+        },
+      },
+    ],
+    exclusive: true,
+  },
+  {
+    parent: 'ExpansionCard',
+    children: [
+      {
+        name: 'ExpansionCard.Header',
+        insertion: {
+          jsx:
+            '<ExpansionCard.Header>\n' +
+            '  <ExpansionCard.Title>Payment for June</ExpansionCard.Title>\n' +
+            '  <ExpansionCard.Description>\n' +
+            '    You are registered as the recipient of sickness benefits from Nav.\n' +
+            '  </ExpansionCard.Description>\n' +
+            '</ExpansionCard.Header>',
+        },
+      },
+      {
+        name: 'ExpansionCard.Content',
+        insertion: {
+          jsx:
+            '<ExpansionCard.Content>\n' +
+            '  The payment will be sent to your employer on 14 June.\n' +
+            '</ExpansionCard.Content>',
+        },
+      },
+    ],
+    exclusive: true,
+  },
+  {
+    parent: 'ExpansionCard.Header',
+    children: [
+      {
+        name: 'ExpansionCard.Title',
+        insertion: {
+          jsx: '<ExpansionCard.Title>Payment for June</ExpansionCard.Title>',
+        },
+      },
+      {
+        name: 'ExpansionCard.Description',
+        insertion: {
+          jsx:
+            '<ExpansionCard.Description>\n' +
+            '  You are registered as the recipient of sickness benefits from Nav.\n' +
+            '</ExpansionCard.Description>',
+        },
+      },
+    ],
     exclusive: true,
   },
   {
@@ -371,13 +448,122 @@ const AKSEL_CONTEXTUAL_AUTOCOMPLETE_RULES: AkselContextualAutocompleteRule[] = [
     exclusive: true,
   },
   {
+    parent: 'Process',
+    children: [
+      {
+        name: 'Process.Event',
+        insertion: {
+          jsx:
+            '<Process.Event\n' +
+            '  status="active"\n' +
+            '  title="Case officer is reviewing the application"\n' +
+            '  timestamp="12 June 2026"\n' +
+            '>\n' +
+            '  You will get a message if we need more information.\n' +
+            '</Process.Event>',
+        },
+      },
+    ],
+    exclusive: true,
+  },
+  {
     parent: 'Tabs',
-    children: [{ name: 'Tabs.List' }, { name: 'Tabs.Panel' }],
+    children: [
+      {
+        name: 'Tabs.List',
+        insertion: {
+          jsx:
+            '<Tabs.List>\n' +
+            '  <Tabs.Tab value="overview" label="Overview" />\n' +
+            '  <Tabs.Tab value="timeline" label="Timeline" />\n' +
+            '</Tabs.List>',
+        },
+      },
+      {
+        name: 'Tabs.Panel',
+        insertion: {
+          jsx:
+            '<Tabs.Panel value="overview">\n' +
+            '  Overview of the application.\n' +
+            '</Tabs.Panel>',
+        },
+      },
+    ],
     exclusive: true,
   },
   {
     parent: 'Tabs.List',
-    children: [{ name: 'Tabs.Tab' }],
+    children: [
+      {
+        name: 'Tabs.Tab',
+        insertion: {
+          jsx: '<Tabs.Tab value="overview" label="Overview" />',
+        },
+      },
+    ],
+    exclusive: true,
+  },
+  {
+    parent: 'Stepper',
+    children: [
+      {
+        name: 'Stepper.Step',
+        insertion: {
+          jsx: '<Stepper.Step href="#">Choose support</Stepper.Step>',
+        },
+      },
+    ],
+    exclusive: true,
+  },
+  {
+    parent: 'Timeline',
+    children: [
+      {
+        name: 'Timeline.Pin',
+        insertion: {
+          jsx:
+            '<Timeline.Pin date={new Date("2025-05-12")}>\n' +
+            '  Follow-up meeting with the employer\n' +
+            '</Timeline.Pin>',
+        },
+      },
+      {
+        name: 'Timeline.Row',
+        insertion: {
+          jsx:
+            '<Timeline.Row label="Sick leave">\n' +
+            '  <Timeline.Period\n' +
+            '    start={new Date("2025-05-01")}\n' +
+            '    end={new Date("2025-05-14")}\n' +
+            '    status="warning"\n' +
+            '    statusLabel="Sick leave"\n' +
+            '  >\n' +
+            '    50% sick leave\n' +
+            '  </Timeline.Period>\n' +
+            '</Timeline.Row>',
+        },
+      },
+    ],
+    exclusive: true,
+  },
+  {
+    parent: 'Timeline.Row',
+    children: [
+      {
+        name: 'Timeline.Period',
+        insertion: {
+          jsx:
+            '<Timeline.Period\n' +
+            '  start={new Date("2025-05-01")}\n' +
+            '  end={new Date("2025-05-14")}\n' +
+            '  status="warning"\n' +
+            '  statusLabel="Sick leave"\n' +
+            '>\n' +
+            '  50% sick leave\n' +
+            '</Timeline.Period>',
+        },
+      },
+    ],
     exclusive: true,
   },
   {
@@ -419,9 +605,7 @@ const contextualAutocompleteEntryNamesByComponent = new Map(
 )
 const contextualOnlyAutocompleteNames = new Set(
   AKSEL_CONTEXTUAL_AUTOCOMPLETE_RULES.flatMap((rule) =>
-    rule.children
-      .filter((child) => child.discovery !== 'top-level')
-      .map((child) => child.name)
+    rule.children.filter((child) => child.discovery !== 'top-level').map((child) => child.name)
   )
 )
 
@@ -2344,6 +2528,414 @@ export const AKSEL_CATALOG: AkselCatalogEntry[] = [
         '  </VStack>\n' +
         '</FileUpload>',
       description: 'Upload dropzone with an example attachment item.',
+    },
+  },
+  {
+    id: 'accordion',
+    name: 'Accordion',
+    group: 'component',
+    status: 'current',
+    package: '@navikt/ds-react',
+    importName: 'Accordion',
+    importGuidance: "import { Accordion } from '@navikt/ds-react';",
+    docs: `${COMPONENT_DOCS_BASE}/accordion`,
+    description: 'Accordion with related questions and one answer expanded.',
+    keywords: ['accordion', 'faq', 'expand', 'collapse', 'disclosure'],
+    props: [
+      {
+        name: 'size',
+        type: '"large" | "medium" | "small"',
+        values: ['large', 'medium', 'small'],
+        valueKind: 'enum',
+        default: 'medium',
+        description: 'Accordion size.',
+      },
+      {
+        name: 'indent',
+        type: 'boolean',
+        values: ['true', 'false'],
+        valueKind: 'enum',
+        description: 'Indent the content area.',
+      },
+      {
+        name: 'data-color',
+        type: 'string',
+        values: dataColorValues,
+        valueKind: 'data-color',
+        description: 'Override the inherited color context.',
+      },
+    ],
+    snippet: {
+      code:
+        '<Accordion>\n' +
+        '  <Accordion.Item defaultOpen>\n' +
+        '    <Accordion.Header>How do I change my meeting time?</Accordion.Header>\n' +
+        '    <Accordion.Content>\n' +
+        '      You can change the meeting time from the activity plan up to 24 hours before the appointment.\n' +
+        '    </Accordion.Content>\n' +
+        '  </Accordion.Item>\n' +
+        '  <Accordion.Item>\n' +
+        '    <Accordion.Header>When will I get an answer?</Accordion.Header>\n' +
+        '    <Accordion.Content>\n' +
+        '      We usually reply within five working days after we receive all documents.\n' +
+        '    </Accordion.Content>\n' +
+        '  </Accordion.Item>\n' +
+        '</Accordion>',
+      description: 'Frequently asked questions with one answer expanded.',
+    },
+  },
+  {
+    id: 'expansioncard',
+    name: 'ExpansionCard',
+    group: 'component',
+    status: 'current',
+    package: '@navikt/ds-react',
+    importName: 'ExpansionCard',
+    importGuidance: "import { ExpansionCard } from '@navikt/ds-react';",
+    docs: `${COMPONENT_DOCS_BASE}/expansioncard`,
+    description: 'Expansion card with visible summary and expanded details.',
+    keywords: ['expansion card', 'expand', 'collapse', 'summary', 'details'],
+    props: [
+      {
+        name: 'defaultOpen',
+        type: 'boolean',
+        values: ['true', 'false'],
+        valueKind: 'enum',
+        description: 'Start with the card expanded.',
+      },
+      {
+        name: 'open',
+        type: 'boolean',
+        values: ['true', 'false'],
+        valueKind: 'enum',
+        description: 'Controlled open state.',
+      },
+      {
+        name: 'onToggle',
+        type: '(open: boolean) => void',
+        description: 'Callback when the card opens or closes.',
+      },
+      {
+        name: 'size',
+        type: '"medium" | "small"',
+        values: ['medium', 'small'],
+        valueKind: 'enum',
+        default: 'medium',
+        description: 'Expansion card size.',
+      },
+      {
+        name: 'data-color',
+        type: 'string',
+        values: dataColorValues,
+        valueKind: 'data-color',
+        description: 'Override the inherited color context.',
+      },
+    ],
+    snippet: {
+      code:
+        '<ExpansionCard aria-label="Payment summary" defaultOpen>\n' +
+        '  <ExpansionCard.Header>\n' +
+        '    <ExpansionCard.Title>Payment for June</ExpansionCard.Title>\n' +
+        '    <ExpansionCard.Description>\n' +
+        '      You are registered as the recipient of sickness benefits from Nav.\n' +
+        '    </ExpansionCard.Description>\n' +
+        '  </ExpansionCard.Header>\n' +
+        '  <ExpansionCard.Content>\n' +
+        '    The payment will be sent to your employer on 14 June. You can review the calculation details from this summary.\n' +
+        '  </ExpansionCard.Content>\n' +
+        '</ExpansionCard>',
+      description: 'Expansion card with a visible summary and open content.',
+    },
+  },
+  {
+    id: 'process',
+    name: 'Process',
+    group: 'component',
+    status: 'current',
+    package: '@navikt/ds-react',
+    importName: 'Process',
+    importGuidance: "import { Process } from '@navikt/ds-react';",
+    docs: `${COMPONENT_DOCS_BASE}/process`,
+    description: 'Process event list with completed and active statuses.',
+    keywords: ['process', 'events', 'case flow', 'status', 'timeline', 'workflow'],
+    props: [
+      {
+        name: 'hideStatusText',
+        type: 'boolean',
+        values: ['true', 'false'],
+        valueKind: 'enum',
+        description: 'Hide the status text on the active event.',
+      },
+      {
+        name: 'isTruncated',
+        type: '"start" | "end" | "both"',
+        values: ['start', 'end', 'both'],
+        valueKind: 'enum',
+        description: 'Show that more events exist before or after the current list.',
+      },
+    ],
+    snippet: {
+      code:
+        '<Process>\n' +
+        '  <Process.Event status="completed" title="Application received" timestamp="10 June 2026">\n' +
+        '    We have received your application and attachments.\n' +
+        '  </Process.Event>\n' +
+        '  <Process.Event\n' +
+        '    status="active"\n' +
+        '    title="Case officer is reviewing the application"\n' +
+        '    timestamp="12 June 2026"\n' +
+        '  >\n' +
+        '    You will get a message if we need more information.\n' +
+        '  </Process.Event>\n' +
+        '  <Process.Event title="Decision is ready" timestamp="Expected this week">\n' +
+        '    We notify you as soon as the decision is available.\n' +
+        '  </Process.Event>\n' +
+        '</Process>',
+      description: 'Process with completed, active, and upcoming events.',
+    },
+  },
+  {
+    id: 'readmore',
+    name: 'ReadMore',
+    group: 'component',
+    status: 'current',
+    package: '@navikt/ds-react',
+    importName: 'ReadMore',
+    importGuidance: "import { ReadMore } from '@navikt/ds-react';",
+    docs: `${COMPONENT_DOCS_BASE}/read-more`,
+    description: 'Expandable explanation text with a visible header.',
+    keywords: ['read more', 'expand', 'disclosure', 'details', 'help'],
+    props: [
+      {
+        name: 'header',
+        type: 'ReactNode',
+        required: true,
+        description: 'Visible button label for the disclosure.',
+      },
+      {
+        name: 'defaultOpen',
+        type: 'boolean',
+        values: ['true', 'false'],
+        valueKind: 'enum',
+        description: 'Start with the content expanded.',
+      },
+      {
+        name: 'open',
+        type: 'boolean',
+        values: ['true', 'false'],
+        valueKind: 'enum',
+        description: 'Controlled open state.',
+      },
+      {
+        name: 'size',
+        type: '"large" | "medium" | "small"',
+        values: ['large', 'medium', 'small'],
+        valueKind: 'enum',
+        default: 'medium',
+        description: 'ReadMore content size.',
+      },
+      {
+        name: 'variant',
+        type: '"moderate" | "ghost"',
+        values: ['moderate', 'ghost'],
+        valueKind: 'enum',
+        default: 'ghost',
+        description: 'Visual emphasis for the disclosure.',
+      },
+    ],
+    snippet: {
+      code:
+        '<ReadMore header="Why we ask about income" variant="moderate">\n' +
+        '  We use your income to calculate the correct benefit and show which documents you must send in.\n' +
+        '</ReadMore>',
+      description: 'ReadMore with visible helper text when expanded.',
+    },
+  },
+  {
+    id: 'stepper',
+    name: 'Stepper',
+    group: 'component',
+    status: 'current',
+    package: '@navikt/ds-react',
+    importName: 'Stepper',
+    importGuidance: "import { Stepper } from '@navikt/ds-react';",
+    docs: `${COMPONENT_DOCS_BASE}/stepper`,
+    description: 'Stepper with a valid current step and visible navigation labels.',
+    keywords: ['stepper', 'wizard', 'steps', 'progress', 'navigation'],
+    props: [
+      {
+        name: 'activeStep',
+        type: 'number',
+        required: true,
+        description: 'Current active step. Stepper starts at 1.',
+      },
+      {
+        name: 'orientation',
+        type: '"horizontal" | "vertical"',
+        values: ['horizontal', 'vertical'],
+        valueKind: 'enum',
+        default: 'vertical',
+        description: 'Layout direction for the stepper.',
+      },
+      {
+        name: 'onStepChange',
+        type: '(step: number) => void',
+        description: 'Callback when the user changes step.',
+      },
+    ],
+    snippet: {
+      code:
+        '<Stepper aria-label="Application steps" activeStep={2}>\n' +
+        '  <Stepper.Step href="#">Choose support</Stepper.Step>\n' +
+        '  <Stepper.Step href="#">Upload documents</Stepper.Step>\n' +
+        '  <Stepper.Step href="#">Send application</Stepper.Step>\n' +
+        '</Stepper>',
+      description: 'Visible stepper with a current step highlighted.',
+    },
+  },
+  {
+    id: 'tabs',
+    name: 'Tabs',
+    group: 'component',
+    status: 'current',
+    package: '@navikt/ds-react',
+    importName: 'Tabs',
+    importGuidance: "import { Tabs } from '@navikt/ds-react';",
+    docs: `${COMPONENT_DOCS_BASE}/tabs`,
+    description: 'Controlled tabs with Hooks-tab state and three panels.',
+    keywords: ['tabs', 'tab navigation', 'panel', 'messages', 'switch'],
+    props: [
+      {
+        name: 'size',
+        type: '"medium" | "small"',
+        values: ['medium', 'small'],
+        valueKind: 'enum',
+        default: 'medium',
+        description: 'Tab list size.',
+      },
+      {
+        name: 'onChange',
+        type: '(value: string) => void',
+        description: 'Callback when a tab is selected.',
+      },
+      {
+        name: 'value',
+        type: 'string',
+        description: 'Controlled selected tab value.',
+      },
+      {
+        name: 'defaultValue',
+        type: 'string',
+        description: 'Initial tab value for uncontrolled state.',
+      },
+      {
+        name: 'selectionFollowsFocus',
+        type: 'boolean',
+        values: ['true', 'false'],
+        valueKind: 'enum',
+        description: 'Automatically select tabs when focus moves.',
+      },
+      {
+        name: 'fill',
+        type: 'boolean',
+        values: ['true', 'false'],
+        valueKind: 'enum',
+        description: 'Stretch tabs to fill the available width.',
+      },
+    ],
+    snippet: {
+      code:
+        '<Tabs {...useTabsState{{tabsSuffix}}()}>\n' +
+        '  <Tabs.List>\n' +
+        '    <Tabs.Tab value="overview" label="Overview" />\n' +
+        '    <Tabs.Tab value="timeline" label="Timeline" />\n' +
+        '    <Tabs.Tab value="documents" label="Documents" />\n' +
+        '  </Tabs.List>\n' +
+        '  <Tabs.Panel value="overview">Overview of the application.</Tabs.Panel>\n' +
+        '  <Tabs.Panel value="timeline">Timeline of the case.</Tabs.Panel>\n' +
+        '  <Tabs.Panel value="documents">Attachments and letters.</Tabs.Panel>\n' +
+        '</Tabs>',
+      hooksCode:
+        'export const useTabsState{{tabsSuffix}} = (initialValue = "overview") => {\n' +
+        '  const [selectedTab, setSelectedTab] = useState(initialValue)\n' +
+        '\n' +
+        '  return {\n' +
+        '    value: selectedTab,\n' +
+        '    onChange: setSelectedTab,\n' +
+        '  }\n' +
+        '}',
+      description: 'Tabs with Hooks-tab state so panel changes are visible on click.',
+    },
+  },
+  {
+    id: 'timeline',
+    name: 'Timeline',
+    group: 'component',
+    status: 'current',
+    package: '@navikt/ds-react',
+    importName: 'Timeline',
+    importGuidance: "import { Box, Timeline } from '@navikt/ds-react';",
+    docs: `${COMPONENT_DOCS_BASE}/timeline`,
+    description: 'Timeline with rows, dated periods, and a visible pin.',
+    keywords: ['timeline', 'period', 'chronology', 'milestone', 'schedule', 'internal'],
+    props: [
+      {
+        name: 'startDate',
+        type: 'Date',
+        description: 'Start date for the visible range.',
+      },
+      {
+        name: 'endDate',
+        type: 'Date',
+        description: 'End date for the visible range.',
+      },
+      {
+        name: 'direction',
+        type: '"left" | "right"',
+        values: ['left', 'right'],
+        valueKind: 'enum',
+        default: 'left',
+        description: 'Sort direction for the periods.',
+      },
+    ],
+    snippet: {
+      code:
+        '<Box marginInline="auto" maxWidth="800px">\n' +
+        '  <Timeline>\n' +
+        '    <Timeline.Pin date={new Date("2025-05-12")}>\n' +
+        '      Follow-up meeting with the employer\n' +
+        '    </Timeline.Pin>\n' +
+        '    <Timeline.Row label="Sick leave">\n' +
+        '      <Timeline.Period\n' +
+        '        start={new Date("2025-05-01")}\n' +
+        '        end={new Date("2025-05-14")}\n' +
+        '        status="warning"\n' +
+        '        statusLabel="Sick leave"\n' +
+        '      >\n' +
+        '        50% sick leave\n' +
+        '      </Timeline.Period>\n' +
+        '      <Timeline.Period\n' +
+        '        start={new Date("2025-05-15")}\n' +
+        '        end={new Date("2025-05-31")}\n' +
+        '        status="success"\n' +
+        '        statusLabel="Return plan"\n' +
+        '      >\n' +
+        '        Gradual return to work\n' +
+        '      </Timeline.Period>\n' +
+        '    </Timeline.Row>\n' +
+        '    <Timeline.Row label="Payments">\n' +
+        '      <Timeline.Period\n' +
+        '        start={new Date("2025-05-05")}\n' +
+        '        end={new Date("2025-05-20")}\n' +
+        '        status="info"\n' +
+        '        statusLabel="Benefit payment"\n' +
+        '      >\n' +
+        '        First benefit payment\n' +
+        '      </Timeline.Period>\n' +
+        '    </Timeline.Row>\n' +
+        '  </Timeline>\n' +
+        '</Box>',
+      description: 'Timeline with rows, periods, and a dated pin.',
     },
   },
   {

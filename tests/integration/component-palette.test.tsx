@@ -151,7 +151,7 @@ describe('ComponentPalette', () => {
     )
   })
 
-  it('passes uncontrolled Tabs snippets through the Add menu boundary', async () => {
+  it('passes hook-backed Tabs insertion metadata through the Add menu boundary', async () => {
     const user = userEvent.setup()
     const onInsertComponent = vi.fn()
 
@@ -165,7 +165,12 @@ describe('ComponentPalette', () => {
     expect(onInsertComponent).toHaveBeenCalledWith(
       expect.objectContaining({
         name: 'Tabs',
-        snippet: expect.stringContaining('<Tabs defaultValue="tab1">'),
+        insertion: expect.objectContaining({
+          jsx: expect.stringContaining('{...useTabsState{{tabsSuffix}}()}'),
+          hooks: expect.stringContaining(
+            'export const useTabsState{{tabsSuffix}} = (initialValue = "overview") => {'
+          ),
+        }),
       })
     )
   })

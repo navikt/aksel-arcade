@@ -244,9 +244,7 @@ describe('Aksel-aware autocomplete contract', () => {
       'Action menu with trigger button and grouped actions.'
     )
     expect(applyFor('<Action', 'ActionMenu')).toContain('<ActionMenu.Trigger>')
-    expect(applyFor('<Action', 'ActionMenu')).toContain(
-      '<ActionMenu.Group label="Case actions">'
-    )
+    expect(applyFor('<Action', 'ActionMenu')).toContain('<ActionMenu.Group label="Case actions">')
     expect(optionFor('<Drop', 'Dropdown')?.detail).toBe(
       'Dropdown menu with grouped and simple item lists.'
     )
@@ -256,10 +254,38 @@ describe('Aksel-aware autocomplete contract', () => {
       'Inline help trigger with explanatory text.'
     )
     expect(applyFor('<Help', 'HelpText')).toContain('HStack gap="space-4" align="center">')
-    expect(optionFor('<Tool', 'Tooltip')?.detail).toBe(
-      'Tooltip around a visible trigger button.'
-    )
+    expect(optionFor('<Tool', 'Tooltip')?.detail).toBe('Tooltip around a visible trigger button.')
     expect(applyFor('<Tool', 'Tooltip')).toContain('describesChild')
+  })
+
+  it('prefers catalog-backed compound workflow details and insertions for top-level targets', () => {
+    expect(optionFor('<Acco', 'Accordion')?.detail).toBe(
+      'Accordion with related questions and one answer expanded.'
+    )
+    expect(applyFor('<Acco', 'Accordion')).toContain('<Accordion.Item defaultOpen>')
+    expect(applyFor('<Acco', 'Accordion')).toContain(
+      '<Accordion.Header>How do I change my meeting time?</Accordion.Header>'
+    )
+    expect(optionFor('<Expa', 'ExpansionCard')?.detail).toBe(
+      'Expansion card with visible summary and expanded details.'
+    )
+    expect(applyFor('<Expa', 'ExpansionCard')).toContain('<ExpansionCard.Description>')
+    expect(applyFor('<Proc', 'Process')).toContain('<Process.Event status="completed"')
+    expect(applyFor('<Proc', 'Process')).not.toContain('Process.Step')
+    expect(optionFor('<Read', 'ReadMore')?.detail).toBe(
+      'Expandable explanation text with a visible header.'
+    )
+    expect(applyFor('<Read', 'ReadMore')).toContain('header="Why we ask about income"')
+    expect(optionFor('<Step', 'Stepper')?.detail).toBe(
+      'Stepper with a valid current step and visible navigation labels.'
+    )
+    expect(applyFor('<Step', 'Stepper')).toContain('activeStep={2}')
+    expect(applyFor('<Step', 'Stepper')).not.toContain('activeStep={0}')
+    expect(optionFor('<Time', 'Timeline')?.detail).toBe(
+      'Timeline with rows, dated periods, and a visible pin.'
+    )
+    expect(applyFor('<Time', 'Timeline')).toContain('<Timeline.Pin date={new Date("2025-05-12")}>')
+    expect(applyFor('<Time', 'Timeline')).not.toContain('Timeline.Content')
   })
 
   it('routes Pagination through the catalog insertion callback with composable JSX', () => {
@@ -398,9 +424,36 @@ describe('Aksel-aware autocomplete contract', () => {
         jsx: 'ReviewDialog{{dialogSuffix}} />',
       }),
     })
-    expect(call?.[0]?.insertion.hooks).toContain('export const ReviewDialog{{dialogSuffix}} = () => {')
+    expect(call?.[0]?.insertion.hooks).toContain(
+      'export const ReviewDialog{{dialogSuffix}} = () => {'
+    )
     expect(call?.[0]?.insertion.hooks).toContain('Dialog.CloseTrigger')
     expect(call?.[0]?.insertion.hooks).toContain('review-dialog-popup{{dialogSuffix}}')
+  })
+
+  it('routes Tabs through the catalog insertion callback with controlled state', () => {
+    const onApplyCatalogInsertion = vi.fn()
+    const option = optionFor('<Tabs', 'Tabs', undefined, onApplyCatalogInsertion)
+
+    expect(option?.detail).toBe('Controlled tabs with Hooks-tab state and three panels.')
+    expect(typeof option?.apply).toBe('function')
+
+    if (typeof option?.apply !== 'function') {
+      throw new Error('Expected Tabs completion to use a custom apply callback')
+    }
+
+    option.apply({} as never, option as never, 0, '<Tabs'.length)
+
+    expect(onApplyCatalogInsertion).toHaveBeenCalledWith({
+      from: 0,
+      to: '<Tabs'.length,
+      insertion: expect.objectContaining({
+        jsx: expect.stringContaining('{...useTabsState{{tabsSuffix}}()}'),
+        hooks: expect.stringContaining(
+          'export const useTabsState{{tabsSuffix}} = (initialValue = "overview") => {'
+        ),
+      }),
+    })
   })
 
   it('hides multi-part catalog insertions when the editor cannot apply them safely', () => {
@@ -409,6 +462,7 @@ describe('Aksel-aware autocomplete contract', () => {
       ['<Dial', 'Dialog'],
       ['<MonthP', 'MonthPicker'],
       ['<Pagi', 'Pagination'],
+      ['<Tabs', 'Tabs'],
       ['<ToggleG', 'ToggleGroup'],
     ] as const
 
@@ -471,7 +525,11 @@ describe('Aksel-aware autocomplete contract', () => {
     expect(labelsFor('<Accordion.')).toEqual([])
     expect(labelsFor('<ActionMenu.')).toEqual([])
     expect(labelsFor('<Dropdown.')).toEqual([])
+    expect(labelsFor('<ExpansionCard.')).toEqual([])
+    expect(labelsFor('<Process.')).toEqual([])
+    expect(labelsFor('<Stepper.')).toEqual([])
     expect(labelsFor('<Tabs.')).toEqual([])
+    expect(labelsFor('<Timeline.')).toEqual([])
   })
 
   it('shows contextual subcomponents inside matching parent ancestry', () => {
@@ -482,13 +540,36 @@ describe('Aksel-aware autocomplete contract', () => {
     ])
     expect(labelsFor('<ActionMenu>\n  <')).toEqual(['ActionMenu.Trigger', 'ActionMenu.Content'])
     expect(labelsFor('<Dropdown>\n  <')).toEqual(['Dropdown.Toggle', 'Dropdown.Menu'])
+    expect(labelsFor('<ExpansionCard>\n  <')).toEqual([
+      'ExpansionCard.Header',
+      'ExpansionCard.Content',
+    ])
+    expect(labelsFor('<ExpansionCard>\n  <ExpansionCard.Header>\n    <')).toEqual([
+      'ExpansionCard.Title',
+      'ExpansionCard.Description',
+    ])
+    expect(labelsFor('<Process>\n  <')).toEqual(['Process.Event'])
+    expect(labelsFor('<Stepper>\n  <')).toEqual(['Stepper.Step'])
     expect(labelsFor('<Tabs>\n  <')).toEqual(['Tabs.List', 'Tabs.Panel'])
+    expect(labelsFor('<Timeline>\n  <')).toEqual(['Timeline.Pin', 'Timeline.Row'])
+    expect(labelsFor('<Timeline>\n  <Timeline.Row label="Sick leave">\n    <')).toEqual([
+      'Timeline.Period',
+    ])
   })
 
   it('matches contextual subcomponents by their relative child name', () => {
     expect(labelsFor('<Accordion>\n  <Accordion.Item>\n    <H')).toContain('Accordion.Header')
     expect(labelsFor('<ActionMenu>\n  <ActionMenu.Content>\n    <I')).toContain('ActionMenu.Item')
+    expect(labelsFor('<ExpansionCard>\n  <ExpansionCard.Header>\n    <T')).toContain(
+      'ExpansionCard.Title'
+    )
+    expect(labelsFor('<Process>\n  <E')).toContain('Process.Event')
+    expect(labelsFor('<Stepper>\n  <S')).toContain('Stepper.Step')
     expect(labelsFor('<Tabs>\n  <Tabs.List>\n    <T')).toContain('Tabs.Tab')
+    expect(labelsFor('<Timeline>\n  <R')).toContain('Timeline.Row')
+    expect(labelsFor('<Timeline>\n  <Timeline.Row label="Payments">\n    <P')).toContain(
+      'Timeline.Period'
+    )
   })
 
   it('keeps contextual Dropdown divider suggestions aligned with the runtime subcomponent name', () => {
@@ -516,6 +597,31 @@ describe('Aksel-aware autocomplete contract', () => {
     )
   })
 
+  it('applies compound-safe contextual snippets inside workflow and navigation parents', () => {
+    expect(applyFor('<Accordion>\n  <', 'Accordion.Item')).toContain(
+      'Accordion.Header>When will I get an answer?</Accordion.Header>'
+    )
+    expect(applyFor('<ExpansionCard>\n  <', 'ExpansionCard.Header')).toContain(
+      'ExpansionCard.Title>Payment for June</ExpansionCard.Title>'
+    )
+    expect(applyFor('<Process>\n  <', 'Process.Event')).toContain(
+      'Process.Event\n  status="active"'
+    )
+    expect(applyFor('<Stepper>\n  <', 'Stepper.Step')).toBe(
+      'Stepper.Step href="#">Choose support</Stepper.Step>'
+    )
+    expect(applyFor('<Tabs>\n  <', 'Tabs.List')).toContain(
+      'Tabs.Tab value="overview" label="Overview"'
+    )
+    expect(applyFor('<Timeline>\n  <', 'Timeline.Pin')).toContain(
+      'Timeline.Pin date={new Date("2025-05-12")}'
+    )
+    expect(applyFor('<Timeline>\n  <', 'Timeline.Row')).toContain('Timeline.Period')
+    expect(
+      applyFor('<Timeline>\n  <Timeline.Row label="Sick leave">\n    <', 'Timeline.Period')
+    ).toContain('statusLabel="Sick leave"')
+  })
+
   it('suppresses generic child-level suggestions in constrained compound positions', () => {
     expect(labelsFor('<Accordion>\n  <')).not.toContain('Box')
     expect(labelsFor('<ActionMenu>\n  <ActionMenu.Content>\n    <')).not.toContain('Button')
@@ -526,7 +632,9 @@ describe('Aksel-aware autocomplete contract', () => {
   })
 
   it('removes generic docs-only detail text from autocomplete options', () => {
-    expect(optionFor('<Accordion', 'Accordion')?.detail).toBe('')
+    expect(optionFor('<Accordion', 'Accordion')?.detail).toBe(
+      'Accordion with related questions and one answer expanded.'
+    )
     expect(optionFor('<ActionMenu', 'ActionMenu')?.detail).toBe(
       'Action menu with trigger button and grouped actions.'
     )
