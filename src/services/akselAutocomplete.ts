@@ -1,8 +1,5 @@
 import type { Completion, CompletionContext, CompletionResult } from '@codemirror/autocomplete'
-import {
-  filterNewAuthoringEntries,
-  isHiddenFromNewAuthoring,
-} from '@/data/akselAuthoringPolicy'
+import { filterNewAuthoringEntries, isHiddenFromNewAuthoring } from '@/data/akselAuthoringPolicy'
 import {
   getCatalogComponent,
   getContextualAutocompleteRule,
@@ -18,6 +15,7 @@ import {
   type AkselAutocompleteEntry,
   type AkselAutocompleteProp,
 } from '@/data/akselAutocompleteData'
+import { insertionNeedsEditorApply } from '@/services/componentInsertion'
 import type { ArcadePage } from '@/types/project'
 import type { ComponentInsertion } from '@/types/snippets'
 
@@ -792,11 +790,11 @@ function supportsCatalogInsertion(
   onApplyCatalogInsertion?: ApplyCatalogInsertion,
   insertionOverride?: ComponentInsertion
 ): boolean {
-  const hooksCode = entry.source === 'catalog'
-    ? getCatalogInsertion(entry, insertionOverride).hooks
-    : undefined
+  const insertion =
+    entry.source === 'catalog' ? getCatalogInsertion(entry, insertionOverride) : insertionOverride
+  const needsEditorApply = insertion ? insertionNeedsEditorApply(insertion) : false
 
-  return !(entry.source === 'catalog' && hooksCode && !onApplyCatalogInsertion)
+  return !(needsEditorApply && !onApplyCatalogInsertion)
 }
 
 function componentOption(
@@ -805,15 +803,29 @@ function componentOption(
   insertionOverride?: ComponentInsertion
 ): Completion {
   const catalogInsertion =
-    entry.source === 'catalog' ? getAutocompleteCatalogInsertion(entry, insertionOverride) : undefined
+    entry.source === 'catalog'
+      ? getAutocompleteCatalogInsertion(entry, insertionOverride)
+      : undefined
   const overrideApply = insertionOverride
     ? insertionOverride.jsx.startsWith('<')
       ? insertionOverride.jsx.slice(1)
       : insertionOverride.jsx
     : undefined
+  const editorAppliedInsertion =
+    catalogInsertion ??
+    (insertionOverride
+      ? {
+          ...insertionOverride,
+          jsx: overrideApply ?? insertionOverride.jsx,
+        }
+      : undefined)
   let apply: Completion['apply'] = getEntryApply(entry)
 
-  if (catalogInsertion?.hooks && onApplyCatalogInsertion) {
+  if (
+    editorAppliedInsertion &&
+    onApplyCatalogInsertion &&
+    insertionNeedsEditorApply(editorAppliedInsertion)
+  ) {
     const applyCatalogInsertion: NonNullable<Exclude<Completion['apply'], string>> = (
       _view,
       _completion,
@@ -821,7 +833,7 @@ function componentOption(
       to
     ) => {
       onApplyCatalogInsertion({
-        insertion: catalogInsertion,
+        insertion: editorAppliedInsertion,
         from,
         to,
       })

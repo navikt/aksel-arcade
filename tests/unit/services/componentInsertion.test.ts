@@ -103,16 +103,50 @@ const popoverInsertion = {
     'const popoverId{{popoverSuffix}} = useId()',
 }
 
+const tabsListAutocompleteInsertion = {
+  jsx:
+    'Tabs.List>\n' +
+    '  <Tabs.Tab value="__AX_TAB_VALUE__" label="__AX_TAB_LABEL__" />\n' +
+    '</Tabs.List>',
+}
+
+const tabsTabAutocompleteInsertion = {
+  jsx: 'Tabs.Tab value="__AX_TAB_VALUE__" label="__AX_TAB_LABEL__" />',
+}
+
+const tabsPanelAutocompleteInsertion = {
+  jsx: 'Tabs.Panel value="__AX_TAB_VALUE__">\n' + '  __AX_TAB_CONTENT__\n' + '</Tabs.Panel>',
+}
+
+function applyAutocompleteInsertionWithMarker(jsx: string, insertion: { jsx: string }) {
+  const marker = '__CURSOR__'
+  const from = jsx.indexOf(marker)
+
+  if (from === -1) {
+    throw new Error('Expected JSX fixture to include __CURSOR__ marker')
+  }
+
+  return applyComponentInsertion(createArcadeSourceFile(jsx.replace(marker, ''), ''), insertion, {
+    kind: 'autocomplete',
+    from,
+    to: from,
+  })
+}
+
 describe('component insertion service', () => {
   it('preserves JSX-only Add menu insertion on the active JSX tab', () => {
     const source = createArcadeSourceFile('<Box>First</Box>\n<Box>Second</Box>', '')
 
-    const nextSource = applyComponentInsertion(source, createJsxOnlyInsertion('<Button>Save</Button>'), {
-      kind: 'palette',
-      activeTab: 'JSX',
-      jsxCursor: { line: 1, column: 0 },
-      hooksCursor: { line: 0, column: 0 },
-    })
+    const nextSource = applyComponentInsertion(
+      source,
+      createJsxOnlyInsertion('<Button>Save</Button>'),
+      {
+        kind: 'palette',
+        activeTab: 'JSX',
+        jsxCursor: { line: 1, column: 0 },
+        hooksCursor: { line: 0, column: 0 },
+      }
+    )
 
     expect(nextSource).toEqual(
       createArcadeSourceFile('<Box>First</Box>\n<Button>Save</Button>\n<Box>Second</Box>', '')
@@ -147,12 +181,16 @@ describe('component insertion service', () => {
   })
 
   it('avoids support-name collisions when the same multi-part insertion is repeated', () => {
-    const firstSource = applyComponentInsertion(createArcadeSourceFile('', ''), paginationInsertion, {
-      kind: 'palette',
-      activeTab: 'JSX',
-      jsxCursor: { line: 0, column: 0 },
-      hooksCursor: { line: 0, column: 0 },
-    })
+    const firstSource = applyComponentInsertion(
+      createArcadeSourceFile('', ''),
+      paginationInsertion,
+      {
+        kind: 'palette',
+        activeTab: 'JSX',
+        jsxCursor: { line: 0, column: 0 },
+        hooksCursor: { line: 0, column: 0 },
+      }
+    )
 
     const secondSource = applyComponentInsertion(firstSource, paginationInsertion, {
       kind: 'palette',
@@ -170,12 +208,16 @@ describe('component insertion service', () => {
   })
 
   it('avoids helper-component name collisions for picker insertions', () => {
-    const firstSource = applyComponentInsertion(createArcadeSourceFile('', ''), datePickerInsertion, {
-      kind: 'palette',
-      activeTab: 'JSX',
-      jsxCursor: { line: 0, column: 0 },
-      hooksCursor: { line: 0, column: 0 },
-    })
+    const firstSource = applyComponentInsertion(
+      createArcadeSourceFile('', ''),
+      datePickerInsertion,
+      {
+        kind: 'palette',
+        activeTab: 'JSX',
+        jsxCursor: { line: 0, column: 0 },
+        hooksCursor: { line: 0, column: 0 },
+      }
+    )
 
     const secondSource = applyComponentInsertion(firstSource, datePickerInsertion, {
       kind: 'palette',
@@ -260,6 +302,69 @@ describe('component insertion service', () => {
     expect(nextSource.hooks).not.toContain('ReviewDialog2')
     expect(nextSource.hooks).not.toContain('dialogOpen2')
     expect(nextSource.hooks).not.toContain('review-dialog-popup2')
+  })
+
+  it('pairs contextual Tabs.Panel insertions with the next unpaired tab value', () => {
+    const nextSource = applyAutocompleteInsertionWithMarker(
+      '<Tabs>\n' +
+        '  <Tabs.List>\n' +
+        '    <Tabs.Tab value="overview" label="Overview" />\n' +
+        '    <Tabs.Tab value="timeline" label="Timeline" />\n' +
+        '  </Tabs.List>\n' +
+        '  <Tabs.Panel value="overview">Overview of the application.</Tabs.Panel>\n' +
+        '  <__CURSOR__\n' +
+        '</Tabs>',
+      tabsPanelAutocompleteInsertion
+    )
+
+    expect(nextSource.jsx).toContain(
+      '<Tabs.Panel value="timeline">\n  Timeline content.\n</Tabs.Panel>'
+    )
+  })
+
+  it('pairs contextual Tabs.Tab insertions with the next unpaired panel value', () => {
+    const nextSource = applyAutocompleteInsertionWithMarker(
+      '<Tabs>\n' +
+        '  <Tabs.List>\n' +
+        '    <Tabs.Tab value="overview" label="Overview" />\n' +
+        '    <__CURSOR__\n' +
+        '  </Tabs.List>\n' +
+        '  <Tabs.Panel value="overview">Overview of the application.</Tabs.Panel>\n' +
+        '  <Tabs.Panel value="tab1">Tab 1 content.</Tabs.Panel>\n' +
+        '</Tabs>',
+      tabsTabAutocompleteInsertion
+    )
+
+    expect(nextSource.jsx).toContain('<Tabs.Tab value="tab1" label="Tab 1" />')
+  })
+
+  it('reuses unpaired panel values when inserting a contextual Tabs.List scaffold', () => {
+    const nextSource = applyAutocompleteInsertionWithMarker(
+      '<Tabs>\n' +
+        '  <Tabs.Panel value="tab1">Tab 1 content.</Tabs.Panel>\n' +
+        '  <__CURSOR__\n' +
+        '</Tabs>',
+      tabsListAutocompleteInsertion
+    )
+
+    expect(nextSource.jsx).toContain(
+      '<Tabs.List>\n  <Tabs.Tab value="tab1" label="Tab 1" />\n</Tabs.List>'
+    )
+  })
+
+  it('generates the next sequential tab value when all existing Tabs values are already paired', () => {
+    const nextSource = applyAutocompleteInsertionWithMarker(
+      '<Tabs>\n' +
+        '  <Tabs.List>\n' +
+        '    <Tabs.Tab value="overview" label="Overview" />\n' +
+        '  </Tabs.List>\n' +
+        '  <Tabs.Panel value="overview">Overview of the application.</Tabs.Panel>\n' +
+        '  <__CURSOR__\n' +
+        '</Tabs>',
+      tabsPanelAutocompleteInsertion
+    )
+
+    expect(nextSource.jsx).toContain('<Tabs.Panel value="tab1">\n  Tab 1 content.\n</Tabs.Panel>')
   })
 
   it('replaces JSX completion ranges and preserves existing Hooks code', () => {

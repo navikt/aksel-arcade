@@ -118,18 +118,16 @@ describe('Aksel catalog starter path', () => {
     const legacyEntries = listCatalogEntries({ statuses: ['legacy'] })
     const paletteComponents = getCatalogPaletteComponents()
 
-    expect(legacyEntries.map((entry) => entry.name)).toEqual(
-      expect.arrayContaining(['Alert'])
-    )
+    expect(legacyEntries.map((entry) => entry.name)).toEqual(expect.arrayContaining(['Alert']))
     expect(getCatalogComponent('Alert')?.status).toBe('legacy')
     expect(paletteComponents.some((component) => component.name === 'Alert')).toBe(false)
     expect(paletteComponents.some((component) => component.name === 'Modal')).toBe(false)
-    expect(getComponentsByCategory('component').some((component) => component.name === 'Alert')).toBe(
-      false
-    )
-    expect(getComponentsByCategory('component').some((component) => component.name === 'Modal')).toBe(
-      false
-    )
+    expect(
+      getComponentsByCategory('component').some((component) => component.name === 'Alert')
+    ).toBe(false)
+    expect(
+      getComponentsByCategory('component').some((component) => component.name === 'Modal')
+    ).toBe(false)
     expect(AKSEL_SNIPPETS.some((snippet) => snippet.name === 'Alert')).toBe(false)
     expect(AKSEL_SNIPPETS.some((snippet) => snippet.name === 'Modal')).toBe(false)
     expect(searchComponents('alert')).not.toContainEqual(expect.objectContaining({ name: 'Alert' }))
@@ -216,9 +214,9 @@ describe('Aksel catalog starter path', () => {
     expect(toggleGroupEntry?.snippet.hooksCode).toContain(
       'export const useToggleGroupState{{toggleGroupSuffix}} = (initialValue = "list") => {'
     )
-    expect(
-      paletteComponents.find((component) => component.name === 'Radio')?.snippet
-    ).toContain('<RadioGroup legend="Choose delivery speed" defaultValue="standard" name="deliverySpeed">')
+    expect(paletteComponents.find((component) => component.name === 'Radio')?.snippet).toContain(
+      '<RadioGroup legend="Choose delivery speed" defaultValue="standard" name="deliverySpeed">'
+    )
     expect(
       paletteComponents.find((component) => component.name === 'ToggleGroup')?.insertion
     ).toEqual(
@@ -229,7 +227,9 @@ describe('Aksel catalog starter path', () => {
         ),
       })
     )
-    expect(searchComponents('radiogroup')).toContainEqual(expect.objectContaining({ name: 'Radio' }))
+    expect(searchComponents('radiogroup')).toContainEqual(
+      expect.objectContaining({ name: 'Radio' })
+    )
     expect(searchComponents('segmented')).toContainEqual(
       expect.objectContaining({ name: 'ToggleGroup' })
     )
@@ -298,9 +298,9 @@ describe('Aksel catalog starter path', () => {
         hooks: expect.stringContaining('export const ReviewDialog{{dialogSuffix}} = () => {'),
       })
     )
-    expect(
-      paletteComponents.find((component) => component.name === 'InlineMessage')?.snippet
-    ).toBe('<InlineMessage status="success">Draft saved at 14:35</InlineMessage>')
+    expect(paletteComponents.find((component) => component.name === 'InlineMessage')?.snippet).toBe(
+      '<InlineMessage status="success">Draft saved at 14:35</InlineMessage>'
+    )
     expect(searchComponents('modal replacement')).toContainEqual(
       expect.objectContaining({ name: 'Dialog' })
     )
@@ -351,6 +351,66 @@ describe('Aksel catalog starter path', () => {
     expect(searchComponents('anchor')).toContainEqual(expect.objectContaining({ name: 'Popover' }))
   })
 
+  it('routes compound workflow and navigation examples through the shared catalog for Add menu data', () => {
+    const componentEntries = listCatalogEntries({ groups: ['component'], statuses: ['current'] })
+    const paletteComponents = getComponentsByCategory('component')
+    const accordionEntry = getCatalogComponent('Accordion')
+    const expansionCardEntry = getCatalogComponent('ExpansionCard')
+    const processEntry = getCatalogComponent('Process')
+    const readMoreEntry = getCatalogComponent('ReadMore')
+    const stepperEntry = getCatalogComponent('Stepper')
+    const tabsEntry = getCatalogComponent('Tabs')
+    const timelineEntry = getCatalogComponent('Timeline')
+
+    expect(componentEntries.map((entry) => entry.name)).toEqual(
+      expect.arrayContaining([
+        'Accordion',
+        'ExpansionCard',
+        'Process',
+        'ReadMore',
+        'Stepper',
+        'Tabs',
+        'Timeline',
+      ])
+    )
+    expect(accordionEntry?.snippet.code).toContain('<Accordion.Item defaultOpen>')
+    expect(accordionEntry?.snippet.code).toContain(
+      '<Accordion.Header>How do I change my meeting time?</Accordion.Header>'
+    )
+    expect(expansionCardEntry?.snippet.code).toContain('<ExpansionCard.Description>')
+    expect(expansionCardEntry?.snippet.code).toContain('defaultOpen')
+    expect(processEntry?.snippet.code).toContain('<Process.Event status="completed"')
+    expect(processEntry?.snippet.code).not.toContain('Process.Step')
+    expect(readMoreEntry?.snippet.code).toContain('header="Why we ask about income"')
+    expect(stepperEntry?.snippet.code).toContain('activeStep={2}')
+    expect(stepperEntry?.snippet.code).toContain(
+      '<Stepper.Step href="#">Choose support</Stepper.Step>'
+    )
+    expect(stepperEntry?.snippet.code).not.toContain('activeStep={0}')
+    expect(tabsEntry?.snippet.code).toContain('{...useTabsState{{tabsSuffix}}()}')
+    expect(tabsEntry?.snippet.hooksCode).toContain(
+      'export const useTabsState{{tabsSuffix}} = (initialValue = "overview") => {'
+    )
+    expect(timelineEntry?.snippet.code).toContain('<Timeline.Pin date={new Date("2025-05-12")}>')
+    expect(timelineEntry?.snippet.code).toContain('<Timeline.Row label="Sick leave">')
+    expect(timelineEntry?.snippet.code).not.toContain('Timeline.Content')
+    expect(paletteComponents.find((component) => component.name === 'Tabs')?.insertion).toEqual(
+      expect.objectContaining({
+        jsx: expect.stringContaining('{...useTabsState{{tabsSuffix}}()}'),
+        hooks: expect.stringContaining(
+          'export const useTabsState{{tabsSuffix}} = (initialValue = "overview") => {'
+        ),
+      })
+    )
+    expect(searchComponents('faq')).toContainEqual(expect.objectContaining({ name: 'Accordion' }))
+    expect(searchComponents('workflow')).toContainEqual(
+      expect.objectContaining({ name: 'Process' })
+    )
+    expect(searchComponents('chronology')).toContainEqual(
+      expect.objectContaining({ name: 'Timeline' })
+    )
+  })
+
   it('exposes Pagination as a catalog-backed multi-part insertion', () => {
     const paginationEntry = getCatalogComponent('Pagination')
     const paginationPaletteEntry = getComponentsByCategory('component').find(
@@ -359,9 +419,7 @@ describe('Aksel catalog starter path', () => {
     const paginationSnippet = AKSEL_SNIPPETS.find((snippet) => snippet.name === 'Pagination')
 
     expect(paginationEntry?.description).toBe('Pagination controls with Hooks-tab state.')
-    expect(paginationEntry?.snippet.code).toContain(
-      '{...usePaginationState{{paginationSuffix}}()}'
-    )
+    expect(paginationEntry?.snippet.code).toContain('{...usePaginationState{{paginationSuffix}}()}')
     expect(paginationEntry?.snippet.code).not.toContain('{(() => {')
     expect(paginationEntry?.snippet.code).toContain(
       'srHeading={{ tag: "h2", text: "Result pages" }}'
@@ -391,7 +449,9 @@ describe('Aksel catalog starter path', () => {
         ),
       })
     )
-    expect(searchComponents('pager')).toContainEqual(expect.objectContaining({ name: 'Pagination' }))
+    expect(searchComponents('pager')).toContainEqual(
+      expect.objectContaining({ name: 'Pagination' })
+    )
   })
 
   it('exposes DatePicker, MonthPicker, and ToggleGroup as catalog-backed stateful insertions', () => {
@@ -449,6 +509,7 @@ describe('Aksel catalog starter path', () => {
       'MonthPicker',
       'Pagination',
       'Popover',
+      'Tabs',
       'ToggleGroup',
     ])
 
@@ -459,15 +520,23 @@ describe('Aksel catalog starter path', () => {
     }
   })
 
-  it('keeps Tabs snippets uncontrolled so preview clicks can switch panels', () => {
+  it('keeps Tabs snippets composable while routing state through Hooks', () => {
+    const tabsCatalogEntry = getCatalogComponent('Tabs')
     const tabsPaletteEntry = getComponentsByCategory('component').find(
       (component) => component.name === 'Tabs'
     )
     const tabsSnippet = AKSEL_SNIPPETS.find((snippet) => snippet.name === 'Tabs')
 
-    expect(tabsPaletteEntry?.snippet).toContain('<Tabs defaultValue="tab1">')
-    expect(tabsPaletteEntry?.snippet).not.toContain('<Tabs value="tab1">')
-    expect(tabsSnippet?.template).toContain('<Tabs defaultValue="tab1">')
+    expect(tabsCatalogEntry?.snippet.hooksCode).toContain(
+      'export const useTabsState{{tabsSuffix}} = (initialValue = "overview") => {'
+    )
+    expect(tabsPaletteEntry?.snippet).toContain('<Tabs {...useTabsState{{tabsSuffix}}()}>')
+    expect(tabsSnippet?.template).toContain('<Tabs {...useTabsState{{tabsSuffix}}()}>')
+    expect(tabsPaletteEntry?.insertion).toEqual(
+      expect.objectContaining({
+        hooks: expect.stringContaining('const [selectedTab, setSelectedTab] = useState(initialValue)'),
+      })
+    )
   })
 
   it('makes the editor snippet and prop metadata paths prefer the same catalog source', () => {

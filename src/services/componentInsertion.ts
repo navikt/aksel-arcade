@@ -6,6 +6,12 @@ const SNIPPET_PLACEHOLDER_PATTERN = /\$\{(\d+):([^}]+)\}/g
 const COLLISION_TOKEN_PATTERN = /\{\{[\w]+\}\}/g
 const IDENTIFIER_PREFIX = /[A-Za-z_$][\w$]*/
 const IDENTIFIER_PART = /[\w$]/
+const TABS_VALUE_PLACEHOLDER = '__AX_TAB_VALUE__'
+const TABS_LABEL_PLACEHOLDER = '__AX_TAB_LABEL__'
+const TABS_CONTENT_PLACEHOLDER = '__AX_TAB_CONTENT__'
+const TABS_ROOT_TAG_PATTERN = /<\/?Tabs(?!\.)\b[^>]*>/g
+const TABS_TAB_TAG_PATTERN = /<Tabs\.Tab\b([^>]*)\/?>/g
+const TABS_PANEL_TAG_PATTERN = /<Tabs\.Panel\b([^>]*)>/g
 
 interface PaletteInsertionLocation {
   kind: 'palette'
@@ -140,18 +146,144 @@ export function createJsxOnlyInsertion(jsx: string): ComponentInsertion {
   return { jsx }
 }
 
+export function insertionNeedsEditorApply(insertion: ComponentInsertion): boolean {
+  return Boolean(
+    insertion.hooks ||
+    insertion.jsx.includes(TABS_VALUE_PLACEHOLDER) ||
+    insertion.jsx.includes(TABS_LABEL_PLACEHOLDER) ||
+    insertion.jsx.includes(TABS_CONTENT_PLACEHOLDER)
+  )
+}
+
+function extractAttributeValue(attributes: string, attributeName: string): string | undefined {
+  const match = attributes.match(new RegExp(`\\b${attributeName}="([^"]+)"`))
+  return match?.[1]
+}
+
+function getContainingTabsBlock(source: string, position: number): string | undefined {
+  const ranges: Array<{ start: number; end: number }> = []
+  const stack: number[] = []
+
+  for (const match of source.matchAll(TABS_ROOT_TAG_PATTERN)) {
+    const tag = match[0]
+    const start = match.index ?? 0
+
+    if (tag.startsWith('</')) {
+      const openStart = stack.pop()
+      if (openStart !== undefined) {
+        ranges.push({ start: openStart, end: start + tag.length })
+      }
+      continue
+    }
+
+    if (!tag.endsWith('/>')) {
+      stack.push(start)
+    }
+  }
+
+  const containingRanges = ranges
+    .filter((range) => range.start <= position && position <= range.end)
+    .sort((first, second) => first.start - second.start)
+  const containingRange = containingRanges[containingRanges.length - 1]
+
+  return containingRange ? source.slice(containingRange.start, containingRange.end) : undefined
+}
+
+function formatTabsLabel(value: string): string {
+  const sequentialTabMatch = value.match(/^tab(\d+)$/)
+  if (sequentialTabMatch) {
+    return `Tab ${sequentialTabMatch[1]}`
+  }
+
+  return value
+    .split(/[-_]+/)
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ')
+}
+
+function getNextTabsValue(usedValues: Set<string>): string {
+  let counter = 1
+  while (usedValues.has(`tab${counter}`)) {
+    counter += 1
+  }
+
+  return `tab${counter}`
+}
+
+function resolveTabsAutocompletePlaceholders(
+  source: string,
+  position: number,
+  jsxBlock: string
+): string {
+  if (!jsxBlock.includes(TABS_VALUE_PLACEHOLDER)) {
+    return jsxBlock
+  }
+
+  const tabsBlock = getContainingTabsBlock(source, position) ?? source
+  const tabValues: string[] = []
+  const panelValues: string[] = []
+  const tabLabelsByValue = new Map<string, string>()
+
+  for (const match of tabsBlock.matchAll(TABS_TAB_TAG_PATTERN)) {
+    const attributes = match[1] ?? ''
+    const value = extractAttributeValue(attributes, 'value')
+
+    if (!value) {
+      continue
+    }
+
+    tabValues.push(value)
+    tabLabelsByValue.set(
+      value,
+      extractAttributeValue(attributes, 'label') ?? formatTabsLabel(value)
+    )
+  }
+
+  for (const match of tabsBlock.matchAll(TABS_PANEL_TAG_PATTERN)) {
+    const attributes = match[1] ?? ''
+    const value = extractAttributeValue(attributes, 'value')
+
+    if (value) {
+      panelValues.push(value)
+    }
+  }
+
+  const tabValueSet = new Set(tabValues)
+  const panelValueSet = new Set(panelValues)
+  const usedValues = new Set([...tabValueSet, ...panelValueSet])
+  const isPanelInsertion = jsxBlock.includes('Tabs.Panel')
+  const matchingUnpairedValue = isPanelInsertion
+    ? tabValues.find((value) => !panelValueSet.has(value))
+    : panelValues.find((value) => !tabValueSet.has(value))
+  const value = matchingUnpairedValue ?? getNextTabsValue(usedValues)
+  const label = tabLabelsByValue.get(value) ?? formatTabsLabel(value)
+
+  return replaceAllOccurrences(
+    replaceAllOccurrences(
+      replaceAllOccurrences(jsxBlock, TABS_VALUE_PLACEHOLDER, value),
+      TABS_LABEL_PLACEHOLDER,
+      label
+    ),
+    TABS_CONTENT_PLACEHOLDER,
+    `${label} content.`
+  )
+}
+
 export function applyComponentInsertion(
   source: ArcadeSourceFile,
   insertion: ComponentInsertion,
   location: ComponentInsertionLocation
 ): ArcadeSourceFile {
   const replacements = getTokenReplacements(insertion, source)
-  const jsxBlock = applyTokenReplacements(insertion.jsx, replacements)
+  let jsxBlock = applyTokenReplacements(insertion.jsx, replacements)
   const hooksBlock = insertion.hooks
     ? applyTokenReplacements(insertion.hooks, replacements)
     : undefined
 
   if (location.kind === 'autocomplete') {
+    jsxBlock = resolveTabsAutocompletePlaceholders(source.jsx, location.from, jsxBlock)
+
     return {
       jsx: replaceRange(source.jsx, location.from, location.to, jsxBlock),
       hooks: hooksBlock ? appendBlock(source.hooks, hooksBlock) : source.hooks,
