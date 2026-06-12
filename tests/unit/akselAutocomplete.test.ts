@@ -238,11 +238,64 @@ describe('Aksel-aware autocomplete contract', () => {
       '<Heading level="2" size="small" spacing>Need help before you send the application?</Heading>'
     )
     expect(optionFor('<Inter', 'InternalHeader')?.detail).toBe(
-      'Visible internal header with title and action button.'
+      'Visible internal header with a user menu and logout action.'
     )
-    expect(applyFor('<Inter', 'InternalHeader')).toContain(
-      '<InternalHeader.Button>Log out</InternalHeader.Button>'
+
+    const onApplyCatalogInsertion = vi.fn()
+    const option = optionFor('<Inter', 'InternalHeader', undefined, onApplyCatalogInsertion)
+
+    expect(option).toBeTruthy()
+    expect(typeof option?.apply).toBe('function')
+
+    if (typeof option?.apply !== 'function') {
+      throw new Error('Expected InternalHeader completion to use a custom apply callback')
+    }
+
+    option.apply(
+      {
+        label: option.label,
+        type: option.type,
+      } as never,
+      option as never,
+      0,
+      '<Inter'.length
     )
+
+    expect(onApplyCatalogInsertion).toHaveBeenCalledWith({
+      from: 0,
+      to: '<Inter'.length,
+      insertion: {
+        jsx:
+          'InternalHeader>\n' +
+          '  <InternalHeader.Title as="h1">Sykepenger</InternalHeader.Title>\n' +
+          '  <Spacer />\n' +
+          '  <ActionMenu>\n' +
+          '    <ActionMenu.Trigger>\n' +
+          '      <InternalHeader.UserButton name="Ola N." description="Enhet: Skien" />\n' +
+          '    </ActionMenu.Trigger>\n' +
+          '    <Theme theme={resolvedTheme{{internalHeaderSuffix}} as "light" | "dark"}>\n' +
+          '      <ActionMenu.Content align="end">\n' +
+          '        <ActionMenu.Label>\n' +
+          '          <dl style={{ margin: "0" }}>\n' +
+          '            <BodyShort as="dt" size="small">\n' +
+          '              Ola Normann\n' +
+          '            </BodyShort>\n' +
+          '            <Detail as="dd">D123456</Detail>\n' +
+          '          </dl>\n' +
+          '        </ActionMenu.Label>\n' +
+          '        <ActionMenu.Divider />\n' +
+          '        <ActionMenu.Group aria-label="Handlinger">\n' +
+          '          <ActionMenu.Item>\n' +
+          '            Logg ut <Spacer /> <LeaveIcon aria-hidden fontSize="1.5rem" />\n' +
+          '          </ActionMenu.Item>\n' +
+          '        </ActionMenu.Group>\n' +
+          '      </ActionMenu.Content>\n' +
+          '    </Theme>\n' +
+          '  </ActionMenu>\n' +
+          '</InternalHeader>',
+        hooks: "const resolvedTheme{{internalHeaderSuffix}} = 'light'",
+      },
+    })
     expect(optionFor('<Link', 'Link')?.detail).toBe('Safe visible link example.')
     expect(applyFor('<Link', 'Link')).toBe(
       'Link href="#">Read the guide to sick leave follow-up</Link>'

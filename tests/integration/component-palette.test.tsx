@@ -187,7 +187,12 @@ describe('ComponentPalette', () => {
       2,
       expect.objectContaining({
         name: 'InternalHeader',
-        snippet: expect.stringContaining('<InternalHeader.Button>Log out</InternalHeader.Button>'),
+        snippet: expect.stringContaining(
+          '<InternalHeader.UserButton name="Ola N." description="Enhet: Skien" />'
+        ),
+        insertion: expect.objectContaining({
+          hooks: "const resolvedTheme{{internalHeaderSuffix}} = 'light'",
+        }),
       })
     )
   })

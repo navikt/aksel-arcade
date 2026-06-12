@@ -223,7 +223,13 @@ describe('Aksel catalog starter path', () => {
       '<Heading level="2" size="small" spacing>Need help before you send the application?</Heading>'
     )
     expect(internalHeaderEntry?.snippet.code).toContain(
-      '<InternalHeader.Button>Log out</InternalHeader.Button>'
+      '<InternalHeader.UserButton name="Ola N." description="Enhet: Skien" />'
+    )
+    expect(internalHeaderEntry?.snippet.code).toContain(
+      '<Theme theme={resolvedTheme{{internalHeaderSuffix}} as "light" | "dark"}>'
+    )
+    expect(internalHeaderEntry?.snippet.hooksCode).toBe(
+      "const resolvedTheme{{internalHeaderSuffix}} = 'light'"
     )
     expect(linkEntry?.snippet.code).toBe(
       '<Link href="#">Read the guide to sick leave follow-up</Link>'
@@ -709,6 +715,7 @@ describe('Aksel catalog starter path', () => {
       'Chips Toggle',
       'DatePicker',
       'Dialog',
+      'InternalHeader',
       'MonthPicker',
       'Pagination',
       'Popover',

@@ -2538,3 +2538,19 @@ Verification:
 Next note:
 
 - The remaining open issue from the original `#212` / `#213` pair is `#213`. If a future slice needs more preview support for sandboxed interactive components, keep `sandbox="allow-scripts"` and add narrowly scoped iframe `allow` capabilities instead of broadening the sandbox origin or enabling modals.
+
+### 2026-06-12 - PR #231 follow-up for issue #212 InternalHeader snippet
+
+Implemented:
+
+- Replaced the simple issue-212 `InternalHeader` catalog example with the richer user-menu structure requested in follow-up: `InternalHeader.Title`, `Spacer`, `ActionMenu`, `InternalHeader.UserButton`, themed `ActionMenu.Content`, user identity details, and the trailing `LeaveIcon` logout action.
+- Updated the catalog import guidance to include the full snippet surface (`ActionMenu`, `BodyShort`, `Detail`, `InternalHeader`, `Spacer`, `Theme`, and `LeaveIcon`) and added a Hooks-tab `resolvedTheme` helper so the inserted example renders immediately in the sandbox without requiring manual setup.
+- Kept the insertion composable and repeat-safe by suffixing the `resolvedTheme` helper through the shared collision-token path, then updated the catalog/autocomplete/Add-menu regressions so `InternalHeader` now behaves like the other callback-backed Hooks snippets.
+
+Verification:
+
+- npm run typecheck
+- npm run lint (passes with the existing `.eslintignore` deprecation notice and existing `InspectionPopover` hook-dependency warning only)
+- npm run test -- --run
+- npm run build (passes with the existing Vite/browser-compatibility and chunk-size warnings only)
+- Browser check at `http://127.0.0.1:4387/aksel-arcade/`: confirmed Add -> `InternalHeader` inserts the updated JSX plus Hooks helper, confirmed the preview renders the `Sykepenger` header and `Ola N.` user button, confirmed opening the user menu shows `Ola Normann`, `D123456`, and `Logg ut`, and confirmed the verified session showed no browser console warnings or errors.
