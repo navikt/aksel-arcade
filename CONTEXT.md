@@ -57,7 +57,7 @@ A shell-neutral portable share artifact named with the `.akselarcade` extension 
 _Avoid_: Arcade project, save file, document, AI export bundle
 
 **Web share URL**:
-A Web Arcade link that carries only the portable **Arcade project** data needed to load a shared prototype: **Arcade project source**, shareable **Preview preferences**, and share-opening intent such as **Preview fullscreen**. Opening one creates a fresh local **Arcade project** identity without preserving sender identity, timestamps, diagnostics, preview evidence, or durable **Workspace preferences**.
+A Web Arcade link that carries the portable **Arcade project** data needed to load a shared prototype — **Arcade project source** and shareable **Preview preferences** — and may also carry share-opening intent such as **Preview fullscreen**. Opening one creates a fresh local **Arcade project** identity without preserving sender identity, timestamps, diagnostics, preview evidence, or durable **Workspace preferences**.
 _Avoid_: Project code URL, save file, telemetry bundle
 
 **Web Arcade URL**:
