@@ -2839,3 +2839,18 @@ Verification:
 Next note:
 
 - `#240` can now focus on end-to-end capability-boundary validation without reworking share UI plumbing. The reusable share control and `useShareLink` cancellation path are already in place; keep Desktop/non-share-capable verification building on the new `PreviewPane shellCapabilities` wiring instead of adding another fullscreen-specific branch.
+
+### 2026-06-14 - PR #250 review follow-up for issue #239
+
+Implemented:
+
+- PR review found that the new pane-level fullscreen `Escape` handler also caught `Escape` presses from inside the fullscreen share popover, which could kick the user out of **Preview fullscreen** instead of dismissing the popover first.
+- Tagged the reusable share popover content with an explicit data boundary and updated `PreviewPane` to ignore fullscreen-exit `Escape` handling when the key event originates inside that share popover subtree.
+- Added a regression in `tests/integration/fullscreen-share-popover.test.tsx` proving the first `Escape` closes the fullscreen share popover while leaving fullscreen active, and the next `Escape` still exits fullscreen normally.
+
+Verification:
+
+- `npm run typecheck`
+- `npm run build`
+- `CI=1 npm run test -- --run tests/integration/fullscreen-share-popover.test.tsx tests/integration/share-popover.test.tsx tests/integration/preview-fullscreen-entry.test.tsx tests/integration/app-preview-fullscreen.test.tsx`
+- Browser check at `http://127.0.0.1:4194/aksel-arcade/`: opened the fullscreen share popover, pressed `Escape`, confirmed the popover closed while fullscreen stayed active, then focused the fullscreen exit control and confirmed `Escape` still exited fullscreen; no browser console errors appeared during the verified flow.

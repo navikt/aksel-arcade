@@ -270,6 +270,13 @@ export const PreviewPane = ({
         return
       }
 
+      if (
+        event.target instanceof Element &&
+        event.target.closest('[data-share-popover-content="true"]')
+      ) {
+        return
+      }
+
       event.preventDefault()
       exitPreviewFullscreen()
     },

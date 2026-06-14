@@ -222,6 +222,35 @@ describe('Fullscreen share popover integration', () => {
     expect(payload.previewFullscreen).toBe(true)
   })
 
+  it('closes the fullscreen share popover on Escape before exiting fullscreen', async () => {
+    const user = userEvent.setup()
+
+    renderHarness()
+
+    await user.click(screen.getByRole('button', { name: 'Enter preview fullscreen' }))
+    await user.click(screen.getByRole('button', { name: 'Share fullscreen preview' }))
+
+    const copyButton = await screen.findByRole('button', { name: 'Copy Web share URL' })
+    copyButton.focus()
+
+    await user.keyboard('{Escape}')
+
+    await waitFor(() => {
+      expect(screen.queryAllByTestId('share-popover')).toHaveLength(0)
+    })
+    const exitFullscreenButton = screen.getByRole('button', { name: 'Exit preview fullscreen' })
+
+    expect(exitFullscreenButton).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Share fullscreen preview' })).toBeTruthy()
+
+    exitFullscreenButton.focus()
+    await user.keyboard('{Escape}')
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Enter preview fullscreen' })).toBeTruthy()
+    })
+  })
+
   it('keeps the multi-page warning and Start-page-only payload in fullscreen sharing', async () => {
     const user = userEvent.setup()
 

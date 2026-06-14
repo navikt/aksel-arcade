@@ -234,7 +234,11 @@ export const SharePopoverButton = ({
           anchorEl={shareButtonRef.current}
           placement="bottom-end"
         >
-          <Popover.Content className="share-popover" data-testid="share-popover">
+          <Popover.Content
+            className="share-popover"
+            data-testid="share-popover"
+            data-share-popover-content="true"
+          >
             <VStack gap="space-12">
               <Heading size="small" level="2">
                 Share this prototype
