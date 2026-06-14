@@ -1,5 +1,5 @@
 import { useCallback, useContext, useEffect, useRef, useState } from 'react'
-import { Alert, BodyShort, Box, Button, Detail, HStack, VStack } from '@navikt/ds-react'
+import { Alert, BodyShort, Box, Button, Detail, VStack } from '@navikt/ds-react'
 import { ExpandIcon, ShrinkIcon } from '@navikt/aksel-icons'
 import { AppContext } from '@/hooks/useProject'
 import { transpileCode, transpileProjectSource } from '@/services/transpiler'
@@ -33,7 +33,7 @@ export const PreviewPane = () => {
     theme,
     selectedEditTarget,
     previewFullscreen,
-    togglePreviewFullscreen,
+    setPreviewFullscreen,
   } = useSettings()
   const effectiveEditTarget = resolveSelectedEditTarget(multiPageEnabled, selectedEditTarget)
   const activeSource = getActiveSource(project)
@@ -50,6 +50,7 @@ export const PreviewPane = () => {
   const pendingCompileErrorRef = useRef<CompileError | null>(null)
   const isCodeEditorFocusedRef = useRef(editorState.isCodeEditorFocused)
   const fullscreenToggleRef = useRef<HTMLButtonElement | null>(null)
+  const shouldRestoreFullscreenToggleFocusRef = useRef(false)
 
   const revealCompileError = useCallback(
     (error: CompileError) => {
@@ -233,11 +234,48 @@ export const PreviewPane = () => {
     setIsInspectMode(enabled)
   }
 
-  useEffect(() => {
+  const exitPreviewFullscreen = useCallback(() => {
     if (!previewFullscreen) {
       return
     }
 
+    shouldRestoreFullscreenToggleFocusRef.current = true
+    setPreviewFullscreen(false)
+  }, [previewFullscreen, setPreviewFullscreen])
+
+  const handlePreviewFullscreenToggle = useCallback(() => {
+    if (previewFullscreen) {
+      exitPreviewFullscreen()
+      return
+    }
+
+    shouldRestoreFullscreenToggleFocusRef.current = false
+    setPreviewFullscreen(true)
+  }, [exitPreviewFullscreen, previewFullscreen, setPreviewFullscreen])
+
+  const handlePreviewPaneKeyDown = useCallback(
+    (event: React.KeyboardEvent<HTMLElement>) => {
+      if (!previewFullscreen || event.key !== 'Escape' || event.defaultPrevented) {
+        return
+      }
+
+      event.preventDefault()
+      exitPreviewFullscreen()
+    },
+    [exitPreviewFullscreen, previewFullscreen]
+  )
+
+  useEffect(() => {
+    if (previewFullscreen) {
+      fullscreenToggleRef.current?.focus()
+      return
+    }
+
+    if (!shouldRestoreFullscreenToggleFocusRef.current) {
+      return
+    }
+
+    shouldRestoreFullscreenToggleFocusRef.current = false
     fullscreenToggleRef.current?.focus()
   }, [previewFullscreen])
 
@@ -249,31 +287,44 @@ export const PreviewPane = () => {
     <Box
       as="section"
       className={previewFullscreen ? 'preview-pane preview-pane--fullscreen' : 'preview-pane'}
+      onKeyDown={handlePreviewPaneKeyDown}
     >
       <Box
         data-name="Preview Header"
-        className="preview-pane__header"
+        data-testid="preview-header"
+        className={
+          previewFullscreen
+            ? 'preview-pane__header preview-pane__header--fullscreen'
+            : 'preview-pane__header'
+        }
         borderWidth="0 0 1 0"
         borderColor="neutral-subtleA"
         paddingInline="space-20"
         paddingBlock="space-8"
       >
-        <HStack gap="space-12" justify="space-between" align="center">
-          <Button
-            ref={fullscreenToggleRef}
-            variant="tertiary"
-            data-color="neutral"
-            size="small"
-            aria-label={fullscreenToggleLabel}
-            aria-pressed={previewFullscreen}
-            icon={previewFullscreen ? <ShrinkIcon aria-hidden /> : <ExpandIcon aria-hidden />}
-            onClick={togglePreviewFullscreen}
-          />
-          <HStack gap="space-12" justify="end" align="center">
+        <div className="preview-pane__header-controls">
+          <div className="preview-pane__header-controls-left">
+            <Button
+              ref={fullscreenToggleRef}
+              variant="tertiary"
+              data-color="neutral"
+              size="small"
+              aria-label={fullscreenToggleLabel}
+              aria-pressed={previewFullscreen}
+              icon={previewFullscreen ? <ShrinkIcon aria-hidden /> : <ExpandIcon aria-hidden />}
+              onClick={handlePreviewFullscreenToggle}
+            />
+          </div>
+          <div
+            className="preview-pane__header-controls-right"
+            data-testid="preview-header-controls-right"
+          >
             <InspectMode onInspectToggle={handleInspectToggle} />
-            <ViewportToggle />
-          </HStack>
-        </HStack>
+            <div className="preview-pane__viewport-toggle">
+              <ViewportToggle fill={previewFullscreen} />
+            </div>
+          </div>
+        </div>
       </Box>
 
       <Box

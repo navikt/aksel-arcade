@@ -2694,6 +2694,46 @@ Next note:
 
 - `#238` can now consume `shareHydration.openingIntent` to apply fullscreen only after “Load Web share URL”, while `#239` can reuse the same `useShareLink({ openingIntent: { previewFullscreen: true } })` path for the fullscreen header share button. Keep normal-header sharing on the omission path; absence of the field now intentionally means “preserve the recipient tab’s current fullscreen state.”
 
+### 2026-06-14 - Issue #237: Add fullscreen preview-header exit and responsive chrome behavior
+
+Implemented:
+
+- Picked `#237` as the highest-priority open `ready-for-agent` issue from `#237`-`#240` after checking the parent PRD `#233`, `CONTEXT.md`, and the latest `progress.txt` notes. It is the first remaining unblocked fullscreen slice and the later share/capability issues explicitly depend on it.
+- Updated `PreviewPane` so **Preview fullscreen** now has its own sticky preview-header state with the icon-only “Exit preview fullscreen” control on the left, while Inspect and the viewport toggle stay available on the right in the same preview chrome.
+- Added explicit fullscreen-exit handling instead of a blind toggle path so Escape from preview chrome exits fullscreen and focus reliably returns to the normal preview-header fullscreen toggle after exit.
+- Kept the existing preview iframe, inspect-mode state, selected viewport breakpoint, and preview theme intact across fullscreen enter/exit by reusing the existing `previewFullscreen` workspace-preference wiring rather than remounting preview content.
+- Added responsive fullscreen-header layout behavior in `PreviewPane.css`: controls can wrap across multiple rows on narrow screens, the viewport toggle can fill available width in fullscreen, and the preview iframe starts below the taller wrapped header instead of being overlapped.
+- Extended regression coverage in `tests/integration/preview-fullscreen-entry.test.tsx` and `tests/integration/app-preview-fullscreen.test.tsx` for the fullscreen exit path, Escape handling, focus restoration, preserved inspect/viewport state, sticky fullscreen-header mode, and restoring the normal workspace chrome after exit.
+
+Verification:
+
+- `npm run type-check`
+- `npm run lint` (passes with the existing `.eslintignore` deprecation notice and the existing `InspectionPopover` hook-dependency warning only)
+- `CI=1 npm test -- --run`
+- `npm run build`
+- Browser check at `http://127.0.0.1:4190/aksel-arcade/`: confirmed the preview header shows the enter button in normal mode, entering fullscreen hides the normal app chrome and editor, the fullscreen header becomes sticky with focus on the exit button, narrowing to `360px` wraps controls into multiple rows and keeps the iframe below the header, pressing Escape from preview chrome exits fullscreen and restores focus to the normal toggle, and the verified session showed no browser console errors.
+
+Next note:
+
+- `#239` can now add the fullscreen-only share control onto the same sticky preview-header structure without inventing another fullscreen layout. Keep the share button last in the right-hand control order when the header wraps, and reuse the existing `previewFullscreen` exit path so fullscreen-only popovers can reset cleanly on exit.
+
+### 2026-06-14 - PR #246 review follow-up for issue #237
+
+Implemented:
+
+- Code review of PR `#246` found that the new Escape handler only listened on the fullscreen header, so Escape would miss other fullscreen **Arcade chrome** rendered inside the preview pane, such as the compile/runtime error overlay close button.
+- Moved the Escape handler from the preview header to the fullscreen preview-pane section so key events from other fullscreen chrome inside the pane still exit **Preview fullscreen** while preserving the existing iframe behavior.
+- Added a regression in `tests/integration/preview-fullscreen-entry.test.tsx` that forces a compile error, enters fullscreen, focuses the fullscreen error chrome, presses Escape, and confirms fullscreen exits with focus restored to the normal toggle.
+
+Verification:
+
+- `npm run type-check`
+- `CI=1 npm test -- --run tests/integration/preview-fullscreen-entry.test.tsx`
+
+Next note:
+
+- `#239` can keep relying on pane-level fullscreen Escape handling for any fullscreen-only share popover chrome it adds later, rather than rebinding Escape separately on each fullscreen control surface.
+
 ### 2026-06-14 - PR #245 review follow-up for issue #236
 
 Implemented:

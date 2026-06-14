@@ -150,5 +150,11 @@ describe('App preview fullscreen layout', () => {
       expect(parsed.preferences.previewFullscreen).toBe(true)
       expect(parsed.project.lastModified).toBe(project.lastModified)
     })
+
+    await user.click(screen.getByRole('button', { name: 'Exit preview fullscreen' }))
+
+    expect(screen.getByRole('button', { name: 'Enter preview fullscreen' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Header control' }).closest('[hidden]')).toBeNull()
+    expect(screen.getByRole('button', { name: 'Editor control' }).closest('[hidden]')).toBeNull()
   })
 })
