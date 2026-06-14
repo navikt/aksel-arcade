@@ -1,9 +1,11 @@
 import { useCallback, useContext, useEffect, useRef, useState } from 'react'
 import { Alert, BodyShort, Box, Button, Detail, VStack } from '@navikt/ds-react'
 import { ExpandIcon, ShrinkIcon } from '@navikt/aksel-icons'
+import { SharePopoverButton } from '@/components/Share/SharePopoverButton'
 import { AppContext } from '@/hooks/useProject'
 import { transpileCode, transpileProjectSource } from '@/services/transpiler'
 import { getActiveSource, resolveSelectedEditTarget } from '@/services/projectSource'
+import { WEB_ARCADE_CAPABILITIES, type ShellCapabilities } from '@/services/shellCapabilities'
 import { useSettings } from '@/contexts/SettingsContext'
 import { LivePreview } from './LivePreview'
 import { ViewportToggle } from './ViewportToggle'
@@ -15,7 +17,13 @@ import {
 } from '@/services/previewDiagnostics'
 import './PreviewPane.css'
 
-export const PreviewPane = () => {
+interface PreviewPaneProps {
+  shellCapabilities?: ShellCapabilities
+}
+
+export const PreviewPane = ({
+  shellCapabilities = WEB_ARCADE_CAPABILITIES,
+}: PreviewPaneProps = {}) => {
   const context = useContext(AppContext)
   if (!context) throw new Error('PreviewPane must be used within AppProvider')
 
@@ -28,20 +36,15 @@ export const PreviewPane = () => {
     recordSandboxConsoleMessage,
     updateProject,
   } = context
-  const {
-    multiPageEnabled,
-    theme,
-    selectedEditTarget,
-    previewFullscreen,
-    setPreviewFullscreen,
-  } = useSettings()
+  const { multiPageEnabled, theme, selectedEditTarget, previewFullscreen, setPreviewFullscreen } =
+    useSettings()
+  const canUseShareUrl = shellCapabilities.shareUrl.enabled
   const effectiveEditTarget = resolveSelectedEditTarget(multiPageEnabled, selectedEditTarget)
   const activeSource = getActiveSource(project)
   const singlePagePreviewJsx = multiPageEnabled ? null : activeSource.jsx
   const singlePagePreviewHooks = multiPageEnabled ? null : activeSource.hooks
   const multiPagePreviewSource = multiPageEnabled ? project.source : null
-  const showGlobalConfigPlaceholder =
-    multiPageEnabled && effectiveEditTarget === 'global-config'
+  const showGlobalConfigPlaceholder = multiPageEnabled && effectiveEditTarget === 'global-config'
   const [transpiledCode, setTranspiledCode] = useState<string | null>(null)
   const [compileError, setCompileError] = useState<CompileError | null>(null)
   const [runtimeError, setRuntimeError] = useState<RuntimeError | null>(null)
@@ -331,6 +334,13 @@ export const PreviewPane = () => {
             <div className="preview-pane__viewport-toggle">
               <ViewportToggle />
             </div>
+            {previewFullscreen && canUseShareUrl && (
+              <SharePopoverButton
+                ariaLabel="Share fullscreen preview"
+                note="opens in fullscreen"
+                shareOptions={{ openingIntent: { previewFullscreen: true } }}
+              />
+            )}
           </div>
         </div>
       </Box>
