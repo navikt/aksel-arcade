@@ -263,8 +263,7 @@ export const PreviewPane = () => {
             ref={fullscreenToggleRef}
             variant="tertiary"
             data-color="neutral"
-            size="xsmall"
-            className="preview-pane__fullscreen-toggle"
+            size="small"
             aria-label={fullscreenToggleLabel}
             aria-pressed={previewFullscreen}
             icon={previewFullscreen ? <ShrinkIcon aria-hidden /> : <ExpandIcon aria-hidden />}

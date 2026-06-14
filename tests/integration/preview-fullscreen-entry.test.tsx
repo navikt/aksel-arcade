@@ -48,10 +48,14 @@ describe('Preview fullscreen entry control', () => {
     )
 
     const toggle = screen.getByRole('button', { name: /preview fullscreen/i })
+    const inspect = screen.getByRole('button', { name: 'Enable inspect mode' })
     const previewIframe = await screen.findByTestId('preview-iframe')
 
     expect(toggle.getAttribute('aria-pressed')).toBe('false')
     expect(screen.getByTestId('settings-preview-fullscreen').textContent).toBe('false')
+    expect(toggle.className).toContain('aksel-button--small')
+    expect(toggle.className).not.toContain('aksel-button--xsmall')
+    expect(inspect.className).toContain('aksel-button--small')
 
     await user.click(toggle)
 
@@ -59,5 +63,7 @@ describe('Preview fullscreen entry control', () => {
     expect(screen.getByTestId('settings-preview-fullscreen').textContent).toBe('true')
     expect(document.activeElement).toBe(screen.getByRole('button', { name: /preview fullscreen/i }))
     expect(screen.getByTestId('preview-iframe')).toBe(previewIframe)
+    expect(toggle.className).toContain('aksel-button--small')
+    expect(toggle.className).not.toContain('aksel-button--xsmall')
   })
 })
