@@ -4,6 +4,10 @@
   width: 100%;
 }
 
+.split-pane__panel--hidden {
+  display: none;
+}
+
 /* Left panel */
 .split-pane__left {
   overflow: visible;
@@ -17,6 +21,10 @@
   width: 0;
   position: relative;
   cursor: col-resize;
+}
+
+.split-pane--preview-fullscreen .split-pane__divider {
+  display: none;
 }
 
 .split-pane__divider::before {
@@ -58,4 +66,9 @@
   background: var(--ax-bg-subtle);
   display: flex;
   flex-direction: column;
+}
+
+.split-pane--preview-fullscreen .split-pane__panel--preview {
+  flex: 1 1 auto !important;
+  width: 100% !important;
 }

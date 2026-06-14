@@ -12,3 +12,7 @@
   min-height: 0;
   width: 100%;
 }
+
+.app-shell__workspace--preview-fullscreen {
+  background: var(--ax-bg-default);
+}

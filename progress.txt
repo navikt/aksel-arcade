@@ -2634,3 +2634,24 @@ Verification:
 Next note:
 
 - `#235`-`#240` can now build on the persisted `previewFullscreen` workspace preference instead of inventing their own storage path. Keep future enter/exit/share behavior wired through the same `SettingsContext` + working-copy envelope so fullscreen stays out of durable Arcade project/package data.
+
+### 2026-06-14 - Issue #235: Add normal preview-header enter fullscreen path
+
+Implemented:
+
+- Picked `#235` as the highest-priority open `ready-for-agent` issue from `#235`-`#240` after checking the parent PRD `#233`, `CONTEXT.md`, and the latest `progress.txt` notes. It is the first user-facing Preview fullscreen entry point and it blocks the later fullscreen chrome/share slices.
+- Added the preview-header fullscreen toggle to `PreviewPane` on the far left, keeping Inspect and viewport controls on the right and exposing pressed-state semantics through the same tab-local `previewFullscreen` setting introduced in `#234`.
+- Wired the App shell and split-pane layout to hide the normal Arcade header and the editor panel from both the visual layout and the accessibility tree while Preview fullscreen is active, without swapping out the mounted preview pane.
+- Kept the live preview iframe mounted across fullscreen entry/exit by collapsing the editor/layout chrome instead of remounting the preview tree; the preview header button now retains focus across the toggle and provides the temporary safe fullscreen focus target until the later sticky fullscreen chrome slice lands.
+- Added regression coverage in `tests/integration/app-preview-fullscreen.test.tsx` and `tests/integration/preview-fullscreen-entry.test.tsx` for the fullscreen enter path, history/address stability, hidden normal chrome, and the workspace-only persistence contract while keeping the existing `#234` last-modified storage coverage intact.
+
+Verification:
+
+- npm run typecheck
+- npm run lint (passes with the existing `.eslintignore` deprecation notice and the existing `InspectionPopover` hook-dependency warning only)
+- npm test -- --run
+- Browser check at `http://127.0.0.1:5187/aksel-arcade/`: confirmed the normal preview header now shows the fullscreen toggle on the far left, entering fullscreen removes the normal header/editor from the accessibility tree, the same preview iframe survives the round trip, focus lands on the fullscreen toggle, and the URL/history stay unchanged. The checked session showed no runtime console errors; Chrome still reported the pre-existing form-field issue entry.
+
+Next note:
+
+- `#237` can now refine the same preview-header control into the sticky fullscreen-specific chrome (Escape handling, focus restoration, responsive wrapping) instead of introducing a second fullscreen state path. Keep reusing the existing `previewFullscreen` workspace-preference wiring and avoid pushing fullscreen into share/package project data except where `#236`/`#238` explicitly add Web share opening intent.

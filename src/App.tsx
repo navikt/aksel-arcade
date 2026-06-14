@@ -79,7 +79,10 @@ function App({ shellCapabilities = WEB_ARCADE_CAPABILITIES }: AppProps) {
 
   return (
     <ThemeProvider>
-      <Page.Block gutters={false} className="app-shell">
+      <Page.Block
+        gutters={false}
+        className={previewFullscreen ? 'app-shell app-shell--preview-fullscreen' : 'app-shell'}
+      >
         {shareHydration.status === 'ready' && shareHydration.snapshot && (
           <WarningNotification
             variant="warning"
@@ -108,20 +111,29 @@ function App({ shellCapabilities = WEB_ARCADE_CAPABILITIES }: AppProps) {
 
         {saveError && <WarningNotification message={`Save error: ${saveError}`} />}
 
-        <AppHeader
-          projectName={project.name}
-          onProjectNameChange={handleProjectNameChange}
-          currentProject={project}
-          onProjectImported={handleProjectImported}
-          saveStatus={saveStatus}
-          projectSizeBytes={projectSizeBytes}
-          onResetToIntro={resetToIntro}
-          onLoadFormSummaryTemplate={loadFormSummaryTemplate}
-          onLoadHooksDemo={loadHooksDemo}
-          shellCapabilities={shellCapabilities}
-        />
+        <div className="app-shell__chrome" hidden={previewFullscreen} aria-hidden={previewFullscreen}>
+          <AppHeader
+            projectName={project.name}
+            onProjectNameChange={handleProjectNameChange}
+            currentProject={project}
+            onProjectImported={handleProjectImported}
+            saveStatus={saveStatus}
+            projectSizeBytes={projectSizeBytes}
+            onResetToIntro={resetToIntro}
+            onLoadFormSummaryTemplate={loadFormSummaryTemplate}
+            onLoadHooksDemo={loadHooksDemo}
+            shellCapabilities={shellCapabilities}
+          />
+        </div>
 
-        <Box as="main" className="app-shell__workspace">
+        <Box
+          as="main"
+          className={
+            previewFullscreen
+              ? 'app-shell__workspace app-shell__workspace--preview-fullscreen'
+              : 'app-shell__workspace'
+          }
+        >
           <SplitPane
             left={<EditorPane />}
             right={<PreviewPane />}
