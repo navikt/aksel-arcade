@@ -1,5 +1,6 @@
 import { useCallback, useContext, useEffect, useRef, useState } from 'react'
-import { Alert, BodyShort, Box, Detail, HStack, VStack } from '@navikt/ds-react'
+import { Alert, BodyShort, Box, Button, Detail, HStack, VStack } from '@navikt/ds-react'
+import { ExpandIcon, ShrinkIcon } from '@navikt/aksel-icons'
 import { AppContext } from '@/hooks/useProject'
 import { transpileCode, transpileProjectSource } from '@/services/transpiler'
 import { getActiveSource, resolveSelectedEditTarget } from '@/services/projectSource'
@@ -27,7 +28,13 @@ export const PreviewPane = () => {
     recordSandboxConsoleMessage,
     updateProject,
   } = context
-  const { multiPageEnabled, theme, selectedEditTarget } = useSettings() // Use centralized theme from Settings
+  const {
+    multiPageEnabled,
+    theme,
+    selectedEditTarget,
+    previewFullscreen,
+    togglePreviewFullscreen,
+  } = useSettings()
   const effectiveEditTarget = resolveSelectedEditTarget(multiPageEnabled, selectedEditTarget)
   const activeSource = getActiveSource(project)
   const singlePagePreviewJsx = multiPageEnabled ? null : activeSource.jsx
@@ -42,6 +49,7 @@ export const PreviewPane = () => {
   const debounceTimerRef = useRef<number | undefined>(undefined)
   const pendingCompileErrorRef = useRef<CompileError | null>(null)
   const isCodeEditorFocusedRef = useRef(editorState.isCodeEditorFocused)
+  const fullscreenToggleRef = useRef<HTMLButtonElement | null>(null)
 
   const revealCompileError = useCallback(
     (error: CompileError) => {
@@ -225,27 +233,55 @@ export const PreviewPane = () => {
     setIsInspectMode(enabled)
   }
 
+  useEffect(() => {
+    if (!previewFullscreen) {
+      return
+    }
+
+    fullscreenToggleRef.current?.focus()
+  }, [previewFullscreen])
+
+  const fullscreenToggleLabel = previewFullscreen
+    ? 'Exit preview fullscreen'
+    : 'Enter preview fullscreen'
+
   return (
-    <Box as="section" className="preview-pane">
+    <Box
+      as="section"
+      className={previewFullscreen ? 'preview-pane preview-pane--fullscreen' : 'preview-pane'}
+    >
       <Box
         data-name="Preview Header"
+        className="preview-pane__header"
         borderWidth="0 0 1 0"
         borderColor="neutral-subtleA"
         paddingInline="space-20"
         paddingBlock="space-8"
       >
-        <HStack gap="space-12" justify="end" align="center">
-          <InspectMode onInspectToggle={handleInspectToggle} />
-          <ViewportToggle />
+        <HStack gap="space-12" justify="space-between" align="center">
+          <Button
+            ref={fullscreenToggleRef}
+            variant="tertiary"
+            data-color="neutral"
+            size="small"
+            aria-label={fullscreenToggleLabel}
+            aria-pressed={previewFullscreen}
+            icon={previewFullscreen ? <ShrinkIcon aria-hidden /> : <ExpandIcon aria-hidden />}
+            onClick={togglePreviewFullscreen}
+          />
+          <HStack gap="space-12" justify="end" align="center">
+            <InspectMode onInspectToggle={handleInspectToggle} />
+            <ViewportToggle />
+          </HStack>
         </HStack>
       </Box>
 
       <Box
         data-name="Preview"
-        paddingBlock="space-16"
-        paddingInline="space-16"
+        paddingBlock={previewFullscreen ? 'space-0' : 'space-16'}
+        paddingInline={previewFullscreen ? 'space-0' : 'space-16'}
         background="default"
-        className={`preview-pane__surface ${theme}`}
+        className={`preview-pane__surface${previewFullscreen ? ' preview-pane__surface--fullscreen' : ''} ${theme}`}
       >
         {(visibleCompileError || visibleRuntimeError) && (
           <div className="preview-pane__error error-overlay">
