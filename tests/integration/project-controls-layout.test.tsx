@@ -119,7 +119,7 @@ const Harness = ({
           Load shared project
         </button>
       )}
-      {includePreview && <PreviewPane />}
+      {includePreview && <PreviewPane shellCapabilities={shellCapabilities} />}
     </>
   )
 }
@@ -791,6 +791,36 @@ describe('ProjectControls layout', () => {
     fireEvent.click(settingsButton)
     expect(await screen.findByText(/Switch to light theme/i)).toBeTruthy()
     expect(screen.queryByText(/Switch to light mode/i)).toBeNull()
+  })
+
+  it('does not restore Preview fullscreen when importing a clean package in Desktop Arcade', async () => {
+    renderHeader({ includePreview: true, shellCapabilities: DESKTOP_ARCADE_CAPABILITIES })
+
+    expect(screen.queryByRole('button', { name: 'Share fullscreen preview' })).toBeNull()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Enter preview fullscreen' }))
+
+    expect(screen.getByRole('button', { name: 'Exit preview fullscreen' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Share fullscreen preview' })).toBeNull()
+
+    fireEvent.change(screen.getByLabelText(/import \.akselarcade arcade project package/i), {
+      target: {
+        files: [
+          createProjectPackageFileForCode(
+            'Imported fullscreen boundary project',
+            'export default function App() { return <Heading>Imported boundary</Heading> }'
+          ),
+        ],
+      },
+    })
+
+    await waitFor(() =>
+      expect(screen.getByText('Imported fullscreen boundary project')).toBeTruthy()
+    )
+
+    expect(screen.getByRole('button', { name: 'Enter preview fullscreen' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Exit preview fullscreen' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Share fullscreen preview' })).toBeNull()
   })
 
   it('keeps the legacy Agent browser bridge absent while Desktop transport is temporary', async () => {

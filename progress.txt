@@ -2854,3 +2854,24 @@ Verification:
 - `npm run build`
 - `CI=1 npm run test -- --run tests/integration/fullscreen-share-popover.test.tsx tests/integration/share-popover.test.tsx tests/integration/preview-fullscreen-entry.test.tsx tests/integration/app-preview-fullscreen.test.tsx`
 - Browser check at `http://127.0.0.1:4194/aksel-arcade/`: opened the fullscreen share popover, pressed `Escape`, confirmed the popover closed while fullscreen stayed active, then focused the fullscreen exit control and confirmed `Escape` still exited fullscreen; no browser console errors appeared during the verified flow.
+
+### 2026-06-15 - Issue #240: Validate Preview fullscreen across Web and Desktop capability boundaries
+
+Implemented:
+
+- Picked `#240` as the single highest-priority ready-for-agent feature after checking issue `#240`, parent PRD `#233`, `CONTEXT.md`, and the latest `progress.txt` notes. This slice stays strictly on the final Preview fullscreen validation boundary and does not change the shipped fullscreen/share UI behavior.
+- Extended `tests/integration/app-preview-fullscreen.test.tsx` so the fullscreen layout regression now runs against both `WEB_ARCADE_CAPABILITIES` and `DESKTOP_ARCADE_CAPABILITIES`, proving the shared App shell still hides/restores the normal chrome and preserves tab-local fullscreen persistence across both product-surface capability sets.
+- Fixed the Desktop preview integration harness in `tests/integration/project-controls-layout.test.tsx` to pass the active `shellCapabilities` into `PreviewPane` instead of silently falling back to Web defaults, then added a Desktop-only regression proving a clean `.akselarcade` import exits **Preview fullscreen** and still omits the fullscreen share button in the non-share-capable shell.
+- Tightened `tests/unit/services/storage.test.ts` so clean package exports explicitly exclude Web-share-only `openingIntent` metadata and imports reject polluted package/import payloads that try to carry `openingIntent` or `previewFullscreen`, keeping fullscreen opening intent out of `.akselarcade` boundaries entirely.
+
+Verification:
+
+- `npm run typecheck`
+- `npm run lint` (existing `InspectionPopover` hook dependency warning only)
+- `npm run build`
+- `CI=1 npm run test`
+- Browser check at `http://127.0.0.1:4193/aksel-arcade/`: entered **Preview fullscreen**, confirmed the fullscreen share button appeared in the Web shell, opened the share popover and saw the `opens in fullscreen` note, exited fullscreen back to the normal layout, and confirmed there were no browser console errors during the verified flow.
+
+Next note:
+
+- Any future Desktop/non-share-capable preview integration test that mounts `PreviewPane` must thread the intended `shellCapabilities` through the harness; otherwise the preview silently uses Web defaults and can hide capability-boundary regressions like the fullscreen share button appearing where it should be omitted.

@@ -690,6 +690,7 @@ describe('Storage Service', () => {
       expect(serialized).not.toContain('evidence-secret')
       expect(serialized).not.toContain('transport-secret')
       expect(serialized).not.toContain('multiPageEnabled')
+      expect(serialized).not.toContain('openingIntent')
       expect(serialized).not.toContain('previewFullscreen')
       expect(collectObjectKeys(packageData).join(' ')).not.toMatch(
         /agent|session|credential|endpoint|permission|checkpoint|diagnostic|evidence|transport|meta|exportedAt|createdAt|lastModified|id|panelLayout/i
@@ -907,6 +908,55 @@ describe('Storage Service', () => {
       expect(getPrimarySource(result.project!).hooks).toBe(
         'export const usePortableStartPage = () => "start"'
       )
+    })
+
+    it('rejects package data polluted with fullscreen-only share fields', async () => {
+      const sourceProject = createTestProject({
+        name: 'Fullscreen Boundary Package Import Test',
+        jsxCode: '<Box>Fullscreen boundary package</Box>',
+        hooksCode: 'export const useFullscreenBoundaryPackage = () => "ok"',
+      })
+      const cleanPackageData = createArcadeProjectPackage(sourceProject)
+      const pollutedPackages: Array<{
+        expectedField: string
+        packageData: Record<string, unknown>
+      }> = [
+        {
+          expectedField: 'openingIntent',
+          packageData: {
+            ...cleanPackageData,
+            openingIntent: { previewFullscreen: true },
+          },
+        },
+        {
+          expectedField: 'previewFullscreen',
+          packageData: {
+            ...cleanPackageData,
+            project: {
+              ...cleanPackageData.project,
+              preview: {
+                ...cleanPackageData.project.preview,
+                previewFullscreen: true,
+              },
+            },
+          },
+        },
+      ]
+
+      for (const { expectedField, packageData } of pollutedPackages) {
+        const file = createMockFile(
+          JSON.stringify(packageData),
+          `fullscreen-boundary-${expectedField}.akselarcade`,
+          ARCADE_PROJECT_PACKAGE_MIME_TYPE
+        )
+
+        const result = await importProject(file)
+
+        expect(result.success).toBe(false)
+        expect(result.project).toBeNull()
+        expect(result.error).toContain('Package is not a clean .akselarcade Arcade project package')
+        expect(result.error).toContain(expectedField)
+      }
     })
 
     it('should reject clean package content when the file is not .akselarcade', async () => {
