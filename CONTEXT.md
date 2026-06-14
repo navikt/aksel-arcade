@@ -216,7 +216,7 @@ Domain expert: "That is a Desktop release credential. It belongs only to release
 
 Developer: "The user opened a Web share URL from a colleague."
 
-Domain expert: "Replace only the current Web Arcade working copy with a fresh local Arcade project identity from the shared Arcade project source and preview preferences. Do not preserve sender identity, timestamps, diagnostics, preview evidence, or workspace preferences."
+Domain expert: "Replace only the current Web Arcade working copy with a fresh local Arcade project identity from the shared Arcade project source, preview preferences, and any share-opening intent. Do not preserve sender identity, timestamps, diagnostics, preview evidence, or durable workspace preferences."
 
 Developer: "The user copied the ordinary Web Arcade URL into a new tab."
 
