@@ -1,4 +1,5 @@
-import { act, render } from '@testing-library/react'
+import { act, fireEvent, render, screen } from '@testing-library/react'
+import { useState } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createDefaultProject } from '@/utils/projectDefaults'
 
@@ -26,9 +27,52 @@ const Harness = () => {
     multiPageEnabled: false,
     pagePanelOpen: true,
     selectedEditTarget: 'page',
+    previewFullscreen: false,
   })
 
   return null
+}
+
+const DynamicHarness = () => {
+  const [projectState, setProjectState] = useState(() => createDefaultProject())
+  const [preferences, setPreferences] = useState({
+    theme: 'dark' as const,
+    panelOrder: 'code-left' as const,
+    multiPageEnabled: false,
+    pagePanelOpen: true,
+    selectedEditTarget: 'page' as const,
+    previewFullscreen: false,
+  })
+
+  useAutoSave(projectState, preferences)
+
+  return (
+    <>
+      <button
+        onClick={() =>
+          setPreferences((prev) => ({
+            ...prev,
+            previewFullscreen: !prev.previewFullscreen,
+          }))
+        }
+      >
+        Toggle preview fullscreen
+      </button>
+      <button
+        onClick={() =>
+          setPreferences((prev) => ({
+            ...prev,
+            theme: prev.theme === 'dark' ? 'light' : 'dark',
+          }))
+        }
+      >
+        Toggle theme
+      </button>
+      <button onClick={() => setProjectState((prev) => ({ ...prev, name: `${prev.name}!` }))}>
+        Rename project
+      </button>
+    </>
+  )
 }
 
 describe('useAutoSave', () => {
@@ -48,5 +92,70 @@ describe('useAutoSave', () => {
     })
 
     expect(saveProjectMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('persists preview fullscreen immediately without scheduling a second debounced save', async () => {
+    saveProjectMock.mockReturnValue({ success: true })
+    vi.useFakeTimers()
+
+    render(<DynamicHarness />)
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1000)
+    })
+    saveProjectMock.mockClear()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Toggle preview fullscreen' }))
+
+    expect(saveProjectMock).toHaveBeenCalledTimes(1)
+    expect(saveProjectMock).toHaveBeenLastCalledWith(
+      expect.objectContaining({ name: 'Untitled Project' }),
+      expect.objectContaining({
+        updateLastModified: false,
+        preferences: expect.objectContaining({ previewFullscreen: true }),
+      })
+    )
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1500)
+    })
+
+    expect(saveProjectMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('includes the latest preview fullscreen value in later debounced autosaves', async () => {
+    saveProjectMock.mockReturnValue({ success: true })
+    vi.useFakeTimers()
+
+    render(<DynamicHarness />)
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1000)
+    })
+    saveProjectMock.mockClear()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Toggle preview fullscreen' }))
+    expect(saveProjectMock).toHaveBeenLastCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        updateLastModified: false,
+        preferences: expect.objectContaining({ previewFullscreen: true }),
+      })
+    )
+
+    saveProjectMock.mockClear()
+    fireEvent.click(screen.getByRole('button', { name: 'Rename project' }))
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1000)
+    })
+
+    expect(saveProjectMock).toHaveBeenCalledTimes(1)
+    expect(saveProjectMock).toHaveBeenLastCalledWith(
+      expect.objectContaining({ name: 'Untitled Project!' }),
+      expect.objectContaining({
+        preferences: expect.objectContaining({ previewFullscreen: true }),
+      })
+    )
   })
 })

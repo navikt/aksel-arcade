@@ -45,7 +45,7 @@ const Harness = () => {
     applySharedSnapshot,
     dismissShareHydration,
   } = useProject()
-  const { theme, panelOrder } = useSettings()
+  const { theme, panelOrder, previewFullscreen } = useSettings()
   const source = getStartPageSource(project)
 
   return (
@@ -64,6 +64,7 @@ const Harness = () => {
       <div data-testid="preview-viewport-width">{previewState.viewportWidth}</div>
       <div data-testid="settings-theme">{theme}</div>
       <div data-testid="settings-panel-order">{panelOrder}</div>
+      <div data-testid="settings-preview-fullscreen">{String(previewFullscreen)}</div>
       <div data-testid="share-status">{shareHydration.status}</div>
       <button onClick={() => updateEditorState({ activeTab: 'Hooks' })}>Set local Hooks tab</button>
       <button onClick={resetToIntro}>Reset editor</button>
@@ -91,7 +92,15 @@ const Harness = () => {
 
 const PersistedHarness = () => {
   const { project, shareHydration, applySharedSnapshot } = useProject()
-  const { theme, panelOrder, multiPageEnabled, pagePanelOpen, selectedEditTarget } = useSettings()
+  const {
+    theme,
+    panelOrder,
+    multiPageEnabled,
+    pagePanelOpen,
+    selectedEditTarget,
+    previewFullscreen,
+    togglePreviewFullscreen,
+  } = useSettings()
   const source = getStartPageSource(project)
   useAutoSave(project, {
     theme,
@@ -99,6 +108,7 @@ const PersistedHarness = () => {
     multiPageEnabled,
     pagePanelOpen,
     selectedEditTarget,
+    previewFullscreen,
   })
 
   return (
@@ -107,6 +117,8 @@ const PersistedHarness = () => {
       <div data-testid="jsx-code">{source.jsx}</div>
       <div data-testid="settings-theme">{theme}</div>
       <div data-testid="settings-panel-order">{panelOrder}</div>
+      <div data-testid="settings-preview-fullscreen">{String(previewFullscreen)}</div>
+      <button onClick={togglePreviewFullscreen}>Toggle preview fullscreen</button>
       {shareHydration.status === 'ready' && (
         <button onClick={applySharedSnapshot}>Load Web share URL</button>
       )}
@@ -253,6 +265,7 @@ describe('share decode integration', () => {
         theme: 'light',
         panelOrder: 'preview-left',
         multiPageEnabled: false,
+        previewFullscreen: true,
       },
     })
 
@@ -270,6 +283,25 @@ describe('share decode integration', () => {
     await waitFor(() => {
       expect(screen.getByTestId('settings-theme').textContent).toBe('light')
       expect(screen.getByTestId('settings-panel-order').textContent).toBe('preview-left')
+      expect(screen.getByTestId('settings-preview-fullscreen').textContent).toBe('true')
+    })
+  })
+
+  it('persists preview fullscreen immediately enough to survive an immediate reload', async () => {
+    const firstRender = renderPersistedHarness()
+
+    expect(screen.getByTestId('settings-preview-fullscreen').textContent).toBe('false')
+
+    await user.click(screen.getByRole('button', { name: 'Toggle preview fullscreen' }))
+    await waitFor(() => {
+      expect(screen.getByTestId('settings-preview-fullscreen').textContent).toBe('true')
+    })
+
+    firstRender.unmount()
+    renderPersistedHarness()
+
+    await waitFor(() => {
+      expect(screen.getByTestId('settings-preview-fullscreen').textContent).toBe('true')
     })
   })
 

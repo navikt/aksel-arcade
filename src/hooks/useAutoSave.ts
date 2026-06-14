@@ -13,9 +13,21 @@ export type SaveStatus = 'idle' | 'saving' | 'saved' | 'error'
  */
 export const useAutoSave = (project: Project, preferences: WebArcadeWorkingCopyPreferences) => {
   const timeoutRef = useRef<number | undefined>(undefined)
+  const latestProjectRef = useRef(project)
+  const latestPreferencesRef = useRef(preferences)
+  const hasInitializedPreviewFullscreenRef = useRef(false)
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle')
   const [saveError, setSaveError] = useState<string | null>(null)
-  const { theme, panelOrder, multiPageEnabled, pagePanelOpen, selectedEditTarget } = preferences
+  const { theme, panelOrder, multiPageEnabled, pagePanelOpen, selectedEditTarget, previewFullscreen } =
+    preferences
+
+  useEffect(() => {
+    latestProjectRef.current = project
+  }, [project])
+
+  useEffect(() => {
+    latestPreferencesRef.current = preferences
+  }, [preferences])
 
   useEffect(() => {
     if (timeoutRef.current) {
@@ -27,15 +39,7 @@ export const useAutoSave = (project: Project, preferences: WebArcadeWorkingCopyP
     timeoutRef.current = window.setTimeout(() => {
       setSaveStatus('saving')
 
-      const result: SaveResult = saveProject(project, {
-        preferences: {
-          theme,
-          panelOrder,
-          multiPageEnabled,
-          pagePanelOpen,
-          selectedEditTarget,
-        },
-      })
+      const result: SaveResult = saveProject(project, { preferences: latestPreferencesRef.current })
 
       if (result.success) {
         setSaveStatus('saved')
@@ -60,6 +64,27 @@ export const useAutoSave = (project: Project, preferences: WebArcadeWorkingCopyP
       }
     }
   }, [multiPageEnabled, pagePanelOpen, panelOrder, project, selectedEditTarget, theme])
+
+  useEffect(() => {
+    if (!hasInitializedPreviewFullscreenRef.current) {
+      hasInitializedPreviewFullscreenRef.current = true
+      return
+    }
+
+    const result = saveProject(latestProjectRef.current, {
+      preferences: latestPreferencesRef.current,
+      updateLastModified: false,
+    })
+
+    if (result.success) {
+      setSaveError(null)
+      return
+    }
+
+    setSaveStatus('error')
+    setSaveError(result.error || 'Unknown error')
+    console.error('Preview fullscreen persistence failed:', result.error)
+  }, [previewFullscreen])
 
   return { saveStatus, saveError }
 }

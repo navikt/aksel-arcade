@@ -2613,3 +2613,24 @@ Verification:
 - npm run lint (passes with the existing `.eslintignore` deprecation notice and existing `InspectionPopover` hook-dependency warning only)
 - npm run test -- --run
 - npm run build (passes with the existing Vite/browser-compatibility and chunk-size warnings only)
+
+### 2026-06-14 - Issue #234: Persist Preview fullscreen as tab-local workspace state
+
+Implemented:
+
+- Picked `#234` as the highest-priority open `ready-for-agent` issue from `#234`-`#240` after checking issue `#205`, the parent PRD `#233`, `CONTEXT.md`, and the latest `progress.txt` notes. It is the root dependency for the whole Preview fullscreen stack, and every later ready slice depends on its storage/runtime contract.
+- Extended `WebArcadeWorkingCopyPreferences` and `SettingsContext` with `previewFullscreen`, keeping it as tab-local **Workspace preference** state with a backward-compatible default of `false` for older stored working copies.
+- Updated `saveProject` with an `updateLastModified` escape hatch so workspace-only persistence can write the working copy envelope without mutating Arcade project data, then taught `useAutoSave` to persist fullscreen changes immediately while keeping normal debounced autosave behavior for ordinary project/settings changes.
+- Wired the restored fullscreen preference back through `useProject` / `App` so reloaded working copies and forked duplicated tabs keep the current fullscreen intent in the same session-scoped storage model as the other workspace preferences.
+- Added coverage in `tests/unit/services/storage.test.ts`, `tests/unit/useAutoSave.test.tsx`, and `tests/integration/share-decode.test.tsx` for backward-compatible defaults, duplicated-tab persistence, package exclusion, immediate fullscreen persistence, and reload survival.
+
+Verification:
+
+- npm run typecheck
+- npm run lint (existing `.eslintignore` deprecation notice and existing `InspectionPopover` hook dependency warning only)
+- npm run test -- --run
+- Browser check at `http://127.0.0.1:4337/aksel-arcade/`: confirmed the working copy now stores the full preference envelope including `previewFullscreen`, forced `previewFullscreen: true` into the tab-scoped working copy, reloaded the same tab, confirmed the stored preference stayed `true`, and confirmed the verified session had no browser console warnings or errors.
+
+Next note:
+
+- `#235`-`#240` can now build on the persisted `previewFullscreen` workspace preference instead of inventing their own storage path. Keep future enter/exit/share behavior wired through the same `SettingsContext` + working-copy envelope so fullscreen stays out of durable Arcade project/package data.
