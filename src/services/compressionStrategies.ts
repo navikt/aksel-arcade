@@ -1,5 +1,6 @@
 import { compressToEncodedURIComponent, decompressFromEncodedURIComponent } from 'lz-string'
 import { deflateSync, inflateSync, strFromU8, strToU8 } from 'fflate'
+import lzmaWorkerUrl from 'lzma/src/lzma_worker-min.js?url'
 import type { ProjectSnapshot, CompressionStrategyId, ProjectFileSnapshot } from '@/types/project'
 import { toBase64Url, fromBase64Url } from '@/utils/base64'
 import { serializePackedSnapshot, unpackSnapshot } from '@/utils/snapshotPacking'
@@ -333,23 +334,114 @@ const decodeBase91 = (input: string): Uint8Array => {
 }
 
 type LzmaModule = {
-  compress: (data: string | Uint8Array, mode: number, onFinish: (result: unknown) => void) => void
-  decompress: (data: Uint8Array | number[], onFinish: (result: unknown) => void) => void
+  compress: (
+    data: string | Uint8Array,
+    mode: number,
+    onFinish: (result: unknown, error?: unknown) => void,
+    onProgress?: (percent: number) => void
+  ) => void
+  decompress: (
+    data: Uint8Array | number[],
+    onFinish: (result: unknown, error?: unknown) => void,
+    onProgress?: (percent: number) => void
+  ) => void
+  worker?: () => Worker | null
 }
 
 let lzmaPromise: Promise<LzmaModule> | null = null
+let browserLzmaModulePromise: Promise<LzmaModule> | null = null
 const loadLzma = async (): Promise<LzmaModule> => {
   if (!lzmaPromise) {
-    lzmaPromise = import('lzma').then(module => (module as unknown as { default?: LzmaModule }).default ?? (module as unknown as LzmaModule))
+    lzmaPromise = shouldUseBrowserLzmaLoader()
+      ? loadBrowserLzma()
+      : loadNodeLzma()
   }
   return lzmaPromise
+}
+
+const shouldUseBrowserLzmaLoader = (): boolean => {
+  if (getBrowserLzmaModule()) {
+    return true
+  }
+
+  return typeof window !== 'undefined' && typeof document !== 'undefined' && !isNodeLikeEnvironment()
+}
+
+const isNodeLikeEnvironment = (): boolean => {
+  return typeof process !== 'undefined' && Boolean(process.versions?.node)
+}
+
+const getBrowserLzmaModule = (): LzmaModule | null => {
+  if (typeof window === 'undefined') {
+    return null
+  }
+
+  const candidate = (window as Window & { LZMA?: unknown }).LZMA
+  if (
+    candidate &&
+    typeof candidate === 'object' &&
+    typeof (candidate as LzmaModule).compress === 'function' &&
+    typeof (candidate as LzmaModule).decompress === 'function'
+  ) {
+    return candidate as LzmaModule
+  }
+
+  return null
+}
+
+const loadBrowserLzma = async (): Promise<LzmaModule> => {
+  const existingModule = getBrowserLzmaModule()
+  if (existingModule) {
+    return existingModule
+  }
+
+  if (!browserLzmaModulePromise) {
+    browserLzmaModulePromise = new Promise((resolve, reject) => {
+      const head = document.head ?? document.getElementsByTagName('head')[0]
+      if (!head) {
+        reject(new Error('Document head is unavailable for LZMA loader'))
+        return
+      }
+
+      const script = document.createElement('script')
+      script.src = lzmaWorkerUrl
+      script.async = true
+      script.onload = () => {
+        const loadedModule = getBrowserLzmaModule()
+        if (!loadedModule) {
+          browserLzmaModulePromise = null
+          reject(new Error('Browser LZMA script did not expose window.LZMA'))
+          return
+        }
+        resolve(loadedModule)
+      }
+      script.onerror = () => {
+        browserLzmaModulePromise = null
+        reject(new Error('Failed to load browser LZMA script'))
+      }
+
+      head.appendChild(script)
+    })
+  }
+
+  return browserLzmaModulePromise
+}
+
+const loadNodeLzma = async (): Promise<LzmaModule> => {
+  const lzmaSpecifier = 'lzma'
+  const module = await import(/* @vite-ignore */ lzmaSpecifier)
+  return ((module as { default?: unknown }).default ?? module) as LzmaModule
 }
 
 const runLzmaCompress = async (serialized: string): Promise<Uint8Array> => {
   const { compress } = await loadLzma()
   return new Promise((resolve, reject) => {
     try {
-      compress(serialized, 3, (result) => {
+      compress(serialized, 3, (result, error) => {
+        if (error) {
+          reject(error instanceof Error ? error : new Error(String(error)))
+          return
+        }
         if (result instanceof Uint8Array) {
           resolve(result)
           return
@@ -374,7 +466,11 @@ const runLzmaDecompress = async (bytes: Uint8Array): Promise<string> => {
   const { decompress } = await loadLzma()
   return new Promise((resolve, reject) => {
     try {
-      decompress(Array.from(bytes), (result) => {
+      decompress(Array.from(bytes), (result, error) => {
+        if (error) {
+          reject(error instanceof Error ? error : new Error(String(error)))
+          return
+        }
         if (typeof result === 'string') {
           resolve(result)
           return
