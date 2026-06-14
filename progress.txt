@@ -2655,3 +2655,19 @@ Verification:
 Next note:
 
 - `#237` can now refine the same preview-header control into the sticky fullscreen-specific chrome (Escape handling, focus restoration, responsive wrapping) instead of introducing a second fullscreen state path. Keep reusing the existing `previewFullscreen` workspace-preference wiring and avoid pushing fullscreen into share/package project data except where `#236`/`#238` explicitly add Web share opening intent.
+
+### 2026-06-14 - PR #243 review follow-up for issue #235
+
+Implemented:
+
+- PR review found that the editor pane remained keyboard-focusable in **Preview fullscreen** because `SplitPane` only used `aria-hidden` plus a CSS class. Added real `hidden` state to the editor panel and divider so fullscreen removes that subtree from both layout interaction and the accessibility tree without remounting the preview pane.
+- PR review also caught that the fullscreen preview surface used raw `'0'` padding values on Aksel `Box` props. Replaced them with the valid `space-0` token so the fullscreen path stays compatible with Aksel v8 primitive typing.
+- Tightened `tests/integration/app-preview-fullscreen.test.tsx` to assert the hidden editor control now lives under a real `[hidden]` ancestor, and updated `tests/integration/preview-fullscreen-entry.test.tsx` to verify the fullscreen button size through a stable test-owned `data-size` signal instead of Aksel internal class names.
+
+Verification:
+
+- npm run typecheck
+- npm run lint (passes with the existing `.eslintignore` deprecation notice and the existing `InspectionPopover` hook-dependency warning only)
+- npm run test -- --run
+- npm run build (confirmed the PR-scoped `PreviewPane` padding token issue was fixed; the remaining `tests/unit/useAutoSave.test.tsx` build/type error is outside this PR diff and was left untouched in this review follow-up)
+- Browser check at `http://127.0.0.1:5187/aksel-arcade/`: confirmed entering fullscreen leaves only preview controls in the accessibility tree, the editor panel and divider both carry real `hidden` state, and the visible controls no longer include the editor/header chrome.

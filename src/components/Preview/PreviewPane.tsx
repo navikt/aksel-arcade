@@ -278,8 +278,8 @@ export const PreviewPane = () => {
 
       <Box
         data-name="Preview"
-        paddingBlock={previewFullscreen ? '0' : 'space-16'}
-        paddingInline={previewFullscreen ? '0' : 'space-16'}
+        paddingBlock={previewFullscreen ? 'space-0' : 'space-16'}
+        paddingInline={previewFullscreen ? 'space-0' : 'space-16'}
         background="default"
         className={`preview-pane__surface${previewFullscreen ? ' preview-pane__surface--fullscreen' : ''} ${theme}`}
       >

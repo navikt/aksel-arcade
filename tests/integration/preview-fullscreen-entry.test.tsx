@@ -1,3 +1,4 @@
+import type { ComponentProps } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
@@ -10,6 +11,17 @@ import {
   setupLocalStorageMock,
   setupSessionStorageMock,
 } from '../helpers/mockLocalStorage'
+
+vi.mock('@navikt/ds-react', async () => {
+  const actual = await vi.importActual<typeof import('@navikt/ds-react')>('@navikt/ds-react')
+
+  return {
+    ...actual,
+    Button: ({ size, ...props }: ComponentProps<typeof actual.Button>) => (
+      <actual.Button {...props} size={size} data-size={size} />
+    ),
+  }
+})
 
 vi.mock('@/utils/sandboxMessaging', () => ({
   postMessageToSandbox: vi.fn(),
@@ -53,9 +65,8 @@ describe('Preview fullscreen entry control', () => {
 
     expect(toggle.getAttribute('aria-pressed')).toBe('false')
     expect(screen.getByTestId('settings-preview-fullscreen').textContent).toBe('false')
-    expect(toggle.className).toContain('aksel-button--small')
-    expect(toggle.className).not.toContain('aksel-button--xsmall')
-    expect(inspect.className).toContain('aksel-button--small')
+    expect(toggle.getAttribute('data-size')).toBe('small')
+    expect(inspect.getAttribute('data-size')).toBe('small')
 
     await user.click(toggle)
 
@@ -63,7 +74,6 @@ describe('Preview fullscreen entry control', () => {
     expect(screen.getByTestId('settings-preview-fullscreen').textContent).toBe('true')
     expect(document.activeElement).toBe(screen.getByRole('button', { name: /preview fullscreen/i }))
     expect(screen.getByTestId('preview-iframe')).toBe(previewIframe)
-    expect(toggle.className).toContain('aksel-button--small')
-    expect(toggle.className).not.toContain('aksel-button--xsmall')
+    expect(toggle.getAttribute('data-size')).toBe('small')
   })
 })

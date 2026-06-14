@@ -129,7 +129,13 @@ describe('App preview fullscreen layout', () => {
     expect(screen.queryByRole('button', { name: 'Header control' })).toBeNull()
     expect(screen.queryByRole('button', { name: 'Editor control' })).toBeNull()
     expect(screen.getByRole('button', { name: 'Header control', hidden: true })).toBeTruthy()
+    expect(
+      screen.getByRole('button', { name: 'Header control', hidden: true }).closest('[hidden]')
+    ).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Editor control', hidden: true })).toBeTruthy()
+    expect(
+      screen.getByRole('button', { name: 'Editor control', hidden: true }).closest('[hidden]')
+    ).toBeTruthy()
 
     expect(window.location.href).toBe(hrefBefore)
     expect(window.history.length).toBe(historyLengthBefore)

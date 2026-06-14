@@ -25,6 +25,8 @@ export const SplitPane = ({
   const secondPanel = panelOrder === 'code-left' ? right : left
   const firstPanelRole = panelOrder === 'code-left' ? 'editor' : 'preview'
   const secondPanelRole = panelOrder === 'code-left' ? 'preview' : 'editor'
+  const firstPanelHidden = previewFullscreen && firstPanelRole === 'editor'
+  const secondPanelHidden = previewFullscreen && secondPanelRole === 'editor'
 
   return (
     <PanelGroup
@@ -35,21 +37,23 @@ export const SplitPane = ({
         defaultSize={defaultLeftWidth}
         minSize={minLeftWidth}
         className={`split-pane__left split-pane__panel split-pane__panel--${firstPanelRole}${
-          previewFullscreen && firstPanelRole === 'editor' ? ' split-pane__panel--hidden' : ''
+          firstPanelHidden ? ' split-pane__panel--hidden' : ''
         }`}
         data-pane-role={firstPanelRole}
-        aria-hidden={previewFullscreen && firstPanelRole === 'editor'}
+        aria-hidden={firstPanelHidden}
+        hidden={firstPanelHidden}
       >
         {firstPanel}
       </Panel>
-      <PanelResizeHandle className="split-pane__divider" />
+      <PanelResizeHandle className="split-pane__divider" hidden={previewFullscreen} />
       <Panel
         minSize={minRightWidth}
         className={`split-pane__right split-pane__panel split-pane__panel--${secondPanelRole}${
-          previewFullscreen && secondPanelRole === 'editor' ? ' split-pane__panel--hidden' : ''
+          secondPanelHidden ? ' split-pane__panel--hidden' : ''
         }`}
         data-pane-role={secondPanelRole}
-        aria-hidden={previewFullscreen && secondPanelRole === 'editor'}
+        aria-hidden={secondPanelHidden}
+        hidden={secondPanelHidden}
       >
         {secondPanel}
       </Panel>
