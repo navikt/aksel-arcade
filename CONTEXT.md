@@ -44,6 +44,10 @@ _Avoid_: Active page, home route, landing page, default tab
 A review-facing display preference of an **Arcade project**, such as the viewport or theme used to open its preview.
 _Avoid_: Workspace preference, editor layout
 
+**Preview fullscreen**:
+A tab-local in-app **Workspace preference** that makes the preview the primary Arcade surface while preserving a way back to the normal workspace layout. It is not browser fullscreen, and changes only how Arcade is arranged around the active **Arcade project**, not the project itself, its **Preview preferences**, or **Arcade project packages**; it survives ordinary reloads of the same working copy, and a **Web share URL** may carry it as an opening intent for the recipient tab.
+_Avoid_: Fullscreen preview preference, project fullscreen, browser fullscreen
+
 **Workspace preference**:
 A local product-surface preference for arranging Arcade itself around an **Arcade project**, such as editor panel placement or whether experimental multi-page authoring is enabled. In **Web Arcade**, workspace preferences belong to the current **Web Arcade working copy**.
 _Avoid_: Preview preference, project content
@@ -53,7 +57,7 @@ A shell-neutral portable share artifact named with the `.akselarcade` extension 
 _Avoid_: Arcade project, save file, document, AI export bundle
 
 **Web share URL**:
-A Web Arcade link that carries only the portable **Arcade project** data needed to load a shared prototype: **Arcade project source** and shareable **Preview preferences**. Opening one creates a fresh local **Arcade project** identity without preserving sender identity, timestamps, diagnostics, preview evidence, or **Workspace preferences**.
+A Web Arcade link that carries only the portable **Arcade project** data needed to load a shared prototype: **Arcade project source**, shareable **Preview preferences**, and share-opening intent such as **Preview fullscreen**. Opening one creates a fresh local **Arcade project** identity without preserving sender identity, timestamps, diagnostics, preview evidence, or durable **Workspace preferences**.
 _Avoid_: Project code URL, save file, telemetry bundle
 
 **Web Arcade URL**:
