@@ -1,5 +1,10 @@
 import { compressToEncodedURIComponent } from 'lz-string'
-import type { CompressionStrategyId, ProjectSnapshot, SharePayloadEnvelope } from '@/types/project'
+import type {
+  CompressionStrategyId,
+  ProjectSnapshot,
+  SharePayloadEnvelope,
+  ShareUrlOpeningIntent,
+} from '@/types/project'
 import { fromBase64Url, toBase64Url } from '@/utils/base64'
 import {
   createWebShareUrlPayload,
@@ -28,6 +33,7 @@ interface EncodeOptions {
   charLimit?: number
   metadataVersion?: number
   compressed?: string
+  openingIntent?: ShareUrlOpeningIntent
 }
 
 interface ShareTokenMetadataPayloadWire {
@@ -64,9 +70,10 @@ export const serializeSnapshot = (snapshot: ProjectSnapshot): string => {
   return JSON.stringify(snapshot)
 }
 
-export const serializeSharePayload = (snapshot: ProjectSnapshot): string => {
-  return serializeWebShareUrlPayload(createWebShareUrlPayload(snapshot))
-}
+export const serializeSharePayload = (
+  snapshot: ProjectSnapshot,
+  options?: { openingIntent?: ShareUrlOpeningIntent }
+): string => serializeWebShareUrlPayload(createWebShareUrlPayload(snapshot, options))
 
 export const computeChecksum = async (payload: string): Promise<string> => {
   const encoder = new TextEncoder()
@@ -83,7 +90,7 @@ export const encodeSharePayload = async (
   const json = options?.serialized ?? (
     formatVersion === LEGACY_SHARE_FORMAT_VERSION
       ? serializeSnapshot(snapshot)
-      : serializeSharePayload(snapshot)
+      : serializeSharePayload(snapshot, { openingIntent: options?.openingIntent })
   )
   const checksumPayload = options?.checksumSource ?? json
   const checksum = options?.checksum ?? (await computeChecksum(checksumPayload))

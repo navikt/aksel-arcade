@@ -1,3 +1,4 @@
+import { compressToEncodedURIComponent, decompressFromEncodedURIComponent } from 'lz-string'
 import { describe, expect, it } from 'vitest'
 import { decodeShareToken } from '@/utils/shareDecoding'
 import { encodeSharePayload, createShareToken, LEGACY_SHARE_FORMAT_VERSION } from '@/utils/shareEncoding'
@@ -38,6 +39,67 @@ describe('shareDecoding v3 payloads', () => {
       linting: true,
       showLineNumbers: true,
     })
+  })
+
+  it('exposes preview fullscreen opening intent without adding it to the shared snapshot model', async () => {
+    const project = createDefaultProject()
+    project.source = createSinglePageProjectSource(
+      'export default function App() { return <div>Shared fullscreen intent</div> }',
+      'export function useSharedFullscreenIntent() { return "Shared Hooks" }'
+    )
+    const snapshot = createShareSnapshot(project, {
+      preview: {
+        viewport: 'LG',
+        theme: 'light',
+      },
+    })
+    const envelope = await encodeSharePayload(snapshot, {
+      openingIntent: { previewFullscreen: true },
+    })
+    const token = createShareToken(envelope)
+    const result = await decodeShareToken(token)
+
+    expect(result.checksumValid).toBe(true)
+    expect(result.openingIntent).toEqual({ previewFullscreen: true })
+    expect(result.snapshot?.preview).toEqual({
+      viewport: snapshot.preview.viewport,
+      zoom: 1,
+      theme: snapshot.preview.theme,
+      sandboxFlags: {},
+    })
+    expect(JSON.stringify(result.snapshot)).not.toContain('previewFullscreen')
+  })
+
+  it('detects preview fullscreen intent tampering through checksum validation', async () => {
+    const project = createDefaultProject()
+    project.source = createSinglePageProjectSource(
+      'export default function App() { return <div>Checksum guard</div> }',
+      'export function useChecksumGuard() { return "Shared Hooks" }'
+    )
+    const snapshot = createShareSnapshot(project)
+    const envelope = await encodeSharePayload(snapshot)
+    const token = createShareToken(envelope)
+    const [version, metadata, checksum, payload] = token.split('.', 4)
+
+    if (!version || !metadata || !checksum || !payload) {
+      throw new Error('Expected a v3 share token with four segments')
+    }
+
+    const serialized = decompressFromEncodedURIComponent(payload)
+    if (!serialized) {
+      throw new Error('Expected the default v3 payload to decompress')
+    }
+
+    const tamperedSerialized = JSON.stringify({
+      ...JSON.parse(serialized),
+      previewFullscreen: true,
+    })
+    const tamperedToken =
+      `${version}.${metadata}.${checksum}.${compressToEncodedURIComponent(tamperedSerialized)}`
+    const result = await decodeShareToken(tamperedToken)
+
+    expect(result.checksumValid).toBe(false)
+    expect(result.error?.code).toBe('checksum-mismatch')
   })
 })
 

@@ -1,4 +1,9 @@
-import type { CompressionStrategyId, ProjectSnapshot, ShareUrlMetadata } from '@/types/project'
+import type {
+  CompressionStrategyId,
+  ProjectSnapshot,
+  ShareUrlMetadata,
+  ShareUrlOpeningIntent,
+} from '@/types/project'
 import {
   computeChecksum,
   LEGACY_SHARE_FORMAT_VERSION,
@@ -16,6 +21,7 @@ import {
 } from '@/utils/snapshotPacking'
 import { recordShareDecodeTelemetry } from '@/services/telemetry'
 import {
+  extractShareUrlOpeningIntent,
   normalizeLegacyV2FullSnapshotToWebShareSnapshot,
   parseWebShareUrlPayload,
   webShareUrlPayloadToSnapshot,
@@ -36,6 +42,7 @@ export interface ShareDecodeError {
 export interface ShareDecodeResult {
   metadata?: ShareUrlMetadata
   snapshot?: ProjectSnapshot
+  openingIntent?: ShareUrlOpeningIntent
   checksumValid: boolean
   error?: ShareDecodeError
 }
@@ -78,7 +85,7 @@ export const decodeShareToken = async (token: string): Promise<ShareDecodeResult
   try {
     const decoded = await decodeSharePayloadWithStrategy(metadata)
     repairApplied = decoded.repairApplied
-    const { snapshot, checksumPayload } = decoded
+    const { snapshot, checksumPayload, openingIntent } = decoded
     const computedChecksum = await computeChecksum(checksumPayload)
 
     if (computedChecksum !== metadata.checksum) {
@@ -104,6 +111,7 @@ export const decodeShareToken = async (token: string): Promise<ShareDecodeResult
     return {
       metadata,
       snapshot,
+      openingIntent,
       checksumValid: true,
     }
   } catch (error) {
@@ -145,7 +153,12 @@ const decodeSnapshotWithStrategy = async (
 
 const decodeSharePayloadWithStrategy = async (
   metadata: ShareUrlMetadata,
-): Promise<{ snapshot: ProjectSnapshot; checksumPayload: string; repairApplied: boolean }> => {
+): Promise<{
+  snapshot: ProjectSnapshot
+  checksumPayload: string
+  repairApplied: boolean
+  openingIntent?: ShareUrlOpeningIntent
+}> => {
   if (metadata.formatVersion === SHARE_FORMAT_VERSION) {
     const serialized = await decodeSerializedPayload(metadata.strategyId, metadata.payload)
     const payload = parseWebShareUrlPayload(serialized)
@@ -153,6 +166,7 @@ const decodeSharePayloadWithStrategy = async (
       snapshot: webShareUrlPayloadToSnapshot(payload),
       checksumPayload: serialized,
       repairApplied: false,
+      openingIntent: extractShareUrlOpeningIntent(payload),
     }
   }
 
@@ -168,6 +182,7 @@ const decodeSharePayloadWithStrategy = async (
     snapshot,
     checksumPayload: getChecksumPayloadForStrategy(decodedSnapshot, metadata.strategyId),
     repairApplied,
+    openingIntent: undefined,
   }
 }
 

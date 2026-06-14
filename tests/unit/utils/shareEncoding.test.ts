@@ -210,6 +210,20 @@ describe('shareEncoding utilities', () => {
     }
   })
 
+  it('serializes preview fullscreen opening intent only when requested', async () => {
+    const { snapshot, expectedPayload } = createNonShareableStateFixture()
+    const envelope = await encodeSharePayload(snapshot, {
+      openingIntent: { previewFullscreen: true },
+    })
+    const serialized = decompressFromEncodedURIComponent(envelope.compressed)
+
+    expect(serialized).toBeTruthy()
+    expect(JSON.parse(serialized ?? '')).toEqual({
+      ...expectedPayload,
+      previewFullscreen: true,
+    })
+  })
+
   it('generates shorter v3 Web share URLs than equivalent legacy v2 full-snapshot URLs', async () => {
     const representativeSnapshots = [
       createShareSnapshot(createDefaultProject()),

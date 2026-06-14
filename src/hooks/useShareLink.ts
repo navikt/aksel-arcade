@@ -1,5 +1,10 @@
 import { useCallback, useEffect, useRef, useState, type MutableRefObject } from 'react'
-import type { CompressionStrategyId, ProjectSnapshot, SharePayloadEnvelope } from '@/types/project'
+import type {
+  CompressionStrategyId,
+  ProjectSnapshot,
+  SharePayloadEnvelope,
+  ShareUrlOpeningIntent,
+} from '@/types/project'
 import { useProject } from '@/hooks/useProject'
 import { useShareLinkExperiments } from '@/hooks/useShareLinkExperiments'
 import { useSettings } from '@/contexts/SettingsContext'
@@ -69,6 +74,7 @@ export interface UseShareLinkOptions {
   baseUrl?: string
   slowGenerationThresholdMs?: number
   generationDelayMs?: number
+  openingIntent?: ShareUrlOpeningIntent
 }
 
 const IDLE_STATE: ShareLinkState = {
@@ -109,6 +115,7 @@ export const useShareLink = (options?: UseShareLinkOptions) => {
     ? options.slowGenerationThresholdMs
     : SLOW_GENERATION_THRESHOLD_MS
   const generationDelayMs = options?.generationDelayMs ?? 0
+  const previewFullscreenOpeningIntent = options?.openingIntent?.previewFullscreen === true
 
   useEffect(() => {
     stateRef.current = state
@@ -272,7 +279,9 @@ export const useShareLink = (options?: UseShareLinkOptions) => {
       if (generationDelayMs > 0) {
         await new Promise(resolve => setTimeout(resolve, generationDelayMs))
       }
-      const serialized = serializeSharePayload(snapshot)
+      const serialized = serializeSharePayload(snapshot, {
+        openingIntent: previewFullscreenOpeningIntent ? { previewFullscreen: true } : undefined,
+      })
       const contentSignature = await computeChecksum(serialized)
 
       if (
@@ -462,6 +471,7 @@ export const useShareLink = (options?: UseShareLinkOptions) => {
     charLimit,
     generationDelayMs,
     options?.baseUrl,
+    previewFullscreenOpeningIntent,
     recordResult,
     slowGenerationThresholdMs,
     snapshotBuilder,

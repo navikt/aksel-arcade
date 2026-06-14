@@ -20,6 +20,7 @@ import {
   type ProjectSnapshot,
   type SelectedEditTarget,
   type ShareUrlMetadata,
+  type ShareUrlOpeningIntent,
 } from '@/types/project'
 import type { EditorState } from '@/types/editor'
 import type { PreviewState, SandboxConsoleMessage } from '@/types/preview'
@@ -68,6 +69,7 @@ interface ShareHydrationState {
   token?: string
   snapshot?: ProjectSnapshot
   metadata?: ShareUrlMetadata
+  openingIntent?: ShareUrlOpeningIntent
   error?: ShareDecodeError
 }
 
@@ -212,6 +214,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
           token,
           snapshot: result.snapshot,
           metadata: result.metadata,
+          openingIntent: result.openingIntent,
         })
       } else {
         setShareHydration({

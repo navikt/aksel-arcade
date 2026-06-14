@@ -1,4 +1,4 @@
-import type { ProjectSnapshot, ViewportSize } from '@/types/project'
+import type { ProjectSnapshot, ShareUrlOpeningIntent, ViewportSize } from '@/types/project'
 import { SNAPSHOT_FILE_IDS } from '@/services/storage'
 
 export interface WebShareUrlPayloadV3 {
@@ -10,13 +10,17 @@ export interface WebShareUrlPayloadV3 {
     viewport: ViewportSize
     theme: ProjectSnapshot['preview']['theme']
   }
+  previewFullscreen?: true
 }
 
 const WEB_SHARE_SNAPSHOT_VERSION = '1.0.0'
 const VALID_VIEWPORTS: readonly ViewportSize[] = ['2XL', 'XL', 'LG', 'MD', 'SM', 'XS']
 const VALID_THEMES: readonly ProjectSnapshot['preview']['theme'][] = ['light', 'dark']
 
-export const createWebShareUrlPayload = (snapshot: ProjectSnapshot): WebShareUrlPayloadV3 => ({
+export const createWebShareUrlPayload = (
+  snapshot: ProjectSnapshot,
+  options?: { openingIntent?: ShareUrlOpeningIntent }
+): WebShareUrlPayloadV3 => ({
   source: {
     jsx: findJsxSource(snapshot),
     hooks: findHooksSource(snapshot),
@@ -25,6 +29,7 @@ export const createWebShareUrlPayload = (snapshot: ProjectSnapshot): WebShareUrl
     viewport: snapshot.preview.viewport,
     theme: snapshot.preview.theme,
   },
+  ...(options?.openingIntent?.previewFullscreen ? { previewFullscreen: true } : {}),
 })
 
 export const normalizeLegacyV2FullSnapshotToWebShareSnapshot = (
@@ -51,18 +56,24 @@ export const serializeWebShareUrlPayload = (payload: WebShareUrlPayloadV3): stri
       viewport: payload.preview.viewport,
       theme: payload.preview.theme,
     },
+    ...(payload.previewFullscreen ? { previewFullscreen: true } : {}),
   })
 
 export const parseWebShareUrlPayload = (serialized: string): WebShareUrlPayloadV3 => {
   const value = JSON.parse(serialized) as unknown
   assertRecord(value, 'Web share payload')
-  assertExactKeys(value, ['source', 'preview'], 'Web share payload')
+  assertAllowedKeys(value, ['source', 'preview', 'previewFullscreen'], 'Web share payload')
+  assertRequiredKeys(value, ['source', 'preview'], 'Web share payload')
 
   const { source, preview } = value
   assertRecord(source, 'Web share source')
   assertRecord(preview, 'Web share preview')
   assertExactKeys(source, ['jsx', 'hooks'], 'Web share source')
   assertExactKeys(preview, ['viewport', 'theme'], 'Web share preview')
+
+  if ('previewFullscreen' in value && value.previewFullscreen !== true) {
+    throw new Error('Web share preview fullscreen intent is invalid')
+  }
 
   if (typeof source.jsx !== 'string' || typeof source.hooks !== 'string') {
     throw new Error('Web share source must include JSX and Hooks strings')
@@ -85,8 +96,14 @@ export const parseWebShareUrlPayload = (serialized: string): WebShareUrlPayloadV
       viewport: preview.viewport,
       theme: preview.theme,
     },
+    ...(value.previewFullscreen === true ? { previewFullscreen: true } : {}),
   }
 }
+
+export const extractShareUrlOpeningIntent = (
+  payload: Pick<WebShareUrlPayloadV3, 'previewFullscreen'>
+): ShareUrlOpeningIntent | undefined =>
+  payload.previewFullscreen ? { previewFullscreen: true } : undefined
 
 export const webShareUrlPayloadToSnapshot = (payload: WebShareUrlPayloadV3): ProjectSnapshot => ({
   version: WEB_SHARE_SNAPSHOT_VERSION,
@@ -167,9 +184,34 @@ const assertExactKeys = (
 ): void => {
   const keys = Object.keys(value)
   const extras = keys.filter((key) => !allowedKeys.includes(key))
-  const missing = allowedKeys.filter((key) => !keys.includes(key))
 
-  if (extras.length || missing.length) {
+  if (extras.length) {
+    throw new Error(`${label} keys are invalid`)
+  }
+}
+
+const assertAllowedKeys = (
+  value: Record<string, unknown>,
+  allowedKeys: readonly string[],
+  label: string
+): void => {
+  const keys = Object.keys(value)
+  const extras = keys.filter((key) => !allowedKeys.includes(key))
+
+  if (extras.length) {
+    throw new Error(`${label} keys are invalid`)
+  }
+}
+
+const assertRequiredKeys = (
+  value: Record<string, unknown>,
+  requiredKeys: readonly string[],
+  label: string
+): void => {
+  const keys = Object.keys(value)
+  const missing = requiredKeys.filter((key) => !keys.includes(key))
+
+  if (missing.length) {
     throw new Error(`${label} keys are invalid`)
   }
 }
