@@ -1,10 +1,11 @@
 import type { ComponentProps } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { AppProvider } from '@/hooks/useProject'
 import { PreviewPane } from '@/components/Preview/PreviewPane'
 import { SettingsProvider, useSettings } from '@/contexts/SettingsContext'
+import * as transpiler from '@/services/transpiler'
 import {
   resetLocalStorageMock,
   resetSessionStorageMock,
@@ -134,5 +135,45 @@ describe('Preview fullscreen entry control', () => {
       )
     ).toBe('true')
     expect(screen.getByTestId('preview-iframe')).toBe(previewIframe)
+  })
+
+  it('exits fullscreen with Escape from the fullscreen error chrome and restores focus to the toggle', async () => {
+    vi.spyOn(transpiler, 'transpileCode').mockResolvedValue({
+      success: false,
+      code: null,
+      error: {
+        message: 'Broken preview',
+        line: 0,
+        column: 0,
+        stack: null,
+        pageId: null,
+      },
+    })
+
+    const user = userEvent.setup()
+
+    render(
+      <SettingsProvider>
+        <AppProvider>
+          <SettingsProbe />
+          <PreviewPane />
+        </AppProvider>
+      </SettingsProvider>
+    )
+
+    await screen.findByText(/Compile Error/i, undefined, { timeout: 5000 })
+    await user.click(screen.getByRole('button', { name: 'Enter preview fullscreen' }))
+
+    const errorCloseButton = screen.getByRole('button', { name: /lukk/i })
+    errorCloseButton.focus()
+    expect(document.activeElement).toBe(errorCloseButton)
+
+    await user.keyboard('{Escape}')
+
+    await waitFor(() => {
+      expect(screen.getByTestId('settings-preview-fullscreen').textContent).toBe('false')
+    })
+
+    expect(screen.getByRole('button', { name: 'Enter preview fullscreen' })).toBe(document.activeElement)
   })
 })

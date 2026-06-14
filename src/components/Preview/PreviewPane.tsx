@@ -253,7 +253,7 @@ export const PreviewPane = () => {
     setPreviewFullscreen(true)
   }, [exitPreviewFullscreen, previewFullscreen, setPreviewFullscreen])
 
-  const handleHeaderKeyDown = useCallback(
+  const handlePreviewPaneKeyDown = useCallback(
     (event: React.KeyboardEvent<HTMLElement>) => {
       if (!previewFullscreen || event.key !== 'Escape' || event.defaultPrevented) {
         return
@@ -287,6 +287,7 @@ export const PreviewPane = () => {
     <Box
       as="section"
       className={previewFullscreen ? 'preview-pane preview-pane--fullscreen' : 'preview-pane'}
+      onKeyDown={handlePreviewPaneKeyDown}
     >
       <Box
         data-name="Preview Header"
@@ -300,7 +301,6 @@ export const PreviewPane = () => {
         borderColor="neutral-subtleA"
         paddingInline="space-20"
         paddingBlock="space-8"
-        onKeyDown={handleHeaderKeyDown}
       >
         <div className="preview-pane__header-controls">
           <div className="preview-pane__header-controls-left">

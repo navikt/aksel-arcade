@@ -2717,6 +2717,23 @@ Next note:
 
 - `#239` can now add the fullscreen-only share control onto the same sticky preview-header structure without inventing another fullscreen layout. Keep the share button last in the right-hand control order when the header wraps, and reuse the existing `previewFullscreen` exit path so fullscreen-only popovers can reset cleanly on exit.
 
+### 2026-06-14 - PR #246 review follow-up for issue #237
+
+Implemented:
+
+- Code review of PR `#246` found that the new Escape handler only listened on the fullscreen header, so Escape would miss other fullscreen **Arcade chrome** rendered inside the preview pane, such as the compile/runtime error overlay close button.
+- Moved the Escape handler from the preview header to the fullscreen preview-pane section so key events from other fullscreen chrome inside the pane still exit **Preview fullscreen** while preserving the existing iframe behavior.
+- Added a regression in `tests/integration/preview-fullscreen-entry.test.tsx` that forces a compile error, enters fullscreen, focuses the fullscreen error chrome, presses Escape, and confirms fullscreen exits with focus restored to the normal toggle.
+
+Verification:
+
+- `npm run type-check`
+- `CI=1 npm test -- --run tests/integration/preview-fullscreen-entry.test.tsx`
+
+Next note:
+
+- `#239` can keep relying on pane-level fullscreen Escape handling for any fullscreen-only share popover chrome it adds later, rather than rebinding Escape separately on each fullscreen control surface.
+
 ### 2026-06-14 - PR #245 review follow-up for issue #236
 
 Implemented:
