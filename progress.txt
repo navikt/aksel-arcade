@@ -2742,6 +2742,7 @@ Implemented:
 - Root cause was the merged flex contract in `PreviewPane.css` plus the fullscreen-only `fill` prop passed into `ViewportToggle`. The right control group and viewport wrapper were both allowed to grow, so the ToggleGroup expanded to consume most of the header and dragged the whole control cluster left.
 - Restored the intended layout by making the outer header-controls row explicitly span the full header width, keeping the right-side wrapper hug-content with `margin-inline-start: auto`, and removing the fullscreen `fill` behavior from `ViewportToggle` so the ToggleGroup keeps its intrinsic width in both modes.
 - Added a focused Playwright regression in `tests/e2e/preview-header-layout.spec.ts` that checks the header geometry in normal and fullscreen modes: the right-side control group must stay flush to the right edge and both the group and ToggleGroup must remain well under the full header width instead of stretching.
+- PR review also found that the repo-default Playwright runner could bind to an unrelated reused `localhost:5173` Vite server from another checkout. Hardened `playwright.config.ts` so `npm run test:e2e` now starts an isolated repo-local Vite server on a stable per-worktree port by default, with explicit reuse still available through `PLAYWRIGHT_REUSE_SERVER=true` and `PLAYWRIGHT_PORT`.
 
 Verification:
 
@@ -2749,6 +2750,7 @@ Verification:
 - `npm run lint` (passes with the existing `.eslintignore` deprecation notice and the existing `InspectionPopover` hook-dependency warning only)
 - `CI=1 npm run test -- --run`
 - `npm run build`
+- `npx playwright test tests/e2e/preview-header-layout.spec.ts --project=chromium`
 - Focused browser regression against the current worktree server on `http://127.0.0.1:4190/aksel-arcade/` confirmed the fix numerically in both modes:
   - normal mode: right controls width `337px`, ToggleGroup width `293px`
   - fullscreen mode: right controls width `337px`, ToggleGroup width `293px`
