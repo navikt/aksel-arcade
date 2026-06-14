@@ -1,97 +1,54 @@
-import { test, expect } from '@playwright/test'
+import { expect, test, type FrameLocator, type Page } from '@playwright/test'
 
-test.describe('Aksel Darkside Components', () => {
-  test('default project renders Aksel Button component with correct styling', async ({ page }) => {
-    await page.goto('http://localhost:5173')
+const stackSource = `export default function App() {
+  return (
+    <VStack gap="space-8">
+      <BodyShort>First item</BodyShort>
+      <BodyShort>Second item</BodyShort>
+    </VStack>
+  )
+}`
 
-    // Wait for the app to load
-    await page.waitForSelector('[data-testid="live-preview"]', { timeout: 10000 })
+const openArcade = async (page: Page): Promise<FrameLocator> => {
+  await page.goto('/aksel-arcade/')
+  await page.waitForLoadState('networkidle')
+  await expect(page.getByTestId('preview-iframe')).toBeVisible({ timeout: 10000 })
+  return page.frameLocator('[data-testid="preview-iframe"]')
+}
 
-    // Get the iframe
-    const iframe = page.frameLocator('[data-testid="live-preview"] iframe')
+const replaceJsx = async (page: Page, source: string) => {
+  const editor = page.locator('.cm-content[contenteditable="true"]').first()
+  await expect(editor).toBeVisible()
+  await editor.click()
+  await page.keyboard.press('ControlOrMeta+A')
+  await page.keyboard.insertText(source)
+}
 
-    // Wait for content to render in iframe
-    await iframe.locator('button').first().waitFor({ timeout: 10000 })
+test.describe('Aksel components', () => {
+  test('default project renders the intro preview content', async ({ page }) => {
+    const previewFrame = await openArcade(page)
 
-    // Verify button exists
-    const button = iframe.locator('button').first()
-    await expect(button).toBeVisible()
-
-    // Verify button text
-    await expect(button).toHaveText('Click me')
-
-    // Verify it's an Aksel button (has Aksel CSS classes)
-    const buttonClasses = await button.getAttribute('class')
-    expect(buttonClasses).toContain('navds-button')
-
-    // Verify primary variant
-    expect(buttonClasses).toContain('navds-button--primary')
-
-    // Verify button has proper styling (not a plain HTML button)
-    const backgroundColor = await button.evaluate((el) => {
-      return window.getComputedStyle(el).backgroundColor
-    })
-
-    // Aksel primary button should have a distinct color, not default button gray
-    // RGB values for Aksel primary color (approximately)
-    expect(backgroundColor).not.toBe('rgba(0, 0, 0, 0)') // Not transparent
-    expect(backgroundColor).not.toBe('rgb(255, 255, 255)') // Not white
-    expect(backgroundColor).not.toBe('rgb(239, 239, 239)') // Not default button gray
+    await expect(
+      previewFrame.getByRole('heading', { name: /welcome to aksel arcade/i })
+    ).toBeVisible()
+    await expect(previewFrame.getByText(/browser-based React playground/i)).toBeVisible()
   })
 
-  test('Theme component wraps user content', async ({ page }) => {
-    await page.goto('http://localhost:5173')
+  test('preview sandbox exposes Aksel theme variables', async ({ page }) => {
+    const previewFrame = await openArcade(page)
 
-    // Wait for the app to load
-    await page.waitForSelector('[data-testid="live-preview"]', { timeout: 10000 })
+    const themeBackgroundToken = await previewFrame.locator('body').evaluate((el) =>
+      window.getComputedStyle(el).getPropertyValue('--ax-bg-default').trim()
+    )
 
-    // Get the iframe
-    const iframe = page.frameLocator('[data-testid="live-preview"] iframe')
-
-    // Wait for root to have content
-    await iframe.locator('#root').waitFor({ timeout: 10000 })
-
-    // Check that Theme wrapper exists (it should be the first child of root)
-    const rootChildren = await iframe.locator('#root > *').count()
-    expect(rootChildren).toBeGreaterThan(0)
-
-    // Verify Darkside theme CSS variables are applied
-    const rootBg = await iframe.locator('body').evaluate((el) => {
-      return window.getComputedStyle(el).getPropertyValue('--ax-bg-default') ||
-             window.getComputedStyle(el).backgroundColor
-    })
-
-    // Should have dark background (Darkside theme)
-    expect(rootBg).toBeTruthy()
+    expect(themeBackgroundToken).not.toBe('')
   })
 
-  test('Component Palette inserts Aksel components that render correctly', async ({ page }) => {
-    await page.goto('http://localhost:5173')
+  test('edited JSX renders grouped Aksel content in preview', async ({ page }) => {
+    const previewFrame = await openArcade(page)
+    await replaceJsx(page, stackSource)
 
-    // Open component palette
-    await page.click('[aria-label="Open component palette"]')
-
-    // Wait for palette to open
-    await page.waitForSelector('[data-testid="component-palette"]', { timeout: 5000 })
-
-    // Click on Stack component
-    await page.getByTestId('component-palette').getByRole('link', { name: /^Stack\b/ }).click()
-
-    // Wait for code to be inserted (component palette should close)
-    await page.waitForSelector('[data-testid="component-palette"]', { state: 'hidden', timeout: 5000 })
-
-    // Get the iframe
-    const iframe = page.frameLocator('[data-testid="live-preview"] iframe')
-
-    // Wait for Stack to render (it should contain the default items)
-    await iframe.locator('.navds-stack').first().waitFor({ timeout: 10000 })
-
-    // Verify Stack has Aksel CSS class
-    const stack = iframe.locator('.navds-stack').first()
-    await expect(stack).toBeVisible()
-
-    // Verify Stack has children (default template has 2 items)
-    const stackChildren = await stack.locator('> *').count()
-    expect(stackChildren).toBeGreaterThan(0)
+    await expect(previewFrame.getByText('First item')).toBeVisible({ timeout: 10000 })
+    await expect(previewFrame.getByText('Second item')).toBeVisible()
   })
 })

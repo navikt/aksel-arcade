@@ -1,109 +1,69 @@
-/**
- * E2E test to verify Alert component renders with Aksel Darkside theme
- */
+import { expect, test, type FrameLocator, type Page } from '@playwright/test'
 
-import { test, expect } from '@playwright/test';
+const alertSource = `export default function App() {
+  return <Alert variant="info">Welcome to Aksel Arcade</Alert>
+}`
 
-test.describe('Alert Component Theme Verification', () => {
-  test.beforeEach(async ({ page }) => {
-    // Clear localStorage before each test
-    await page.goto('http://localhost:5173');
-    await page.evaluate(() => localStorage.clear());
-  });
+const openArcade = async (page: Page): Promise<FrameLocator> => {
+  await page.goto('/aksel-arcade/')
+  await page.waitForLoadState('networkidle')
+  await expect(page.getByTestId('preview-iframe')).toBeVisible({ timeout: 10000 })
+  return page.frameLocator('[data-testid="preview-iframe"]')
+}
 
-  test('should render Alert component with Aksel Darkside styling', async ({ page }) => {
-    // Navigate to app
-    await page.goto('http://localhost:5173');
-    
-    // Wait for app to load
-    await page.waitForSelector('[data-testid="preview-iframe"]', { timeout: 10000 });
-    
-    // Get the preview iframe
-    const iframe = page.frameLocator('[data-testid="preview-iframe"]');
-    
-    // Wait for Alert to render in iframe
-    await iframe.locator('[class*="aksel-alert"]').waitFor({ timeout: 10000 });
-    
-    // Check that Alert exists
-    const alert = iframe.locator('[class*="aksel-alert"]').first();
-    await expect(alert).toBeVisible();
-    
-    // Check that Alert has text content
-    await expect(alert).toContainText('Welcome to AkselArcade');
-    
-    // Check that Alert has Aksel classes (indicating theme is applied)
-    const alertClasses = await alert.getAttribute('class');
-    expect(alertClasses).toContain('aksel-alert');
-    
-    // Check that Alert has the info variant
-    expect(alertClasses).toMatch(/info|aksel-alert--info/);
-    
-    // Take screenshot for manual verification
-    await page.screenshot({ path: 'alert-verification-light-mode.png', fullPage: true });
-    
-  });
+const replaceJsx = async (page: Page, source: string) => {
+  const editor = page.locator('.cm-content[contenteditable="true"]').first()
+  await expect(editor).toBeVisible()
+  await editor.click()
+  await page.keyboard.press('ControlOrMeta+A')
+  await page.keyboard.insertText(source)
+}
 
-  test('should render Alert in dark mode', async ({ page }) => {
-    // Navigate to app
-    await page.goto('http://localhost:5173');
-    
-    // Wait for preview iframe
-    await page.waitForSelector('[data-testid="preview-iframe"]', { timeout: 10000 });
-    
-    // Click theme toggle to switch to dark mode
-    const themeToggle = page.locator('button').filter({ hasText: /theme|dark|light/i }).first();
-    if (await themeToggle.count() > 0) {
-      await themeToggle.click();
-      await page.waitForTimeout(500); // Wait for theme change
-    }
-    
-    // Get the preview iframe
-    const iframe = page.frameLocator('[data-testid="preview-iframe"]');
-    
-    // Wait for Alert
-    await iframe.locator('[class*="aksel-alert"]').waitFor({ timeout: 10000 });
-    
-    // Check Alert is visible
-    const alert = iframe.locator('[class*="aksel-alert"]').first();
-    await expect(alert).toBeVisible();
-    
-    // Take screenshot for manual verification
-    await page.screenshot({ path: 'alert-verification-dark-mode.png', fullPage: true });
-    
-  });
+const renderAlertPreview = async (page: Page) => {
+  const previewFrame = await openArcade(page)
+  await replaceJsx(page, alertSource)
 
-  test('should have proper Aksel computed styles', async ({ page }) => {
-    // Navigate to app
-    await page.goto('http://localhost:5173');
-    
-    // Wait for preview iframe
-    await page.waitForSelector('[data-testid="preview-iframe"]', { timeout: 10000 });
-    
-    // Get the preview iframe
-    const iframe = page.frameLocator('[data-testid="preview-iframe"]');
-    
-    // Wait for Alert
-    const alert = iframe.locator('[class*="aksel-alert"]').first();
-    await alert.waitFor({ timeout: 10000 });
-    
-    // Check computed styles (these should come from Aksel Darkside)
-    const backgroundColor = await alert.evaluate((el) => {
-      return window.getComputedStyle(el).backgroundColor;
-    });
-    
-    const padding = await alert.evaluate((el) => {
-      return window.getComputedStyle(el).padding;
-    });
-    
-    const borderRadius = await alert.evaluate((el) => {
-      return window.getComputedStyle(el).borderRadius;
-    });
-    
-    
-    // Verify styles are not default browser styles
-    expect(backgroundColor).not.toBe('rgba(0, 0, 0, 0)');
-    expect(padding).not.toBe('0px');
-    expect(borderRadius).not.toBe('0px');
-    
-  });
-});
+  const alert = previewFrame.locator('.aksel-alert').first()
+  await expect(alert).toBeVisible({ timeout: 10000 })
+
+  return { previewFrame, alert }
+}
+
+test.describe('Alert component preview', () => {
+  test('renders an Alert with Aksel classes in the preview iframe', async ({ page }) => {
+    const { alert } = await renderAlertPreview(page)
+
+    await expect(alert).toContainText('Welcome to Aksel Arcade')
+
+    const alertClasses = await alert.getAttribute('class')
+    expect(alertClasses).toContain('aksel-alert')
+    expect(alertClasses).toContain('aksel-alert--info')
+  })
+
+  test('keeps the Alert inside the sandbox theme wrapper', async ({ page }) => {
+    const { previewFrame } = await renderAlertPreview(page)
+
+    const hasWrappedAlert = await previewFrame.locator('body').evaluate(() =>
+      Boolean(document.querySelector('.aksel-theme .aksel-alert'))
+    )
+
+    expect(hasWrappedAlert).toBe(true)
+  })
+
+  test('applies non-default computed styles to the Alert', async ({ page }) => {
+    const { alert } = await renderAlertPreview(page)
+
+    const styles = await alert.evaluate((el) => {
+      const computed = window.getComputedStyle(el)
+      return {
+        backgroundColor: computed.backgroundColor,
+        padding: computed.padding,
+        borderRadius: computed.borderRadius,
+      }
+    })
+
+    expect(styles.backgroundColor).not.toBe('rgba(0, 0, 0, 0)')
+    expect(styles.padding).not.toBe('0px')
+    expect(styles.borderRadius).not.toBe('0px')
+  })
+})

@@ -160,6 +160,9 @@ npm run aksel:audit -- --target 8.11.0
                          # Run the manual Aksel docs/runtime/catalog drift audit
 ```
 
+Playwright starts its own isolated Vite server by default. To intentionally reuse a local
+server, run `PLAYWRIGHT_REUSE_SERVER=true PLAYWRIGHT_PORT=<port> npm run test:e2e`.
+
 ### Manual Aksel upgrade and audit workflow
 
 Ordinary `npm run typecheck`, `npm run lint`, and `npm test` stay network-independent. Fresh `https://aksel.nav.no/llm.md` data is only fetched by the explicit maintainer commands above.

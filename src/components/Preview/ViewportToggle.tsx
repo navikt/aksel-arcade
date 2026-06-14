@@ -4,11 +4,7 @@ import { AppContext } from '@/hooks/useProject'
 import { VIEWPORTS } from '@/types/viewports'
 import type { ViewportSize } from '@/types/project'
 
-interface ViewportToggleProps {
-  fill?: boolean
-}
-
-export const ViewportToggle = ({ fill = false }: ViewportToggleProps) => {
+export const ViewportToggle = () => {
   const context = useContext(AppContext)
   if (!context) throw new Error('ViewportToggle must be used within AppProvider')
 
@@ -24,7 +20,6 @@ export const ViewportToggle = ({ fill = false }: ViewportToggleProps) => {
       value={project.viewportSize}
       onChange={handleViewportChange}
       variant="neutral"
-      fill={fill}
     >
       {VIEWPORTS.map((viewport) => (
         <ToggleGroup.Item

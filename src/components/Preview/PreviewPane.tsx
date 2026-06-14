@@ -321,7 +321,7 @@ export const PreviewPane = () => {
           >
             <InspectMode onInspectToggle={handleInspectToggle} />
             <div className="preview-pane__viewport-toggle">
-              <ViewportToggle fill={previewFullscreen} />
+              <ViewportToggle />
             </div>
           </div>
         </div>
