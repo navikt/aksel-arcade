@@ -154,6 +154,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   const {
     multiPageEnabled,
+    previewFullscreen,
     selectedEditTarget,
     setTheme,
     setPanelOrder,
@@ -436,12 +437,17 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     }
 
     const snapshot = shareHydration.snapshot
+    const nextPreviewFullscreen =
+      shareHydration.openingIntent?.previewFullscreen === true
+        ? true
+        : previewFullscreen
 
     try {
       const nextProject = buildProjectFromSnapshot(snapshot)
       replaceCurrentWorkingCopy(nextProject, {
         ...DEFAULT_WEB_ARCADE_WORKING_COPY_PREFERENCES,
         theme: snapshot.preview.theme,
+        previewFullscreen: nextPreviewFullscreen,
       })
     } catch (error) {
       console.error('Failed to apply shared snapshot', error)

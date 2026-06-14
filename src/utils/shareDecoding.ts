@@ -7,6 +7,7 @@ import type {
 import {
   computeChecksum,
   LEGACY_SHARE_FORMAT_VERSION,
+  SHARE_FULLSCREEN_INTENT_FORMAT_VERSION,
   SHARE_FORMAT_VERSION,
   SHARE_METADATA_VERSION,
   SHARE_URL_PARAM,
@@ -159,7 +160,7 @@ const decodeSharePayloadWithStrategy = async (
   repairApplied: boolean
   openingIntent?: ShareUrlOpeningIntent
 }> => {
-  if (metadata.formatVersion === SHARE_FORMAT_VERSION) {
+  if (isMinimalWebShareFormatVersion(metadata.formatVersion)) {
     const serialized = await decodeSerializedPayload(metadata.strategyId, metadata.payload)
     const payload = parseWebShareUrlPayload(serialized)
     return {
@@ -255,7 +256,7 @@ const parseShareToken = (token: string): ShareUrlMetadata => {
     }
   }
 
-  if (version !== LEGACY_SHARE_FORMAT_VERSION && version !== SHARE_FORMAT_VERSION) {
+  if (!isSupportedShareFormatVersion(version)) {
     throw createDecodeError('unsupported-version')
   }
 
@@ -325,3 +326,11 @@ const createDecodeError = (code: ShareDecodeErrorCode): ShareDecodeError => {
       }
   }
 }
+
+const isSupportedShareFormatVersion = (version: number): boolean =>
+  version === LEGACY_SHARE_FORMAT_VERSION
+  || version === SHARE_FORMAT_VERSION
+  || version === SHARE_FULLSCREEN_INTENT_FORMAT_VERSION
+
+const isMinimalWebShareFormatVersion = (version: number): boolean =>
+  version === SHARE_FORMAT_VERSION || version === SHARE_FULLSCREEN_INTENT_FORMAT_VERSION

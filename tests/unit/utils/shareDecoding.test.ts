@@ -1,7 +1,12 @@
 import { compressToEncodedURIComponent, decompressFromEncodedURIComponent } from 'lz-string'
 import { describe, expect, it } from 'vitest'
 import { decodeShareToken } from '@/utils/shareDecoding'
-import { encodeSharePayload, createShareToken, LEGACY_SHARE_FORMAT_VERSION } from '@/utils/shareEncoding'
+import {
+  encodeSharePayload,
+  createShareToken,
+  LEGACY_SHARE_FORMAT_VERSION,
+  SHARE_FULLSCREEN_INTENT_FORMAT_VERSION,
+} from '@/utils/shareEncoding'
 import { getCompressionStrategy } from '@/services/compressionStrategies'
 import type { ProjectSnapshot } from '@/types/project'
 import { createDefaultProject } from '@/utils/projectDefaults'
@@ -60,6 +65,7 @@ describe('shareDecoding v3 payloads', () => {
     const result = await decodeShareToken(token)
 
     expect(result.checksumValid).toBe(true)
+    expect(result.metadata?.formatVersion).toBe(SHARE_FULLSCREEN_INTENT_FORMAT_VERSION)
     expect(result.openingIntent).toEqual({ previewFullscreen: true })
     expect(result.snapshot?.preview).toEqual({
       viewport: snapshot.preview.viewport,

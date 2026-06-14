@@ -10,6 +10,7 @@ import {
   computeChecksum,
   estimateShareUrlLength,
   LEGACY_SHARE_FORMAT_VERSION,
+  SHARE_FULLSCREEN_INTENT_FORMAT_VERSION,
   SHARE_FORMAT_VERSION,
   SHARE_METADATA_VERSION,
   SHARE_URL_CHAR_LIMIT,
@@ -218,6 +219,7 @@ describe('shareEncoding utilities', () => {
     const serialized = decompressFromEncodedURIComponent(envelope.compressed)
 
     expect(serialized).toBeTruthy()
+    expect(envelope.formatVersion).toBe(SHARE_FULLSCREEN_INTENT_FORMAT_VERSION)
     expect(JSON.parse(serialized ?? '')).toEqual({
       ...expectedPayload,
       previewFullscreen: true,
