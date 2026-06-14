@@ -45,7 +45,7 @@ const Harness = () => {
     applySharedSnapshot,
     dismissShareHydration,
   } = useProject()
-  const { theme, panelOrder, previewFullscreen } = useSettings()
+  const { theme, panelOrder, multiPageEnabled, pagePanelOpen, previewFullscreen } = useSettings()
   const source = getStartPageSource(project)
 
   return (
@@ -64,6 +64,8 @@ const Harness = () => {
       <div data-testid="preview-viewport-width">{previewState.viewportWidth}</div>
       <div data-testid="settings-theme">{theme}</div>
       <div data-testid="settings-panel-order">{panelOrder}</div>
+      <div data-testid="settings-multi-page-enabled">{String(multiPageEnabled)}</div>
+      <div data-testid="settings-page-panel-open">{String(pagePanelOpen)}</div>
       <div data-testid="settings-preview-fullscreen">{String(previewFullscreen)}</div>
       <div data-testid="share-opening-preview-fullscreen">
         {String(shareHydration.openingIntent?.previewFullscreen === true)}
@@ -444,6 +446,51 @@ describe('share decode integration', () => {
     )
     expect(screen.getByTestId('editor-active-tab').textContent).toBe('JSX')
     expect(window.location.search).not.toContain('share=')
+  })
+
+  it('preserves the recipient multi-page workspace affordance when loading a Web share URL', async () => {
+    const previousProject = createWorkingCopyProject({
+      name: 'Recipient multi-page workspace',
+      jsxCode: 'export default function App() { return <div>Recipient JSX</div> }',
+    })
+    saveProject(previousProject, {
+      preferences: {
+        ...DEFAULT_WEB_ARCADE_WORKING_COPY_PREFERENCES,
+        multiPageEnabled: true,
+        pagePanelOpen: false,
+      },
+    })
+
+    const senderProject = createDefaultProject()
+    setPrimarySource(
+      senderProject,
+      'export default function App() { return <Heading>Shared multi-page affordance</Heading> }'
+    )
+
+    const token = await createShareTokenForSnapshot(
+      createShareSnapshot(senderProject, {
+        preview: {
+          theme: 'light',
+        },
+      })
+    )
+    window.history.replaceState({}, '', `/?share=${encodeURIComponent(token)}`)
+
+    renderHarness()
+
+    await screen.findByText('share-ready')
+    expect(screen.getByTestId('settings-multi-page-enabled').textContent).toBe('true')
+    expect(screen.getByTestId('settings-page-panel-open').textContent).toBe('false')
+
+    await user.click(screen.getByRole('button', { name: /load shared project/i }))
+
+    await waitFor(() => {
+      expect(screen.getByTestId('share-status').textContent).toBe('idle')
+    })
+
+    expect(screen.getByTestId('jsx-code').textContent).toContain('Shared multi-page affordance')
+    expect(screen.getByTestId('settings-multi-page-enabled').textContent).toBe('true')
+    expect(screen.getByTestId('settings-page-panel-open').textContent).toBe('false')
   })
 
   it('exposes preview fullscreen opening intent before loading a shared project', async () => {

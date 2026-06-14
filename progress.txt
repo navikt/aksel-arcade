@@ -2799,3 +2799,19 @@ Verification:
 - `CI=1 npm run test -- --run`
 - `npm run build`
 - Browser check at `http://127.0.0.1:4189/aksel-arcade/`: generated a normal Web share URL, entered Preview fullscreen, reopened that share URL in the same tab, accepted “Load Web share URL”, and confirmed fullscreen stayed active before and after load with no console errors or page errors.
+### 2026-06-14 - Follow-up fixes on Issue #238 / PR #248
+
+Implemented:
+
+- Fixed the reload blank-preview regression by removing the 500ms typing debounce from initial / project-replacement preview transpilation while keeping the debounce for same-project edits that happen with the code editor focused.
+- Fixed the page-panel regression after accepting a Web share URL by preserving the recipient tab's `multiPageEnabled` and `pagePanelOpen` working-copy preferences instead of resetting them to the single-page defaults.
+- Kept page-scoped runtime errors visible until the sandbox reports a fresh render success, which avoids clearing page-panel error indicators during fast recompiles triggered around the new reload behavior.
+- Added regression coverage in `tests/integration/preview-fullscreen-entry.test.tsx` for immediate initial transpilation and in `tests/integration/share-decode.test.tsx` for preserving the recipient multi-page workspace affordance on share load.
+
+Verification:
+
+- npm run typecheck
+- npm run lint (passes with the existing `InspectionPopover` hook dependency warning and ESLint `.eslintignore` deprecation warning)
+- npm test -- --run
+- npm run build
+- Browser checks at `http://127.0.0.1:5193/aksel-arcade/` for fast dark-mode reload preview recovery and for keeping the `Show pages` button after accepting a Web share URL into a tab with multi-page enabled
