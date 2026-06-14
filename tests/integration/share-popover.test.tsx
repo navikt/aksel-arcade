@@ -506,6 +506,33 @@ describe('Share popover integration', () => {
     expect(serialized).not.toContain('charLimit')
   })
 
+  it('includes preview fullscreen opening intent when share generation opts in', async () => {
+    renderHeader({
+      openingIntent: { previewFullscreen: true },
+    })
+
+    fireEvent.click(screen.getByLabelText(/share project/i))
+
+    await waitFor(() => expect(encodeSpy).toHaveBeenCalled())
+    const serialized = encodeSpy.mock.calls[0][1]?.serialized
+    if (!serialized) {
+      throw new Error('Expected share generation to pass a serialized payload.')
+    }
+
+    const payload = JSON.parse(serialized)
+    expect(payload).toEqual({
+      source: {
+        jsx: expect.any(String),
+        hooks: expect.any(String),
+      },
+      preview: {
+        viewport: 'MD',
+        theme: 'dark',
+      },
+      previewFullscreen: true,
+    })
+  })
+
   it('warns that multi-page sharing includes only the Start page', async () => {
     renderHeader()
     act(() => {

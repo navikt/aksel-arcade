@@ -10,6 +10,7 @@ import {
   computeChecksum,
   estimateShareUrlLength,
   LEGACY_SHARE_FORMAT_VERSION,
+  SHARE_FULLSCREEN_INTENT_FORMAT_VERSION,
   SHARE_FORMAT_VERSION,
   SHARE_METADATA_VERSION,
   SHARE_URL_CHAR_LIMIT,
@@ -208,6 +209,21 @@ describe('shareEncoding utilities', () => {
     for (const snippet of excludedSnippets) {
       expect(serialized).not.toContain(snippet)
     }
+  })
+
+  it('serializes preview fullscreen opening intent only when requested', async () => {
+    const { snapshot, expectedPayload } = createNonShareableStateFixture()
+    const envelope = await encodeSharePayload(snapshot, {
+      openingIntent: { previewFullscreen: true },
+    })
+    const serialized = decompressFromEncodedURIComponent(envelope.compressed)
+
+    expect(serialized).toBeTruthy()
+    expect(envelope.formatVersion).toBe(SHARE_FULLSCREEN_INTENT_FORMAT_VERSION)
+    expect(JSON.parse(serialized ?? '')).toEqual({
+      ...expectedPayload,
+      previewFullscreen: true,
+    })
   })
 
   it('generates shorter v3 Web share URLs than equivalent legacy v2 full-snapshot URLs', async () => {

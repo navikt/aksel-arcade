@@ -2671,3 +2671,41 @@ Verification:
 - npm run test -- --run
 - npm run build (confirmed the PR-scoped `PreviewPane` padding token issue was fixed; the remaining `tests/unit/useAutoSave.test.tsx` build/type error is outside this PR diff and was left untouched in this review follow-up)
 - Browser check at `http://127.0.0.1:5187/aksel-arcade/`: confirmed entering fullscreen leaves only preview controls in the accessibility tree, the editor panel and divider both carry real `hidden` state, and the visible controls no longer include the editor/header chrome.
+
+### 2026-06-14 - Issue #236: Encode Preview fullscreen opening intent in Web share URLs
+
+Implemented:
+
+- Picked `#236` as the highest-priority open `ready-for-agent` issue from `#236`-`#240` after checking the parent PRD `#233`, `CONTEXT.md`, and the latest `progress.txt` notes. It is the earliest unblocked fullscreen-share slice and it gates both share hydration (`#238`) and fullscreen share-popover reuse (`#239`).
+- Extended the v3 Web share payload contract with optional top-level `previewFullscreen: true`, keeping it strictly as checksum-protected share-opening intent rather than durable **Arcade project** data, a **Preview preference**, or `.akselarcade` package content.
+- Updated `useShareLink` / share encoding so normal share generation still omits the field, while future fullscreen-share callers can opt in through the hook with `{ openingIntent: { previewFullscreen: true } }` instead of inventing a second payload path.
+- Updated share decoding to expose the optional opening intent separately from the decoded snapshot model, and threaded that intent into `shareHydration` so `#238` can apply it after user confirmation without revisiting the payload boundary.
+- Added regression coverage in `tests/unit/utils/shareEncoding.test.ts`, `tests/unit/utils/shareDecoding.test.ts`, `tests/integration/share-popover.test.tsx`, and `tests/integration/share-decode.test.tsx` for fullscreen-intent inclusion, normal-share omission, backward-compatible decoding, checksum/tamper protection, and pre-apply hydration exposure.
+
+Verification:
+
+- Ran `npm install` in this worktree because dependencies were missing (`tsc` was not initially available on PATH through local `node_modules/.bin`).
+- `npm run typecheck`
+- `CI=1 npm run test -- --run`
+- `npm run build`
+- Browser check at `http://127.0.0.1:4189/aksel-arcade/`: confirmed the app loaded without console errors, Preview fullscreen still entered/exited cleanly, the normal Share project popover still generated/copyable Web share URLs, and the verified session had no runtime warnings or page errors.
+
+Next note:
+
+- `#238` can now consume `shareHydration.openingIntent` to apply fullscreen only after “Load Web share URL”, while `#239` can reuse the same `useShareLink({ openingIntent: { previewFullscreen: true } })` path for the fullscreen header share button. Keep normal-header sharing on the omission path; absence of the field now intentionally means “preserve the recipient tab’s current fullscreen state.”
+
+### 2026-06-14 - PR #245 review follow-up for issue #236
+
+Implemented:
+
+- PR review found that fullscreen-intent share payloads were still emitted as format `3`, which would have made older clients reject the new top-level field as malformed v3 payloads. Added a dedicated format `4` for payloads that carry `previewFullscreen: true` while keeping normal share links on v3 and legacy full snapshots on v2.
+- PR review also found that loading a normal Web share URL while the recipient tab was already in **Preview fullscreen** still forced fullscreen off because share apply reset workspace preferences to defaults. Share apply now preserves the current `previewFullscreen` state when the share has no fullscreen opening intent.
+- Kept the opening intent separate from the Arcade project snapshot model, and extended decode handling so both minimal Web share formats (v3 normal, v4 fullscreen-intent) go through the same portable payload parser.
+- Added regression coverage proving fullscreen-intent payloads use format v4, decoded opening intent is still exposed for fullscreen-intent shares, and accepting a normal share while already fullscreen keeps the recipient tab fullscreen.
+
+Verification:
+
+- `npm run typecheck`
+- `CI=1 npm run test -- --run`
+- `npm run build`
+- Browser check at `http://127.0.0.1:4189/aksel-arcade/`: generated a normal Web share URL, entered Preview fullscreen, reopened that share URL in the same tab, accepted “Load Web share URL”, and confirmed fullscreen stayed active before and after load with no console errors or page errors.

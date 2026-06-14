@@ -65,6 +65,9 @@ const Harness = () => {
       <div data-testid="settings-theme">{theme}</div>
       <div data-testid="settings-panel-order">{panelOrder}</div>
       <div data-testid="settings-preview-fullscreen">{String(previewFullscreen)}</div>
+      <div data-testid="share-opening-preview-fullscreen">
+        {String(shareHydration.openingIntent?.previewFullscreen === true)}
+      </div>
       <div data-testid="share-status">{shareHydration.status}</div>
       <button onClick={() => updateEditorState({ activeTab: 'Hooks' })}>Set local Hooks tab</button>
       <button onClick={resetToIntro}>Reset editor</button>
@@ -434,6 +437,85 @@ describe('share decode integration', () => {
     )
     expect(screen.getByTestId('editor-active-tab').textContent).toBe('JSX')
     expect(window.location.search).not.toContain('share=')
+  })
+
+  it('exposes preview fullscreen opening intent before loading a shared project', async () => {
+    const senderProject = createDefaultProject()
+    setPrimarySource(
+      senderProject,
+      'export default function App() { return <Heading>Shared fullscreen preview</Heading> }',
+      'export function useSharedFullscreenPreview() { return "Shared Hooks" }'
+    )
+    const snapshot = createShareSnapshot(senderProject, {
+      preview: {
+        viewport: 'LG',
+        theme: 'light',
+      },
+    })
+    const envelope = await encodeSharePayload(snapshot, {
+      openingIntent: { previewFullscreen: true },
+    })
+    const token = createShareToken(envelope)
+    window.history.replaceState({}, '', `/?share=${encodeURIComponent(token)}`)
+
+    renderHarness()
+
+    await screen.findByText('share-ready')
+
+    expect(screen.getByTestId('share-opening-preview-fullscreen').textContent).toBe('true')
+    expect(screen.getByTestId('settings-preview-fullscreen').textContent).toBe('false')
+  })
+
+  it('preserves the current fullscreen state when a share has no fullscreen opening intent', async () => {
+    const previousProject = createWorkingCopyProject({
+      name: 'Fullscreen recipient working copy',
+      jsxCode: 'export default function App() { return <div>Fullscreen recipient JSX</div> }',
+      hooksCode: 'export function useFullscreenRecipientHook() { return "Fullscreen Hooks" }',
+    })
+    saveProject(previousProject, {
+      preferences: {
+        ...DEFAULT_WEB_ARCADE_WORKING_COPY_PREFERENCES,
+        previewFullscreen: true,
+      },
+    })
+
+    const senderProject = createDefaultProject()
+    setPrimarySource(
+      senderProject,
+      'export default function App() { return <Heading>Shared normal preview</Heading> }',
+      'export function useSharedNormalPreview() { return "Shared Hooks" }'
+    )
+    const token = await createShareTokenForSnapshot(
+      createShareSnapshot(senderProject, {
+        preview: {
+          viewport: 'LG',
+          theme: 'light',
+        },
+      })
+    )
+    window.history.replaceState({}, '', `/?share=${encodeURIComponent(token)}`)
+
+    renderPersistedHarness()
+
+    await screen.findByRole('button', { name: /load web share url/i })
+    expect(screen.getByTestId('settings-preview-fullscreen').textContent).toBe('true')
+
+    await user.click(screen.getByRole('button', { name: /load web share url/i }))
+
+    await waitFor(() => {
+      expect(screen.getByTestId('project-name').textContent).toBe('Untitled Project')
+      expect(screen.getByTestId('settings-preview-fullscreen').textContent).toBe('true')
+    })
+
+    await waitFor(() => {
+      const stored = sessionStorage.getItem(WEB_ARCADE_WORKING_COPY_STORAGE_KEY)
+      if (!stored) {
+        throw new Error('Expected the working copy to be persisted after loading the share')
+      }
+
+      const parsed = JSON.parse(stored) as { preferences: WebArcadeWorkingCopyPreferences }
+      expect(parsed.preferences.previewFullscreen).toBe(true)
+    })
   })
 
   it('loads multi-page Web share URLs as single-page local projects using only the Start page', async () => {

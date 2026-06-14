@@ -1,5 +1,10 @@
 import { compressToEncodedURIComponent } from 'lz-string'
-import type { CompressionStrategyId, ProjectSnapshot, SharePayloadEnvelope } from '@/types/project'
+import type {
+  CompressionStrategyId,
+  ProjectSnapshot,
+  SharePayloadEnvelope,
+  ShareUrlOpeningIntent,
+} from '@/types/project'
 import { fromBase64Url, toBase64Url } from '@/utils/base64'
 import {
   createWebShareUrlPayload,
@@ -11,6 +16,7 @@ export const SHARE_URL_WARNING_THRESHOLD = 3600
 export const SHARE_URL_CHAR_LIMIT = 4000
 export const LEGACY_SHARE_FORMAT_VERSION = 2
 export const SHARE_FORMAT_VERSION = 3
+export const SHARE_FULLSCREEN_INTENT_FORMAT_VERSION = 4
 export const SHARE_METADATA_VERSION = 1
 export const SHARE_URL_ESTIMATE_MULTIPLIER = 1.4
 export const DEFAULT_COMPRESSION_STRATEGY_ID: CompressionStrategyId = 'lz-string-uri'
@@ -28,6 +34,7 @@ interface EncodeOptions {
   charLimit?: number
   metadataVersion?: number
   compressed?: string
+  openingIntent?: ShareUrlOpeningIntent
 }
 
 interface ShareTokenMetadataPayloadWire {
@@ -64,9 +71,10 @@ export const serializeSnapshot = (snapshot: ProjectSnapshot): string => {
   return JSON.stringify(snapshot)
 }
 
-export const serializeSharePayload = (snapshot: ProjectSnapshot): string => {
-  return serializeWebShareUrlPayload(createWebShareUrlPayload(snapshot))
-}
+export const serializeSharePayload = (
+  snapshot: ProjectSnapshot,
+  options?: { openingIntent?: ShareUrlOpeningIntent }
+): string => serializeWebShareUrlPayload(createWebShareUrlPayload(snapshot, options))
 
 export const computeChecksum = async (payload: string): Promise<string> => {
   const encoder = new TextEncoder()
@@ -79,11 +87,16 @@ export const encodeSharePayload = async (
   snapshot: ProjectSnapshot,
   options?: EncodeOptions
 ): Promise<SharePayloadEnvelope> => {
-  const formatVersion = options?.formatVersion ?? SHARE_FORMAT_VERSION
+  const formatVersion = options?.formatVersion
+    ?? (
+      options?.openingIntent?.previewFullscreen
+        ? SHARE_FULLSCREEN_INTENT_FORMAT_VERSION
+        : SHARE_FORMAT_VERSION
+    )
   const json = options?.serialized ?? (
     formatVersion === LEGACY_SHARE_FORMAT_VERSION
       ? serializeSnapshot(snapshot)
-      : serializeSharePayload(snapshot)
+      : serializeSharePayload(snapshot, { openingIntent: options?.openingIntent })
   )
   const checksumPayload = options?.checksumSource ?? json
   const checksum = options?.checksum ?? (await computeChecksum(checksumPayload))

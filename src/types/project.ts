@@ -119,6 +119,10 @@ export interface ShareUrlMetadata {
   charLimit?: number
 }
 
+export interface ShareUrlOpeningIntent {
+  previewFullscreen?: true
+}
+
 export interface CompressionExperimentResult {
   strategyId: CompressionStrategyId
   estimatedChars: number
