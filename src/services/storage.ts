@@ -53,10 +53,12 @@ export interface WebArcadeWorkingCopyPreferences {
   multiPageEnabled: boolean
   pagePanelOpen: boolean
   selectedEditTarget: SelectedEditTarget
+  previewFullscreen: boolean
 }
 
 export interface SaveProjectOptions {
   preferences?: WebArcadeWorkingCopyPreferences
+  updateLastModified?: boolean
 }
 
 interface WebArcadeWorkingCopyEnvelope {
@@ -115,6 +117,7 @@ export const DEFAULT_WEB_ARCADE_WORKING_COPY_PREFERENCES: WebArcadeWorkingCopyPr
   multiPageEnabled: false,
   pagePanelOpen: true,
   selectedEditTarget: 'page',
+  previewFullscreen: false,
 }
 
 export const getPortableArtifactWarning = (project: Pick<Project, 'source'>): string | null =>
@@ -149,11 +152,13 @@ export const validateProjectSize = (project: Project): ProjectSizeStatus => {
 }
 
 export const saveProject = (project: Project, options?: SaveProjectOptions): SaveResult => {
-  // Update timestamp
-  const projectToSave = {
-    ...project,
-    lastModified: new Date().toISOString(),
-  }
+  const projectToSave =
+    options?.updateLastModified === false
+      ? project
+      : {
+          ...project,
+          lastModified: new Date().toISOString(),
+        }
 
   // Validate schema
   try {
@@ -679,12 +684,22 @@ const validateWorkingCopyPreferences = (preferences: unknown): WebArcadeWorkingC
     throw new Error('Invalid Web Arcade working copy edit target preference')
   }
 
+  const previewFullscreen =
+    'previewFullscreen' in preferences
+      ? preferences.previewFullscreen
+      : DEFAULT_WEB_ARCADE_WORKING_COPY_PREFERENCES.previewFullscreen
+
+  if (typeof previewFullscreen !== 'boolean') {
+    throw new Error('Invalid Web Arcade working copy preview fullscreen preference')
+  }
+
   return {
     theme: preferences.theme,
     panelOrder: preferences.panelOrder,
     multiPageEnabled,
     pagePanelOpen,
     selectedEditTarget,
+    previewFullscreen,
   }
 }
 

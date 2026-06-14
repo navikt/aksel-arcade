@@ -34,7 +34,8 @@ function App({ shellCapabilities = WEB_ARCADE_CAPABILITIES }: AppProps) {
     dismissShareHydration,
   } = context
 
-  const { theme, panelOrder, multiPageEnabled, pagePanelOpen, selectedEditTarget } = useSettings()
+  const { theme, panelOrder, multiPageEnabled, pagePanelOpen, selectedEditTarget, previewFullscreen } =
+    useSettings()
 
   // T097: Auto-save integration
   const { saveStatus, saveError } = useAutoSave(project, {
@@ -43,6 +44,7 @@ function App({ shellCapabilities = WEB_ARCADE_CAPABILITIES }: AppProps) {
     multiPageEnabled,
     pagePanelOpen,
     selectedEditTarget,
+    previewFullscreen,
   })
 
   // T094, T095, T096: Project size monitoring

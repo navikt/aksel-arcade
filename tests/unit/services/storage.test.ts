@@ -223,6 +223,29 @@ describe('Storage Service', () => {
       )
     })
 
+    it('preserves lastModified when saving workspace-only preference changes', () => {
+      const project = createTestProject({
+        createdAt: '2025-01-01T00:00:00.000Z',
+        lastModified: '2025-01-02T00:00:00.000Z',
+      })
+
+      const result = saveProject(project, {
+        updateLastModified: false,
+        preferences: {
+          ...DEFAULT_WEB_ARCADE_WORKING_COPY_PREFERENCES,
+          previewFullscreen: true,
+        },
+      })
+
+      expect(result.success).toBe(true)
+
+      const stored = sessionStorage.getItem(WEB_ARCADE_WORKING_COPY_STORAGE_KEY)
+      const parsed = JSON.parse(stored!)
+
+      expect(parsed.project.lastModified).toBe('2025-01-02T00:00:00.000Z')
+      expect(parsed.preferences.previewFullscreen).toBe(true)
+    })
+
     it('should save Web Arcade working copy preferences with the project', () => {
       const project = createTestProject({
         name: 'Preference Project',
@@ -234,6 +257,7 @@ describe('Storage Service', () => {
         theme: 'light',
         panelOrder: 'preview-left',
         multiPageEnabled: true,
+        previewFullscreen: true,
       }
 
       const result = saveProject(project, { preferences })
@@ -366,6 +390,7 @@ describe('Storage Service', () => {
         theme: 'light',
         panelOrder: 'preview-left',
         multiPageEnabled: true,
+        previewFullscreen: true,
       }
 
       saveProject(project, { preferences })
@@ -380,7 +405,7 @@ describe('Storage Service', () => {
       expect(result.preferences).toEqual(preferences)
     })
 
-    it('defaults new page panel preferences when restoring older working copies', () => {
+    it('defaults newer workspace preferences when restoring older working copies', () => {
       const project = createTestProject({ name: 'Older stored preferences' })
       saveProject(project, {
         preferences: {
@@ -395,6 +420,7 @@ describe('Storage Service', () => {
       const parsed = JSON.parse(stored!)
       delete parsed.preferences.pagePanelOpen
       delete parsed.preferences.selectedEditTarget
+      delete parsed.preferences.previewFullscreen
       sessionStorage.setItem(WEB_ARCADE_WORKING_COPY_STORAGE_KEY, JSON.stringify(parsed))
 
       const result = loadProject()
@@ -405,6 +431,7 @@ describe('Storage Service', () => {
         multiPageEnabled: true,
         pagePanelOpen: DEFAULT_WEB_ARCADE_WORKING_COPY_PREFERENCES.pagePanelOpen,
         selectedEditTarget: DEFAULT_WEB_ARCADE_WORKING_COPY_PREFERENCES.selectedEditTarget,
+        previewFullscreen: DEFAULT_WEB_ARCADE_WORKING_COPY_PREFERENCES.previewFullscreen,
       })
     })
 
@@ -422,6 +449,7 @@ describe('Storage Service', () => {
         theme: 'light',
         panelOrder: 'preview-left',
         multiPageEnabled: true,
+        previewFullscreen: true,
       }
       saveProject(initialProject, { preferences: initialPreferences })
 
@@ -457,6 +485,7 @@ describe('Storage Service', () => {
             theme: 'dark',
             panelOrder: 'code-left',
             multiPageEnabled: false,
+            previewFullscreen: false,
           },
         }
       )
@@ -506,6 +535,7 @@ describe('Storage Service', () => {
         multiPageEnabled: false,
         pagePanelOpen: DEFAULT_WEB_ARCADE_WORKING_COPY_PREFERENCES.pagePanelOpen,
         selectedEditTarget: DEFAULT_WEB_ARCADE_WORKING_COPY_PREFERENCES.selectedEditTarget,
+        previewFullscreen: false,
       })
     })
   })
@@ -660,6 +690,7 @@ describe('Storage Service', () => {
       expect(serialized).not.toContain('evidence-secret')
       expect(serialized).not.toContain('transport-secret')
       expect(serialized).not.toContain('multiPageEnabled')
+      expect(serialized).not.toContain('previewFullscreen')
       expect(collectObjectKeys(packageData).join(' ')).not.toMatch(
         /agent|session|credential|endpoint|permission|checkpoint|diagnostic|evidence|transport|meta|exportedAt|createdAt|lastModified|id|panelLayout/i
       )

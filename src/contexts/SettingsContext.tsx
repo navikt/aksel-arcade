@@ -9,15 +9,18 @@ interface SettingsContextValue {
   multiPageEnabled: boolean
   pagePanelOpen: boolean
   selectedEditTarget: SelectedEditTarget
+  previewFullscreen: boolean
   toggleTheme: () => void
   togglePanelOrder: () => void
   toggleMultiPageEnabled: () => void
   togglePagePanel: () => void
+  togglePreviewFullscreen: () => void
   setTheme: (nextTheme: ThemeMode) => void
   setPanelOrder: (nextPanelOrder: PanelOrder) => void
   setMultiPageEnabled: (enabled: boolean) => void
   setPagePanelOpen: (open: boolean) => void
   setSelectedEditTarget: (target: SelectedEditTarget) => void
+  setPreviewFullscreen: (previewFullscreen: boolean) => void
 }
 
 const SettingsContext = createContext<SettingsContextValue | null>(null)
@@ -32,6 +35,7 @@ export const SettingsProvider = ({ children }: SettingsProviderProps) => {
   const [multiPageEnabled, setMultiPageEnabledState] = useState(false)
   const [pagePanelOpen, setPagePanelOpenState] = useState(true)
   const [selectedEditTarget, setSelectedEditTargetState] = useState<SelectedEditTarget>('page')
+  const [previewFullscreen, setPreviewFullscreenState] = useState(false)
 
   const toggleTheme = () => {
     setThemeState((prev) => (prev === 'dark' ? 'light' : 'dark'))
@@ -47,6 +51,10 @@ export const SettingsProvider = ({ children }: SettingsProviderProps) => {
 
   const togglePagePanel = () => {
     setPagePanelOpenState((prev) => !prev)
+  }
+
+  const togglePreviewFullscreen = () => {
+    setPreviewFullscreenState((prev) => !prev)
   }
 
   const setTheme = (nextTheme: ThemeMode) => {
@@ -69,6 +77,10 @@ export const SettingsProvider = ({ children }: SettingsProviderProps) => {
     setSelectedEditTargetState(target)
   }
 
+  const setPreviewFullscreen = (nextPreviewFullscreen: boolean) => {
+    setPreviewFullscreenState(nextPreviewFullscreen)
+  }
+
   return (
     <SettingsContext.Provider
       value={{
@@ -77,15 +89,18 @@ export const SettingsProvider = ({ children }: SettingsProviderProps) => {
         multiPageEnabled,
         pagePanelOpen,
         selectedEditTarget,
+        previewFullscreen,
         toggleTheme,
         togglePanelOrder,
         toggleMultiPageEnabled,
         togglePagePanel,
+        togglePreviewFullscreen,
         setTheme,
         setPanelOrder: setPanelOrderValue,
         setMultiPageEnabled,
         setPagePanelOpen,
         setSelectedEditTarget,
+        setPreviewFullscreen,
       }}
     >
       {children}

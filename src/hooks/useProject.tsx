@@ -158,6 +158,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     setMultiPageEnabled,
     setPagePanelOpen,
     setSelectedEditTarget,
+    setPreviewFullscreen,
   } = useSettings()
   const restoredPreferencesRef = useRef(false)
   const [shareHydration, setShareHydration] = useState<ShareHydrationState>(() => {
@@ -178,8 +179,16 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       setMultiPageEnabled(preferences.multiPageEnabled)
       setPagePanelOpen(preferences.pagePanelOpen)
       setSelectedEditTarget(preferences.selectedEditTarget)
+      setPreviewFullscreen(preferences.previewFullscreen)
     }
-  }, [setMultiPageEnabled, setPagePanelOpen, setPanelOrder, setSelectedEditTarget, setTheme])
+  }, [
+    setMultiPageEnabled,
+    setPagePanelOpen,
+    setPanelOrder,
+    setPreviewFullscreen,
+    setSelectedEditTarget,
+    setTheme,
+  ])
 
   const effectiveEditTarget = resolveSelectedEditTarget(multiPageEnabled, selectedEditTarget)
 
@@ -317,6 +326,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     setMultiPageEnabled(preferences.multiPageEnabled)
     setPagePanelOpen(preferences.pagePanelOpen)
     setSelectedEditTarget(preferences.selectedEditTarget)
+    setPreviewFullscreen(preferences.previewFullscreen)
   }
 
   const replaceProject = (newProject: Project) => {
