@@ -25,7 +25,9 @@
 }
 
 .preview-pane__header-controls-left {
+  display: flex;
   flex: 0 0 auto;
+  align-items: center;
 }
 
 .preview-pane__header-controls-right {

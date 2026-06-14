@@ -1,6 +1,7 @@
 import { expect, test, type Page } from '@playwright/test'
 
 interface Rect {
+  height: number
   left: number
   right: number
   width: number
@@ -8,6 +9,7 @@ interface Rect {
 
 interface HeaderLayoutMetrics {
   header: Rect
+  leftControls: Rect
   rightControls: Rect
   toggleGroup: Rect
 }
@@ -22,6 +24,7 @@ const measurePreviewHeader = async (page: Page): Promise<HeaderLayoutMetrics> =>
 
       const rect = element.getBoundingClientRect()
       return {
+        height: rect.height,
         left: rect.left,
         right: rect.right,
         width: rect.width,
@@ -30,10 +33,15 @@ const measurePreviewHeader = async (page: Page): Promise<HeaderLayoutMetrics> =>
 
     return {
       header: readRect('[data-testid="preview-header"]'),
+      leftControls: readRect('.preview-pane__header-controls-left'),
       rightControls: readRect('[data-testid="preview-header-controls-right"]'),
       toggleGroup: readRect('.preview-pane__viewport-toggle .aksel-toggle-group__wrapper'),
     }
   })
+}
+
+const expectCompactLeftPreviewControl = (metrics: HeaderLayoutMetrics) => {
+  expect(metrics.leftControls.height).toBe(32)
 }
 
 const expectRightAlignedPreviewControls = (metrics: HeaderLayoutMetrics) => {
@@ -49,11 +57,15 @@ test.describe('Preview header layout', () => {
     await page.goto('/aksel-arcade/')
     await page.waitForLoadState('networkidle')
 
-    expectRightAlignedPreviewControls(await measurePreviewHeader(page))
+    const initialMetrics = await measurePreviewHeader(page)
+    expectCompactLeftPreviewControl(initialMetrics)
+    expectRightAlignedPreviewControls(initialMetrics)
 
     await page.getByRole('button', { name: 'Enter preview fullscreen' }).click()
     await expect(page.getByRole('button', { name: 'Exit preview fullscreen' })).toBeVisible()
 
-    expectRightAlignedPreviewControls(await measurePreviewHeader(page))
+    const fullscreenMetrics = await measurePreviewHeader(page)
+    expectCompactLeftPreviewControl(fullscreenMetrics)
+    expectRightAlignedPreviewControls(fullscreenMetrics)
   })
 })
