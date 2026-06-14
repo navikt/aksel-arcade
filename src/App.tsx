@@ -77,39 +77,53 @@ function App({ shellCapabilities = WEB_ARCADE_CAPABILITIES }: AppProps) {
     replaceProject(importedProject)
   }
 
+  const hasNotifications =
+    (shareHydration.status === 'ready' && !!shareHydration.snapshot) ||
+    shareHydration.status === 'error' ||
+    !!sizeWarning ||
+    !!saveError
+
+  const notificationsClassName = previewFullscreen
+    ? 'app-shell__notifications app-shell__notifications--inline'
+    : 'app-shell__notifications'
+
   return (
     <ThemeProvider>
       <Page.Block
         gutters={false}
         className={previewFullscreen ? 'app-shell app-shell--preview-fullscreen' : 'app-shell'}
       >
-        {shareHydration.status === 'ready' && shareHydration.snapshot && (
-          <WarningNotification
-            variant="warning"
-            message="Load Web share URL?"
-            description="Loading this Web share URL will replace only this Web Arcade working copy."
-            actions={[
-              { label: 'Load Web share URL', variant: 'primary', onClick: applySharedSnapshot },
-              { label: 'Keep my work', variant: 'secondary', onClick: dismissShareHydration },
-            ]}
-            onClose={dismissShareHydration}
-          />
-        )}
+        {hasNotifications && (
+          <div className={notificationsClassName}>
+            {shareHydration.status === 'ready' && shareHydration.snapshot && (
+              <WarningNotification
+                variant="warning"
+                message="Load Web share URL?"
+                description="Loading this Web share URL will replace only this Web Arcade working copy."
+                actions={[
+                  { label: 'Load Web share URL', variant: 'primary', onClick: applySharedSnapshot },
+                  { label: 'Keep my work', variant: 'secondary', onClick: dismissShareHydration },
+                ]}
+                onClose={dismissShareHydration}
+              />
+            )}
 
-        {shareHydration.status === 'error' && (
-          <WarningNotification
-            variant="error"
-            message="Web share URL could not be opened"
-            description={shareHydration.error?.message}
-            onClose={dismissShareHydration}
-          />
-        )}
+            {shareHydration.status === 'error' && (
+              <WarningNotification
+                variant="error"
+                message="Web share URL could not be opened"
+                description={shareHydration.error?.message}
+                onClose={dismissShareHydration}
+              />
+            )}
 
-        {sizeWarning && (
-          <WarningNotification message={sizeWarning} onClose={() => setSizeWarning(null)} />
-        )}
+            {sizeWarning && (
+              <WarningNotification message={sizeWarning} onClose={() => setSizeWarning(null)} />
+            )}
 
-        {saveError && <WarningNotification message={`Save error: ${saveError}`} />}
+            {saveError && <WarningNotification message={`Save error: ${saveError}`} />}
+          </div>
+        )}
 
         <div className="app-shell__chrome" hidden={previewFullscreen} aria-hidden={previewFullscreen}>
           <AppHeader

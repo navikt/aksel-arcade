@@ -7,6 +7,30 @@
   background: var(--ax-bg-default);
 }
 
+.app-shell__notifications {
+  position: fixed;
+  top: var(--ax-space-16);
+  left: 50%;
+  z-index: 10000;
+  display: flex;
+  flex-direction: column;
+  gap: var(--ax-space-8);
+  width: calc(100% - (2 * var(--ax-space-16)));
+  max-width: 37.5rem;
+  box-sizing: border-box;
+  transform: translateX(-50%);
+}
+
+.app-shell__notifications--inline {
+  position: relative;
+  top: auto;
+  left: auto;
+  z-index: auto;
+  align-self: center;
+  margin-top: var(--ax-space-16);
+  transform: none;
+}
+
 .app-shell__workspace {
   flex: 1;
   min-height: 0;

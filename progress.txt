@@ -2694,6 +2694,29 @@ Next note:
 
 - `#238` can now consume `shareHydration.openingIntent` to apply fullscreen only after “Load Web share URL”, while `#239` can reuse the same `useShareLink({ openingIntent: { previewFullscreen: true } })` path for the fullscreen header share button. Keep normal-header sharing on the omission path; absence of the field now intentionally means “preserve the recipient tab’s current fullscreen state.”
 
+### 2026-06-14 - Issue #238: Apply Preview fullscreen intent during Web share hydration
+
+Implemented:
+
+- Picked `#238` as the highest-priority unblocked `ready-for-agent` issue from `#238`-`#240` after checking issue `#233`, `CONTEXT.md`, and the latest `progress.txt` notes. It completes the recipient-side fullscreen share-opening contract already added in `#236`, and it needs to land before `#239` exposes fullscreen share links in the UI.
+- Kept share hydration consent-based: fullscreen-intent Web share URLs still leave the recipient tab’s current `previewFullscreen` state untouched until the user clicks **Load Web share URL**, while dismissing the share leaves the current layout state unchanged.
+- Moved App-level warning positioning into a shared `app-shell__notifications` container so fullscreen share confirmations, decode errors, save errors, and size warnings all switch from fixed overlay mode to inline flow mode while **Preview fullscreen** is active. That keeps the sticky fullscreen preview header visible and pushes the preview surface down instead of covering controls.
+- Added regression coverage in `tests/integration/share-decode.test.tsx` for the fullscreen-intent accept path (stays out of fullscreen before consent, enters fullscreen after accept, and persists fullscreen for reloads) plus the dismiss path while already fullscreen.
+- Added regression coverage in `tests/integration/app-share-load-ui.test.tsx` for the App-level fullscreen notification layout: a fullscreen-intent share confirmation does not force fullscreen on by itself, and once the recipient tab is fullscreen the confirmation moves into the inline fullscreen flow container.
+
+Verification:
+
+- Ran `npm install` in this worktree before verification because local dependencies were missing initially.
+- `npm run typecheck`
+- `npm run lint` (passes with the existing `.eslintignore` deprecation notice and the existing `InspectionPopover` hook-dependency warning only)
+- `npm run test -- --run`
+- `npm run build`
+- Browser check at `http://127.0.0.1:5191/aksel-arcade/` against this worktree’s own Vite server (shared-machine ports `5173`-`5190` were already occupied): confirmed a fullscreen-intent share URL keeps the recipient tab fullscreen confirmation inline above the sticky header, **Keep my work** preserves fullscreen, a normal share URL accepted while already fullscreen does not exit fullscreen, a fullscreen-intent share accepted while already fullscreen stays fullscreen, and reload keeps the accepted fullscreen share open in fullscreen. No browser console errors or warnings appeared during the verified flow; DevTools still showed the pre-existing form-field accessibility issue.
+
+Next note:
+
+- `#239` can reuse the new `app-shell__notifications` wrapper without adding fullscreen-specific popover positioning logic. Keep the fullscreen header share button lifecycle tied to the existing `previewFullscreen` enter/exit path so popovers reset cleanly when the layout mode changes.
+
 ### 2026-06-14 - Issue #237: Add fullscreen preview-header exit and responsive chrome behavior
 
 Implemented:
