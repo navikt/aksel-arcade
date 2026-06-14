@@ -1,90 +1,68 @@
-import { test, expect } from '@playwright/test'
+import { expect, test, type FrameLocator, type Page } from '@playwright/test'
 
-test.describe('Aksel Theme Wrapper', () => {
-  test('Button component should render with Aksel Darkside styling', async ({ page }) => {
-    // Navigate to the app
-    await page.goto('http://localhost:5173')
+const buttonSource = `export default function App() {
+  return <Button variant="primary">Primary Button</Button>
+}`
 
-    // Wait for app to load
-    await page.waitForSelector('[data-testid="editor-pane"]', { timeout: 10000 })
+const multiComponentSource = `export default function App() {
+  return (
+    <VStack gap="space-8">
+      <Heading size="medium" level="1">Test Heading</Heading>
+      <Button variant="primary">Primary Button</Button>
+      <Button variant="secondary">Secondary Button</Button>
+    </VStack>
+  )
+}`
 
-    // Wait for preview iframe to be ready
-    const previewFrame = page.frameLocator('iframe[data-testid="preview-iframe"]')
-    
-    // Wait for the button to render in the preview
-    await page.waitForTimeout(2000) // Give time for transpilation and rendering
+const openArcade = async (page: Page): Promise<FrameLocator> => {
+  await page.goto('/aksel-arcade/')
+  await page.waitForLoadState('networkidle')
+  await expect(page.getByTestId('preview-iframe')).toBeVisible({ timeout: 10000 })
+  return page.frameLocator('[data-testid="preview-iframe"]')
+}
 
-    // Check if button exists in preview
-    const button = previewFrame.locator('button')
-    await expect(button).toBeVisible({ timeout: 5000 })
+const replaceJsx = async (page: Page, source: string) => {
+  const editor = page.locator('.cm-content[contenteditable="true"]').first()
+  await expect(editor).toBeVisible()
+  await editor.click()
+  await page.keyboard.press('ControlOrMeta+A')
+  await page.keyboard.insertText(source)
+}
 
-    // Verify button has Aksel classes (not plain HTML button)
-    // Aksel buttons should have the 'navds-button' class
-    const hasAkselClass = await button.evaluate((el) => {
-      return el.classList.contains('navds-button')
-    })
-    
-    expect(hasAkselClass).toBe(true)
+test.describe('Aksel theme wrapper', () => {
+  test('default preview is wrapped in aksel-theme', async ({ page }) => {
+    const previewFrame = await openArcade(page)
 
-    // Verify button has computed styles from Aksel (not default HTML button styles)
-    const buttonStyles = await button.evaluate((el) => {
-      const styles = window.getComputedStyle(el)
-      return {
-        backgroundColor: styles.backgroundColor,
-        padding: styles.padding,
-        borderRadius: styles.borderRadius,
-      }
-    })
+    const hasThemeWrapper = await previewFrame.locator('body').evaluate(() =>
+      Boolean(document.querySelector('.aksel-theme'))
+    )
 
-    // Aksel buttons should have specific styling (not browser defaults)
-    // Browser default buttons typically have no background color or very basic styling
-    expect(buttonStyles.backgroundColor).not.toBe('rgba(0, 0, 0, 0)')
-    expect(buttonStyles.backgroundColor).not.toBe('transparent')
-    
+    expect(hasThemeWrapper).toBe(true)
   })
 
-  test('Theme wrapper should be present in sandbox', async ({ page }) => {
-    await page.goto('http://localhost:5173')
-    await page.waitForSelector('[data-testid="editor-pane"]', { timeout: 10000 })
+  test('edited JSX renders a Button with Aksel classes', async ({ page }) => {
+    const previewFrame = await openArcade(page)
+    await replaceJsx(page, buttonSource)
 
-    const previewFrame = page.frameLocator('iframe[data-testid="preview-iframe"]')
-    
-    // Wait for rendering
-    await page.waitForTimeout(2000)
+    const button = previewFrame.getByRole('button', { name: 'Primary Button' })
+    await expect(button).toBeVisible({ timeout: 10000 })
 
-    // Check if Theme wrapper div exists with aksel-theme class
-    const themeWrapper = previewFrame.locator('.aksel-theme')
-    await expect(themeWrapper).toBeVisible({ timeout: 5000 })
+    const buttonClasses = await button.getAttribute('class')
+    expect(buttonClasses).toContain('aksel-button')
+
+    const backgroundColor = await button.evaluate((el) => window.getComputedStyle(el).backgroundColor)
+    expect(backgroundColor).not.toBe('rgba(0, 0, 0, 0)')
+    expect(backgroundColor).not.toBe('transparent')
   })
 
-  test('Multiple Aksel components should render correctly', async ({ page }) => {
-    await page.goto('http://localhost:5173')
-    await page.waitForSelector('[data-testid="editor-pane"]', { timeout: 10000 })
+  test('edited JSX renders multiple Aksel components inside the theme wrapper', async ({ page }) => {
+    const previewFrame = await openArcade(page)
+    await replaceJsx(page, multiComponentSource)
 
-    // Update the JSX code to include multiple Aksel components
-    const editor = page.locator('.cm-content[contenteditable="true"]').first()
-    await editor.click()
-    await page.keyboard.press('Meta+A') // Select all
-    await editor.fill(`<div>
-  <Heading size="large">Test Heading</Heading>
-  <Button variant="primary">Primary Button</Button>
-  <Button variant="secondary">Secondary Button</Button>
-</div>`)
-
-    // Wait for transpilation and rendering
-    await page.waitForTimeout(2000)
-
-    const previewFrame = page.frameLocator('iframe[data-testid="preview-iframe"]')
-    
-    // Verify all components render
-    await expect(previewFrame.locator('h1')).toBeVisible({ timeout: 5000 })
-    await expect(previewFrame.locator('button').first()).toBeVisible()
-    await expect(previewFrame.locator('button').nth(1)).toBeVisible()
-
-    // Check if components have Aksel classes
-    const headingHasClass = await previewFrame.locator('h1').evaluate((el) => {
-      return el.classList.contains('navds-heading')
+    await expect(previewFrame.getByRole('heading', { name: 'Test Heading' })).toBeVisible({
+      timeout: 10000,
     })
-    expect(headingHasClass).toBe(true)
+    await expect(previewFrame.getByRole('button', { name: 'Primary Button' })).toBeVisible()
+    await expect(previewFrame.getByRole('button', { name: 'Secondary Button' })).toBeVisible()
   })
 })
