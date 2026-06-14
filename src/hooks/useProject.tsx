@@ -154,6 +154,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   const {
     multiPageEnabled,
+    pagePanelOpen,
     previewFullscreen,
     selectedEditTarget,
     setTheme,
@@ -447,6 +448,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       replaceCurrentWorkingCopy(nextProject, {
         ...DEFAULT_WEB_ARCADE_WORKING_COPY_PREFERENCES,
         theme: snapshot.preview.theme,
+        multiPageEnabled,
+        pagePanelOpen,
         previewFullscreen: nextPreviewFullscreen,
       })
     } catch (error) {

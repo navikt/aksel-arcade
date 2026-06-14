@@ -1,6 +1,6 @@
 import type { ComponentProps } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
+import { act, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { AppProvider } from '@/hooks/useProject'
 import { PreviewPane } from '@/components/Preview/PreviewPane'
@@ -46,6 +46,33 @@ describe('Preview fullscreen entry control', () => {
 
   afterEach(() => {
     vi.restoreAllMocks()
+  })
+
+  it('starts transpiling immediately on initial mount when the editor is not focused', async () => {
+    vi.useFakeTimers()
+    vi.spyOn(transpiler, 'transpileCode').mockResolvedValue({
+      success: true,
+      code: 'export default function App() { return null }',
+      error: null,
+    })
+
+    try {
+      render(
+        <SettingsProvider>
+          <AppProvider>
+            <PreviewPane />
+          </AppProvider>
+        </SettingsProvider>
+      )
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1)
+      })
+
+      expect(transpiler.transpileCode).toHaveBeenCalledTimes(1)
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('toggles preview fullscreen from the preview header without remounting the preview iframe', async () => {

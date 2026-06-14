@@ -49,6 +49,7 @@ export const PreviewPane = () => {
   const debounceTimerRef = useRef<number | undefined>(undefined)
   const pendingCompileErrorRef = useRef<CompileError | null>(null)
   const isCodeEditorFocusedRef = useRef(editorState.isCodeEditorFocused)
+  const lastTranspileProjectIdRef = useRef<string | null>(null)
   const fullscreenToggleRef = useRef<HTMLButtonElement | null>(null)
   const shouldRestoreFullscreenToggleFocusRef = useRef(false)
 
@@ -108,23 +109,12 @@ export const PreviewPane = () => {
   // Transpile code when JSX or hooks code changes (debounced to avoid errors while typing)
   useEffect(() => {
     let isCancelled = false
+    const shouldDebounceTranspilation =
+      lastTranspileProjectIdRef.current === project.id && isCodeEditorFocusedRef.current
 
-    // Clear previous timer
-    if (debounceTimerRef.current !== undefined) {
-      clearTimeout(debounceTimerRef.current)
-    }
+    lastTranspileProjectIdRef.current = project.id
 
-    pendingCompileErrorRef.current = null
-    setCompileError(null)
-    setRuntimeError(null)
-    updatePreviewState({
-      status: 'transpiling',
-      compileError: null,
-      runtimeError: null,
-    })
-
-    // Debounce transpilation by 500ms to avoid showing errors while typing
-    debounceTimerRef.current = window.setTimeout(() => {
+    const runTranspilation = () => {
       const transpilePromise = multiPagePreviewSource
         ? transpileProjectSource(multiPagePreviewSource, { previewSessionKey: project.id })
         : transpileCode(singlePagePreviewJsx ?? '', singlePagePreviewHooks ?? '')
@@ -137,12 +127,10 @@ export const PreviewPane = () => {
             pendingCompileErrorRef.current = null
             setTranspiledCode(result.code)
             setCompileError(null)
-            setRuntimeError(null)
             updatePreviewState({
               status: 'rendering',
               transpiledCode: result.code,
               compileError: null,
-              runtimeError: null,
             })
           } else if (result.error) {
             queueCompileError(result.error)
@@ -160,7 +148,27 @@ export const PreviewPane = () => {
           }
           queueCompileError(error)
         })
-    }, 500)
+    }
+
+    // Clear previous timer
+    if (debounceTimerRef.current !== undefined) {
+      clearTimeout(debounceTimerRef.current)
+    }
+
+    pendingCompileErrorRef.current = null
+    setCompileError(null)
+    setRuntimeError(null)
+    updatePreviewState({
+      status: 'transpiling',
+      compileError: null,
+      runtimeError: null,
+    })
+
+    if (shouldDebounceTranspilation) {
+      debounceTimerRef.current = window.setTimeout(runTranspilation, 500)
+    } else {
+      runTranspilation()
+    }
 
     return () => {
       isCancelled = true
