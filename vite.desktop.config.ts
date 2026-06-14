@@ -1,8 +1,8 @@
 import { defineConfig, mergeConfig } from 'vite'
-import viteConfig from './vite.config'
+import { baseViteConfig } from './vite.config'
 
 export default mergeConfig(
-  viteConfig,
+  baseViteConfig,
   defineConfig({
     base: './',
     build: {

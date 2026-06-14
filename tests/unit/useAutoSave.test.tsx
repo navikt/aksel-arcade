@@ -2,6 +2,7 @@ import { act, fireEvent, render, screen } from '@testing-library/react'
 import { useState } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createDefaultProject } from '@/utils/projectDefaults'
+import type { WebArcadeWorkingCopyPreferences } from '@/services/storage'
 
 const { saveProjectMock } = vi.hoisted(() => ({
   saveProjectMock: vi.fn(),
@@ -35,12 +36,12 @@ const Harness = () => {
 
 const DynamicHarness = () => {
   const [projectState, setProjectState] = useState(() => createDefaultProject())
-  const [preferences, setPreferences] = useState({
-    theme: 'dark' as const,
-    panelOrder: 'code-left' as const,
+  const [preferences, setPreferences] = useState<WebArcadeWorkingCopyPreferences>({
+    theme: 'dark',
+    panelOrder: 'code-left',
     multiPageEnabled: false,
     pagePanelOpen: true,
-    selectedEditTarget: 'page' as const,
+    selectedEditTarget: 'page',
     previewFullscreen: false,
   })
 
