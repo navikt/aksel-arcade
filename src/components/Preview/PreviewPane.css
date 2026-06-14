@@ -18,6 +18,7 @@
 
 .preview-pane__header-controls {
   display: flex;
+  width: 100%;
   flex-wrap: wrap;
   align-items: center;
   gap: var(--ax-space-12);
@@ -29,22 +30,25 @@
 
 .preview-pane__header-controls-right {
   display: flex;
-  flex: 1 1 22rem;
+  flex: 0 0 auto;
   flex-wrap: wrap;
   align-items: center;
   justify-content: flex-end;
   gap: var(--ax-space-12);
   min-width: 0;
+  max-width: 100%;
   margin-inline-start: auto;
 }
 
 .preview-pane__viewport-toggle {
-  flex: 1 1 18rem;
+  flex: 0 0 auto;
   min-width: 0;
   max-width: 100%;
 }
 
+.preview-pane__viewport-toggle .aksel-toggle-group__wrapper,
 .preview-pane__viewport-toggle .navds-toggle-group {
+  width: auto;
   max-width: 100%;
 }
 

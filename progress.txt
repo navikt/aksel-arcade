@@ -2734,6 +2734,29 @@ Next note:
 
 - `#239` can keep relying on pane-level fullscreen Escape handling for any fullscreen-only share popover chrome it adds later, rather than rebinding Escape separately on each fullscreen control surface.
 
+### 2026-06-14 - Post-merge fullscreen header alignment follow-up
+
+Implemented:
+
+- Fixed the post-merge preview-header layout regression that affected both **Web Arcade** and **Desktop Arcade**: the right-side Inspect + breakpoint controls were no longer hugging the right edge, and the breakpoint ToggleGroup stretched across the available header width in both normal and fullscreen states.
+- Root cause was the merged flex contract in `PreviewPane.css` plus the fullscreen-only `fill` prop passed into `ViewportToggle`. The right control group and viewport wrapper were both allowed to grow, so the ToggleGroup expanded to consume most of the header and dragged the whole control cluster left.
+- Restored the intended layout by making the outer header-controls row explicitly span the full header width, keeping the right-side wrapper hug-content with `margin-inline-start: auto`, and removing the fullscreen `fill` behavior from `ViewportToggle` so the ToggleGroup keeps its intrinsic width in both modes.
+- Added a focused Playwright regression in `tests/e2e/preview-header-layout.spec.ts` that checks the header geometry in normal and fullscreen modes: the right-side control group must stay flush to the right edge and both the group and ToggleGroup must remain well under the full header width instead of stretching.
+
+Verification:
+
+- `npm run typecheck`
+- `npm run lint` (passes with the existing `.eslintignore` deprecation notice and the existing `InspectionPopover` hook-dependency warning only)
+- `CI=1 npm run test -- --run`
+- `npm run build`
+- Focused browser regression against the current worktree server on `http://127.0.0.1:4190/aksel-arcade/` confirmed the fix numerically in both modes:
+  - normal mode: right controls width `337px`, ToggleGroup width `293px`
+  - fullscreen mode: right controls width `337px`, ToggleGroup width `293px`
+
+Next note:
+
+- If later fullscreen-header work adds another control (for example the fullscreen share button in `#239`), preserve the same hug-content layout on the right wrapper; avoid reintroducing `flex: 1` or ToggleGroup `fill` on this header row unless the design explicitly changes.
+
 ### 2026-06-14 - PR #245 review follow-up for issue #236
 
 Implemented:
