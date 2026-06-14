@@ -34,8 +34,14 @@ function App({ shellCapabilities = WEB_ARCADE_CAPABILITIES }: AppProps) {
     dismissShareHydration,
   } = context
 
-  const { theme, panelOrder, multiPageEnabled, pagePanelOpen, selectedEditTarget, previewFullscreen } =
-    useSettings()
+  const {
+    theme,
+    panelOrder,
+    multiPageEnabled,
+    pagePanelOpen,
+    selectedEditTarget,
+    previewFullscreen,
+  } = useSettings()
 
   // T097: Auto-save integration
   const { saveStatus, saveError } = useAutoSave(project, {
@@ -125,7 +131,11 @@ function App({ shellCapabilities = WEB_ARCADE_CAPABILITIES }: AppProps) {
           </div>
         )}
 
-        <div className="app-shell__chrome" hidden={previewFullscreen} aria-hidden={previewFullscreen}>
+        <div
+          className="app-shell__chrome"
+          hidden={previewFullscreen}
+          aria-hidden={previewFullscreen}
+        >
           <AppHeader
             projectName={project.name}
             onProjectNameChange={handleProjectNameChange}
@@ -150,7 +160,7 @@ function App({ shellCapabilities = WEB_ARCADE_CAPABILITIES }: AppProps) {
         >
           <SplitPane
             left={<EditorPane />}
-            right={<PreviewPane />}
+            right={<PreviewPane shellCapabilities={shellCapabilities} />}
             defaultLeftWidth={50}
             minLeftWidth={20}
             minRightWidth={20}

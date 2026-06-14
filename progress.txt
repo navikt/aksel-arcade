@@ -2815,3 +2815,42 @@ Verification:
 - npm test -- --run
 - npm run build
 - Browser checks at `http://127.0.0.1:5193/aksel-arcade/` for fast dark-mode reload preview recovery and for keeping the `Show pages` button after accepting a Web share URL into a tab with multi-page enabled
+
+### 2026-06-14 - Issue #239: Reuse Web share popover from the fullscreen preview header
+
+Implemented:
+
+- Picked `#239` as the single highest-priority `ready-for-agent` feature from `#239`-`#240` after checking the parent PRD `#233`, `CONTEXT.md`, the Figma fullscreen nodes (`125:568` / `125:955`), and the latest `progress.txt` notes. `#240` depends on `#239`, so the fullscreen-header share slice was the next unblocked priority.
+- Extracted the normal header Web share button/popover behavior into `src/components/Share/SharePopoverButton.tsx` so the normal header and the fullscreen preview header now share the same generation, retry, warning, copy-fallback, oversize, and export-fallback flow instead of drifting in two implementations.
+- Wired `PreviewPane` to show a fullscreen-only icon button labelled **Share fullscreen preview** as the last control in the fullscreen preview-header right cluster, matching the Figma order of Inspect → viewport toggle → share and keeping the share button far right / last in tab order when the header wraps.
+- Added the fullscreen-only popover note `opens in fullscreen` and passed `openingIntent: { previewFullscreen: true }` only from the fullscreen share path, while normal header sharing still omits fullscreen opening intent.
+- Added fullscreen-transition lifecycle cleanup: entering fullscreen closes and resets the normal header share popover, exiting fullscreen closes and resets the fullscreen share popover, and `useShareLink` now invalidates in-flight generations so hidden share flows do not complete into stale UI state.
+- Kept capability boundaries and experimental multi-page behavior intact by omitting the fullscreen share button when Web share URLs are unavailable and reusing the existing Start-page-only warning/path for fullscreen sharing.
+- Added focused regression coverage in `tests/integration/fullscreen-share-popover.test.tsx` for fullscreen visibility, control order, fullscreen intent, capability gating, multi-page warning behavior, and popover reset across fullscreen enter/exit.
+
+Verification:
+
+- `npm run typecheck`
+- `npm run lint` (passes with the existing `InspectionPopover` hook dependency warning and ESLint `.eslintignore` deprecation warning)
+- `npm run build`
+- `CI=1 npm run test -- --run`
+- Browser checks at `http://127.0.0.1:4193/aksel-arcade/`: opened the normal header share popover, entered **Preview fullscreen** and confirmed the normal popover closed; confirmed the fullscreen share button was the last/rightmost preview-header control; opened the fullscreen share popover and confirmed the `opens in fullscreen` note; exited fullscreen with the popover open and confirmed it closed; enabled multi-page authoring, added a second page, shared from fullscreen, and confirmed the existing Start-page-only warning appeared; no browser console errors appeared during the verified flow.
+
+Next note:
+
+- `#240` can now focus on end-to-end capability-boundary validation without reworking share UI plumbing. The reusable share control and `useShareLink` cancellation path are already in place; keep Desktop/non-share-capable verification building on the new `PreviewPane shellCapabilities` wiring instead of adding another fullscreen-specific branch.
+
+### 2026-06-14 - PR #250 review follow-up for issue #239
+
+Implemented:
+
+- PR review found that the new pane-level fullscreen `Escape` handler also caught `Escape` presses from inside the fullscreen share popover, which could kick the user out of **Preview fullscreen** instead of dismissing the popover first.
+- Tagged the reusable share popover content with an explicit data boundary and updated `PreviewPane` to ignore fullscreen-exit `Escape` handling when the key event originates inside that share popover subtree.
+- Added a regression in `tests/integration/fullscreen-share-popover.test.tsx` proving the first `Escape` closes the fullscreen share popover while leaving fullscreen active, and the next `Escape` still exits fullscreen normally.
+
+Verification:
+
+- `npm run typecheck`
+- `npm run build`
+- `CI=1 npm run test -- --run tests/integration/fullscreen-share-popover.test.tsx tests/integration/share-popover.test.tsx tests/integration/preview-fullscreen-entry.test.tsx tests/integration/app-preview-fullscreen.test.tsx`
+- Browser check at `http://127.0.0.1:4194/aksel-arcade/`: opened the fullscreen share popover, pressed `Escape`, confirmed the popover closed while fullscreen stayed active, then focused the fullscreen exit control and confirmed `Escape` still exited fullscreen; no browser console errors appeared during the verified flow.

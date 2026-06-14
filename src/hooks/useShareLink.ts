@@ -95,6 +95,7 @@ export const useShareLink = (options?: UseShareLinkOptions) => {
   const stateRef = useRef(state)
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const pendingGenerationRef = useRef<PendingGeneration | null>(null)
+  const generationIdRef = useRef(0)
   const lastResultRef = useRef<{
     contentSignature: string
     checksum: string
@@ -111,9 +112,10 @@ export const useShareLink = (options?: UseShareLinkOptions) => {
   const { adjustPayloadEstimate, recordResult } = useShareLinkExperiments()
 
   const charLimit = options?.charLimit ?? SHARE_URL_CHAR_LIMIT
-  const slowGenerationThresholdMs = options?.slowGenerationThresholdMs && options.slowGenerationThresholdMs > 0
-    ? options.slowGenerationThresholdMs
-    : SLOW_GENERATION_THRESHOLD_MS
+  const slowGenerationThresholdMs =
+    options?.slowGenerationThresholdMs && options.slowGenerationThresholdMs > 0
+      ? options.slowGenerationThresholdMs
+      : SLOW_GENERATION_THRESHOLD_MS
   const generationDelayMs = options?.generationDelayMs ?? 0
   const previewFullscreenOpeningIntent = options?.openingIntent?.previewFullscreen === true
 
@@ -121,9 +123,20 @@ export const useShareLink = (options?: UseShareLinkOptions) => {
     stateRef.current = state
   }, [state])
 
+  const invalidateShareGeneration = useCallback(() => {
+    generationIdRef.current += 1
+    pendingGenerationRef.current = null
+
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current)
+      intervalRef.current = null
+    }
+  }, [])
+
   const derivedSnapshotBuilder = useCallback(() => {
     return createShareSnapshot(project, {
-      activeFileId: editorState.activeTab === 'Hooks' ? SNAPSHOT_FILE_IDS.hooks : SNAPSHOT_FILE_IDS.jsx,
+      activeFileId:
+        editorState.activeTab === 'Hooks' ? SNAPSHOT_FILE_IDS.hooks : SNAPSHOT_FILE_IDS.jsx,
       preview: {
         viewport: project.viewportSize,
         theme,
@@ -145,7 +158,7 @@ export const useShareLink = (options?: UseShareLinkOptions) => {
     }
 
     intervalRef.current = setInterval(() => {
-      setState(prev => {
+      setState((prev) => {
         if (!prev.startedAt) {
           return prev
         }
@@ -155,7 +168,8 @@ export const useShareLink = (options?: UseShareLinkOptions) => {
         return {
           ...prev,
           elapsedMs: elapsed,
-          showSlowGenerationNotice: prev.showSlowGenerationNotice || elapsed >= slowGenerationThresholdMs,
+          showSlowGenerationNotice:
+            prev.showSlowGenerationNotice || elapsed >= slowGenerationThresholdMs,
         }
       })
     }, 250)
@@ -169,320 +183,356 @@ export const useShareLink = (options?: UseShareLinkOptions) => {
   }, [slowGenerationThresholdMs, state.status])
 
   const resetShareState = useCallback(() => {
-    if (intervalRef.current) {
-      clearInterval(intervalRef.current)
-      intervalRef.current = null
-    }
+    invalidateShareGeneration()
+    lastResultRef.current = null
     setState(IDLE_STATE)
-  }, [])
+  }, [invalidateShareGeneration])
+
+  const cancelShareGeneration = useCallback(() => {
+    invalidateShareGeneration()
+  }, [invalidateShareGeneration])
 
   const snapshotBuilder = options?.snapshotBuilder ?? derivedSnapshotBuilder
 
-  const generateShareLink = useCallback(async (forceRegeneration = false) => {
-    if (pendingGenerationRef.current) {
-      const { startedAt } = pendingGenerationRef.current
-      const elapsed = Date.now() - startedAt
-      const currentStatus = stateRef.current.status === 'warning' ? 'warning' : 'generating'
+  const generateShareLink = useCallback(
+    async (forceRegeneration = false) => {
+      if (pendingGenerationRef.current) {
+        const { startedAt } = pendingGenerationRef.current
+        const elapsed = Date.now() - startedAt
+        const currentStatus = stateRef.current.status === 'warning' ? 'warning' : 'generating'
 
-      setState(prev => ({
-        ...prev,
-        status: currentStatus,
-        startedAt,
-        elapsedMs: elapsed,
-        showSlowGenerationNotice: prev.showSlowGenerationNotice || elapsed >= slowGenerationThresholdMs,
-        error: undefined,
-        clipboardStatus: 'idle',
-        clipboardError: undefined,
-      }))
-      return
-    }
-
-    if (isProgressStatus(stateRef.current.status)) {
-      return
-    }
-
-    if (typeof navigator !== 'undefined' && navigator.onLine === false) {
-      setState({
-        status: 'error',
-        error: {
-          code: 'offline',
-          message: 'Connect to the internet to generate a Web share URL.',
-        },
-        clipboardStatus: 'idle',
-        showSlowGenerationNotice: false,
-        warningThresholdHit: false,
-        strategyId: undefined,
-        estimatedChars: undefined,
-        approxChars: undefined,
-      })
-      return
-    }
-
-    if (!isStorageAvailable(storageHealthRef)) {
-      setState({
-        status: 'error',
-        error: {
-          code: 'storage-unavailable',
-          message: 'Shared links require local storage access, which is currently blocked.',
-        },
-        clipboardStatus: 'idle',
-        showSlowGenerationNotice: false,
-        warningThresholdHit: false,
-        strategyId: undefined,
-        estimatedChars: undefined,
-        approxChars: undefined,
-      })
-      return
-    }
-
-    const startedAt = Date.now()
-    pendingGenerationRef.current = { startedAt }
-
-    const emitGenerationTelemetry = (payload: {
-      outcome: ShareGenerationOutcome
-      approxChars?: number
-      estimatedChars?: number
-      warningThresholdHit?: boolean
-      strategyId?: CompressionStrategyId
-      encodeMs?: number
-      reused?: boolean
-    }) => {
-      recordShareGenerationTelemetry({
-        durationMs: Date.now() - startedAt,
-        approxChars: payload.approxChars,
-        estimatedChars: payload.estimatedChars,
-        warningThresholdHit: payload.warningThresholdHit,
-        strategyId: payload.strategyId,
-        encodeMs: payload.encodeMs,
-        outcome: payload.outcome,
-        reused: payload.reused,
-      })
-    }
-
-    setState(prev => ({
-      ...prev,
-      status: 'generating',
-      error: undefined,
-      startedAt,
-      elapsedMs: 0,
-      showSlowGenerationNotice: false,
-      clipboardStatus: 'idle',
-      clipboardError: undefined,
-      warningThresholdHit: false,
-      approxChars: undefined,
-      estimatedChars: undefined,
-      strategyId: undefined,
-    }))
-
-    try {
-      const snapshot = await Promise.resolve(snapshotBuilder())
-      if (generationDelayMs > 0) {
-        await new Promise(resolve => setTimeout(resolve, generationDelayMs))
-      }
-      const serialized = serializeSharePayload(snapshot, {
-        openingIntent: previewFullscreenOpeningIntent ? { previewFullscreen: true } : undefined,
-      })
-      const contentSignature = await computeChecksum(serialized)
-
-      if (
-        !forceRegeneration &&
-        lastResultRef.current &&
-        lastResultRef.current.contentSignature === contentSignature
-      ) {
-        emitGenerationTelemetry({
-          outcome: 'success',
-          approxChars: lastResultRef.current?.approxChars,
-          estimatedChars: lastResultRef.current?.estimatedChars,
-          warningThresholdHit: lastResultRef.current?.warningThresholdHit,
-          strategyId: lastResultRef.current?.strategyId,
-          reused: true,
-        })
-        setState(prev => ({
+        setState((prev) => ({
           ...prev,
-          status: 'ready',
-          link: lastResultRef.current?.link,
-          token: lastResultRef.current?.token,
-          approxChars: lastResultRef.current?.approxChars ?? prev.approxChars,
-          estimatedChars: lastResultRef.current?.estimatedChars ?? prev.estimatedChars,
-          elapsedMs: prev.startedAt ? Date.now() - prev.startedAt : prev.elapsedMs,
-          showSlowGenerationNotice: false,
-          warningThresholdHit: lastResultRef.current?.warningThresholdHit ?? false,
-          strategyId: lastResultRef.current?.strategyId,
+          status: currentStatus,
+          startedAt,
+          elapsedMs: elapsed,
+          showSlowGenerationNotice:
+            prev.showSlowGenerationNotice || elapsed >= slowGenerationThresholdMs,
+          error: undefined,
+          clipboardStatus: 'idle',
+          clipboardError: undefined,
         }))
         return
       }
 
-      const rankedStrategies = rankCompressionStrategies(
-        serialized.length,
-        options?.baseUrl,
-        adjustPayloadEstimate,
-      )
-      if (!rankedStrategies.length) {
-        throw new Error('No compression strategies available for Web share URLs')
+      if (isProgressStatus(stateRef.current.status)) {
+        return
       }
 
-      const smallestEstimate = rankedStrategies[0]
-      const viableCandidates = rankedStrategies.filter(est => est.estimatedChars <= charLimit)
-      const candidateQueue = viableCandidates.length ? viableCandidates : [smallestEstimate]
-      const updateEstimateState = (estimate: StrategyEstimate) => {
-        const thresholdHit = estimate.estimatedChars >= SHARE_URL_WARNING_THRESHOLD
-        const warningActive = thresholdHit
-        setState(prev => ({
-          ...prev,
-          status: warningActive ? 'warning' : 'generating',
-          estimatedChars: estimate.estimatedChars,
-          warningThresholdHit: warningActive,
-          strategyId: estimate.strategy.id,
-          approxChars: undefined,
-        }))
-      }
-
-      if (candidateQueue.length) {
-        updateEstimateState(candidateQueue[0])
-      }
-
-      let lastFailure: Error | null = null
-      let maxOversizeChars: number | null = null
-
-      for (const estimate of candidateQueue) {
-        if (estimate !== candidateQueue[0]) {
-          updateEstimateState(estimate)
-        }
-
-        try {
-          const encodeStartedAt = nowMs()
-          const envelope = await encodeWithStrategy({
-            snapshot,
-            serialized,
-            strategy: estimate.strategy,
-          })
-          const finalized = finalizeShareToken(envelope, options?.baseUrl)
-          const encodeMs = Math.max(0, Math.round(nowMs() - encodeStartedAt))
-
-          recordResult({
-            strategyId: estimate.strategy.id,
-            estimatedChars: estimate.estimatedChars,
-            actualChars: finalized.linkChars,
-            encodeMs,
-          })
-
-          if (finalized.linkChars > charLimit) {
-            maxOversizeChars = Math.max(maxOversizeChars ?? 0, finalized.linkChars)
-            continue
-          }
-
-          const shouldWarn = finalized.warningThresholdHit
-
-          lastResultRef.current = {
-            contentSignature,
-            checksum: envelope.checksum,
-            link: finalized.link,
-            token: finalized.token,
-            approxChars: finalized.linkChars,
-            estimatedChars: estimate.estimatedChars,
-            warningThresholdHit: shouldWarn,
-            strategyId: estimate.strategy.id,
-          }
-
-          emitGenerationTelemetry({
-            outcome: 'success',
-            approxChars: finalized.linkChars,
-            estimatedChars: estimate.estimatedChars,
-            warningThresholdHit: shouldWarn,
-            strategyId: estimate.strategy.id,
-            encodeMs,
-          })
-
-          setState(prev => ({
-            ...prev,
-            status: 'ready',
-            link: finalized.link,
-            token: finalized.token,
-            approxChars: finalized.linkChars,
-            estimatedChars: estimate.estimatedChars,
-            elapsedMs: prev.startedAt ? Date.now() - prev.startedAt : prev.elapsedMs,
-            showSlowGenerationNotice: false,
-            warningThresholdHit: shouldWarn,
-            strategyId: estimate.strategy.id,
-          }))
-          return
-        } catch (error) {
-          lastFailure = error instanceof Error
-            ? error
-            : new Error('Failed to encode Web share URL')
-        }
-      }
-
-      if (maxOversizeChars) {
-        emitGenerationTelemetry({
-          outcome: 'oversize',
-          approxChars: maxOversizeChars,
-          estimatedChars: candidateQueue[0]?.estimatedChars ?? smallestEstimate.estimatedChars,
-          warningThresholdHit: maxOversizeChars >= SHARE_URL_WARNING_THRESHOLD,
-        })
+      if (typeof navigator !== 'undefined' && navigator.onLine === false) {
         setState({
-          status: 'oversize',
-          link: undefined,
-          token: undefined,
-          approxChars: maxOversizeChars,
-          estimatedChars: candidateQueue[0]?.estimatedChars ?? smallestEstimate.estimatedChars,
+          status: 'error',
           error: {
-            code: 'oversize',
-            message: `Web share URL exceeds ${charLimit} characters`,
+            code: 'offline',
+            message: 'Connect to the internet to generate a Web share URL.',
           },
           clipboardStatus: 'idle',
           showSlowGenerationNotice: false,
-          warningThresholdHit: maxOversizeChars >= SHARE_URL_WARNING_THRESHOLD,
+          warningThresholdHit: false,
           strategyId: undefined,
+          estimatedChars: undefined,
+          approxChars: undefined,
         })
         return
       }
 
-      if (lastFailure) {
-        throw lastFailure
+      if (!isStorageAvailable(storageHealthRef)) {
+        setState({
+          status: 'error',
+          error: {
+            code: 'storage-unavailable',
+            message: 'Shared links require local storage access, which is currently blocked.',
+          },
+          clipboardStatus: 'idle',
+          showSlowGenerationNotice: false,
+          warningThresholdHit: false,
+          strategyId: undefined,
+          estimatedChars: undefined,
+          approxChars: undefined,
+        })
+        return
       }
 
-      throw new Error('Web share URL generation failed unexpectedly')
-    } catch (error) {
-      emitGenerationTelemetry({
-        outcome: 'error',
-        approxChars: stateRef.current.approxChars,
-        strategyId: stateRef.current.strategyId,
-        warningThresholdHit: stateRef.current.warningThresholdHit,
-      })
-      setState({
-        status: 'error',
-        error: {
-          code: 'generation-failed',
-          message: error instanceof Error ? error.message : 'Failed to generate Web share URL',
-        },
-        clipboardStatus: 'idle',
+      const startedAt = Date.now()
+      const generationId = generationIdRef.current + 1
+      generationIdRef.current = generationId
+      const isActiveGeneration = () => generationIdRef.current === generationId
+      pendingGenerationRef.current = { startedAt }
+
+      const emitGenerationTelemetry = (payload: {
+        outcome: ShareGenerationOutcome
+        approxChars?: number
+        estimatedChars?: number
+        warningThresholdHit?: boolean
+        strategyId?: CompressionStrategyId
+        encodeMs?: number
+        reused?: boolean
+      }) => {
+        if (!isActiveGeneration()) {
+          return
+        }
+
+        recordShareGenerationTelemetry({
+          durationMs: Date.now() - startedAt,
+          approxChars: payload.approxChars,
+          estimatedChars: payload.estimatedChars,
+          warningThresholdHit: payload.warningThresholdHit,
+          strategyId: payload.strategyId,
+          encodeMs: payload.encodeMs,
+          outcome: payload.outcome,
+          reused: payload.reused,
+        })
+      }
+
+      setState((prev) => ({
+        ...prev,
+        status: 'generating',
+        error: undefined,
+        startedAt,
+        elapsedMs: 0,
         showSlowGenerationNotice: false,
+        clipboardStatus: 'idle',
+        clipboardError: undefined,
         warningThresholdHit: false,
-        strategyId: undefined,
-        estimatedChars: undefined,
         approxChars: undefined,
-      })
-    } finally {
-      pendingGenerationRef.current = null
-    }
-  }, [
-    adjustPayloadEstimate,
-    charLimit,
-    generationDelayMs,
-    options?.baseUrl,
-    previewFullscreenOpeningIntent,
-    recordResult,
-    slowGenerationThresholdMs,
-    snapshotBuilder,
-  ])
+        estimatedChars: undefined,
+        strategyId: undefined,
+      }))
+
+      try {
+        const snapshot = await Promise.resolve(snapshotBuilder())
+        if (!isActiveGeneration()) {
+          return
+        }
+
+        if (generationDelayMs > 0) {
+          await new Promise((resolve) => setTimeout(resolve, generationDelayMs))
+          if (!isActiveGeneration()) {
+            return
+          }
+        }
+        const serialized = serializeSharePayload(snapshot, {
+          openingIntent: previewFullscreenOpeningIntent ? { previewFullscreen: true } : undefined,
+        })
+        const contentSignature = await computeChecksum(serialized)
+        if (!isActiveGeneration()) {
+          return
+        }
+
+        if (
+          !forceRegeneration &&
+          lastResultRef.current &&
+          lastResultRef.current.contentSignature === contentSignature
+        ) {
+          emitGenerationTelemetry({
+            outcome: 'success',
+            approxChars: lastResultRef.current?.approxChars,
+            estimatedChars: lastResultRef.current?.estimatedChars,
+            warningThresholdHit: lastResultRef.current?.warningThresholdHit,
+            strategyId: lastResultRef.current?.strategyId,
+            reused: true,
+          })
+          setState((prev) => ({
+            ...prev,
+            status: 'ready',
+            link: lastResultRef.current?.link,
+            token: lastResultRef.current?.token,
+            approxChars: lastResultRef.current?.approxChars ?? prev.approxChars,
+            estimatedChars: lastResultRef.current?.estimatedChars ?? prev.estimatedChars,
+            elapsedMs: prev.startedAt ? Date.now() - prev.startedAt : prev.elapsedMs,
+            showSlowGenerationNotice: false,
+            warningThresholdHit: lastResultRef.current?.warningThresholdHit ?? false,
+            strategyId: lastResultRef.current?.strategyId,
+          }))
+          return
+        }
+
+        const rankedStrategies = rankCompressionStrategies(
+          serialized.length,
+          options?.baseUrl,
+          adjustPayloadEstimate
+        )
+        if (!rankedStrategies.length) {
+          throw new Error('No compression strategies available for Web share URLs')
+        }
+
+        const smallestEstimate = rankedStrategies[0]
+        const viableCandidates = rankedStrategies.filter((est) => est.estimatedChars <= charLimit)
+        const candidateQueue = viableCandidates.length ? viableCandidates : [smallestEstimate]
+        const updateEstimateState = (estimate: StrategyEstimate) => {
+          const thresholdHit = estimate.estimatedChars >= SHARE_URL_WARNING_THRESHOLD
+          const warningActive = thresholdHit
+          setState((prev) => ({
+            ...prev,
+            status: warningActive ? 'warning' : 'generating',
+            estimatedChars: estimate.estimatedChars,
+            warningThresholdHit: warningActive,
+            strategyId: estimate.strategy.id,
+            approxChars: undefined,
+          }))
+        }
+
+        if (candidateQueue.length) {
+          updateEstimateState(candidateQueue[0])
+        }
+
+        let lastFailure: Error | null = null
+        let maxOversizeChars: number | null = null
+
+        for (const estimate of candidateQueue) {
+          if (estimate !== candidateQueue[0]) {
+            updateEstimateState(estimate)
+          }
+
+          try {
+            const encodeStartedAt = nowMs()
+            const envelope = await encodeWithStrategy({
+              snapshot,
+              serialized,
+              strategy: estimate.strategy,
+            })
+            if (!isActiveGeneration()) {
+              return
+            }
+
+            const finalized = finalizeShareToken(envelope, options?.baseUrl)
+            const encodeMs = Math.max(0, Math.round(nowMs() - encodeStartedAt))
+
+            recordResult({
+              strategyId: estimate.strategy.id,
+              estimatedChars: estimate.estimatedChars,
+              actualChars: finalized.linkChars,
+              encodeMs,
+            })
+
+            if (finalized.linkChars > charLimit) {
+              maxOversizeChars = Math.max(maxOversizeChars ?? 0, finalized.linkChars)
+              continue
+            }
+
+            const shouldWarn = finalized.warningThresholdHit
+
+            lastResultRef.current = {
+              contentSignature,
+              checksum: envelope.checksum,
+              link: finalized.link,
+              token: finalized.token,
+              approxChars: finalized.linkChars,
+              estimatedChars: estimate.estimatedChars,
+              warningThresholdHit: shouldWarn,
+              strategyId: estimate.strategy.id,
+            }
+
+            emitGenerationTelemetry({
+              outcome: 'success',
+              approxChars: finalized.linkChars,
+              estimatedChars: estimate.estimatedChars,
+              warningThresholdHit: shouldWarn,
+              strategyId: estimate.strategy.id,
+              encodeMs,
+            })
+
+            setState((prev) => ({
+              ...prev,
+              status: 'ready',
+              link: finalized.link,
+              token: finalized.token,
+              approxChars: finalized.linkChars,
+              estimatedChars: estimate.estimatedChars,
+              elapsedMs: prev.startedAt ? Date.now() - prev.startedAt : prev.elapsedMs,
+              showSlowGenerationNotice: false,
+              warningThresholdHit: shouldWarn,
+              strategyId: estimate.strategy.id,
+            }))
+            return
+          } catch (error) {
+            if (!isActiveGeneration()) {
+              return
+            }
+
+            lastFailure =
+              error instanceof Error ? error : new Error('Failed to encode Web share URL')
+          }
+        }
+
+        if (maxOversizeChars) {
+          emitGenerationTelemetry({
+            outcome: 'oversize',
+            approxChars: maxOversizeChars,
+            estimatedChars: candidateQueue[0]?.estimatedChars ?? smallestEstimate.estimatedChars,
+            warningThresholdHit: maxOversizeChars >= SHARE_URL_WARNING_THRESHOLD,
+          })
+          setState({
+            status: 'oversize',
+            link: undefined,
+            token: undefined,
+            approxChars: maxOversizeChars,
+            estimatedChars: candidateQueue[0]?.estimatedChars ?? smallestEstimate.estimatedChars,
+            error: {
+              code: 'oversize',
+              message: `Web share URL exceeds ${charLimit} characters`,
+            },
+            clipboardStatus: 'idle',
+            showSlowGenerationNotice: false,
+            warningThresholdHit: maxOversizeChars >= SHARE_URL_WARNING_THRESHOLD,
+            strategyId: undefined,
+          })
+          return
+        }
+
+        if (lastFailure) {
+          throw lastFailure
+        }
+
+        throw new Error('Web share URL generation failed unexpectedly')
+      } catch (error) {
+        if (!isActiveGeneration()) {
+          return
+        }
+
+        emitGenerationTelemetry({
+          outcome: 'error',
+          approxChars: stateRef.current.approxChars,
+          strategyId: stateRef.current.strategyId,
+          warningThresholdHit: stateRef.current.warningThresholdHit,
+        })
+        setState({
+          status: 'error',
+          error: {
+            code: 'generation-failed',
+            message: error instanceof Error ? error.message : 'Failed to generate Web share URL',
+          },
+          clipboardStatus: 'idle',
+          showSlowGenerationNotice: false,
+          warningThresholdHit: false,
+          strategyId: undefined,
+          estimatedChars: undefined,
+          approxChars: undefined,
+        })
+      } finally {
+        if (generationIdRef.current === generationId) {
+          pendingGenerationRef.current = null
+        }
+      }
+    },
+    [
+      adjustPayloadEstimate,
+      charLimit,
+      generationDelayMs,
+      options?.baseUrl,
+      previewFullscreenOpeningIntent,
+      recordResult,
+      slowGenerationThresholdMs,
+      snapshotBuilder,
+    ]
+  )
 
   const reuseExistingLink = useCallback(() => {
     const lastResult = lastResultRef.current
     if (!lastResult) {
       return undefined
     }
-    setState(prev => ({
+    setState((prev) => ({
       ...prev,
       status: 'ready',
       link: lastResult.link,
@@ -497,7 +547,7 @@ export const useShareLink = (options?: UseShareLinkOptions) => {
   }, [])
 
   const markCopyPending = useCallback(() => {
-    setState(prev => ({
+    setState((prev) => ({
       ...prev,
       clipboardStatus: 'copying',
       clipboardError: undefined,
@@ -506,7 +556,7 @@ export const useShareLink = (options?: UseShareLinkOptions) => {
 
   const markCopySuccess = useCallback(() => {
     recordShareClipboardTelemetry({ outcome: 'success' })
-    setState(prev => ({
+    setState((prev) => ({
       ...prev,
       clipboardStatus: 'copied',
       clipboardError: undefined,
@@ -516,7 +566,7 @@ export const useShareLink = (options?: UseShareLinkOptions) => {
 
   const markCopyFailure = useCallback((message: string) => {
     recordShareClipboardTelemetry({ outcome: 'fallback' })
-    setState(prev => ({
+    setState((prev) => ({
       ...prev,
       clipboardStatus: 'error',
       clipboardError: message,
@@ -531,6 +581,7 @@ export const useShareLink = (options?: UseShareLinkOptions) => {
     markCopyPending,
     markCopySuccess,
     markCopyFailure,
+    cancelShareGeneration,
   }
 }
 
@@ -574,13 +625,15 @@ interface EncodeWithStrategyInput {
 const rankCompressionStrategies = (
   serializedLength: number,
   baseUrl?: string,
-  adjustEstimate?: EstimateAdjuster,
+  adjustEstimate?: EstimateAdjuster
 ): StrategyEstimate[] => {
   const strategies = listCompressionStrategies().filter(isSharePayloadCompressionStrategy)
   const estimates = strategies
-    .map(strategy => {
+    .map((strategy) => {
       const basePayload = Math.ceil(Math.max(0, strategy.estimateSize(serializedLength)))
-      const adjustedPayload = adjustEstimate ? adjustEstimate(strategy.id, basePayload) : basePayload
+      const adjustedPayload = adjustEstimate
+        ? adjustEstimate(strategy.id, basePayload)
+        : basePayload
       const estimatedChars = estimateShareUrlLengthFromPayload(adjustedPayload, baseUrl)
       return {
         strategy,

@@ -1,14 +1,4 @@
-import {
-  lazy,
-  Suspense,
-  useCallback,
-  useEffect,
-  useId,
-  useMemo,
-  useRef,
-  useState,
-  type KeyboardEvent,
-} from 'react'
+import { lazy, Suspense, useEffect, useId, useRef, useState, type KeyboardEvent } from 'react'
 import {
   Heading,
   Detail,
@@ -18,11 +8,6 @@ import {
   Box,
   ActionMenu,
   BodyLong,
-  CopyButton,
-  Loader,
-  Popover,
-  Alert,
-  Tag,
   Dialog,
   TextField,
 } from '@navikt/ds-react'
@@ -36,11 +21,11 @@ import {
   SunIcon,
   ArrowsSquarepathIcon,
   ArrowUndoIcon,
-  LinkIcon,
   XMarkIcon,
 } from '@navikt/aksel-icons'
 import { SaveStatusIndicator } from './SaveStatusIndicator'
 import { ProjectSizeIndicator } from './ProjectSizeIndicator'
+import { SharePopoverButton } from '@/components/Share/SharePopoverButton'
 import { useSettings } from '@/contexts/SettingsContext'
 import type { Project } from '@/types/project'
 import type { SaveStatus } from '@/hooks/useAutoSave'
@@ -50,14 +35,8 @@ import {
   getPortableArtifactWarning,
   importProject,
 } from '@/services/storage'
-import {
-  useShareLink,
-  type ShareLinkErrorCode,
-  type UseShareLinkOptions,
-} from '@/hooks/useShareLink'
-import { SHARE_URL_CHAR_LIMIT } from '@/utils/shareEncoding'
+import type { UseShareLinkOptions } from '@/hooks/useShareLink'
 import { WEB_ARCADE_CAPABILITIES, type ShellCapabilities } from '@/services/shellCapabilities'
-import { getStartPageSource } from '@/services/projectSource'
 import './AppHeader.css'
 
 const AgentSessionMenu = lazy(() =>
@@ -110,35 +89,26 @@ export const AppHeader = ({
 }: AppHeaderProps) => {
   const MAX_PROJECT_SIZE = 5 * 1024 * 1024 // 5MB
   const fileInputRef = useRef<HTMLInputElement>(null)
-  const shareButtonRef = useRef<HTMLButtonElement>(null)
-  const clipboardBufferRef = useRef<HTMLTextAreaElement>(null)
-  const lastGeneratedShareFingerprintRef = useRef<string | null>(null)
   const projectNameInputRef = useRef<HTMLInputElement>(null)
-  const [shareOpen, setShareOpen] = useState(false)
   const [exportConfirmOpen, setExportConfirmOpen] = useState(false)
   const [importConfirmOpen, setImportConfirmOpen] = useState(false)
   const [isEditingProjectName, setIsEditingProjectName] = useState(false)
   const [projectNameDraft, setProjectNameDraft] = useState(projectName)
-  const loadingDescriptionId = useId()
   const exportConfirmDialogId = useId()
   const importConfirmDialogId = useId()
-  const slowDescriptionId = `${loadingDescriptionId}-delay`
-  const { theme, toggleTheme, togglePanelOrder, multiPageEnabled, setMultiPageEnabled } =
-    useSettings()
   const {
-    state: shareState,
-    generateShareLink,
-    resetShareState,
-    markCopyPending,
-    markCopySuccess,
-    markCopyFailure,
-  } = useShareLink(shareOptions)
+    theme,
+    toggleTheme,
+    togglePanelOrder,
+    multiPageEnabled,
+    setMultiPageEnabled,
+    previewFullscreen,
+  } = useSettings()
   const canUseShareUrl = shellCapabilities.shareUrl.enabled
   const canUseAgentSessions = shellCapabilities.agentSessions.enabled
   const portableArtifactWarning = getPortableArtifactWarning(currentProject)
 
   const handleExport = () => {
-    setShareOpen(false)
     if (portableArtifactWarning) {
       setExportConfirmOpen(true)
       return
@@ -183,19 +153,6 @@ export const AppHeader = ({
     }
   }
 
-  const handleShareButtonClick = () => {
-    if (!canUseShareUrl) {
-      return
-    }
-
-    if (shareOpen) {
-      generateShareLink(true)
-      return
-    }
-
-    setShareOpen(true)
-  }
-
   const handleStartProjectNameEdit = () => {
     setProjectNameDraft(projectName)
     setIsEditingProjectName(true)
@@ -234,10 +191,6 @@ export const AppHeader = ({
     }
   }
 
-  const handleShareClose = useCallback(() => {
-    setShareOpen(false)
-  }, [])
-
   useEffect(() => {
     if (!isEditingProjectName) {
       setProjectNameDraft(projectName)
@@ -252,129 +205,6 @@ export const AppHeader = ({
     setProjectNameDraft(projectName)
     setIsEditingProjectName(false)
   }, [currentProject.id, projectName])
-
-  useEffect(() => {
-    if (!canUseShareUrl) {
-      return
-    }
-
-    return () => {
-      resetShareState()
-    }
-  }, [canUseShareUrl, resetShareState])
-
-  const handleCopyClick = async (event: React.MouseEvent<HTMLButtonElement>) => {
-    if (!shareState.link) {
-      event.preventDefault()
-      return
-    }
-
-    markCopyPending()
-
-    try {
-      if (typeof navigator === 'undefined' || !navigator.clipboard?.writeText) {
-        throw new Error('Clipboard API unavailable')
-      }
-      await navigator.clipboard.writeText(shareState.link)
-      markCopySuccess()
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unable to access clipboard'
-      markCopyFailure(message)
-      event.preventDefault()
-
-      if (clipboardBufferRef.current) {
-        clipboardBufferRef.current.readOnly = true
-        clipboardBufferRef.current.focus()
-        clipboardBufferRef.current.select()
-      }
-    }
-  }
-
-  const isGeneratingShare = shareState.status === 'generating' || shareState.status === 'warning'
-  const shareableSource = getStartPageSource(currentProject)
-  const shareDependenciesFingerprint = useMemo(() => {
-    const lastModified = currentProject.lastModified ?? 'unknown'
-    const jsxLength = shareableSource.jsx.length
-    const hooksLength = shareableSource.hooks.length
-    return `${lastModified}|${jsxLength}|${hooksLength}|${currentProject.viewportSize}|${theme}`
-  }, [
-    currentProject.lastModified,
-    currentProject.viewportSize,
-    shareableSource.hooks.length,
-    shareableSource.jsx.length,
-    theme,
-  ])
-  const showOversizeMessage =
-    shareState.status === 'oversize' || shareState.error?.code === 'oversize'
-  const shareCharLimitLabel = SHARE_URL_CHAR_LIMIT.toLocaleString()
-  const shareLengthChars = shareState.approxChars ?? shareState.estimatedChars
-  const hasExactShareLength =
-    typeof shareState.approxChars === 'number' && !Number.isNaN(shareState.approxChars)
-  const shareLengthValue =
-    typeof shareLengthChars === 'number' ? formatCharCount(shareLengthChars) : null
-  const shareLengthLabel = hasExactShareLength ? 'Share URL length' : 'Estimated share length'
-  const shareLengthTagText = shareLengthValue
-    ? `${shareLengthLabel} ${shareLengthValue} / ${shareCharLimitLabel} chars`
-    : null
-  const shareLengthDetailText = shareLengthValue
-    ? `${shareLengthLabel} ${shareLengthValue} / ${shareCharLimitLabel} characters`
-    : null
-
-  const shareLengthTag = shareLengthTagText ? (
-    <Tag
-      size="small"
-      variant="moderate"
-      data-color={
-        showOversizeMessage ? 'danger' : shareState.warningThresholdHit ? 'warning' : 'info'
-      }
-      className="share-popover__estimate-tag"
-    >
-      {shareLengthTagText}
-    </Tag>
-  ) : null
-
-  const statusMessage =
-    shareState.clipboardStatus === 'copying'
-      ? 'Copying link…'
-      : shareState.clipboardStatus === 'error'
-        ? 'Clipboard blocked. The link is selected—press Cmd/Ctrl+C to copy.'
-        : null
-
-  const shareMeta =
-    !showOversizeMessage && shareLengthTag ? (
-      <VStack gap="space-4" className="share-popover__meta">
-        {shareLengthTag}
-        {shareState.strategyId && (
-          <Detail size="small" className="share-popover__estimate-copy">
-            {`Strategy: ${shareState.strategyId}`}
-          </Detail>
-        )}
-      </VStack>
-    ) : null
-
-  useEffect(() => {
-    if (!canUseShareUrl || !shareOpen) {
-      lastGeneratedShareFingerprintRef.current = null
-      return
-    }
-
-    if (isGeneratingShare) {
-      return
-    }
-
-    if (lastGeneratedShareFingerprintRef.current === shareDependenciesFingerprint) {
-      return
-    }
-
-    lastGeneratedShareFingerprintRef.current = shareDependenciesFingerprint
-    generateShareLink()
-  }, [
-    canUseShareUrl,
-    shareOpen,
-    shareDependenciesFingerprint,
-    isGeneratingShare,
-    generateShareLink,
-  ])
 
   return (
     <Box
@@ -413,11 +243,7 @@ export const AppHeader = ({
             className="app-header__project-name-wrapper"
           >
             {isEditingProjectName ? (
-              <HStack
-                gap="space-16"
-                align="center"
-                className="app-header__project-name-editor"
-              >
+              <HStack gap="space-16" align="center" className="app-header__project-name-editor">
                 <TextField
                   ref={projectNameInputRef}
                   label="Prosjektnavn"
@@ -498,153 +324,11 @@ export const AppHeader = ({
             Import
           </Button>
           {canUseShareUrl && (
-            <>
-              <Button
-                variant="tertiary"
-                data-color="neutral"
-                size="small"
-                icon={<LinkIcon aria-hidden />}
-                onClick={handleShareButtonClick}
-                aria-label="Share project"
-                ref={shareButtonRef}
-                aria-expanded={shareOpen}
-              />
-              <Popover
-                open={shareOpen}
-                onClose={handleShareClose}
-                anchorEl={shareButtonRef.current}
-                placement="bottom-end"
-              >
-                <Popover.Content className="share-popover" data-testid="share-popover">
-                  <VStack gap="space-12">
-                    <Heading size="small" level="2">
-                      Share this prototype
-                    </Heading>
-                    {portableArtifactWarning && (
-                      <Alert variant="warning" size="small">
-                        <BodyLong size="small">{portableArtifactWarning}</BodyLong>
-                      </Alert>
-                    )}
-                    {isGeneratingShare ? (
-                      <HStack gap="space-8" align="center" role="status" aria-live="polite">
-                        <Loader size="xsmall" title="Generating Web share URL" />
-                        <VStack gap="space-4">
-                          <BodyLong size="small" id={loadingDescriptionId}>
-                            Web share URL is being generated…
-                          </BodyLong>
-                          {shareState.showSlowGenerationNotice && (
-                            <Detail
-                              size="small"
-                              id={slowDescriptionId}
-                              className="share-popover__loader-apology"
-                            >
-                              This is taking longer than usual. Sorry for the wait!
-                            </Detail>
-                          )}
-                          {shareState.warningThresholdHit && (
-                            <Detail size="small" className="share-popover__loader-warning">
-                              Estimated size {formatCharCount(shareState.estimatedChars)} /{' '}
-                              {SHARE_URL_CHAR_LIMIT.toLocaleString()} characters.
-                            </Detail>
-                          )}
-                        </VStack>
-                      </HStack>
-                    ) : (
-                      <>
-                        <BodyLong size="small">
-                          Generate a Web share URL so teammates can load this project without
-                          downloading an Arcade project package.
-                        </BodyLong>
-                        <VStack gap="space-12">
-                          {shareState.status === 'error' && shareState.error && (
-                            <Alert variant="warning" size="small">
-                              <VStack gap="space-8">
-                                <BodyLong size="small">
-                                  {getShareErrorMessage(shareState.error.code)}
-                                </BodyLong>
-                                <Button
-                                  size="xsmall"
-                                  variant="tertiary"
-                                  onClick={() => {
-                                    void generateShareLink()
-                                  }}
-                                  className="share-popover__retry"
-                                >
-                                  Retry generation
-                                </Button>
-                              </VStack>
-                            </Alert>
-                          )}
-                          {showOversizeMessage ? (
-                            <Alert variant="warning" size="small" role="status">
-                              <VStack gap="space-12">
-                                <VStack gap="space-4">
-                                  <BodyLong size="small">
-                                    This project is too large for a Web share URL. Use Export
-                                    instead.
-                                  </BodyLong>
-                                  {shareLengthDetailText && (
-                                    <Detail
-                                      size="small"
-                                      className="share-popover__oversize-details"
-                                    >
-                                      {shareLengthDetailText}
-                                    </Detail>
-                                  )}
-                                </VStack>
-                                <Button
-                                  size="xsmall"
-                                  variant="primary"
-                                  className="share-popover__oversize-cta"
-                                  onClick={handleExport}
-                                >
-                                  Use Export instead
-                                </Button>
-                              </VStack>
-                            </Alert>
-                          ) : (
-                            <CopyButton
-                              copyText={shareState.link ?? ''}
-                              text="Copy Web share URL"
-                              activeText="Web share URL copied"
-                              size="small"
-                              variant="neutral"
-                              disabled={shareState.status !== 'ready'}
-                              onClick={handleCopyClick}
-                            />
-                          )}
-                          {statusMessage && (
-                            <Detail
-                              size="small"
-                              className="share-popover__status"
-                              role="status"
-                              aria-live="polite"
-                            >
-                              {statusMessage}
-                            </Detail>
-                          )}
-                          {shareState.clipboardStatus === 'error' && (
-                            <BodyLong size="small" className="share-popover__error">
-                              {shareState.clipboardError ||
-                                'Clipboard permissions prevented automatic copy.'}
-                            </BodyLong>
-                          )}
-                        </VStack>
-                        {shareMeta}
-                        <textarea
-                          ref={clipboardBufferRef}
-                          className="share-popover__clipboard-buffer"
-                          aria-hidden="true"
-                          tabIndex={-1}
-                          readOnly
-                          value={shareState.link ?? ''}
-                        />
-                      </>
-                    )}
-                  </VStack>
-                </Popover.Content>
-              </Popover>
-            </>
+            <SharePopoverButton
+              ariaLabel="Share project"
+              shareOptions={shareOptions}
+              ownerVisible={!previewFullscreen}
+            />
           )}
           {canUseAgentSessions && (
             <Suspense fallback={null}>
@@ -767,24 +451,4 @@ export const AppHeader = ({
       </HStack>
     </Box>
   )
-}
-
-const getShareErrorMessage = (code: ShareLinkErrorCode): string => {
-  switch (code) {
-    case 'offline':
-      return 'You appear to be offline. Reconnect to the internet and try again.'
-    case 'storage-unavailable':
-      return 'Browser storage is blocked, so we cannot package your project. Enable storage access and retry.'
-    case 'oversize':
-      return 'This project is too large for a Web share URL. Use Export instead.'
-    default:
-      return 'Something went wrong while generating the Web share URL. Please try again.'
-  }
-}
-
-const formatCharCount = (value?: number): string => {
-  if (typeof value !== 'number' || Number.isNaN(value)) {
-    return '—'
-  }
-  return value.toLocaleString()
 }
