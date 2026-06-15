@@ -56,6 +56,11 @@ export interface WebArcadeWorkingCopyPreferences {
   previewFullscreen: boolean
 }
 
+interface PersistedWebArcadeWorkingCopyPreferences
+  extends Omit<WebArcadeWorkingCopyPreferences, 'multiPageEnabled'> {
+  multiPageEnabled?: boolean
+}
+
 export interface SaveProjectOptions {
   preferences?: WebArcadeWorkingCopyPreferences
   updateLastModified?: boolean
@@ -65,7 +70,7 @@ interface WebArcadeWorkingCopyEnvelope {
   format: typeof WEB_ARCADE_WORKING_COPY_FORMAT
   formatVersion: typeof WEB_ARCADE_WORKING_COPY_FORMAT_VERSION
   project: Project
-  preferences: WebArcadeWorkingCopyPreferences
+  preferences: PersistedWebArcadeWorkingCopyPreferences
 }
 
 export interface LoadResult {
@@ -189,7 +194,7 @@ export const saveProject = (project: Project, options?: SaveProjectOptions): Sav
     format: WEB_ARCADE_WORKING_COPY_FORMAT,
     formatVersion: WEB_ARCADE_WORKING_COPY_FORMAT_VERSION,
     project: projectToSave,
-    preferences,
+    preferences: createPersistedWorkingCopyPreferences(preferences),
   }
   const json = JSON.stringify(workingCopy)
   const sizeBytes = new Blob([json]).size
@@ -702,6 +707,16 @@ const validateWorkingCopyPreferences = (preferences: unknown): WebArcadeWorkingC
     previewFullscreen,
   }
 }
+
+const createPersistedWorkingCopyPreferences = (
+  preferences: WebArcadeWorkingCopyPreferences
+): PersistedWebArcadeWorkingCopyPreferences => ({
+  theme: preferences.theme,
+  panelOrder: preferences.panelOrder,
+  pagePanelOpen: preferences.pagePanelOpen,
+  selectedEditTarget: preferences.selectedEditTarget,
+  previewFullscreen: preferences.previewFullscreen,
+})
 
 const isThemeMode = (value: unknown): value is ThemeMode => value === 'light' || value === 'dark'
 

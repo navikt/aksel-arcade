@@ -100,8 +100,6 @@ export const AppHeader = ({
     theme,
     toggleTheme,
     togglePanelOrder,
-    multiPageEnabled,
-    setMultiPageEnabled,
     previewFullscreen,
   } = useSettings()
   const canUseShareUrl = shellCapabilities.shareUrl.enabled
@@ -354,15 +352,6 @@ export const AppHeader = ({
                 >
                   Switch to {theme === 'dark' ? 'light' : 'dark'} theme
                 </ActionMenu.Item>
-              </ActionMenu.Group>
-              <ActionMenu.Divider />
-              <ActionMenu.Group label="Experiments">
-                <ActionMenu.CheckboxItem
-                  checked={multiPageEnabled}
-                  onCheckedChange={setMultiPageEnabled}
-                >
-                  Multiple pages
-                </ActionMenu.CheckboxItem>
               </ActionMenu.Group>
               <ActionMenu.Divider />
               <ActionMenu.Group label="Templates">

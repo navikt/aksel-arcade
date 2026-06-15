@@ -81,7 +81,7 @@ const Harness = ({
     shareHydration,
     applySharedSnapshot,
   } = useProject()
-  const { setTheme } = useSettings()
+  const { setTheme, setMultiPageEnabled } = useSettings()
 
   return (
     <>
@@ -110,6 +110,9 @@ const Harness = ({
         }}
       >
         Update Agent read fixture
+      </button>
+      <button type="button" onClick={() => setMultiPageEnabled(true)}>
+        Enable legacy multi-page mode
       </button>
       <div data-testid="project-jsx-code" hidden>
         {getActiveSource(project).jsx}
@@ -987,19 +990,15 @@ describe('ProjectControls layout', () => {
     await expectProjectReplacementRevokedAgentAccess(desktopTransport, 4)
   })
 
-  it('shows multiple pages as a checkbox in settings', async () => {
+  it('hides the obsolete multiple-pages experiment controls in settings', async () => {
     renderHeader()
 
     fireEvent.click(screen.getByRole('button', { name: /settings/i }))
 
-    expect(
-      (
-        await screen.findByRole('menuitemcheckbox', {
-          name: /multiple pages/i,
-        })
-      ).getAttribute('aria-checked')
-    ).toBe('false')
+    expect(screen.queryByText('Experiments')).toBeNull()
+    expect(screen.queryByRole('menuitemcheckbox', { name: /multiple pages/i })).toBeNull()
     expect(screen.queryByRole('menuitem', { name: /multiple pages/i })).toBeNull()
+    expect(screen.getAllByRole('separator')).toHaveLength(2)
   })
 
   it('revokes active Agent access when loading a shared project snapshot', async () => {
@@ -1988,7 +1987,7 @@ describe('ProjectControls layout', () => {
   it('exposes pages-aware bridge commands and targeted source edits when multi-page is enabled', async () => {
     renderHeader()
 
-    await selectSettingsMenuItem(/multiple pages/i)
+    fireEvent.click(screen.getByRole('button', { name: /enable legacy multi-page mode/i }))
     const bridge = await startAgentAccess()
     await waitFor(() => {
       expect(expectBridgeSuccess(callBridgeCommand(() => bridge.getProject())).pageMode).toBe(
