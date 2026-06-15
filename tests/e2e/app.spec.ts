@@ -1,4 +1,45 @@
-import { test, expect } from '@playwright/test'
+import { test, expect, type Page } from '@playwright/test'
+
+async function expectPreviewSurfaceFlush(page: Page) {
+  const geometry = await page.evaluate(() => {
+    const previewSurface = document.querySelector<HTMLElement>('[data-name="Preview"]')
+    const livePreview = document.querySelector<HTMLElement>('[data-testid="live-preview"]')
+
+    if (!previewSurface || !livePreview) {
+      throw new Error('Preview shell elements were not rendered.')
+    }
+
+    const previewSurfaceRect = previewSurface.getBoundingClientRect()
+    const livePreviewRect = livePreview.getBoundingClientRect()
+    const previewSurfaceStyles = getComputedStyle(previewSurface)
+
+    return {
+      padding: {
+        top: previewSurfaceStyles.paddingTop,
+        right: previewSurfaceStyles.paddingRight,
+        bottom: previewSurfaceStyles.paddingBottom,
+        left: previewSurfaceStyles.paddingLeft,
+      },
+      offsets: {
+        top: livePreviewRect.top - previewSurfaceRect.top,
+        right: previewSurfaceRect.right - livePreviewRect.right,
+        bottom: previewSurfaceRect.bottom - livePreviewRect.bottom,
+        left: livePreviewRect.left - previewSurfaceRect.left,
+      },
+    }
+  })
+
+  expect(geometry.padding).toEqual({
+    top: '0px',
+    right: '0px',
+    bottom: '0px',
+    left: '0px',
+  })
+
+  for (const offset of Object.values(geometry.offsets)) {
+    expect(Math.abs(offset)).toBeLessThanOrEqual(1)
+  }
+}
 
 test.describe('AkselArcade Core Functionality', () => {
   test.beforeEach(async ({ page }) => {
@@ -40,6 +81,15 @@ test.describe('AkselArcade Core Functionality', () => {
     const button = iframe.locator('button')
     await expect(button).toBeVisible({ timeout: 10000 })
     await expect(button).toHaveText('Hello Aksel!')
+  })
+
+  test('keeps the preview flush with the panel edges in windowed and fullscreen modes', async ({ page }) => {
+    await expect(page.getByTestId('live-preview')).toBeVisible()
+
+    await expectPreviewSurfaceFlush(page)
+
+    await page.getByRole('button', { name: 'Enter preview fullscreen' }).click()
+    await expectPreviewSurfaceFlush(page)
   })
 
   test('CRITICAL: should update preview when code changes', async ({ page }) => {
