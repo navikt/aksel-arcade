@@ -13,9 +13,9 @@ import {
   type ThemeMode,
 } from '@/types/project'
 import {
-  FIRST_PAGE_ID,
   cloneProjectSource,
   createSinglePageProjectSource,
+  FIRST_PAGE_ID,
   getStartPageSource,
   isArcadePageId,
   normalizeProjectSelection,
@@ -30,7 +30,7 @@ const WEB_ARCADE_WORKING_COPY_FORMAT_VERSION = 1
 const MAX_PROJECT_SIZE_BYTES = 5 * 1024 * 1024 // 5MB
 const WARN_PROJECT_SIZE_BYTES = 4 * 1024 * 1024 // 4MB
 export const ARCADE_PROJECT_PACKAGE_FORMAT = 'aksel-arcade/project-package' as const
-export const ARCADE_PROJECT_PACKAGE_FORMAT_VERSION = 2
+export const ARCADE_PROJECT_PACKAGE_FORMAT_VERSION = 3
 export const ARCADE_PROJECT_PACKAGE_EXTENSION = '.akselarcade' as const
 const CLEAN_PACKAGE_REJECTION_MESSAGE = 'Package is not a clean .akselarcade Arcade project package'
 export const ARCADE_PROJECT_PACKAGE_MIME_TYPE =
@@ -91,18 +91,18 @@ export interface ExportProjectOptions {
   exportedAt?: string
 }
 
-export const MULTI_PAGE_PORTABLE_ARTIFACT_WARNING =
-  'While multi-page is experimental, Web share URLs and .akselarcade exports include only the Start page. Additional pages and Global config are not included.'
+const LEGACY_SINGLE_PAGE_ARCADE_PROJECT_PACKAGE_FORMAT_VERSION = 2 as const
+const LEGACY_PORTABLE_ARCADE_PROJECT_PACKAGE_FORMAT_VERSION = 1 as const
+
+export const MULTI_PAGE_WEB_SHARE_WARNING =
+  'Web share URLs currently include only the Start page. Additional pages and Global config are not included. Export an Arcade project package for a lossless handoff.'
 
 export interface ArcadeProjectPackage {
   format: typeof ARCADE_PROJECT_PACKAGE_FORMAT
   formatVersion: typeof ARCADE_PROJECT_PACKAGE_FORMAT_VERSION
   project: {
     name: string
-    source: {
-      jsx: string
-      hooks: string
-    }
+    source: Project['source']
     preview: {
       viewport: Project['viewportSize']
     }
@@ -125,8 +125,8 @@ export const DEFAULT_WEB_ARCADE_WORKING_COPY_PREFERENCES: WebArcadeWorkingCopyPr
   previewFullscreen: false,
 }
 
-export const getPortableArtifactWarning = (project: Pick<Project, 'source'>): string | null =>
-  isPortableArtifactLossy(project) ? MULTI_PAGE_PORTABLE_ARTIFACT_WARNING : null
+export const getWebShareWarning = (project: Pick<Project, 'source'>): string | null =>
+  isWebShareLossy(project) ? MULTI_PAGE_WEB_SHARE_WARNING : null
 
 export const SNAPSHOT_FILE_IDS = {
   jsx: 'file-jsx',
@@ -308,17 +308,12 @@ export const loadProject = (): LoadResult => {
 }
 
 export const createArcadeProjectPackage = (project: Project): ArcadeProjectPackage => {
-  const source = getStartPageSource(project)
-
   return {
     format: ARCADE_PROJECT_PACKAGE_FORMAT,
     formatVersion: ARCADE_PROJECT_PACKAGE_FORMAT_VERSION,
     project: {
       name: project.name,
-      source: {
-        jsx: source.jsx,
-        hooks: source.hooks,
-      },
+      source: cloneProjectSource(project.source),
       preview: {
         viewport: project.viewportSize,
       },
@@ -404,8 +399,8 @@ const buildProjectFromCleanPackage = (payload: unknown): Project => {
     version: CURRENT_PROJECT_VERSION,
     id: generateSecureUUID(),
     name: cleanProject.name,
-    source: createSinglePageProjectSource(cleanProject.source.jsx, cleanProject.source.hooks),
-    activePageId: FIRST_PAGE_ID,
+    source: cloneProjectSource(cleanProject.source),
+    activePageId: cleanProject.source.startPageId,
     viewportSize: cleanProject.preview.viewport,
     panelLayout: createDefaultProject().panelLayout,
     createdAt: now,
@@ -418,63 +413,264 @@ const parseCleanArcadeProjectPackage = (payload: unknown): ArcadeProjectPackage[
     throw new Error(CLEAN_PACKAGE_REJECTION_MESSAGE)
   }
 
-  assertExactKeys(payload, ['format', 'formatVersion', 'project'], 'package')
-
-  if (payload.formatVersion !== ARCADE_PROJECT_PACKAGE_FORMAT_VERSION) {
-    throw new Error(`Unsupported Arcade project package version "${String(payload.formatVersion)}"`)
+  if (
+    payload.formatVersion === LEGACY_PORTABLE_ARCADE_PROJECT_PACKAGE_FORMAT_VERSION &&
+    payload.format === ARCADE_PROJECT_PACKAGE_FORMAT
+  ) {
+    validateLegacyPortablePackageEnvelope(payload)
+    return parseLegacyPortablePackageProject(payload.project)
   }
+
+  assertExactKeys(payload, ['format', 'formatVersion', 'project'], 'package')
 
   if (payload.format !== ARCADE_PROJECT_PACKAGE_FORMAT) {
     throw new Error('Unsupported Arcade project package format')
   }
 
-  return parseCleanPackageProject(payload.project)
+  switch (payload.formatVersion) {
+    case ARCADE_PROJECT_PACKAGE_FORMAT_VERSION:
+      return parseFullSourcePackageProject(payload.project)
+    case LEGACY_SINGLE_PAGE_ARCADE_PROJECT_PACKAGE_FORMAT_VERSION:
+      return parseLegacySinglePagePackageProject(payload.project)
+    case LEGACY_PORTABLE_ARCADE_PROJECT_PACKAGE_FORMAT_VERSION:
+      return parseLegacyPortablePackageProject(payload.project)
+    default:
+      throw new Error(`Unsupported Arcade project package version "${String(payload.formatVersion)}"`)
+  }
 }
 
-const parseCleanPackageProject = (payload: unknown): ArcadeProjectPackage['project'] => {
+const validateLegacyPortablePackageEnvelope = (payload: Record<string, unknown>): void => {
+  const allowedKeys = new Set(['format', 'formatVersion', 'project', 'exportedAt', 'meta'])
+  const unknownKeys = Object.keys(payload).filter((key) => !allowedKeys.has(key))
+
+  if (unknownKeys.length) {
+    throw new Error(`Invalid legacy portable package fields: unknown ${formatKeyList(unknownKeys)}`)
+  }
+
+  if ('exportedAt' in payload && typeof payload.exportedAt !== 'string') {
+    throw new Error('Legacy portable package exportedAt must be a string')
+  }
+
+  if ('meta' in payload && !isRecord(payload.meta)) {
+    throw new Error('Legacy portable package meta must be an object')
+  }
+}
+
+const parseFullSourcePackageProject = (payload: unknown): ArcadeProjectPackage['project'] => {
   if (!isRecord(payload)) {
     throw new Error('Project package is missing clean project content')
   }
 
   assertExactKeys(payload, ['name', 'source', 'preview'], 'project')
 
-  if (!isRecord(payload.source)) {
-    throw new Error('Project package source must be an object')
-  }
-
-  assertExactKeys(payload.source, ['jsx', 'hooks'], 'project source')
-
-  if (!isRecord(payload.preview)) {
-    throw new Error('Project package preview must be an object')
-  }
-
-  assertExactKeys(payload.preview, ['viewport'], 'project preview')
-
   if (typeof payload.name !== 'string') {
     throw new Error('Project package name must be a string')
   }
 
+  return {
+    name: payload.name,
+    source: parsePortableProjectSource(payload.source),
+    preview: parsePackagePreview(payload.preview),
+  }
+}
+
+const parseLegacySinglePagePackageProject = (payload: unknown): ArcadeProjectPackage['project'] => {
+  if (!isRecord(payload)) {
+    throw new Error('Legacy project package is missing clean project content')
+  }
+
+  assertExactKeys(payload, ['name', 'source', 'preview'], 'legacy project')
+
+  if (typeof payload.name !== 'string') {
+    throw new Error('Legacy project package name must be a string')
+  }
+
+  if (!isRecord(payload.source)) {
+    throw new Error('Legacy project package source must be an object')
+  }
+
+  assertExactKeys(payload.source, ['jsx', 'hooks'], 'legacy project source')
+
   if (typeof payload.source.jsx !== 'string') {
-    throw new Error('Project package JSX source must be a string')
+    throw new Error('Legacy project package JSX source must be a string')
   }
 
   if (typeof payload.source.hooks !== 'string') {
-    throw new Error('Project package Hooks source must be a string')
-  }
-
-  if (typeof payload.preview.viewport !== 'string') {
-    throw new Error('Project package preview viewport must be a string')
+    throw new Error('Legacy project package Hooks source must be a string')
   }
 
   return {
     name: payload.name,
-    source: {
-      jsx: payload.source.jsx,
-      hooks: payload.source.hooks,
-    },
+    source: createSinglePageProjectSource(payload.source.jsx, payload.source.hooks),
+    preview: parsePackagePreview(payload.preview, 'legacy project preview'),
+  }
+}
+
+const parseLegacyPortablePackageProject = (payload: unknown): ArcadeProjectPackage['project'] => {
+  if (!isRecord(payload)) {
+    throw new Error('Legacy project package is missing portable project content')
+  }
+
+  assertExactKeys(payload, ['version', 'id', 'name', 'createdAt', 'lastModified', 'code', 'ui'], 'legacy portable project')
+
+  if (typeof payload.version !== 'string') {
+    throw new Error('Legacy project package version must be a string')
+  }
+
+  if (typeof payload.id !== 'string') {
+    throw new Error('Legacy project package id must be a string')
+  }
+
+  if (typeof payload.name !== 'string') {
+    throw new Error('Legacy project package name must be a string')
+  }
+
+  if (typeof payload.createdAt !== 'string') {
+    throw new Error('Legacy project package createdAt must be a string')
+  }
+
+  if (typeof payload.lastModified !== 'string') {
+    throw new Error('Legacy project package lastModified must be a string')
+  }
+
+  if (!isRecord(payload.code)) {
+    throw new Error('Legacy project package code must be an object')
+  }
+
+  assertExactKeys(payload.code, ['jsxCode', 'hooksCode'], 'legacy project code')
+
+  if (typeof payload.code.jsxCode !== 'string') {
+    throw new Error('Legacy project package JSX code must be a string')
+  }
+
+  if (typeof payload.code.hooksCode !== 'string') {
+    throw new Error('Legacy project package Hooks code must be a string')
+  }
+
+  if (!isRecord(payload.ui)) {
+    throw new Error('Legacy project package UI must be an object')
+  }
+
+  assertExactKeys(payload.ui, ['viewportSize', 'panelLayout'], 'legacy project UI')
+
+  if (!isViewportSize(payload.ui.viewportSize)) {
+    throw new Error('Legacy project package viewport size must be valid')
+  }
+
+  if (!isPanelLayout(payload.ui.panelLayout)) {
+    throw new Error('Legacy project package panel layout must be valid')
+  }
+
+  return {
+    name: payload.name,
+    source: createSinglePageProjectSource(payload.code.jsxCode, payload.code.hooksCode),
     preview: {
-      viewport: payload.preview.viewport as Project['viewportSize'],
+      viewport: payload.ui.viewportSize,
     },
+  }
+}
+
+const parsePortableProjectSource = (payload: unknown): ArcadeProjectPackage['project']['source'] => {
+  if (!isRecord(payload)) {
+    throw new Error('Project package source must be an object')
+  }
+
+  assertExactKeys(payload, ['globalConfig', 'pages', 'startPageId', 'nextPageNumber'], 'project source')
+
+  const globalConfig = parsePackageSourceFile(payload.globalConfig, 'project global config')
+
+  if (!Array.isArray(payload.pages) || payload.pages.length === 0) {
+    throw new Error('Project package pages must contain at least one Arcade page')
+  }
+
+  const pages = payload.pages.map((page) => parsePackagePage(page))
+  const pageIds = new Set<string>()
+  for (const page of pages) {
+    if (pageIds.has(page.id)) {
+      throw new Error(`Duplicate Arcade page id "${page.id}"`)
+    }
+    pageIds.add(page.id)
+  }
+
+  if (!isArcadePageId(payload.startPageId) || !pageIds.has(payload.startPageId)) {
+    throw new Error('Project package startPageId must target an exported Arcade page')
+  }
+
+  if (
+    typeof payload.nextPageNumber !== 'number' ||
+    !Number.isInteger(payload.nextPageNumber) ||
+    payload.nextPageNumber < 2
+  ) {
+    throw new Error('Project package nextPageNumber must be an integer >= 2')
+  }
+
+  return {
+    globalConfig,
+    pages,
+    startPageId: payload.startPageId,
+    nextPageNumber: payload.nextPageNumber,
+  }
+}
+
+const parsePackagePage = (payload: unknown): ArcadeProjectPackage['project']['source']['pages'][number] => {
+  if (!isRecord(payload)) {
+    throw new Error('Project package page must be an object')
+  }
+
+  assertExactKeys(payload, ['id', 'name', 'source'], 'project page')
+
+  if (!isArcadePageId(payload.id)) {
+    throw new Error('Project package page id must be a valid Arcade page id')
+  }
+
+  if (typeof payload.name !== 'string' || payload.name.trim().length === 0) {
+    throw new Error('Project package page name must be a non-empty string')
+  }
+
+  return {
+    id: payload.id,
+    name: payload.name,
+    source: parsePackageSourceFile(payload.source, `Arcade page "${payload.id}" source`),
+  }
+}
+
+const parsePackageSourceFile = (payload: unknown, label: string): ArcadeSourceFile => {
+  if (!isRecord(payload)) {
+    throw new Error(`${label} must be an object`)
+  }
+
+  assertExactKeys(payload, ['jsx', 'hooks'], label)
+
+  if (typeof payload.jsx !== 'string') {
+    throw new Error(`${label} JSX must be a string`)
+  }
+
+  if (typeof payload.hooks !== 'string') {
+    throw new Error(`${label} Hooks must be a string`)
+  }
+
+  return {
+    jsx: payload.jsx,
+    hooks: payload.hooks,
+  }
+}
+
+const parsePackagePreview = (
+  payload: unknown,
+  label = 'project preview'
+): ArcadeProjectPackage['project']['preview'] => {
+  if (!isRecord(payload)) {
+    throw new Error(`${label} must be an object`)
+  }
+
+  assertExactKeys(payload, ['viewport'], label)
+
+  if (!isViewportSize(payload.viewport)) {
+    throw new Error(`${label} viewport must be valid`)
+  }
+
+  return {
+    viewport: payload.viewport,
   }
 }
 
@@ -585,7 +781,7 @@ const buildDefaultSnapshotFiles = (project: Project): ProjectFileSnapshot[] => {
   ]
 }
 
-const isPortableArtifactLossy = (project: Pick<Project, 'source'>): boolean =>
+const isWebShareLossy = (project: Pick<Project, 'source'>): boolean =>
   project.source.pages.length > 1 || hasSourceContent(project.source.globalConfig)
 
 const hasSourceContent = (source: ArcadeSourceFile): boolean =>
@@ -725,6 +921,17 @@ const createPersistedWorkingCopyPreferences = (
 
 const isThemeMode = (value: unknown): value is ThemeMode => value === 'light' || value === 'dark'
 
+const isViewportSize = (value: unknown): value is Project['viewportSize'] =>
+  value === 'XS' ||
+  value === 'SM' ||
+  value === 'MD' ||
+  value === 'LG' ||
+  value === 'XL' ||
+  value === '2XL'
+
+const isPanelLayout = (value: unknown): value is Project['panelLayout'] =>
+  value === 'editor-left' || value === 'editor-right'
+
 const isPanelOrder = (value: unknown): value is PanelOrder =>
   value === 'code-left' || value === 'preview-left'
 
@@ -786,13 +993,11 @@ const validateProjectSchema: (project: unknown) => asserts project is Project = 
     throw new Error('Invalid activePageId field')
   }
 
-  const validViewports = ['XS', 'SM', 'MD', 'LG', 'XL', '2XL']
-  if (!validViewports.includes(p.viewportSize as string)) {
+  if (!isViewportSize(p.viewportSize)) {
     throw new Error('Invalid viewportSize field')
   }
 
-  const validLayouts = ['editor-left', 'editor-right']
-  if (!validLayouts.includes(p.panelLayout as string)) {
+  if (!isPanelLayout(p.panelLayout)) {
     throw new Error('Invalid panelLayout field')
   }
 

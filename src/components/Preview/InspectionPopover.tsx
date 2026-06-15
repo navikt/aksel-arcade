@@ -17,57 +17,57 @@ export const InspectionPopover = ({ data, iframeRef, isVisible }: InspectionPopo
   const popoverRef = useRef<HTMLDivElement | null>(null)
   const [position, setPosition] = useState<{ left: number; top: number } | null>(null)
 
-  const calculatePosition = () => {
-    if (!iframeRef.current || !popoverRef.current) return null
-
-    const iframeRect = iframeRef.current.getBoundingClientRect()
-    const elementRect = data.boundingRect
-    const elementInWindow = {
-      left: iframeRect.left + elementRect.left,
-      right: iframeRect.left + elementRect.right,
-      top: iframeRect.top + elementRect.top,
-      bottom: iframeRect.top + elementRect.bottom,
-      width: elementRect.width,
-      height: elementRect.height,
-    }
-
-    const popoverRect = popoverRef.current.getBoundingClientRect()
-    const popoverWidth = popoverRect.width || POPOVER_WIDTH
-    const popoverHeight = popoverRect.height || POPOVER_FALLBACK_HEIGHT
-
-    const viewportWidth = window.innerWidth
-    const viewportHeight = window.innerHeight
-
-    const elementCenter = elementInWindow.left + elementInWindow.width / 2
-    const minLeft = Math.max(iframeRect.left + VIEWPORT_MARGIN, VIEWPORT_MARGIN)
-    const maxLeftCandidateIframe = iframeRect.right - popoverWidth - VIEWPORT_MARGIN
-    const maxLeftCandidateViewport = viewportWidth - popoverWidth - VIEWPORT_MARGIN
-    const maxLeft = Math.max(minLeft, Math.min(maxLeftCandidateIframe, maxLeftCandidateViewport))
-    const centeredLeft = elementCenter - popoverWidth / 2
-    const left = Math.min(Math.max(centeredLeft, minLeft), maxLeft)
-
-    const spaceBelow = viewportHeight - elementInWindow.bottom - VIEWPORT_MARGIN
-    const spaceAbove = elementInWindow.top - VIEWPORT_MARGIN
-    const preferBelow = spaceBelow >= popoverHeight + ELEMENT_GAP || spaceBelow >= spaceAbove
-
-    const preferredTop = preferBelow
-      ? elementInWindow.bottom + ELEMENT_GAP
-      : elementInWindow.top - popoverHeight - ELEMENT_GAP
-
-    const minTop = Math.max(iframeRect.top + VIEWPORT_MARGIN, VIEWPORT_MARGIN)
-    const maxTopCandidateIframe = iframeRect.bottom - popoverHeight - VIEWPORT_MARGIN
-    const maxTopCandidateViewport = viewportHeight - popoverHeight - VIEWPORT_MARGIN
-    const maxTop = Math.max(minTop, Math.min(maxTopCandidateIframe, maxTopCandidateViewport))
-
-    const top = Math.min(Math.max(preferredTop, minTop), maxTop)
-
-    return { left, top }
-  }
-
   useLayoutEffect(() => {
     if (!isVisible) {
       setPosition(null)
       return
+    }
+
+    const calculatePosition = () => {
+      if (!iframeRef.current || !popoverRef.current) return null
+
+      const iframeRect = iframeRef.current.getBoundingClientRect()
+      const elementRect = data.boundingRect
+      const elementInWindow = {
+        left: iframeRect.left + elementRect.left,
+        right: iframeRect.left + elementRect.right,
+        top: iframeRect.top + elementRect.top,
+        bottom: iframeRect.top + elementRect.bottom,
+        width: elementRect.width,
+        height: elementRect.height,
+      }
+
+      const popoverRect = popoverRef.current.getBoundingClientRect()
+      const popoverWidth = popoverRect.width || POPOVER_WIDTH
+      const popoverHeight = popoverRect.height || POPOVER_FALLBACK_HEIGHT
+
+      const viewportWidth = window.innerWidth
+      const viewportHeight = window.innerHeight
+
+      const elementCenter = elementInWindow.left + elementInWindow.width / 2
+      const minLeft = Math.max(iframeRect.left + VIEWPORT_MARGIN, VIEWPORT_MARGIN)
+      const maxLeftCandidateIframe = iframeRect.right - popoverWidth - VIEWPORT_MARGIN
+      const maxLeftCandidateViewport = viewportWidth - popoverWidth - VIEWPORT_MARGIN
+      const maxLeft = Math.max(minLeft, Math.min(maxLeftCandidateIframe, maxLeftCandidateViewport))
+      const centeredLeft = elementCenter - popoverWidth / 2
+      const left = Math.min(Math.max(centeredLeft, minLeft), maxLeft)
+
+      const spaceBelow = viewportHeight - elementInWindow.bottom - VIEWPORT_MARGIN
+      const spaceAbove = elementInWindow.top - VIEWPORT_MARGIN
+      const preferBelow = spaceBelow >= popoverHeight + ELEMENT_GAP || spaceBelow >= spaceAbove
+
+      const preferredTop = preferBelow
+        ? elementInWindow.bottom + ELEMENT_GAP
+        : elementInWindow.top - popoverHeight - ELEMENT_GAP
+
+      const minTop = Math.max(iframeRect.top + VIEWPORT_MARGIN, VIEWPORT_MARGIN)
+      const maxTopCandidateIframe = iframeRect.bottom - popoverHeight - VIEWPORT_MARGIN
+      const maxTopCandidateViewport = viewportHeight - popoverHeight - VIEWPORT_MARGIN
+      const maxTop = Math.max(minTop, Math.min(maxTopCandidateIframe, maxTopCandidateViewport))
+
+      const top = Math.min(Math.max(preferredTop, minTop), maxTop)
+
+      return { left, top }
     }
 
     const nextPosition = calculatePosition()

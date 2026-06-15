@@ -13,7 +13,7 @@ import {
   WEB_ARCADE_CAPABILITIES,
   type ShellCapabilities,
 } from '@/services/shellCapabilities'
-import { MULTI_PAGE_PORTABLE_ARTIFACT_WARNING } from '@/services/storage'
+import { MULTI_PAGE_WEB_SHARE_WARNING } from '@/services/storage'
 import { createArcadePage, createArcadeSourceFile } from '@/services/projectSource'
 import { createDefaultProject } from '@/utils/projectDefaults'
 import * as shareEncoding from '@/utils/shareEncoding'
@@ -261,7 +261,7 @@ describe('Fullscreen share popover integration', () => {
     await user.click(screen.getByRole('button', { name: 'Share fullscreen preview' }))
 
     expect(
-      (await screen.findAllByText(MULTI_PAGE_PORTABLE_ARTIFACT_WARNING)).length
+      (await screen.findAllByText(MULTI_PAGE_WEB_SHARE_WARNING)).length
     ).toBeGreaterThan(0)
     await waitFor(() => expect(encodeSpy).toHaveBeenCalled())
 

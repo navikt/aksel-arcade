@@ -1,6 +1,6 @@
 import { useCallback, useEffect } from 'react'
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, fireEvent, waitFor, act, within } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { AppProvider, useProject } from '@/hooks/useProject'
 import { SettingsProvider, useSettings } from '@/contexts/SettingsContext'
@@ -26,7 +26,7 @@ import type {
 } from '@/services/desktopAgentTransportProtocol'
 import * as shareEncoding from '@/utils/shareEncoding'
 import * as storage from '@/services/storage'
-import { MULTI_PAGE_PORTABLE_ARTIFACT_WARNING } from '@/services/storage'
+import { MULTI_PAGE_WEB_SHARE_WARNING } from '@/services/storage'
 import type { CompressionStrategy } from '@/services/compressionStrategies'
 import * as compressionStrategies from '@/services/compressionStrategies'
 import {
@@ -541,7 +541,7 @@ describe('Share popover integration', () => {
 
     fireEvent.click(screen.getByLabelText(/share project/i))
 
-    expect(await screen.findByText(MULTI_PAGE_PORTABLE_ARTIFACT_WARNING)).toBeTruthy()
+    expect(await screen.findByText(MULTI_PAGE_WEB_SHARE_WARNING)).toBeTruthy()
     await waitFor(() => expect(encodeSpy).toHaveBeenCalled())
 
     const serialized = encodeSpy.mock.calls.at(-1)?.[1]?.serialized
@@ -559,7 +559,7 @@ describe('Share popover integration', () => {
     expect(serialized).not.toContain('sharedConfig')
   })
 
-  it('warns before exporting a multi-page project and waits for confirmation', async () => {
+  it('exports a multi-page project directly because packages are lossless', async () => {
     const exportSpy = vi.spyOn(storage, 'exportProject').mockImplementation(() => undefined)
 
     try {
@@ -570,19 +570,14 @@ describe('Share popover integration', () => {
 
       fireEvent.click(screen.getByRole('button', { name: /^Export$/i }))
 
-      const exportDialog = await screen.findByRole('alertdialog', { name: /confirm export/i })
-      expect(within(exportDialog).getByText(MULTI_PAGE_PORTABLE_ARTIFACT_WARNING)).toBeTruthy()
-      expect(exportSpy).not.toHaveBeenCalled()
-
-      fireEvent.click(within(exportDialog).getByRole('button', { name: /export start page only/i }))
-
       expect(exportSpy).toHaveBeenCalledTimes(1)
+      expect(screen.queryByRole('alertdialog', { name: /confirm export/i })).toBeNull()
     } finally {
       exportSpy.mockRestore()
     }
   })
 
-  it('still warns before exporting a multi-page project when the experiment is disabled', async () => {
+  it('still exports a multi-page project directly when the legacy flag is false', async () => {
     const exportSpy = vi.spyOn(storage, 'exportProject').mockImplementation(() => undefined)
 
     try {
@@ -597,9 +592,8 @@ describe('Share popover integration', () => {
 
       fireEvent.click(screen.getByRole('button', { name: /^Export$/i }))
 
-      const exportDialog = await screen.findByRole('alertdialog', { name: /confirm export/i })
-      expect(within(exportDialog).getByText(MULTI_PAGE_PORTABLE_ARTIFACT_WARNING)).toBeTruthy()
-      expect(exportSpy).not.toHaveBeenCalled()
+      expect(exportSpy).toHaveBeenCalledTimes(1)
+      expect(screen.queryByRole('alertdialog', { name: /confirm export/i })).toBeNull()
     } finally {
       exportSpy.mockRestore()
     }
@@ -665,8 +659,17 @@ describe('Share popover integration', () => {
         project: {
           name: string
           source: {
-            jsx: string
-            hooks: string
+            globalConfig: { jsx: string; hooks: string }
+            pages: Array<{
+              id: string
+              name: string
+              source: {
+                jsx: string
+                hooks: string
+              }
+            }>
+            startPageId: string
+            nextPageNumber: number
           }
           preview: {
             viewport: string
@@ -678,8 +681,22 @@ describe('Share popover integration', () => {
       expect(exported.project).toMatchObject({
         name: 'Fallback Export Project',
         source: {
-          jsx: nextJsx,
-          hooks: nextHooks,
+          globalConfig: {
+            jsx: '',
+            hooks: '',
+          },
+          pages: [
+            {
+              id: 'page01',
+              name: 'Page 1',
+              source: {
+                jsx: nextJsx,
+                hooks: nextHooks,
+              },
+            },
+          ],
+          startPageId: 'page01',
+          nextPageNumber: 2,
         },
         preview: {
           viewport: 'XS',
@@ -746,7 +763,8 @@ describe('Share popover integration', () => {
     })
     await Promise.resolve()
     await Promise.resolve()
-    const copyButton = screen.getByRole('button', { name: /copy web share url/i })
+    vi.useRealTimers()
+    const copyButton = await screen.findByRole('button', { name: /copy web share url/i })
     expect((copyButton as HTMLButtonElement).disabled).toBe(false)
   }, 15000)
 

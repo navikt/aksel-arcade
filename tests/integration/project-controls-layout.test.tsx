@@ -5,7 +5,12 @@ import { SettingsProvider, useSettings } from '@/contexts/SettingsContext'
 import { AppHeader } from '@/components/Header/AppHeader'
 import { PreviewPane } from '@/components/Preview/PreviewPane'
 import { createDefaultProject } from '@/utils/projectDefaults'
-import { createSinglePageProjectSource, getActiveSource } from '@/services/projectSource'
+import {
+  createArcadePage,
+  createArcadeSourceFile,
+  createSinglePageProjectSource,
+  getActiveSource,
+} from '@/services/projectSource'
 import {
   MAX_SANDBOX_CONSOLE_MESSAGES,
   type PreviewDiagnostics,
@@ -73,15 +78,17 @@ const Harness = ({
 }: HarnessProps) => {
   const {
     project,
+    editorState,
     replaceProject,
     updateProject,
+    updateEditorState,
     resetToIntro,
     loadFormSummaryTemplate,
     loadHooksDemo,
     shareHydration,
     applySharedSnapshot,
   } = useProject()
-  const { setTheme } = useSettings()
+  const { pagePanelOpen, setPagePanelOpen, setTheme } = useSettings()
 
   return (
     <>
@@ -111,8 +118,23 @@ const Harness = ({
       >
         Update Agent read fixture
       </button>
+      <button type="button" onClick={() => updateEditorState({ activeTab: 'Hooks' })}>
+        Set local Hooks tab
+      </button>
+      <button type="button" onClick={() => setPagePanelOpen(true)}>
+        Open page panel
+      </button>
       <div data-testid="project-jsx-code" hidden>
         {getActiveSource(project).jsx}
+      </div>
+      <div data-testid="project-active-page-id" hidden>
+        {project.activePageId}
+      </div>
+      <div data-testid="editor-active-tab" hidden>
+        {editorState.activeTab}
+      </div>
+      <div data-testid="settings-page-panel-open" hidden>
+        {String(pagePanelOpen)}
       </div>
       {shareHydration.status === 'ready' && (
         <button type="button" onClick={applySharedSnapshot}>
@@ -232,6 +254,42 @@ const createProjectPackageFileForCode = (name: string, jsxCode: string): File =>
   const project = createDefaultProject()
   project.name = name
   project.source = createSinglePageProjectSource(jsxCode, getActiveSource(project).hooks)
+
+  return createProjectPackageFile(
+    JSON.stringify(createArcadeProjectPackage(project))
+  )
+}
+
+const createMultiPageProjectPackageFile = (): File => {
+  const project = createDefaultProject()
+  project.name = 'Imported multi-page package'
+  project.source = {
+    globalConfig: createArcadeSourceFile(
+      'const SharedChrome = () => <Box>Shared chrome</Box>',
+      'export const useSharedChrome = () => "shared"'
+    ),
+    pages: [
+      createArcadePage(
+        'page01',
+        'Page 1',
+        createArcadeSourceFile(
+          'export default function App() { return <Heading>Overview page</Heading> }',
+          'export const useOverviewPage = () => "overview"'
+        )
+      ),
+      createArcadePage(
+        'page02',
+        'Page 2',
+        createArcadeSourceFile(
+          'export default function App() { return <Heading>Imported start page</Heading> }',
+          'export const useImportedStartPage = () => "start"'
+        )
+      ),
+    ],
+    startPageId: 'page02',
+    nextPageNumber: 3,
+  }
+  project.activePageId = 'page01'
 
   return createProjectPackageFile(
     JSON.stringify(createArcadeProjectPackage(project))
@@ -771,6 +829,30 @@ describe('ProjectControls layout', () => {
         )
       ).toBeNull()
     })
+  })
+
+  it('imports full-source packages onto the Start page with JSX tab and the closed page-panel default', async () => {
+    renderHeader({ shellCapabilities: WEB_ARCADE_CAPABILITIES })
+
+    fireEvent.click(screen.getByRole('button', { name: /set local hooks tab/i }))
+    fireEvent.click(screen.getByRole('button', { name: /open page panel/i }))
+
+    expect(screen.getByTestId('editor-active-tab').textContent).toBe('Hooks')
+    expect(screen.getByTestId('settings-page-panel-open').textContent).toBe('true')
+
+    fireEvent.change(screen.getByLabelText(/import \.akselarcade arcade project package/i), {
+      target: {
+        files: [createMultiPageProjectPackageFile()],
+      },
+    })
+
+    await waitFor(() => expect(screen.getByText('Imported multi-page package')).toBeTruthy())
+
+    expect(screen.getByTestId('project-active-page-id').textContent).toBe('page02')
+    expect(screen.getByTestId('project-jsx-code').textContent).toContain('Imported start page')
+    expect(screen.getByTestId('project-jsx-code').textContent).not.toContain('Overview page')
+    expect(screen.getByTestId('editor-active-tab').textContent).toBe('JSX')
+    expect(screen.getByTestId('settings-page-panel-open').textContent).toBe('false')
   })
 
   it('keeps Desktop Arcade Agent access available and Share URL absent', async () => {
@@ -1517,8 +1599,22 @@ describe('ProjectControls layout', () => {
       expect(activePackage.packageData.project).toMatchObject({
         name: 'Transport Package Project',
         source: {
-          jsx: nextJsx,
-          hooks: nextHooks,
+          globalConfig: {
+            jsx: '',
+            hooks: '',
+          },
+          pages: [
+            {
+              id: 'page01',
+              name: 'Page 1',
+              source: {
+                jsx: nextJsx,
+                hooks: nextHooks,
+              },
+            },
+          ],
+          startPageId: 'page01',
+          nextPageNumber: 2,
         },
         preview: {
           viewport: 'XS',
@@ -1543,8 +1639,22 @@ describe('ProjectControls layout', () => {
       expect(stoppedPackage.packageData.project).toMatchObject({
         name: 'Transport Package Project',
         source: {
-          jsx: nextJsx,
-          hooks: nextHooks,
+          globalConfig: {
+            jsx: '',
+            hooks: '',
+          },
+          pages: [
+            {
+              id: 'page01',
+              name: 'Page 1',
+              source: {
+                jsx: nextJsx,
+                hooks: nextHooks,
+              },
+            },
+          ],
+          startPageId: 'page01',
+          nextPageNumber: 2,
         },
         preview: {
           viewport: 'XS',

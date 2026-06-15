@@ -73,6 +73,33 @@ const createLegacyPortableProject = (project: Project) => ({
   },
 })
 
+const createLegacySinglePagePackage = (project: Project) => ({
+  format: ARCADE_PROJECT_PACKAGE_FORMAT,
+  formatVersion: 2,
+  project: {
+    name: project.name,
+    source: {
+      jsx: getStartPageSource(project).jsx,
+      hooks: getStartPageSource(project).hooks,
+    },
+    preview: {
+      viewport: project.viewportSize,
+    },
+  },
+})
+
+const createLegacyPortablePackage = (project: Project) => ({
+  format: ARCADE_PROJECT_PACKAGE_FORMAT,
+  formatVersion: 1,
+  exportedAt: '2026-05-20T00:00:00.000Z',
+  project: createLegacyPortableProject(project),
+  meta: {
+    designSystem: 'Aksel',
+    usedComponents: ['Box'],
+    aiInstructions: 'legacy-export-ai-guidance',
+  },
+})
+
 const getPrimarySource = (project: Project) => getStartPageSource(project)
 
 const createLossyMultiPageProject = (
@@ -335,6 +362,7 @@ describe('Storage Service', () => {
       const result = loadProject()
 
       expect(result.fromStorage).toBe(true)
+      expect(result.error).toBeUndefined()
       expect(result.migrated).toBe(true)
       expect(result.project).toMatchObject({
         name: 'Legacy Migrated Project',
@@ -713,8 +741,22 @@ describe('Storage Service', () => {
         project: {
           name: 'Portable Package Test',
           source: {
-            jsx: '<HStack><Button>Click</Button></HStack>',
-            hooks: 'export const useCounter = () => 1',
+            globalConfig: {
+              jsx: '',
+              hooks: '',
+            },
+            pages: [
+              {
+                id: FIRST_PAGE_ID,
+                name: 'Page 1',
+                source: {
+                  jsx: '<HStack><Button>Click</Button></HStack>',
+                  hooks: 'export const useCounter = () => 1',
+                },
+              },
+            ],
+            startPageId: FIRST_PAGE_ID,
+            nextPageNumber: 2,
           },
           preview: {
             viewport: 'LG',
@@ -732,12 +774,15 @@ describe('Storage Service', () => {
       expect(serialized).not.toContain('multiPageEnabled')
       expect(serialized).not.toContain('openingIntent')
       expect(serialized).not.toContain('previewFullscreen')
+      expect(serialized).not.toContain(project.id)
+      expect(serialized).not.toContain(project.createdAt)
+      expect(serialized).not.toContain(project.lastModified)
       expect(collectObjectKeys(packageData).join(' ')).not.toMatch(
-        /agent|session|credential|endpoint|permission|checkpoint|diagnostic|evidence|transport|meta|exportedAt|createdAt|lastModified|id|panelLayout/i
+        /agent|session|credential|endpoint|permission|checkpoint|diagnostic|evidence|transport|meta|exportedAt|createdAt|lastModified|panelLayout/i
       )
     })
 
-    it('exports only the Start page when a project contains multiple pages and Global config', () => {
+    it('exports the full Arcade project source when a project contains multiple pages and Global config', () => {
       const project = createLossyMultiPageProject({
         name: 'Portable Multi-page Package',
       })
@@ -748,17 +793,39 @@ describe('Storage Service', () => {
       expect(packageData.project).toEqual({
         name: 'Portable Multi-page Package',
         source: {
-          jsx: '<Box>Portable start page</Box>',
-          hooks: 'export const usePortableStartPage = () => "start"',
+          globalConfig: {
+            jsx: 'const SharedChrome = () => <Box>Shared chrome</Box>',
+            hooks: 'export const sharedConfig = "shared"',
+          },
+          pages: [
+            {
+              id: FIRST_PAGE_ID,
+              name: 'Page 1',
+              source: {
+                jsx: '<Box>Non-start page</Box>',
+                hooks: 'export const useFirstPage = () => "first"',
+              },
+            },
+            {
+              id: 'page02',
+              name: 'Page 2',
+              source: {
+                jsx: '<Box>Portable start page</Box>',
+                hooks: 'export const usePortableStartPage = () => "start"',
+              },
+            },
+          ],
+          startPageId: 'page02',
+          nextPageNumber: 3,
         },
         preview: {
           viewport: 'MD',
         },
       })
-      expect(serialized).not.toContain('Non-start page')
-      expect(serialized).not.toContain('Shared chrome')
-      expect(serialized).not.toContain('sharedConfig')
-      expect(serialized).not.toContain('useFirstPage')
+      expect(serialized).toContain('Non-start page')
+      expect(serialized).toContain('Shared chrome')
+      expect(serialized).toContain('sharedConfig')
+      expect(serialized).toContain('useFirstPage')
     })
 
     it('exports the clean package shape without metadata', async () => {
@@ -793,7 +860,16 @@ describe('Storage Service', () => {
           formatVersion: number
           project: {
             name: string
-            source: { jsx: string; hooks: string }
+            source: {
+              globalConfig: { jsx: string; hooks: string }
+              pages: Array<{
+                id: string
+                name: string
+                source: { jsx: string; hooks: string }
+              }>
+              startPageId: string
+              nextPageNumber: number
+            }
             preview: { viewport: string }
           }
         }
@@ -803,8 +879,22 @@ describe('Storage Service', () => {
         expect(exported.project).toEqual({
           name: 'Export Shape Test',
           source: {
-            jsx: '<HStack><Button>Click</Button></HStack>',
-            hooks: '',
+            globalConfig: {
+              jsx: '',
+              hooks: '',
+            },
+            pages: [
+              {
+                id: FIRST_PAGE_ID,
+                name: 'Page 1',
+                source: {
+                  jsx: '<HStack><Button>Click</Button></HStack>',
+                  hooks: '',
+                },
+              },
+            ],
+            startPageId: FIRST_PAGE_ID,
+            nextPageNumber: 2,
           },
           preview: {
             viewport: 'MD',
@@ -812,10 +902,16 @@ describe('Storage Service', () => {
         })
         expect(Object.keys(exported).sort()).toEqual(['format', 'formatVersion', 'project'])
         expect(Object.keys(exported.project).sort()).toEqual(['name', 'preview', 'source'])
-        expect(Object.keys(exported.project.source).sort()).toEqual(['hooks', 'jsx'])
+        expect(Object.keys(exported.project.source).sort()).toEqual([
+          'globalConfig',
+          'nextPageNumber',
+          'pages',
+          'startPageId',
+        ])
         expect(Object.keys(exported.project.preview)).toEqual(['viewport'])
+        expect(exportedText).not.toContain(project.id)
         expect(exportedText).not.toMatch(
-          /meta|AI|instruction|documentation|setup|production|exportedAt|createdAt|lastModified|id|panelLayout|diagnostic|evidence/i
+          /meta|AI|instruction|documentation|setup|production|exportedAt|createdAt|lastModified|panelLayout|diagnostic|evidence/i
         )
       } finally {
         global.URL.createObjectURL = originalCreateObjectURL
@@ -871,7 +967,9 @@ describe('Storage Service', () => {
         viewportSize: 'XL',
         panelLayout: 'editor-left',
         version: CURRENT_PROJECT_VERSION,
+        activePageId: FIRST_PAGE_ID,
       })
+      expect(result.project!.source).toEqual(sourceProject.source)
       expect(getPrimarySource(result.project!).jsx).toBe('<VStack><Heading>Packaged</Heading></VStack>')
       expect(getPrimarySource(result.project!).hooks).toBe('export const usePackaged = () => "ok"')
       expect(result.project!.id).not.toBe(sourceProject.id)
@@ -916,7 +1014,7 @@ describe('Storage Service', () => {
       )
     })
 
-    it('imports a multi-page export as a valid single-page Arcade project', async () => {
+    it('imports a full-source multi-page export losslessly as a multi-page Arcade project', async () => {
       const sourceProject = createLossyMultiPageProject({
         name: 'Portable Multi-page Import',
         viewportSize: 'XL',
@@ -936,14 +1034,11 @@ describe('Storage Service', () => {
       expect(result.project).toMatchObject({
         name: 'Portable Multi-page Import',
         viewportSize: 'XL',
-        activePageId: FIRST_PAGE_ID,
+        activePageId: 'page02',
       })
-      expect(result.project?.source.globalConfig).toEqual({
-        jsx: '',
-        hooks: '',
-      })
-      expect(result.project?.source.pages).toHaveLength(1)
-      expect(result.project?.source.startPageId).toBe(FIRST_PAGE_ID)
+      expect(result.project?.source).toEqual(sourceProject.source)
+      expect(result.project?.source.pages).toHaveLength(2)
+      expect(result.project?.source.startPageId).toBe('page02')
       expect(getPrimarySource(result.project!).jsx).toBe('<Box>Portable start page</Box>')
       expect(getPrimarySource(result.project!).hooks).toBe(
         'export const usePortableStartPage = () => "start"'
@@ -1038,7 +1133,39 @@ describe('Storage Service', () => {
       expect(result.error).toContain('"agentSession"')
     })
 
-    it('should reject legacy v1 Arcade project packages', async () => {
+    it('imports legacy v2 single-page Arcade project packages as one-page projects', async () => {
+      const sourceProject = createTestProject({
+        name: 'Legacy v2 Package Import Test',
+        jsxCode: '<Box>Legacy v2 package</Box>',
+        hooksCode: 'export const useLegacyV2Package = () => "ok"',
+        viewportSize: 'LG',
+      })
+      const legacyPackage = createLegacySinglePagePackage(sourceProject)
+
+      const file = createMockFile(
+        JSON.stringify(legacyPackage),
+        'legacy-v2-package.akselarcade',
+        ARCADE_PROJECT_PACKAGE_MIME_TYPE
+      )
+
+      const result = await importProject(file)
+
+      expect(result.success).toBe(true)
+      expect(result.error).toBeUndefined()
+      expect(result.project).toMatchObject({
+        name: 'Legacy v2 Package Import Test',
+        viewportSize: 'LG',
+        panelLayout: 'editor-left',
+        activePageId: FIRST_PAGE_ID,
+      })
+      expect(result.project?.source.pages).toHaveLength(1)
+      expect(getPrimarySource(result.project!).jsx).toBe('<Box>Legacy v2 package</Box>')
+      expect(getPrimarySource(result.project!).hooks).toBe(
+        'export const useLegacyV2Package = () => "ok"'
+      )
+    })
+
+    it('imports legacy v1 single-page Arcade project packages as one-page projects', async () => {
       const sourceProject = createTestProject({
         name: 'Legacy Package Import Test',
         jsxCode: '<Box>Legacy package</Box>',
@@ -1046,11 +1173,7 @@ describe('Storage Service', () => {
         viewportSize: 'SM',
         panelLayout: 'editor-right',
       })
-      const legacyPackage = {
-        format: ARCADE_PROJECT_PACKAGE_FORMAT,
-        formatVersion: 1,
-        project: createLegacyPortableProject(sourceProject),
-      }
+      const legacyPackage = createLegacyPortablePackage(sourceProject)
 
       const file = createMockFile(
         JSON.stringify(legacyPackage),
@@ -1060,10 +1183,19 @@ describe('Storage Service', () => {
 
       const result = await importProject(file)
 
-      expect(result.success).toBe(false)
-      expect(result.project).toBeNull()
-      expect(result.error).toContain('Package is not a clean .akselarcade Arcade project package')
-      expect(result.error).toContain('Unsupported Arcade project package version "1"')
+      expect(result.success).toBe(true)
+      expect(result.error).toBeUndefined()
+      expect(result.project).toMatchObject({
+        name: 'Legacy Package Import Test',
+        viewportSize: 'SM',
+        panelLayout: 'editor-left',
+        activePageId: FIRST_PAGE_ID,
+      })
+      expect(result.project?.source.pages).toHaveLength(1)
+      expect(getPrimarySource(result.project!).jsx).toBe('<Box>Legacy package</Box>')
+      expect(getPrimarySource(result.project!).hooks).toBe(
+        'export const useLegacyPackage = () => "ok"'
+      )
     })
 
     it('should reject noisy packages with metadata, identity, preferences, or unknown fields', async () => {

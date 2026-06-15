@@ -5,7 +5,6 @@ import {
   Button,
   CopyButton,
   Detail,
-  Dialog,
   Heading,
   HStack,
   Loader,
@@ -22,7 +21,7 @@ import {
 } from '@/hooks/useShareLink'
 import { useProject } from '@/hooks/useProject'
 import { getStartPageSource } from '@/services/projectSource'
-import { exportProject, getPortableArtifactWarning } from '@/services/storage'
+import { exportProject, getWebShareWarning } from '@/services/storage'
 import { SHARE_URL_CHAR_LIMIT } from '@/utils/shareEncoding'
 import './SharePopoverButton.css'
 
@@ -45,11 +44,9 @@ export const SharePopoverButton = ({
   const clipboardBufferRef = useRef<HTMLTextAreaElement>(null)
   const lastGeneratedShareFingerprintRef = useRef<string | null>(null)
   const [shareOpen, setShareOpen] = useState(false)
-  const [exportConfirmOpen, setExportConfirmOpen] = useState(false)
   const loadingDescriptionId = useId()
-  const exportConfirmDialogId = useId()
   const slowDescriptionId = `${loadingDescriptionId}-delay`
-  const portableArtifactWarning = getPortableArtifactWarning(project)
+  const webShareWarning = getWebShareWarning(project)
   const {
     state: shareState,
     generateShareLink,
@@ -62,15 +59,6 @@ export const SharePopoverButton = ({
 
   const handleExport = useCallback(() => {
     setShareOpen(false)
-    if (portableArtifactWarning) {
-      setExportConfirmOpen(true)
-      return
-    }
-    exportProject(project)
-  }, [portableArtifactWarning, project])
-
-  const handleConfirmExport = useCallback(() => {
-    setExportConfirmOpen(false)
     exportProject(project)
   }, [project])
 
@@ -95,9 +83,7 @@ export const SharePopoverButton = ({
     if (ownerVisible) {
       return
     }
-
     setShareOpen(false)
-    setExportConfirmOpen(false)
     lastGeneratedShareFingerprintRef.current = null
     resetShareState()
   }, [ownerVisible, resetShareState])
@@ -254,9 +240,9 @@ export const SharePopoverButton = ({
                   </Detail>
                 )}
               </VStack>
-              {portableArtifactWarning && (
+              {webShareWarning && (
                 <Alert variant="warning" size="small">
-                  <BodyLong size="small">{portableArtifactWarning}</BodyLong>
+                  <BodyLong size="small">{webShareWarning}</BodyLong>
                 </Alert>
               )}
               {isGeneratingShare ? (
@@ -369,31 +355,6 @@ export const SharePopoverButton = ({
           </Popover.Content>
         </Popover>
       )}
-      <Dialog open={exportConfirmOpen} onOpenChange={setExportConfirmOpen}>
-        <Dialog.Popup
-          id={exportConfirmDialogId}
-          role="alertdialog"
-          aria-label="Confirm export"
-          closeOnOutsideClick={false}
-        >
-          <Dialog.Body>
-            <VStack gap="space-12">
-              <BodyLong>{portableArtifactWarning}</BodyLong>
-              <Detail size="small">Continue with a Start-page-only export?</Detail>
-            </VStack>
-          </Dialog.Body>
-          <Dialog.Footer>
-            <Dialog.CloseTrigger>
-              <Button type="button" variant="secondary" data-color="neutral">
-                Cancel
-              </Button>
-            </Dialog.CloseTrigger>
-            <Button type="button" onClick={handleConfirmExport}>
-              Export Start page only
-            </Button>
-          </Dialog.Footer>
-        </Dialog.Popup>
-      </Dialog>
     </>
   )
 }

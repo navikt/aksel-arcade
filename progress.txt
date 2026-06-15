@@ -2971,3 +2971,46 @@ Verification:
 Next note:
 
 - The old `multiPageEnabled` state is now compatibility-only in practice. Follow-up work can delete the remaining internal single-page bridge branch once the dedicated agent-session cleanup issue lands, without needing to preserve legacy stored false values.
+
+### 2026-06-15 - Issue #256: Lossless `.akselarcade` packages for full Arcade source
+
+Implemented:
+
+- Selected `#256` as the highest-priority `ready-for-agent` feature from `#256`-`#259` because `#259` is blocked on the package/share/agent groundwork, `#258` is narrower Desktop-agent follow-up work, and `#256` establishes the portable full-project package boundary needed before the Web-share fallback in `#257`.
+- Read issue `#252`, `CONTEXT.md`, and the existing `progress.txt` notes before changing code.
+- Updated `src/services/storage.ts` so `.akselarcade` exports now carry the full canonical `project.source` (`globalConfig`, all pages, `startPageId`, `nextPageNumber`) in clean package format `v3`, while imports still mint a fresh local project identity and keep backward compatibility for legacy `v2` single-page packages and `v1` portable packages.
+- Kept raw legacy saved-project JSON rejected on import, narrowed the lossy warning surface to Web share URLs only, and removed the misleading package-export confirmation path because package export is now lossless for the full Arcade project source.
+- Updated the header/share UI and regression coverage in `src/components/Header/AppHeader.tsx`, `src/components/Share/SharePopoverButton.tsx`, `tests/unit/services/storage.test.ts`, `tests/integration/share-popover.test.tsx`, `tests/integration/fullscreen-share-popover.test.tsx`, and `tests/integration/project-controls-layout.test.tsx` so package export/import, Desktop export fallback, and imported working-copy defaults all match the new full-source contract.
+- Cleaned up two unrelated regressions discovered during validation: restored the missing `FIRST_PAGE_ID` import in the legacy storage migration path and moved the `InspectionPopover` position helper into the layout effect so the repo lint pass is clean again.
+
+Verification:
+
+- `npm run typecheck`
+- `npm run lint`
+- `npm run build`
+- `npm run test -- --run`
+- Browser check at `http://127.0.0.1:5190/aksel-arcade/` confirming a two-page `.akselarcade` export captured `startPageId: "page03"` with both pages present, importing that package reset the working copy to the Start page on the **JSX** tab with the page panel closed, and a clean reload completed without console errors
+
+Next note:
+
+- `#257` still owns the lossy Web share fallback. Keep `MULTI_PAGE_WEB_SHARE_WARNING` scoped to share URLs until that path can preserve full project source; package export should stay direct and warning-free.
+- Future package work should keep the `v3` clean-package boundary strict: no working-copy preferences, local identity, or Desktop/agent session artifacts belong in `.akselarcade` payloads.
+
+### 2026-06-15 - PR #263 review follow-up for Issue #256
+
+Fixed after code review:
+
+- The PR review found that real historical `formatVersion: 1` `.akselarcade` files were still rejected because the new parser enforced the strict v3 root shape before it branched to the legacy portable-package path.
+- Updated `src/services/storage.ts` so genuine v1 package envelopes can carry their historical `exportedAt` and optional `meta` root fields without weakening the strict clean-package boundary for current v3 exports or raw legacy JSON working copies.
+- Updated `tests/unit/services/storage.test.ts` so the v1 import regression uses the historical root package shape instead of a synthetic minimal envelope.
+
+Verification:
+
+- `npm run typecheck`
+- `npm run lint`
+- `npm run build`
+- `npm run test -- --run`
+
+Next note:
+
+- Keep the parser branch order intentional: v1 compatibility should be handled before the strict clean-package root-key assertion, while v3 and raw JSON rejections should continue to fail closed on extra top-level fields.
