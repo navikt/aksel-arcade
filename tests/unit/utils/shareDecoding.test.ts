@@ -5,6 +5,7 @@ import {
   encodeSharePayload,
   createShareToken,
   LEGACY_SHARE_FORMAT_VERSION,
+  LEGACY_MINIMAL_SHARE_FORMAT_VERSION,
   SHARE_FULLSCREEN_INTENT_FORMAT_VERSION,
 } from '@/utils/shareEncoding'
 import { getCompressionStrategy } from '@/services/compressionStrategies'
@@ -13,30 +14,38 @@ import { createDefaultProject } from '@/utils/projectDefaults'
 import { createShareSnapshot, SNAPSHOT_FILE_IDS } from '@/services/storage'
 import { createSinglePageProjectSource, getStartPageSource } from '@/services/projectSource'
 
-describe('shareDecoding v3 payloads', () => {
-  it('decodes v3 Web share URL payloads into shared source and preview preferences', async () => {
+describe('shareDecoding full-project payloads', () => {
+  it('decodes Web share URL payloads into full project source and preview preferences', async () => {
     const project = createDefaultProject()
+    project.name = 'Shared project name'
+    project.viewportSize = 'LG'
     project.source = createSinglePageProjectSource(
       'export default function App() { return <div>Shared JSX</div> }',
       'export function useSharedHook() { return "Shared Hooks" }'
     )
-    const snapshot = createShareSnapshot(project, {
-      preview: {
-        viewport: 'LG',
-        theme: 'light',
-      },
+    const envelope = await encodeSharePayload(project, {
+      previewTheme: 'light',
     })
-    const envelope = await encodeSharePayload(snapshot)
     const token = createShareToken(envelope)
     const result = await decodeShareToken(token)
 
     expect(result.checksumValid).toBe(true)
+    expect(result.sharedProject).toEqual({
+      project: {
+        name: 'Shared project name',
+        source: project.source,
+        preview: {
+          viewport: 'LG',
+        },
+      },
+      theme: 'light',
+    })
     expect(result.snapshot?.files.find(file => file.id === 'file-jsx')?.content).toContain('Shared JSX')
     expect(result.snapshot?.files.find(file => file.id === 'file-hooks')?.content).toContain('Shared Hooks')
     expect(result.snapshot?.preview).toEqual({
-      viewport: snapshot.preview.viewport,
+      viewport: 'LG',
       zoom: 1,
-      theme: snapshot.preview.theme,
+      theme: 'light',
       sandboxFlags: {},
     })
     expect(result.snapshot?.settings).toEqual({
@@ -48,17 +57,14 @@ describe('shareDecoding v3 payloads', () => {
 
   it('exposes preview fullscreen opening intent without adding it to the shared snapshot model', async () => {
     const project = createDefaultProject()
+    project.name = 'Shared fullscreen project'
+    project.viewportSize = 'LG'
     project.source = createSinglePageProjectSource(
       'export default function App() { return <div>Shared fullscreen intent</div> }',
       'export function useSharedFullscreenIntent() { return "Shared Hooks" }'
     )
-    const snapshot = createShareSnapshot(project, {
-      preview: {
-        viewport: 'LG',
-        theme: 'light',
-      },
-    })
-    const envelope = await encodeSharePayload(snapshot, {
+    const envelope = await encodeSharePayload(project, {
+      previewTheme: 'light',
       openingIntent: { previewFullscreen: true },
     })
     const token = createShareToken(envelope)
@@ -67,13 +73,51 @@ describe('shareDecoding v3 payloads', () => {
     expect(result.checksumValid).toBe(true)
     expect(result.metadata?.formatVersion).toBe(SHARE_FULLSCREEN_INTENT_FORMAT_VERSION)
     expect(result.openingIntent).toEqual({ previewFullscreen: true })
+    expect(result.sharedProject).toEqual({
+      project: {
+        name: 'Shared fullscreen project',
+        source: project.source,
+        preview: {
+          viewport: 'LG',
+        },
+      },
+      theme: 'light',
+    })
     expect(result.snapshot?.preview).toEqual({
-      viewport: snapshot.preview.viewport,
+      viewport: 'LG',
       zoom: 1,
-      theme: snapshot.preview.theme,
+      theme: 'light',
       sandboxFlags: {},
     })
     expect(JSON.stringify(result.snapshot)).not.toContain('previewFullscreen')
+  })
+
+  it('keeps decoding old single-page minimal Web share URL payloads as one-page projects', async () => {
+    const project = createDefaultProject()
+    project.source = createSinglePageProjectSource(
+      'export default function App() { return <div>Legacy minimal JSX</div> }',
+      'export function useLegacyMinimalHook() { return "Legacy minimal Hooks" }'
+    )
+    const snapshot = createShareSnapshot(project, {
+      preview: {
+        viewport: 'LG',
+        theme: 'light',
+      },
+    })
+    const envelope = await encodeSharePayload(snapshot, {
+      formatVersion: LEGACY_MINIMAL_SHARE_FORMAT_VERSION,
+    })
+    const token = createShareToken(envelope)
+    const result = await decodeShareToken(token)
+
+    expect(result.checksumValid).toBe(true)
+    expect(result.sharedProject).toBeUndefined()
+    expect(result.snapshot?.files.find(file => file.id === 'file-jsx')?.content).toContain(
+      'Legacy minimal JSX'
+    )
+    expect(result.snapshot?.files.find(file => file.id === 'file-hooks')?.content).toContain(
+      'Legacy minimal Hooks'
+    )
   })
 
   it('detects preview fullscreen intent tampering through checksum validation', async () => {

@@ -84,7 +84,10 @@ function App({ shellCapabilities = WEB_ARCADE_CAPABILITIES }: AppProps) {
   }
 
   const hasNotifications =
-    (shareHydration.status === 'ready' && !!shareHydration.snapshot) ||
+    (
+      shareHydration.status === 'ready'
+      && (!!shareHydration.snapshot || !!shareHydration.sharedProject)
+    ) ||
     shareHydration.status === 'error' ||
     !!sizeWarning ||
     !!saveError
@@ -101,7 +104,8 @@ function App({ shellCapabilities = WEB_ARCADE_CAPABILITIES }: AppProps) {
       >
         {hasNotifications && (
           <div className={notificationsClassName}>
-            {shareHydration.status === 'ready' && shareHydration.snapshot && (
+            {shareHydration.status === 'ready' &&
+              (shareHydration.snapshot || shareHydration.sharedProject) && (
               <WarningNotification
                 variant="warning"
                 message="Load Web share URL?"

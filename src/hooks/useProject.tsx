@@ -49,6 +49,7 @@ import {
 } from '@/services/projectSource'
 import {
   DEFAULT_WEB_ARCADE_WORKING_COPY_PREFERENCES,
+  buildFreshProjectFromPortableArcadeProjectData,
   loadProject,
   SNAPSHOT_FILE_IDS,
   type WebArcadeWorkingCopyPreferences,
@@ -63,11 +64,13 @@ import {
 } from '@/utils/shareDecoding'
 import { appendSandboxConsoleMessage } from '@/services/previewDiagnostics'
 import { notifyAgentSessionProjectReplaced } from '@/services/agentSessionLifecycle'
+import type { DecodedWebShareProject } from '@/utils/sharePayload'
 
 interface ShareHydrationState {
   status: 'idle' | 'decoding' | 'ready' | 'error'
   token?: string
   snapshot?: ProjectSnapshot
+  sharedProject?: DecodedWebShareProject
   metadata?: ShareUrlMetadata
   openingIntent?: ShareUrlOpeningIntent
   error?: ShareDecodeError
@@ -210,11 +213,12 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         return
       }
 
-      if (result.snapshot && result.checksumValid) {
+      if ((result.snapshot || result.sharedProject) && result.checksumValid) {
         setShareHydration({
           status: 'ready',
           token,
           snapshot: result.snapshot,
+          sharedProject: result.sharedProject,
           metadata: result.metadata,
           openingIntent: result.openingIntent,
         })
@@ -430,21 +434,31 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   }
 
   const applySharedSnapshot = () => {
-    if (shareHydration.status !== 'ready' || !shareHydration.snapshot) {
+    if (
+      shareHydration.status !== 'ready'
+      || (!shareHydration.snapshot && !shareHydration.sharedProject)
+    ) {
       return
     }
 
-    const snapshot = shareHydration.snapshot
     const nextPreviewFullscreen =
       shareHydration.openingIntent?.previewFullscreen === true
         ? true
         : previewFullscreen
 
     try {
-      const nextProject = buildProjectFromSnapshot(snapshot)
+      const nextProject = shareHydration.sharedProject
+        ? buildFreshProjectFromPortableArcadeProjectData(shareHydration.sharedProject.project)
+        : buildProjectFromSnapshot(shareHydration.snapshot!)
+      const nextTheme = shareHydration.sharedProject?.theme ?? shareHydration.snapshot?.preview.theme
+
+      if (!nextTheme) {
+        throw new Error('Shared project theme is missing')
+      }
+
       replaceCurrentWorkingCopy(nextProject, {
         ...DEFAULT_WEB_ARCADE_WORKING_COPY_PREFERENCES,
-        theme: snapshot.preview.theme,
+        theme: nextTheme,
         multiPageEnabled,
         pagePanelOpen,
         previewFullscreen: nextPreviewFullscreen,

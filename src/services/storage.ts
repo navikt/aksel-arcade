@@ -94,19 +94,18 @@ export interface ExportProjectOptions {
 const LEGACY_SINGLE_PAGE_ARCADE_PROJECT_PACKAGE_FORMAT_VERSION = 2 as const
 const LEGACY_PORTABLE_ARCADE_PROJECT_PACKAGE_FORMAT_VERSION = 1 as const
 
-export const MULTI_PAGE_WEB_SHARE_WARNING =
-  'Web share URLs currently include only the Start page. Additional pages and Global config are not included. Export an Arcade project package for a lossless handoff.'
+export interface PortableArcadeProjectData {
+  name: string
+  source: Project['source']
+  preview: {
+    viewport: Project['viewportSize']
+  }
+}
 
 export interface ArcadeProjectPackage {
   format: typeof ARCADE_PROJECT_PACKAGE_FORMAT
   formatVersion: typeof ARCADE_PROJECT_PACKAGE_FORMAT_VERSION
-  project: {
-    name: string
-    source: Project['source']
-    preview: {
-      viewport: Project['viewportSize']
-    }
-  }
+  project: PortableArcadeProjectData
 }
 
 export interface ShareSnapshotOverrides {
@@ -124,9 +123,6 @@ export const DEFAULT_WEB_ARCADE_WORKING_COPY_PREFERENCES: WebArcadeWorkingCopyPr
   selectedEditTarget: 'page',
   previewFullscreen: false,
 }
-
-export const getWebShareWarning = (project: Pick<Project, 'source'>): string | null =>
-  isWebShareLossy(project) ? MULTI_PAGE_WEB_SHARE_WARNING : null
 
 export const SNAPSHOT_FILE_IDS = {
   jsx: 'file-jsx',
@@ -311,15 +307,17 @@ export const createArcadeProjectPackage = (project: Project): ArcadeProjectPacka
   return {
     format: ARCADE_PROJECT_PACKAGE_FORMAT,
     formatVersion: ARCADE_PROJECT_PACKAGE_FORMAT_VERSION,
-    project: {
-      name: project.name,
-      source: cloneProjectSource(project.source),
-      preview: {
-        viewport: project.viewportSize,
-      },
-    },
+    project: createPortableArcadeProjectData(project),
   }
 }
+
+export const createPortableArcadeProjectData = (project: Project): PortableArcadeProjectData => ({
+  name: project.name,
+  source: cloneProjectSource(project.source),
+  preview: {
+    viewport: project.viewportSize,
+  },
+})
 
 export const exportProject = (project: Project, options: ExportProjectOptions = {}): void => {
   const exportedAt = options.exportedAt ?? new Date().toISOString()
@@ -393,6 +391,12 @@ const isArcadeProjectPackageFile = (file: File): boolean =>
 
 const buildProjectFromCleanPackage = (payload: unknown): Project => {
   const cleanProject = parseCleanArcadeProjectPackage(payload)
+  return buildFreshProjectFromPortableArcadeProjectData(cleanProject)
+}
+
+export const buildFreshProjectFromPortableArcadeProjectData = (
+  cleanProject: PortableArcadeProjectData
+): Project => {
   const now = new Date().toISOString()
 
   return normalizeImportedProject({
@@ -408,7 +412,7 @@ const buildProjectFromCleanPackage = (payload: unknown): Project => {
   })
 }
 
-const parseCleanArcadeProjectPackage = (payload: unknown): ArcadeProjectPackage['project'] => {
+const parseCleanArcadeProjectPackage = (payload: unknown): PortableArcadeProjectData => {
   if (!isRecord(payload)) {
     throw new Error(CLEAN_PACKAGE_REJECTION_MESSAGE)
   }
@@ -456,25 +460,15 @@ const validateLegacyPortablePackageEnvelope = (payload: Record<string, unknown>)
   }
 }
 
-const parseFullSourcePackageProject = (payload: unknown): ArcadeProjectPackage['project'] => {
+const parseFullSourcePackageProject = (payload: unknown): PortableArcadeProjectData => {
   if (!isRecord(payload)) {
     throw new Error('Project package is missing clean project content')
   }
 
-  assertExactKeys(payload, ['name', 'source', 'preview'], 'project')
-
-  if (typeof payload.name !== 'string') {
-    throw new Error('Project package name must be a string')
-  }
-
-  return {
-    name: payload.name,
-    source: parsePortableProjectSource(payload.source),
-    preview: parsePackagePreview(payload.preview),
-  }
+  return parsePortableArcadeProjectData(payload, 'project')
 }
 
-const parseLegacySinglePagePackageProject = (payload: unknown): ArcadeProjectPackage['project'] => {
+const parseLegacySinglePagePackageProject = (payload: unknown): PortableArcadeProjectData => {
   if (!isRecord(payload)) {
     throw new Error('Legacy project package is missing clean project content')
   }
@@ -506,7 +500,7 @@ const parseLegacySinglePagePackageProject = (payload: unknown): ArcadeProjectPac
   }
 }
 
-const parseLegacyPortablePackageProject = (payload: unknown): ArcadeProjectPackage['project'] => {
+const parseLegacyPortablePackageProject = (payload: unknown): PortableArcadeProjectData => {
   if (!isRecord(payload)) {
     throw new Error('Legacy project package is missing portable project content')
   }
@@ -570,20 +564,41 @@ const parseLegacyPortablePackageProject = (payload: unknown): ArcadeProjectPacka
   }
 }
 
-const parsePortableProjectSource = (payload: unknown): ArcadeProjectPackage['project']['source'] => {
+export const parsePortableArcadeProjectData = (
+  payload: unknown,
+  label = 'project'
+): PortableArcadeProjectData => {
   if (!isRecord(payload)) {
-    throw new Error('Project package source must be an object')
+    throw new Error(`${capitalizeLabel(label)} must be an object`)
   }
 
-  assertExactKeys(payload, ['globalConfig', 'pages', 'startPageId', 'nextPageNumber'], 'project source')
+  assertExactKeys(payload, ['name', 'source', 'preview'], label)
 
-  const globalConfig = parsePackageSourceFile(payload.globalConfig, 'project global config')
+  if (typeof payload.name !== 'string') {
+    throw new Error(`${capitalizeLabel(label)} name must be a string`)
+  }
+
+  return {
+    name: payload.name,
+    source: parsePortableProjectSource(payload.source, `${label} source`),
+    preview: parsePackagePreview(payload.preview, `${label} preview`),
+  }
+}
+
+const parsePortableProjectSource = (payload: unknown, label = 'project source'): PortableArcadeProjectData['source'] => {
+  if (!isRecord(payload)) {
+    throw new Error(`${capitalizeLabel(label)} must be an object`)
+  }
+
+  assertExactKeys(payload, ['globalConfig', 'pages', 'startPageId', 'nextPageNumber'], label)
+
+  const globalConfig = parsePackageSourceFile(payload.globalConfig, `${label} global config`)
 
   if (!Array.isArray(payload.pages) || payload.pages.length === 0) {
-    throw new Error('Project package pages must contain at least one Arcade page')
+    throw new Error(`${capitalizeLabel(label)} pages must contain at least one Arcade page`)
   }
 
-  const pages = payload.pages.map((page) => parsePackagePage(page))
+  const pages = payload.pages.map((page) => parsePackagePage(page, label))
   const pageIds = new Set<string>()
   for (const page of pages) {
     if (pageIds.has(page.id)) {
@@ -593,7 +608,7 @@ const parsePortableProjectSource = (payload: unknown): ArcadeProjectPackage['pro
   }
 
   if (!isArcadePageId(payload.startPageId) || !pageIds.has(payload.startPageId)) {
-    throw new Error('Project package startPageId must target an exported Arcade page')
+    throw new Error(`${capitalizeLabel(label)} startPageId must target an exported Arcade page`)
   }
 
   if (
@@ -601,7 +616,7 @@ const parsePortableProjectSource = (payload: unknown): ArcadeProjectPackage['pro
     !Number.isInteger(payload.nextPageNumber) ||
     payload.nextPageNumber < 2
   ) {
-    throw new Error('Project package nextPageNumber must be an integer >= 2')
+    throw new Error(`${capitalizeLabel(label)} nextPageNumber must be an integer >= 2`)
   }
 
   return {
@@ -612,25 +627,28 @@ const parsePortableProjectSource = (payload: unknown): ArcadeProjectPackage['pro
   }
 }
 
-const parsePackagePage = (payload: unknown): ArcadeProjectPackage['project']['source']['pages'][number] => {
+const parsePackagePage = (
+  payload: unknown,
+  projectSourceLabel: string
+): PortableArcadeProjectData['source']['pages'][number] => {
   if (!isRecord(payload)) {
-    throw new Error('Project package page must be an object')
+    throw new Error(`${capitalizeLabel(projectSourceLabel)} page must be an object`)
   }
 
-  assertExactKeys(payload, ['id', 'name', 'source'], 'project page')
+  assertExactKeys(payload, ['id', 'name', 'source'], `${projectSourceLabel} page`)
 
   if (!isArcadePageId(payload.id)) {
-    throw new Error('Project package page id must be a valid Arcade page id')
+    throw new Error(`${capitalizeLabel(projectSourceLabel)} page id must be a valid Arcade page id`)
   }
 
   if (typeof payload.name !== 'string' || payload.name.trim().length === 0) {
-    throw new Error('Project package page name must be a non-empty string')
+    throw new Error(`${capitalizeLabel(projectSourceLabel)} page name must be a non-empty string`)
   }
 
   return {
     id: payload.id,
     name: payload.name,
-    source: parsePackageSourceFile(payload.source, `Arcade page "${payload.id}" source`),
+    source: parsePackageSourceFile(payload.source, `${capitalizeLabel(projectSourceLabel)} page "${payload.id}" source`),
   }
 }
 
@@ -698,6 +716,9 @@ const assertExactKeys = (
 }
 
 const formatKeyList = (keys: string[]): string => keys.map((key) => `"${key}"`).join(', ')
+
+const capitalizeLabel = (label: string): string =>
+  label.charAt(0).toUpperCase() + label.slice(1)
 
 const formatCleanPackageRejection = (error: unknown): string => {
   const message = error instanceof Error ? error.message : String(error)
@@ -780,12 +801,6 @@ const buildDefaultSnapshotFiles = (project: Project): ProjectFileSnapshot[] => {
     },
   ]
 }
-
-const isWebShareLossy = (project: Pick<Project, 'source'>): boolean =>
-  project.source.pages.length > 1 || hasSourceContent(project.source.globalConfig)
-
-const hasSourceContent = (source: ArcadeSourceFile): boolean =>
-  source.jsx.trim().length > 0 || source.hooks.trim().length > 0
 
 const restoreStoredWorkingCopy = (
   stored: unknown

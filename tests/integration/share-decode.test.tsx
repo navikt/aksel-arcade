@@ -25,6 +25,7 @@ import { getCompressionStrategy } from '@/services/compressionStrategies'
 import { CURRENT_PROJECT_VERSION, type Project, type ProjectSnapshot } from '@/types/project'
 import {
   FIRST_PAGE_ID,
+  getActiveSource,
   createArcadePage,
   createArcadeSourceFile,
   createSinglePageProjectSource,
@@ -48,6 +49,7 @@ const Harness = () => {
   } = useProject()
   const { theme, panelOrder, multiPageEnabled, pagePanelOpen, previewFullscreen } = useSettings()
   const source = getStartPageSource(project)
+  const activeSource = getActiveSource(project)
 
   return (
     <div>
@@ -58,8 +60,15 @@ const Harness = () => {
       <div data-testid="project-last-modified">{project.lastModified}</div>
       <div data-testid="project-panel-layout">{project.panelLayout}</div>
       <div data-testid="project-viewport">{project.viewportSize}</div>
+      <div data-testid="project-active-page-id">{project.activePageId}</div>
+      <div data-testid="project-start-page-id">{project.source.startPageId}</div>
+      <div data-testid="project-page-count">{String(project.source.pages.length)}</div>
+      <div data-testid="project-source-json">{JSON.stringify(project.source)}</div>
+      <div data-testid="global-config-jsx">{project.source.globalConfig.jsx}</div>
       <div data-testid="jsx-code">{source.jsx}</div>
       <div data-testid="hooks-code">{source.hooks}</div>
+      <div data-testid="active-jsx-code">{activeSource.jsx}</div>
+      <div data-testid="active-hooks-code">{activeSource.hooks}</div>
       <div data-testid="editor-active-tab">{editorState.activeTab}</div>
       <div data-testid="preview-current-viewport">{previewState.currentViewport}</div>
       <div data-testid="preview-viewport-width">{previewState.viewportWidth}</div>
@@ -417,7 +426,7 @@ describe('share decode integration', () => {
     })
   })
 
-  it('loads v3 Web share URLs as fresh local projects from shared source and preview preferences', async () => {
+  it('loads full-project Web share URLs as fresh local projects with the shared name and preview preferences', async () => {
     const previousProject = createWorkingCopyProject({
       name: 'Previous local project',
       jsxCode: 'export default function App() { return <div>Previous JSX</div> }',
@@ -430,28 +439,14 @@ describe('share decode integration', () => {
     const senderProject = createDefaultProject()
     senderProject.name = 'Sender project name'
     senderProject.version = CURRENT_PROJECT_VERSION
+    senderProject.viewportSize = 'LG'
     setPrimarySource(
       senderProject,
       'export default function App() { return <Heading>Shared v3 JSX</Heading> }',
       'export function useSharedHook() { return "Shared v3 Hooks" }'
     )
 
-    const token = await createShareTokenForSnapshot(
-      createShareSnapshot(senderProject, {
-        activeFileId: SNAPSHOT_FILE_IDS.hooks,
-        preview: {
-          viewport: 'LG',
-          zoom: 0.75,
-          theme: 'light',
-          sandboxFlags: { outlines: true },
-        },
-        settings: {
-          autosave: false,
-          linting: false,
-          showLineNumbers: false,
-        },
-      })
-    )
+    const token = await createShareTokenForProject(senderProject, 'light')
     window.history.replaceState({}, '', `/?share=${encodeURIComponent(token)}&foo=bar`)
 
     renderHarness()
@@ -473,8 +468,7 @@ describe('share decode integration', () => {
     expect(screen.getByTestId('project-id').textContent).toMatch(
       /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
     )
-    expect(screen.getByTestId('project-name').textContent).toBe('Untitled Project')
-    expect(screen.getByTestId('project-name').textContent).not.toBe(senderProject.name)
+    expect(screen.getByTestId('project-name').textContent).toBe(senderProject.name)
     expect(screen.getByTestId('project-created-at').textContent).not.toBe(previousProject.createdAt)
     expect(screen.getByTestId('project-last-modified').textContent).not.toBe(
       previousProject.lastModified
@@ -483,6 +477,8 @@ describe('share decode integration', () => {
     expect(screen.getByTestId('project-panel-layout').textContent).toBe('editor-left')
     expect(screen.getByTestId('jsx-code').textContent).toContain('Shared v3 JSX')
     expect(screen.getByTestId('hooks-code').textContent).toContain('Shared v3 Hooks')
+    expect(screen.getByTestId('project-page-count').textContent).toBe('1')
+    expect(screen.getByTestId('project-active-page-id').textContent).toBe('page01')
     expect(screen.getByTestId('project-viewport').textContent).toBe('LG')
     expect(screen.getByTestId('preview-current-viewport').textContent).toBe('LG')
     expect(screen.getByTestId('preview-viewport-width').textContent).toBe(
@@ -510,18 +506,13 @@ describe('share decode integration', () => {
     })
 
     const senderProject = createDefaultProject()
+    senderProject.name = 'Shared multi-page affordance project'
     setPrimarySource(
       senderProject,
       'export default function App() { return <Heading>Shared multi-page affordance</Heading> }'
     )
 
-    const token = await createShareTokenForSnapshot(
-      createShareSnapshot(senderProject, {
-        preview: {
-          theme: 'light',
-        },
-      })
-    )
+    const token = await createShareTokenForProject(senderProject, 'light')
     window.history.replaceState({}, '', `/?share=${encodeURIComponent(token)}`)
 
     renderHarness()
@@ -542,18 +533,15 @@ describe('share decode integration', () => {
 
   it('exposes preview fullscreen opening intent before loading a shared project', async () => {
     const senderProject = createDefaultProject()
+    senderProject.name = 'Shared fullscreen preview project'
+    senderProject.viewportSize = 'LG'
     setPrimarySource(
       senderProject,
       'export default function App() { return <Heading>Shared fullscreen preview</Heading> }',
       'export function useSharedFullscreenPreview() { return "Shared Hooks" }'
     )
-    const snapshot = createShareSnapshot(senderProject, {
-      preview: {
-        viewport: 'LG',
-        theme: 'light',
-      },
-    })
-    const envelope = await encodeSharePayload(snapshot, {
+    const envelope = await encodeSharePayload(senderProject, {
+      previewTheme: 'light',
       openingIntent: { previewFullscreen: true },
     })
     const token = createShareToken(envelope)
@@ -569,19 +557,17 @@ describe('share decode integration', () => {
 
   it('keeps fullscreen off until a fullscreen share is accepted, then persists it for reloads', async () => {
     const senderProject = createDefaultProject()
+    senderProject.name = 'Shared fullscreen preview project'
+    senderProject.viewportSize = 'LG'
     setPrimarySource(
       senderProject,
       'export default function App() { return <Heading>Shared fullscreen preview</Heading> }',
       'export function useSharedFullscreenPreview() { return "Shared Hooks" }'
     )
     const envelope = await encodeSharePayload(
-      createShareSnapshot(senderProject, {
-        preview: {
-          viewport: 'LG',
-          theme: 'light',
-        },
-      }),
+      senderProject,
       {
+        previewTheme: 'light',
         openingIntent: { previewFullscreen: true },
       }
     )
@@ -627,19 +613,14 @@ describe('share decode integration', () => {
     })
 
     const senderProject = createDefaultProject()
+    senderProject.name = 'Shared normal preview project'
+    senderProject.viewportSize = 'LG'
     setPrimarySource(
       senderProject,
       'export default function App() { return <Heading>Shared normal preview</Heading> }',
       'export function useSharedNormalPreview() { return "Shared Hooks" }'
     )
-    const token = await createShareTokenForSnapshot(
-      createShareSnapshot(senderProject, {
-        preview: {
-          viewport: 'LG',
-          theme: 'light',
-        },
-      })
-    )
+    const token = await createShareTokenForProject(senderProject, 'light')
     window.history.replaceState({}, '', `/?share=${encodeURIComponent(token)}`)
 
     renderPersistedHarness()
@@ -650,7 +631,7 @@ describe('share decode integration', () => {
     await user.click(screen.getByRole('button', { name: /load web share url/i }))
 
     await waitFor(() => {
-      expect(screen.getByTestId('project-name').textContent).toBe('Untitled Project')
+      expect(screen.getByTestId('project-name').textContent).toBe('Shared normal preview project')
       expect(screen.getByTestId('settings-preview-fullscreen').textContent).toBe('true')
     })
 
@@ -679,19 +660,17 @@ describe('share decode integration', () => {
     })
 
     const senderProject = createDefaultProject()
+    senderProject.name = 'Shared fullscreen preview project'
+    senderProject.viewportSize = 'LG'
     setPrimarySource(
       senderProject,
       'export default function App() { return <Heading>Shared fullscreen preview</Heading> }',
       'export function useSharedFullscreenPreview() { return "Shared Hooks" }'
     )
     const envelope = await encodeSharePayload(
-      createShareSnapshot(senderProject, {
-        preview: {
-          viewport: 'LG',
-          theme: 'light',
-        },
-      }),
+      senderProject,
       {
+        previewTheme: 'light',
         openingIntent: { previewFullscreen: true },
       }
     )
@@ -714,16 +693,12 @@ describe('share decode integration', () => {
     expect(screen.getByTestId('settings-preview-fullscreen').textContent).toBe('true')
   })
 
-  it('loads multi-page Web share URLs as single-page local projects using only the Start page', async () => {
+  it('loads multi-page Web share URLs losslessly and opens the shared Start page on the JSX tab', async () => {
     const senderProject = createLossyMultiPageShareProject()
-    const token = await createShareTokenForSnapshot(
-      createShareSnapshot(senderProject, {
-        preview: {
-          viewport: 'LG',
-          theme: 'light',
-        },
-      })
-    )
+    senderProject.name = 'Lossless shared project'
+    senderProject.viewportSize = 'LG'
+    senderProject.activePageId = 'page01'
+    const token = await createShareTokenForProject(senderProject, 'light')
     window.history.replaceState({}, '', `/?share=${encodeURIComponent(token)}`)
 
     renderHarness()
@@ -735,10 +710,18 @@ describe('share decode integration', () => {
       expect(screen.getByTestId('share-status').textContent).toBe('idle')
     })
 
-    expect(screen.getByTestId('jsx-code').textContent).toContain('Portable shared start page')
-    expect(screen.getByTestId('hooks-code').textContent).toContain('usePortableSharedStartPage')
-    expect(screen.getByTestId('jsx-code').textContent).not.toContain('Non-start shared page')
-    expect(screen.getByTestId('jsx-code').textContent).not.toContain('Shared chrome')
+    expect(screen.getByTestId('project-name').textContent).toBe('Lossless shared project')
+    expect(screen.getByTestId('project-page-count').textContent).toBe('2')
+    expect(screen.getByTestId('project-start-page-id').textContent).toBe('page02')
+    expect(screen.getByTestId('project-active-page-id').textContent).toBe('page02')
+    expect(screen.getByTestId('editor-active-tab').textContent).toBe('JSX')
+    expect(screen.getByTestId('global-config-jsx').textContent).toContain('Shared chrome')
+    expect(screen.getByTestId('active-jsx-code').textContent).toContain('Portable shared start page')
+    expect(screen.getByTestId('active-hooks-code').textContent).toContain(
+      'usePortableSharedStartPage'
+    )
+    expect(screen.getByTestId('project-source-json').textContent).toContain('Non-start shared page')
+    expect(screen.getByTestId('project-source-json').textContent).toContain('Shared chrome')
   })
 
   it('applies a Web share URL only to the current tab working copy', async () => {
@@ -786,19 +769,14 @@ describe('share decode integration', () => {
     saveProject(currentTabProject)
 
     const sharedProject = createDefaultProject()
+    sharedProject.name = 'Shared isolated project'
+    sharedProject.viewportSize = 'XL'
     setPrimarySource(
       sharedProject,
       'export default function App() { return <div>Shared isolated JSX</div> }',
       'export function useSharedIsolatedHook() { return "Shared Hooks" }'
     )
-    const token = await createShareTokenForSnapshot(
-      createShareSnapshot(sharedProject, {
-        preview: {
-          viewport: 'XL',
-          theme: 'light',
-        },
-      })
-    )
+    const token = await createShareTokenForProject(sharedProject, 'light')
     window.history.replaceState({}, '', `/?share=${encodeURIComponent(token)}`)
 
     const currentTab = renderPersistedHarness()
@@ -811,7 +789,7 @@ describe('share decode integration', () => {
     await waitFor(
       () => {
         const stored = parseStoredWorkingCopy(currentTabStorage)
-        expect(stored.project.name).toBe('Untitled Project')
+        expect(stored.project.name).toBe('Shared isolated project')
         expect(getStartPageSource(stored.project).jsx).toContain('Shared isolated JSX')
         expect(stored.project.viewportSize).toBe('XL')
         expect(stored.preferences).toEqual({
@@ -1095,12 +1073,14 @@ const createShareTokenForCode = async (code: string): Promise<string> => {
   const project = createDefaultProject()
   setPrimarySource(project, code)
 
-  const snapshot = createShareSnapshot(project)
-  return createShareTokenForSnapshot(snapshot)
+  return createShareTokenForProject(project)
 }
 
-const createShareTokenForSnapshot = async (snapshot: ProjectSnapshot): Promise<string> => {
-  const envelope = await encodeSharePayload(snapshot)
+const createShareTokenForProject = async (
+  project: Project,
+  previewTheme: ProjectSnapshot['preview']['theme'] = 'dark'
+): Promise<string> => {
+  const envelope = await encodeSharePayload(project, { previewTheme })
   return createShareToken(envelope)
 }
 

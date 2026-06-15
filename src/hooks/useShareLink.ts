@@ -1,14 +1,13 @@
 import { useCallback, useEffect, useRef, useState, type MutableRefObject } from 'react'
 import type {
   CompressionStrategyId,
-  ProjectSnapshot,
+  Project,
   SharePayloadEnvelope,
   ShareUrlOpeningIntent,
 } from '@/types/project'
 import { useProject } from '@/hooks/useProject'
 import { useShareLinkExperiments } from '@/hooks/useShareLinkExperiments'
 import { useSettings } from '@/contexts/SettingsContext'
-import { createShareSnapshot, SNAPSHOT_FILE_IDS } from '@/services/storage'
 import {
   buildShareUrl,
   computeChecksum,
@@ -34,6 +33,11 @@ const SLOW_GENERATION_THRESHOLD_MS = 9000
 
 type PendingGeneration = {
   startedAt: number
+}
+
+interface ShareSource {
+  project: Project
+  previewTheme: 'light' | 'dark'
 }
 
 export type ShareLinkStatus = 'idle' | 'generating' | 'warning' | 'ready' | 'oversize' | 'error'
@@ -69,7 +73,7 @@ export interface ShareLinkState {
 }
 
 export interface UseShareLinkOptions {
-  snapshotBuilder?: () => Promise<ProjectSnapshot> | ProjectSnapshot
+  sourceBuilder?: () => Promise<ShareSource> | ShareSource
   charLimit?: number
   baseUrl?: string
   slowGenerationThresholdMs?: number
@@ -107,7 +111,7 @@ export const useShareLink = (options?: UseShareLinkOptions) => {
     strategyId: CompressionStrategyId
   } | null>(null)
   const storageHealthRef = useRef<'unknown' | 'ok' | 'failed'>('unknown')
-  const { project, editorState } = useProject()
+  const { project } = useProject()
   const { theme } = useSettings()
   const { adjustPayloadEstimate, recordResult } = useShareLinkExperiments()
 
@@ -133,16 +137,13 @@ export const useShareLink = (options?: UseShareLinkOptions) => {
     }
   }, [])
 
-  const derivedSnapshotBuilder = useCallback(() => {
-    return createShareSnapshot(project, {
-      activeFileId:
-        editorState.activeTab === 'Hooks' ? SNAPSHOT_FILE_IDS.hooks : SNAPSHOT_FILE_IDS.jsx,
-      preview: {
-        viewport: project.viewportSize,
-        theme,
-      },
-    })
-  }, [editorState.activeTab, project, theme])
+  const derivedSourceBuilder = useCallback(
+    (): ShareSource => ({
+      project,
+      previewTheme: theme,
+    }),
+    [project, theme]
+  )
 
   useEffect(() => {
     if (!isProgressStatus(state.status)) {
@@ -192,7 +193,7 @@ export const useShareLink = (options?: UseShareLinkOptions) => {
     invalidateShareGeneration()
   }, [invalidateShareGeneration])
 
-  const snapshotBuilder = options?.snapshotBuilder ?? derivedSnapshotBuilder
+  const sourceBuilder = options?.sourceBuilder ?? derivedSourceBuilder
 
   const generateShareLink = useCallback(
     async (forceRegeneration = false) => {
@@ -300,7 +301,7 @@ export const useShareLink = (options?: UseShareLinkOptions) => {
       }))
 
       try {
-        const snapshot = await Promise.resolve(snapshotBuilder())
+        const source = await Promise.resolve(sourceBuilder())
         if (!isActiveGeneration()) {
           return
         }
@@ -311,7 +312,8 @@ export const useShareLink = (options?: UseShareLinkOptions) => {
             return
           }
         }
-        const serialized = serializeSharePayload(snapshot, {
+        const serialized = serializeSharePayload(source.project, {
+          previewTheme: source.previewTheme,
           openingIntent: previewFullscreenOpeningIntent ? { previewFullscreen: true } : undefined,
         })
         const contentSignature = await computeChecksum(serialized)
@@ -387,9 +389,11 @@ export const useShareLink = (options?: UseShareLinkOptions) => {
           try {
             const encodeStartedAt = nowMs()
             const envelope = await encodeWithStrategy({
-              snapshot,
+              source,
               serialized,
               strategy: estimate.strategy,
+              openingIntent:
+                previewFullscreenOpeningIntent ? { previewFullscreen: true } : undefined,
             })
             if (!isActiveGeneration()) {
               return
@@ -523,7 +527,7 @@ export const useShareLink = (options?: UseShareLinkOptions) => {
       previewFullscreenOpeningIntent,
       recordResult,
       slowGenerationThresholdMs,
-      snapshotBuilder,
+      sourceBuilder,
     ]
   )
 
@@ -617,9 +621,10 @@ type StrategyEstimate = {
 type EstimateAdjuster = (strategyId: CompressionStrategyId, baseEstimate: number) => number
 
 interface EncodeWithStrategyInput {
-  snapshot: ProjectSnapshot
+  source: ShareSource
   serialized: string
   strategy: CompressionStrategy
+  openingIntent?: ShareUrlOpeningIntent
 }
 
 const rankCompressionStrategies = (
@@ -645,14 +650,21 @@ const rankCompressionStrategies = (
   return estimates
 }
 
-const encodeWithStrategy = async ({ snapshot, serialized, strategy }: EncodeWithStrategyInput) => {
+const encodeWithStrategy = async ({
+  source,
+  serialized,
+  strategy,
+  openingIntent,
+}: EncodeWithStrategyInput) => {
   const result = await strategy.encode({ serialized })
   const checksumSource = result.checksumSource ?? result.serialized ?? serialized
-  return encodeSharePayload(snapshot, {
+  return encodeSharePayload(source.project, {
     serialized: result.serialized,
     checksumSource,
     compressed: result.payload,
     strategyId: strategy.id,
+    previewTheme: source.previewTheme,
+    openingIntent,
   })
 }
 

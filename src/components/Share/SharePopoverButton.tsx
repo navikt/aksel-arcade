@@ -20,8 +20,7 @@ import {
   type UseShareLinkOptions,
 } from '@/hooks/useShareLink'
 import { useProject } from '@/hooks/useProject'
-import { getStartPageSource } from '@/services/projectSource'
-import { exportProject, getWebShareWarning } from '@/services/storage'
+import { exportProject } from '@/services/storage'
 import { SHARE_URL_CHAR_LIMIT } from '@/utils/shareEncoding'
 import './SharePopoverButton.css'
 
@@ -46,7 +45,6 @@ export const SharePopoverButton = ({
   const [shareOpen, setShareOpen] = useState(false)
   const loadingDescriptionId = useId()
   const slowDescriptionId = `${loadingDescriptionId}-delay`
-  const webShareWarning = getWebShareWarning(project)
   const {
     state: shareState,
     generateShareLink,
@@ -89,6 +87,10 @@ export const SharePopoverButton = ({
   }, [ownerVisible, resetShareState])
 
   useEffect(() => {
+    lastGeneratedShareFingerprintRef.current = null
+  }, [generateShareLink])
+
+  useEffect(() => {
     return () => {
       cancelShareGeneration()
     }
@@ -122,19 +124,10 @@ export const SharePopoverButton = ({
   }
 
   const isGeneratingShare = shareState.status === 'generating' || shareState.status === 'warning'
-  const shareableSource = getStartPageSource(project)
   const shareDependenciesFingerprint = useMemo(() => {
     const lastModified = project.lastModified ?? 'unknown'
-    const jsxLength = shareableSource.jsx.length
-    const hooksLength = shareableSource.hooks.length
-    return `${lastModified}|${jsxLength}|${hooksLength}|${project.viewportSize}|${theme}`
-  }, [
-    project.lastModified,
-    project.viewportSize,
-    shareableSource.hooks.length,
-    shareableSource.jsx.length,
-    theme,
-  ])
+    return `${lastModified}|${project.name}|${project.viewportSize}|${theme}`
+  }, [project.lastModified, project.name, project.viewportSize, theme])
   const showOversizeMessage =
     shareState.status === 'oversize' || shareState.error?.code === 'oversize'
   const shareCharLimitLabel = SHARE_URL_CHAR_LIMIT.toLocaleString()
@@ -240,11 +233,6 @@ export const SharePopoverButton = ({
                   </Detail>
                 )}
               </VStack>
-              {webShareWarning && (
-                <Alert variant="warning" size="small">
-                  <BodyLong size="small">{webShareWarning}</BodyLong>
-                </Alert>
-              )}
               {isGeneratingShare ? (
                 <HStack gap="space-8" align="center" role="status" aria-live="polite">
                   <Loader size="xsmall" title="Generating Web share URL" />

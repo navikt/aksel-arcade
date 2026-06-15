@@ -1,7 +1,12 @@
-import type { ProjectSnapshot, ShareUrlOpeningIntent, ViewportSize } from '@/types/project'
-import { SNAPSHOT_FILE_IDS } from '@/services/storage'
+import type { Project, ProjectSnapshot, ShareUrlOpeningIntent, ViewportSize } from '@/types/project'
+import {
+  SNAPSHOT_FILE_IDS,
+  createPortableArcadeProjectData,
+  parsePortableArcadeProjectData,
+  type PortableArcadeProjectData,
+} from '@/services/storage'
 
-export interface WebShareUrlPayloadV3 {
+export interface LegacyWebShareUrlPayloadV3 {
   source: {
     jsx: string
     hooks: string
@@ -13,14 +18,25 @@ export interface WebShareUrlPayloadV3 {
   previewFullscreen?: true
 }
 
+export interface WebShareUrlPayloadV5 {
+  project: PortableArcadeProjectData
+  theme: ProjectSnapshot['preview']['theme']
+  previewFullscreen?: true
+}
+
+export interface DecodedWebShareProject {
+  project: PortableArcadeProjectData
+  theme: ProjectSnapshot['preview']['theme']
+}
+
 const WEB_SHARE_SNAPSHOT_VERSION = '1.0.0'
 const VALID_VIEWPORTS: readonly ViewportSize[] = ['2XL', 'XL', 'LG', 'MD', 'SM', 'XS']
 const VALID_THEMES: readonly ProjectSnapshot['preview']['theme'][] = ['light', 'dark']
 
-export const createWebShareUrlPayload = (
+export const createLegacyWebShareUrlPayload = (
   snapshot: ProjectSnapshot,
   options?: { openingIntent?: ShareUrlOpeningIntent }
-): WebShareUrlPayloadV3 => ({
+): LegacyWebShareUrlPayloadV3 => ({
   source: {
     jsx: findJsxSource(snapshot),
     hooks: findHooksSource(snapshot),
@@ -30,6 +46,18 @@ export const createWebShareUrlPayload = (
     theme: snapshot.preview.theme,
   },
   ...(options?.openingIntent?.previewFullscreen ? { previewFullscreen: true } : {}),
+})
+
+export const createWebShareUrlPayload = (
+  project: Project,
+  options: {
+    theme: ProjectSnapshot['preview']['theme']
+    openingIntent?: ShareUrlOpeningIntent
+  }
+): WebShareUrlPayloadV5 => ({
+  project: createPortableArcadeProjectData(project),
+  theme: options.theme,
+  ...(options.openingIntent?.previewFullscreen ? { previewFullscreen: true } : {}),
 })
 
 export const normalizeLegacyV2FullSnapshotToWebShareSnapshot = (
@@ -46,7 +74,7 @@ export const normalizeLegacyV2FullSnapshotToWebShareSnapshot = (
     },
   })
 
-export const serializeWebShareUrlPayload = (payload: WebShareUrlPayloadV3): string =>
+export const serializeLegacyWebShareUrlPayload = (payload: LegacyWebShareUrlPayloadV3): string =>
   JSON.stringify({
     source: {
       jsx: payload.source.jsx,
@@ -59,7 +87,18 @@ export const serializeWebShareUrlPayload = (payload: WebShareUrlPayloadV3): stri
     ...(payload.previewFullscreen ? { previewFullscreen: true } : {}),
   })
 
-export const parseWebShareUrlPayload = (serialized: string): WebShareUrlPayloadV3 => {
+export const serializeWebShareUrlPayload = (payload: WebShareUrlPayloadV5): string =>
+  JSON.stringify({
+    project: {
+      name: payload.project.name,
+      source: payload.project.source,
+      preview: payload.project.preview,
+    },
+    theme: payload.theme,
+    ...(payload.previewFullscreen ? { previewFullscreen: true } : {}),
+  })
+
+export const parseLegacyWebShareUrlPayload = (serialized: string): LegacyWebShareUrlPayloadV3 => {
   const value = JSON.parse(serialized) as unknown
   assertRecord(value, 'Web share payload')
   assertAllowedKeys(value, ['source', 'preview', 'previewFullscreen'], 'Web share payload')
@@ -100,12 +139,35 @@ export const parseWebShareUrlPayload = (serialized: string): WebShareUrlPayloadV
   }
 }
 
+export const parseWebShareUrlPayload = (serialized: string): DecodedWebShareProject & {
+  previewFullscreen?: true
+} => {
+  const value = JSON.parse(serialized) as unknown
+  assertRecord(value, 'Web share payload')
+  assertAllowedKeys(value, ['project', 'theme', 'previewFullscreen'], 'Web share payload')
+  assertRequiredKeys(value, ['project', 'theme'], 'Web share payload')
+
+  if ('previewFullscreen' in value && value.previewFullscreen !== true) {
+    throw new Error('Web share preview fullscreen intent is invalid')
+  }
+
+  if (!isTheme(value.theme)) {
+    throw new Error('Web share theme is invalid')
+  }
+
+  return {
+    project: parsePortableArcadeProjectData(value.project, 'Web share project'),
+    theme: value.theme,
+    ...(value.previewFullscreen === true ? { previewFullscreen: true } : {}),
+  }
+}
+
 export const extractShareUrlOpeningIntent = (
-  payload: Pick<WebShareUrlPayloadV3, 'previewFullscreen'>
+  payload: Pick<LegacyWebShareUrlPayloadV3 | WebShareUrlPayloadV5, 'previewFullscreen'>
 ): ShareUrlOpeningIntent | undefined =>
   payload.previewFullscreen ? { previewFullscreen: true } : undefined
 
-export const webShareUrlPayloadToSnapshot = (payload: WebShareUrlPayloadV3): ProjectSnapshot => ({
+export const webShareUrlPayloadToSnapshot = (payload: LegacyWebShareUrlPayloadV3): ProjectSnapshot => ({
   version: WEB_SHARE_SNAPSHOT_VERSION,
   files: [
     {
@@ -184,8 +246,9 @@ const assertExactKeys = (
 ): void => {
   const keys = Object.keys(value)
   const extras = keys.filter((key) => !allowedKeys.includes(key))
+  const missing = allowedKeys.filter((key) => !keys.includes(key))
 
-  if (extras.length) {
+  if (extras.length || missing.length) {
     throw new Error(`${label} keys are invalid`)
   }
 }
