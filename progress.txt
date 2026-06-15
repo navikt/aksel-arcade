@@ -3053,3 +3053,25 @@ Verification:
 - `npm run lint`
 - `npm run test -- --run`
 - Browser check at `http://127.0.0.1:5193/aksel-arcade/` confirming both the normal share popover and fullscreen share popover still generate links cleanly with no console warnings or errors
+
+### 2026-06-15 - Issue #258: Make Desktop Agent sessions always pages-aware
+
+Implemented:
+
+- Selected `#258` as the highest-priority `ready-for-agent` feature from `#258`-`#259` because `#259` is explicitly blocked by `#258`, while `#253`-`#257` are already closed.
+- Read issue `#252`, `CONTEXT.md`, `docs/adr/0014-pages-aware-agent-bridge.md`, and the existing `progress.txt` notes before changing code.
+- Removed the remaining single-page Desktop Agent fallback in `src/services/agentBridge.ts`, `src/hooks/useAgentSession.ts`, and `src/components/Header/AgentSessionMenu.tsx` so Agent sessions always expose the full pages-based project model, always advertise page lifecycle commands, and no longer mention experimental multi-page enablement.
+- Updated `tests/unit/services/agentBridge.test.ts`, `tests/unit/services/desktopAgentTransportProtocol.test.ts`, and `tests/e2e/agent-diagnostics.spec.ts` so one-page projects still read as one-page pages-based source, transport errors list the full command surface, and the desktop Agent shim expects `getProject` / `getAgentInstructions` / `getSessionState` to stay pages-aware.
+- Refreshed `CONTEXT.md` and `docs/adr/0014-pages-aware-agent-bridge.md` to remove the outdated agent-side multi-page gating language and describe the permanent pages-based Agent-session contract.
+
+Verification:
+
+- `npm run typecheck`
+- `npm run lint`
+- `npm run build`
+- `npm run test -- --run`
+- Browser check at `http://127.0.0.1:5192/aksel-arcade/` with a Desktop preload shim: started an Agent session, confirmed `getProject` returned `pageMode: "multi-page"` with `globalConfig`, `pages`, `startPageId`, and `activePageId`, confirmed `getAgentInstructions` / `getSessionState` included the lifecycle commands with no experimental fallback copy, and saw no new console errors (only the existing form-field `id` / `name` issue).
+
+Next note:
+
+- `#259` can build on the always-pages-aware Desktop Agent contract; the old single-page bridge/instructions path is gone, so future regression coverage should assert the full command list and page-target / global-config targeting even for one-page projects.

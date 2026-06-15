@@ -18,7 +18,6 @@ import {
   type AgentChangeResult,
   type AgentPageLifecycleResult,
   type AgentProjectReadState,
-  type AgentProjectPageMode,
 } from '@/services/agentBridge'
 import {
   PREVIEW_EVIDENCE_ROOT_SELECTOR,
@@ -55,13 +54,15 @@ const createDiagnostics = (): PreviewDiagnostics => ({
   ],
 })
 
+type AgentProjectFixture = 'one-page' | 'two-page'
+
 const createProjectReadState = (
-  pageMode: AgentProjectPageMode = 'single-page'
+  fixture: AgentProjectFixture = 'one-page'
 ): AgentProjectReadState =>
-  pageMode === 'multi-page'
+  fixture === 'two-page'
     ? {
         name: 'Router test',
-        pageMode,
+        pageMode: 'multi-page',
         jsxCode: '<Button>Details</Button>',
         hooksCode: 'const details = true',
         globalConfig: {
@@ -87,7 +88,7 @@ const createProjectReadState = (
       }
     : {
         name: 'Router test',
-        pageMode,
+        pageMode: 'multi-page',
         jsxCode: '<Button>Test</Button>',
         hooksCode: 'const value = "test"',
         globalConfig: {
@@ -106,8 +107,8 @@ const createProjectReadState = (
         activePageId: 'page01',
       }
 
-const createReadContext = (pageMode: AgentProjectPageMode = 'single-page'): AgentBridgeReadContext => ({
-  project: createProjectReadState(pageMode),
+const createReadContext = (fixture: AgentProjectFixture = 'one-page'): AgentBridgeReadContext => ({
+  project: createProjectReadState(fixture),
   preview: {
     theme: 'light',
     viewportSize: 'MD',
@@ -183,7 +184,7 @@ const createPageLifecycleSuccess = (
 const createController = (
   options: {
     active?: boolean
-    pageMode?: AgentProjectPageMode
+    projectFixture?: AgentProjectFixture
     permissions?: Partial<AgentPermissions>
     previewEvidence?: PreviewEvidenceCaptureResult
     applyResult?: AgentBridgeCommandResult<AgentChangeResult>
@@ -194,7 +195,7 @@ const createController = (
     selectActivePageResult?: AgentBridgeCommandResult<AgentPageLifecycleResult>
   } = {}
 ) => {
-  const context = createReadContext(options.pageMode)
+  const context = createReadContext(options.projectFixture)
   const recordedCommands: AgentBridgeCommandName[] = []
   const appliedRequests: unknown[] = []
   const pageRequests: Array<{ command: string; request: unknown }> = []
@@ -267,7 +268,7 @@ describe('agent bridge command router', () => {
     const { context, controller, recordedCommands } = createController()
     const router = createAgentBridgeCommandRouter(session, controller)
 
-    expect(router.commandNames).toEqual(getAgentBridgeSessionCommandNames(context.project.pageMode))
+    expect(router.commandNames).toEqual(getAgentBridgeSessionCommandNames())
     expect(AGENT_BRIDGE_READ_COMMAND_NAMES).toContain('getAgentInstructions')
     expect(isAgentBridgeReadCommandName('getAgentInstructions')).toBe(true)
     expect(expectBridgeSuccess(router.routeCommand('getProject'))).toEqual(context.project)
@@ -279,12 +280,12 @@ describe('agent bridge command router', () => {
       startedAt: session.startedAt,
       permissions: DEFAULT_AGENT_PERMISSIONS,
       readScope: 'arcade-session',
-      commandNames: getAgentBridgeSessionCommandNames(context.project.pageMode),
+      commandNames: getAgentBridgeSessionCommandNames(),
     })
     expect(recordedCommands).toEqual(['getProject', 'getPreviewContext', 'getSessionState'])
   })
 
-  it('returns a compact single-page Agent operating guide repeatedly without Arcade project content', () => {
+  it('returns a compact pages-aware Agent operating guide repeatedly without Arcade project content', () => {
     const { context, controller, recordedCommands } = createController()
     const router = createAgentBridgeCommandRouter(desktopSession, controller)
 
@@ -301,7 +302,7 @@ describe('agent bridge command router', () => {
       authorizationHeader: desktopSession.transportEndpoint.authorizationHeader,
       permissions: DEFAULT_AGENT_PERMISSIONS,
       readScope: 'arcade-session',
-      commandNames: getAgentBridgeSessionCommandNames(context.project.pageMode),
+      commandNames: getAgentBridgeSessionCommandNames(),
       protocol: {
         transport: 'desktop-loopback-http',
         format: 'json-rpc-2.0',
@@ -310,14 +311,15 @@ describe('agent bridge command router', () => {
       },
     })
     expect(guideLines.length).toBeGreaterThanOrEqual(8)
-    expect(guideLines.length).toBeLessThanOrEqual(12)
+    expect(guideLines.length).toBeLessThanOrEqual(13)
     expect(instructions.instructionsMarkdown).toMatch(/authoritative/i)
     expect(instructions.instructionsMarkdown).toMatch(/call getProject first/i)
     expect(instructions.instructionsMarkdown).toMatch(/getPreviewContext/i)
     expect(instructions.instructionsMarkdown).toMatch(/getDiagnostics/i)
     expect(instructions.instructionsMarkdown).toMatch(/getPreviewEvidence/i)
-    expect(instructions.instructionsMarkdown).toMatch(/single-page authoring/i)
-    expect(instructions.instructionsMarkdown).toMatch(/ask the human to enable experimental multi-page authoring/i)
+    expect(instructions.instructionsMarkdown).toMatch(/full pages-based Arcade project source/i)
+    expect(instructions.instructionsMarkdown).not.toMatch(/single-page authoring/i)
+    expect(instructions.instructionsMarkdown).not.toMatch(/experimental multi-page/i)
     expect(instructions.instructionsMarkdown).toMatch(/import-free Arcade JSX and Hooks/i)
     expect(instructions.instructionsMarkdown).toMatch(/arcadeAuthoringGuidance/i)
     expect(instructions.instructionsMarkdown).toContain(
@@ -377,8 +379,7 @@ describe('agent bridge command router', () => {
         }),
       ])
     )
-    expect(instructions.commandNames).toContain('applyAgentChange')
-    expect(instructions.commandNames).not.toContain('createPage')
+    expect(instructions.commandNames).toEqual(getAgentBridgeSessionCommandNames())
     expect(instructions.commandNames).not.toContain('applySourceChange')
     expect(instructions).not.toHaveProperty('workflow')
     expect(instructions).not.toHaveProperty('workflowGuide')
@@ -418,7 +419,7 @@ describe('agent bridge command router', () => {
   })
 
   it('clones the pages-aware project read state before returning it', () => {
-    const { context, controller } = createController({ pageMode: 'multi-page' })
+    const { context, controller } = createController({ projectFixture: 'two-page' })
     const router = createAgentBridgeCommandRouter(session, controller)
 
     const project = expectBridgeSuccess(router.routeCommand('getProject'))
@@ -513,13 +514,13 @@ describe('agent bridge command router', () => {
     expect(rejected.recordedCommands).toEqual([])
   })
 
-  it('exposes lifecycle commands only in multi-page sessions and routes them through the controller', () => {
-    const { controller, pageRequests, recordedCommands } = createController({ pageMode: 'multi-page' })
+  it('exposes lifecycle commands and routes them through the controller', () => {
+    const { controller, pageRequests, recordedCommands } = createController({ projectFixture: 'two-page' })
     const router = createAgentBridgeCommandRouter(desktopSession, controller)
 
-    expect(router.commandNames).toEqual(getAgentBridgeSessionCommandNames('multi-page'))
+    expect(router.commandNames).toEqual(getAgentBridgeSessionCommandNames())
     expect(expectBridgeSuccess(router.routeCommand('getSessionState')).commandNames).toEqual(
-      getAgentBridgeSessionCommandNames('multi-page')
+      getAgentBridgeSessionCommandNames()
     )
 
     expect(expectBridgeSuccess(router.routeCommand('createPage', {}))).toEqual({
@@ -557,33 +558,37 @@ describe('agent bridge command router', () => {
       'getAgentInstructions',
     ])
 
-    expect(instructions.commandNames).toEqual(getAgentBridgeSessionCommandNames('multi-page'))
+    expect(instructions.commandNames).toEqual(getAgentBridgeSessionCommandNames())
     expect(instructions.instructionsMarkdown).toMatch(
       /createPage, renamePage, deletePage, setStartPage, and selectActivePage/i
     )
   })
 
-  it('rejects lifecycle commands when multi-page authoring is disabled', () => {
-    const { controller, pageRequests, recordedCommands } = createController()
+  it('keeps one-page projects represented as one-page Arcade project source projects', () => {
+    const { controller, recordedCommands } = createController()
     const router = createAgentBridgeCommandRouter(session, controller)
 
-    expect(router.routeCommand('createPage', {})).toMatchObject({
-      ok: false,
-      command: 'createPage',
-      error: {
-        code: 'unsupported-command',
-        message: expect.stringMatching(/ask the human to enable experimental multi-page authoring/i),
+    expect(expectBridgeSuccess(router.routeCommand('getProject'))).toMatchObject({
+      pageMode: 'multi-page',
+      globalConfig: {
+        jsxCode: '',
+        hooksCode: '',
       },
+      pages: [
+        {
+          id: 'page01',
+          name: 'Page 1',
+          jsxCode: '<Button>Test</Button>',
+          hooksCode: 'const value = "test"',
+        },
+      ],
+      startPageId: 'page01',
+      activePageId: 'page01',
     })
-    expect(router.routeCommand('renamePage', { pageId: 'page02', name: 'Details' })).toMatchObject({
-      ok: false,
-      command: 'renamePage',
-      error: {
-        code: 'unsupported-command',
-      },
-    })
-    expect(pageRequests).toEqual([])
-    expect(recordedCommands).toEqual([])
+    expect(expectBridgeSuccess(router.routeCommand('getSessionState')).commandNames).toEqual(
+      getAgentBridgeSessionCommandNames()
+    )
+    expect(recordedCommands).toEqual(['getProject', 'getSessionState'])
   })
 
   it('rejects unsupported commands with a structured router error', () => {

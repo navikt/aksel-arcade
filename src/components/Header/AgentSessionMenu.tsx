@@ -18,7 +18,7 @@ export const AgentSessionMenu = () => {
     deletePage,
     setStartPage,
   } = useProject()
-  const { multiPageEnabled, theme, setTheme } = useSettings()
+  const { theme, setTheme } = useSettings()
   const [copyStatus, setCopyStatus] = useState<'idle' | 'success' | 'error'>('idle')
   const getPreviewEvidence = useCallback(
     () => requestPreviewEvidenceFromFrame(previewIframeRef.current),
@@ -34,7 +34,6 @@ export const AgentSessionMenu = () => {
     project,
     previewState,
     theme,
-    multiPageEnabled,
     onProjectChange: updateProject,
     onCreatePage: createPage,
     onRenamePage: renamePage,
