@@ -87,6 +87,10 @@ export const SharePopoverButton = ({
   }, [ownerVisible, resetShareState])
 
   useEffect(() => {
+    lastGeneratedShareFingerprintRef.current = null
+  }, [generateShareLink])
+
+  useEffect(() => {
     return () => {
       cancelShareGeneration()
     }

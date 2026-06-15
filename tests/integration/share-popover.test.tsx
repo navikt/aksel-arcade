@@ -567,6 +567,33 @@ describe('Share popover integration', () => {
     })
   })
 
+  it('regenerates an open share link when opening intent changes', async () => {
+    const view = renderHeader()
+
+    fireEvent.click(screen.getByLabelText(/share project/i))
+
+    await waitFor(() => expect(encodeSpy).toHaveBeenCalledTimes(1))
+    encodeSpy.mockClear()
+
+    view.rerender(
+      <SettingsProvider>
+        <AppProvider>
+          <Harness shareOptions={{ openingIntent: { previewFullscreen: true } }} />
+        </AppProvider>
+      </SettingsProvider>
+    )
+
+    await waitFor(() => expect(encodeSpy).toHaveBeenCalled())
+    const serialized = encodeSpy.mock.calls.at(-1)?.[1]?.serialized
+    if (!serialized) {
+      throw new Error('Expected regenerated share payload to be serialized.')
+    }
+
+    expect(JSON.parse(serialized)).toMatchObject({
+      previewFullscreen: true,
+    })
+  })
+
   it('shares the full multi-page project source without warning', async () => {
     renderHeader()
     act(() => {
