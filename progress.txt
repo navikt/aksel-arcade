@@ -2995,3 +2995,22 @@ Next note:
 
 - `#257` still owns the lossy Web share fallback. Keep `MULTI_PAGE_WEB_SHARE_WARNING` scoped to share URLs until that path can preserve full project source; package export should stay direct and warning-free.
 - Future package work should keep the `v3` clean-package boundary strict: no working-copy preferences, local identity, or Desktop/agent session artifacts belong in `.akselarcade` payloads.
+
+### 2026-06-15 - PR #263 review follow-up for Issue #256
+
+Fixed after code review:
+
+- The PR review found that real historical `formatVersion: 1` `.akselarcade` files were still rejected because the new parser enforced the strict v3 root shape before it branched to the legacy portable-package path.
+- Updated `src/services/storage.ts` so genuine v1 package envelopes can carry their historical `exportedAt` and optional `meta` root fields without weakening the strict clean-package boundary for current v3 exports or raw legacy JSON working copies.
+- Updated `tests/unit/services/storage.test.ts` so the v1 import regression uses the historical root package shape instead of a synthetic minimal envelope.
+
+Verification:
+
+- `npm run typecheck`
+- `npm run lint`
+- `npm run build`
+- `npm run test -- --run`
+
+Next note:
+
+- Keep the parser branch order intentional: v1 compatibility should be handled before the strict clean-package root-key assertion, while v3 and raw JSON rejections should continue to fail closed on extra top-level fields.

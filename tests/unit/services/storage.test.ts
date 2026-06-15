@@ -91,7 +91,13 @@ const createLegacySinglePagePackage = (project: Project) => ({
 const createLegacyPortablePackage = (project: Project) => ({
   format: ARCADE_PROJECT_PACKAGE_FORMAT,
   formatVersion: 1,
+  exportedAt: '2026-05-20T00:00:00.000Z',
   project: createLegacyPortableProject(project),
+  meta: {
+    designSystem: 'Aksel',
+    usedComponents: ['Box'],
+    aiInstructions: 'legacy-export-ai-guidance',
+  },
 })
 
 const getPrimarySource = (project: Project) => getStartPageSource(project)

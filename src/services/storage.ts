@@ -413,6 +413,14 @@ const parseCleanArcadeProjectPackage = (payload: unknown): ArcadeProjectPackage[
     throw new Error(CLEAN_PACKAGE_REJECTION_MESSAGE)
   }
 
+  if (
+    payload.formatVersion === LEGACY_PORTABLE_ARCADE_PROJECT_PACKAGE_FORMAT_VERSION &&
+    payload.format === ARCADE_PROJECT_PACKAGE_FORMAT
+  ) {
+    validateLegacyPortablePackageEnvelope(payload)
+    return parseLegacyPortablePackageProject(payload.project)
+  }
+
   assertExactKeys(payload, ['format', 'formatVersion', 'project'], 'package')
 
   if (payload.format !== ARCADE_PROJECT_PACKAGE_FORMAT) {
@@ -428,6 +436,23 @@ const parseCleanArcadeProjectPackage = (payload: unknown): ArcadeProjectPackage[
       return parseLegacyPortablePackageProject(payload.project)
     default:
       throw new Error(`Unsupported Arcade project package version "${String(payload.formatVersion)}"`)
+  }
+}
+
+const validateLegacyPortablePackageEnvelope = (payload: Record<string, unknown>): void => {
+  const allowedKeys = new Set(['format', 'formatVersion', 'project', 'exportedAt', 'meta'])
+  const unknownKeys = Object.keys(payload).filter((key) => !allowedKeys.has(key))
+
+  if (unknownKeys.length) {
+    throw new Error(`Invalid legacy portable package fields: unknown ${formatKeyList(unknownKeys)}`)
+  }
+
+  if ('exportedAt' in payload && typeof payload.exportedAt !== 'string') {
+    throw new Error('Legacy portable package exportedAt must be a string')
+  }
+
+  if ('meta' in payload && !isRecord(payload.meta)) {
+    throw new Error('Legacy portable package meta must be an object')
   }
 }
 
