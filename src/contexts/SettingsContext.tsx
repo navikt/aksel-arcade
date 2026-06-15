@@ -33,7 +33,7 @@ export const SettingsProvider = ({ children }: SettingsProviderProps) => {
   const [theme, setThemeState] = useState<ThemeMode>('dark')
   const [panelOrder, setPanelOrder] = useState<PanelOrder>('code-left')
   const [multiPageEnabled, setMultiPageEnabledState] = useState(false)
-  const [pagePanelOpen, setPagePanelOpenState] = useState(true)
+  const [pagePanelOpen, setPagePanelOpenState] = useState(false)
   const [selectedEditTarget, setSelectedEditTargetState] = useState<SelectedEditTarget>('page')
   const [previewFullscreen, setPreviewFullscreenState] = useState(false)
 

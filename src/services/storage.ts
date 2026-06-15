@@ -115,7 +115,7 @@ export const DEFAULT_WEB_ARCADE_WORKING_COPY_PREFERENCES: WebArcadeWorkingCopyPr
   theme: 'dark',
   panelOrder: 'code-left',
   multiPageEnabled: false,
-  pagePanelOpen: true,
+  pagePanelOpen: false,
   selectedEditTarget: 'page',
   previewFullscreen: false,
 }

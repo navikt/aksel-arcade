@@ -39,6 +39,7 @@ const Harness = () => {
     project,
     editorState,
     previewState,
+    replaceProject,
     updateEditorState,
     resetToIntro,
     shareHydration,
@@ -73,6 +74,21 @@ const Harness = () => {
       <div data-testid="share-status">{shareHydration.status}</div>
       <button onClick={() => updateEditorState({ activeTab: 'Hooks' })}>Set local Hooks tab</button>
       <button onClick={resetToIntro}>Reset editor</button>
+      <button
+        onClick={() =>
+          replaceProject(
+            createWorkingCopyProject({
+              name: 'Imported replacement project',
+              jsxCode: 'export default function App() { return <div>Imported replacement</div> }',
+              hooksCode: 'export function useImportedReplacement() { return "Imported replacement" }',
+              viewportSize: 'LG',
+              panelLayout: 'editor-right',
+            })
+          )
+        }
+      >
+        Import replacement project
+      </button>
       {shareHydration.status === 'ready' && (
         <div>
           <span>share-ready</span>
@@ -330,7 +346,8 @@ describe('share decode integration', () => {
         ...DEFAULT_WEB_ARCADE_WORKING_COPY_PREFERENCES,
         theme: 'light',
         panelOrder: 'preview-left',
-        multiPageEnabled: false,
+        multiPageEnabled: true,
+        pagePanelOpen: true,
       },
     })
     const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true)
@@ -341,6 +358,7 @@ describe('share decode integration', () => {
       await waitFor(() => {
         expect(screen.getByTestId('settings-theme').textContent).toBe('light')
         expect(screen.getByTestId('settings-panel-order').textContent).toBe('preview-left')
+        expect(screen.getByTestId('settings-page-panel-open').textContent).toBe('true')
       })
       await user.click(screen.getByRole('button', { name: /set local hooks tab/i }))
 
@@ -364,9 +382,39 @@ describe('share decode integration', () => {
       expect(screen.getByTestId('settings-panel-order').textContent).toBe(
         DEFAULT_WEB_ARCADE_WORKING_COPY_PREFERENCES.panelOrder
       )
+      expect(screen.getByTestId('settings-page-panel-open').textContent).toBe('false')
     } finally {
       confirmSpy.mockRestore()
     }
+  })
+
+  it('resets imported working copies to the closed page-panel default', async () => {
+    const previousProject = createWorkingCopyProject({
+      name: 'Pre-import working copy',
+      jsxCode: 'export default function App() { return <div>Pre-import JSX</div> }',
+    })
+    saveProject(previousProject, {
+      preferences: {
+        ...DEFAULT_WEB_ARCADE_WORKING_COPY_PREFERENCES,
+        multiPageEnabled: true,
+        pagePanelOpen: true,
+      },
+    })
+
+    renderHarness()
+
+    await waitFor(() => {
+      expect(screen.getByTestId('settings-multi-page-enabled').textContent).toBe('true')
+      expect(screen.getByTestId('settings-page-panel-open').textContent).toBe('true')
+    })
+
+    await user.click(screen.getByRole('button', { name: /import replacement project/i }))
+
+    await waitFor(() => {
+      expect(screen.getByTestId('project-name').textContent).toBe('Imported replacement project')
+      expect(screen.getByTestId('settings-multi-page-enabled').textContent).toBe('false')
+      expect(screen.getByTestId('settings-page-panel-open').textContent).toBe('false')
+    })
   })
 
   it('loads v3 Web share URLs as fresh local projects from shared source and preview preferences', async () => {
