@@ -37,7 +37,7 @@ const diagnostics: PreviewDiagnostics = {
 const readContext: AgentBridgeReadContext = {
   project: {
     name: 'Transport request test',
-    pageMode: 'single-page',
+    pageMode: 'multi-page',
     jsxCode: '<Button>Read</Button>',
     hooksCode: 'const value = "read"',
     globalConfig: {
@@ -234,7 +234,7 @@ describe('desktop Agent transport protocol', () => {
     expect(appliedRequests).toEqual([params])
   })
 
-  it('returns a structured bridge error for known lifecycle commands that are unavailable in single-page mode', () => {
+  it('routes known lifecycle commands through the pages-aware bridge by default', () => {
     const { response } = routeRequest({
       id: 'create-page-1',
       method: 'createPage',
@@ -242,20 +242,10 @@ describe('desktop Agent transport protocol', () => {
       sessionId: session.id,
     })
 
-    expect(response).toMatchObject({
+    expect(response).toEqual({
       jsonrpc: '2.0',
       id: 'create-page-1',
-      error: {
-        code: -32002,
-        data: {
-          code: 'unsupported-command',
-          command: 'createPage',
-          bridgeError: {
-            code: 'unsupported-command',
-            message: expect.stringMatching(/enable experimental multi-page authoring/i),
-          },
-        },
-      },
+      result: createPageSuccess(),
     })
   })
 
@@ -310,7 +300,7 @@ describe('desktop Agent transport protocol', () => {
       error: {
         code: -32601,
         message:
-          'Unsupported Agent transport method "openShell". Supported methods: getAgentInstructions, getProject, getPreviewContext, getDiagnostics, getPreviewEvidence, getSessionState, applyAgentChange.',
+          'Unsupported Agent transport method "openShell". Supported methods: getAgentInstructions, getProject, getPreviewContext, getDiagnostics, getPreviewEvidence, getSessionState, applyAgentChange, createPage, renamePage, deletePage, setStartPage, selectActivePage.',
         data: {
           code: 'unsupported-method',
         },
@@ -331,7 +321,7 @@ describe('desktop Agent transport protocol', () => {
       error: {
         code: -32601,
         message:
-          'Unsupported Agent transport method "applySourceChange". Supported methods: getAgentInstructions, getProject, getPreviewContext, getDiagnostics, getPreviewEvidence, getSessionState, applyAgentChange.',
+          'Unsupported Agent transport method "applySourceChange". Supported methods: getAgentInstructions, getProject, getPreviewContext, getDiagnostics, getPreviewEvidence, getSessionState, applyAgentChange, createPage, renamePage, deletePage, setStartPage, selectActivePage.',
         data: {
           code: 'unsupported-method',
         },

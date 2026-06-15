@@ -56,7 +56,6 @@ interface UseAgentSessionOptions {
   project: Project
   previewState: PreviewState
   theme: ThemeMode
-  multiPageEnabled: boolean
   onProjectChange: (updates: AgentProjectUpdates) => void
   onCreatePage: () => void
   onRenamePage: (pageId: ArcadePageId, name: string) => void
@@ -70,7 +69,6 @@ export const useAgentSession = ({
   project,
   previewState,
   theme,
-  multiPageEnabled,
   onProjectChange,
   onCreatePage,
   onRenamePage,
@@ -85,9 +83,8 @@ export const useAgentSession = ({
   const activeSessionIdRef = useRef<string | null>(null)
   const permissionsRef = useRef<AgentPermissions>(permissions)
   const projectRef = useRef(project)
-  const multiPageEnabledRef = useRef(multiPageEnabled)
   const readContextRef = useRef<AgentBridgeReadContext>(
-    createBridgeReadContext(project, previewState, theme, multiPageEnabled)
+    createBridgeReadContext(project, previewState, theme)
   )
 
   if (!coordinatorRef.current) {
@@ -97,13 +94,12 @@ export const useAgentSession = ({
   }
 
   const readContext = useMemo<AgentBridgeReadContext>(
-    () => createBridgeReadContext(project, previewState, theme, multiPageEnabled),
-    [multiPageEnabled, previewState, project, theme]
+    () => createBridgeReadContext(project, previewState, theme),
+    [previewState, project, theme]
   )
 
   permissionsRef.current = permissions
   projectRef.current = project
-  multiPageEnabledRef.current = multiPageEnabled
   readContextRef.current = readContext
 
   const syncCurrentContext = useCallback(
@@ -114,7 +110,7 @@ export const useAgentSession = ({
     ) => {
       projectRef.current = nextProject
       readContextRef.current = {
-        project: createAgentProjectReadState(nextProject, multiPageEnabledRef.current),
+        project: createAgentProjectReadState(nextProject),
         preview: {
           theme: nextTheme,
           viewportSize: nextProject.viewportSize,
@@ -539,10 +535,9 @@ const createBridgeReadContext = (
   project: Project,
   previewState: PreviewState,
   theme: ThemeMode,
-  multiPageEnabled: boolean,
   diagnostics: PreviewDiagnostics = collectPreviewDiagnostics(previewState)
 ): AgentBridgeReadContext => ({
-  project: createAgentProjectReadState(project, multiPageEnabled),
+  project: createAgentProjectReadState(project),
   preview: {
     theme,
     viewportSize: project.viewportSize,
@@ -1007,15 +1002,6 @@ const resolveAgentSourceTargetForSession = (
   }
 
   if (sourceTarget.type === 'global-config') {
-    if (project.pageMode === 'single-page') {
-      return {
-        ok: false,
-        code: 'invalid-request',
-        message:
-          'Global config edits require experimental multi-page authoring. Ask the human to enable it.',
-      }
-    }
-
     return {
       ok: true,
       target: sourceTarget,
@@ -1026,14 +1012,6 @@ const resolveAgentSourceTargetForSession = (
     return {
       ok: true,
       target: sourceTarget,
-    }
-  }
-
-  if (project.pageMode === 'single-page') {
-    return {
-      ok: false,
-      code: 'invalid-request',
-      message: `Only ${project.activePageId} is currently exposed through the single-page Agent bridge. Ask the human to enable experimental multi-page authoring before targeting other pages.`,
     }
   }
 

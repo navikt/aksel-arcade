@@ -29,8 +29,21 @@ interface AgentInstructionsPayload {
 
 interface AgentProject {
   name: string
+  pageMode: 'multi-page'
   jsxCode: string
   hooksCode: string
+  globalConfig: {
+    jsxCode: string
+    hooksCode: string
+  }
+  pages: Array<{
+    id: string
+    name: string
+    jsxCode: string
+    hooksCode: string
+  }>
+  startPageId: string
+  activePageId: string
 }
 
 interface AgentDiagnostics {
@@ -427,12 +440,18 @@ test.describe('Agent diagnostics', () => {
     expect(instructions.instructionsMarkdown).toMatch(
       /poll getDiagnostics until the preview settles/i
     )
+    expect(instructions.instructionsMarkdown).not.toMatch(/experimental multi-page/i)
     expect(instructions.commandNames).toEqual(
       expect.arrayContaining([
         'getProject',
         'getDiagnostics',
         'getPreviewEvidence',
         'applyAgentChange',
+        'createPage',
+        'renamePage',
+        'deletePage',
+        'setStartPage',
+        'selectActivePage',
       ])
     )
     expect(instructions.protocol).toMatchObject({
@@ -449,6 +468,14 @@ test.describe('Agent diagnostics', () => {
     )
     expect(initialProject).toMatchObject({
       name: 'Untitled Project',
+      pageMode: 'multi-page',
+      globalConfig: {
+        jsxCode: '',
+        hooksCode: '',
+      },
+      pages: [expect.objectContaining({ id: 'page01', name: 'Page 1' })],
+      startPageId: 'page01',
+      activePageId: 'page01',
     })
     expect(initialProject.jsxCode).toContain('Welcome to Aksel Arcade')
 
@@ -467,6 +494,7 @@ test.describe('Agent diagnostics', () => {
     const changeResult = expectAgentResultData(
       await callAgentCommand<AgentChangeResult>(page, instructions, 'applyAgentChange', {
         summary: 'Validate Agent operating instructions happy path',
+        target: { type: 'page', pageId: initialProject.activePageId },
         jsxCode: nextJsx,
         hooksCode: nextHooks,
         viewportSize: 'SM',
@@ -493,10 +521,25 @@ test.describe('Agent diagnostics', () => {
     const updatedProject = expectAgentResultData(
       await callAgentCommand<AgentProject>(page, instructions, 'getProject')
     )
-    expect(updatedProject).toEqual({
+    expect(updatedProject).toMatchObject({
       name: 'Agent happy path',
+      pageMode: 'multi-page',
       jsxCode: nextJsx,
       hooksCode: nextHooks,
+      globalConfig: {
+        jsxCode: '',
+        hooksCode: '',
+      },
+      pages: [
+        {
+          id: 'page01',
+          name: 'Page 1',
+          jsxCode: nextJsx,
+          hooksCode: nextHooks,
+        },
+      ],
+      startPageId: 'page01',
+      activePageId: 'page01',
     })
 
     if (instructions.permissions.previewEvidence) {

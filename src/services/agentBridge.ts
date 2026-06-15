@@ -24,7 +24,7 @@ export interface AgentBridgeSession {
   transportEndpoint?: DesktopAgentTransportEndpoint
 }
 
-export type AgentProjectPageMode = 'single-page' | 'multi-page'
+export type AgentProjectPageMode = 'multi-page'
 
 export interface AgentSourceFileReadState {
   jsxCode: string
@@ -130,17 +130,9 @@ export const AGENT_BRIDGE_READ_COMMAND_NAMES = [
 
 export type AgentBridgeReadCommandName = (typeof AGENT_BRIDGE_READ_COMMAND_NAMES)[number]
 
-export const AGENT_BRIDGE_BASE_COMMAND_NAMES = [
-  ...AGENT_BRIDGE_READ_COMMAND_NAMES,
-  'applyAgentChange',
-] as const satisfies readonly AgentBridgeCommandName[]
-
-export const getAgentBridgeSessionCommandNames = (
-  pageMode: AgentProjectPageMode
-): readonly AgentBridgeCommandName[] =>
-  pageMode === 'multi-page'
-    ? [...AGENT_BRIDGE_COMMAND_NAMES]
-    : [...AGENT_BRIDGE_BASE_COMMAND_NAMES]
+export const getAgentBridgeSessionCommandNames = (): readonly AgentBridgeCommandName[] => [
+  ...AGENT_BRIDGE_COMMAND_NAMES,
+]
 
 export interface AgentSessionReadState {
   version: typeof AGENT_BRIDGE_PROTOCOL_VERSION
@@ -336,11 +328,6 @@ const createCommandSuccess = <TData>(
   data,
 })
 
-const EMPTY_AGENT_SOURCE_FILE: AgentSourceFileReadState = {
-  jsxCode: '',
-  hooksCode: '',
-}
-
 const createAgentSourceFileReadState = (source: {
   jsx: string
   hooks: string
@@ -382,26 +369,9 @@ export const cloneAgentProjectReadState = (
 })
 
 export const createAgentProjectReadState = (
-  project: Project,
-  multiPageEnabled: boolean
+  project: Project
 ): AgentProjectReadState => {
   const activePage = getActivePage(project)
-
-  if (!multiPageEnabled) {
-    const exposedPage = createAgentProjectPageReadState(activePage)
-
-    return {
-      name: project.name,
-      pageMode: 'single-page',
-      jsxCode: exposedPage.jsxCode,
-      hooksCode: exposedPage.hooksCode,
-      globalConfig: cloneAgentSourceFileReadState(EMPTY_AGENT_SOURCE_FILE),
-      pages: [exposedPage],
-      startPageId: exposedPage.id,
-      activePageId: exposedPage.id,
-    }
-  }
-
   const startPage = getStartPage(project)
 
   return {
@@ -494,20 +464,17 @@ const ARCADE_AUTHORING_GUIDANCE_SNIPPETS: readonly ArcadeAuthoringGuidanceSnippe
   },
 ] as const
 
-const createAgentInstructionsMarkdown = (
-  project: AgentProjectReadState,
-  commandNames: readonly AgentBridgeCommandName[]
-): string => {
+const createAgentInstructionsMarkdown = (commandNames: readonly AgentBridgeCommandName[]): string => {
   const lines = [
     'Aksel Arcade Agent operating guide',
     '1. Treat this returned guide as authoritative for this active Desktop Arcade Agent session.',
-    `2. Call getProject first, then use getPreviewContext and getSessionState when you need preview or session state; this session currently exposes ${project.pageMode} authoring.`,
+    '2. Call getProject first, then use getPreviewContext and getSessionState when you need preview or session state; this session always exposes the full pages-based Arcade project source.',
     '3. Author import-free Arcade JSX and Hooks only; do not edit files or add imports inside Arcade source.',
     '4. When changing source, follow the returned arcadeAuthoringGuidance before applying.',
     '5. Use getDiagnostics for compile/runtime status and getPreviewEvidence only for permitted sandbox Preview evidence.',
   ]
 
-  if (commandNames.includes('createPage')) {
+  if (commandNames.includes('applyAgentChange')) {
     lines.push(
       '6. Use createPage, renamePage, deletePage, setStartPage, and selectActivePage for page lifecycle changes.',
       '7. Submit full-field replacements with applyAgentChange({ summary, target, jsxCode?, hooksCode?, viewportSize?, theme?, name? }).',
@@ -519,12 +486,8 @@ const createAgentInstructionsMarkdown = (
     )
   } else {
     lines.push(
-      '6. Multi-page authoring is disabled for this session; ask the human to enable experimental multi-page authoring before creating pages, targeting other pages, or editing Global config.',
-      '7. Submit full-field replacements with applyAgentChange({ summary, target, jsxCode?, hooksCode?, viewportSize?, theme?, name? }) only against the currently exposed single page.',
-      '8. Accepted Agent changes apply immediately to the human-visible Arcade project.',
-      '9. After each change, poll getDiagnostics until the preview settles to idle or reports an error.',
-      '10. When diagnostics are idle and permission allows, use Preview evidence to validate the visible result.',
-      '11. Do not read active source from share payloads, Arcade project packages, repository docs, browser storage, clipboard, cookies, unrelated page state, or host UI.'
+      '6. Source changes are disabled for this session. Use read commands only until the human re-enables source changes.',
+      '7. Do not read active source from share payloads, Arcade project packages, repository docs, browser storage, clipboard, cookies, unrelated page state, or host UI.'
     )
   }
 
@@ -535,11 +498,10 @@ const createAgentInstructionsPayload = (
   session: AgentBridgeSession,
   transportEndpoint: DesktopAgentTransportEndpoint,
   permissions: AgentPermissions,
-  project: AgentProjectReadState,
   commandNames: readonly AgentBridgeCommandName[]
 ): AgentInstructionsPayload => ({
   version: AGENT_BRIDGE_PROTOCOL_VERSION,
-  instructionsMarkdown: createAgentInstructionsMarkdown(project, commandNames),
+  instructionsMarkdown: createAgentInstructionsMarkdown(commandNames),
   sessionId: session.id,
   startedAt: session.startedAt,
   endpoint: transportEndpoint.endpoint,
@@ -571,7 +533,7 @@ export const createAgentBridgeCommandRouter = (
   controller: AgentBridgeController
 ): AgentBridgeCommandRouter => {
   const getSessionCommandNames = (): readonly AgentBridgeCommandName[] =>
-    getAgentBridgeSessionCommandNames(controller.getReadContext().project.pageMode)
+    getAgentBridgeSessionCommandNames()
 
   const readCommand = <TData>(
     command: AgentBridgeCommandName,
@@ -658,15 +620,6 @@ export const createAgentBridgeCommandRouter = (
     }
 
     const sessionCommandNames = getSessionCommandNames()
-    if (!sessionCommandNames.includes(command)) {
-      return createCommandFailure(
-        command,
-        'unsupported-command',
-        `Agent bridge command "${command}" is unavailable while multi-page authoring is disabled for this session. Ask the human to enable experimental multi-page authoring. Supported commands: ${sessionCommandNames.join(
-          ', '
-        )}.`
-      )
-    }
 
     switch (command) {
       case 'getAgentInstructions':
@@ -684,7 +637,6 @@ export const createAgentBridgeCommandRouter = (
 
         {
           const permissions = controller.getPermissions()
-          const project = controller.getReadContext().project
           controller.recordActivity(command)
 
           return createCommandSuccess(
@@ -693,7 +645,6 @@ export const createAgentBridgeCommandRouter = (
               session,
               session.transportEndpoint,
               permissions,
-              project,
               sessionCommandNames
             )
           )

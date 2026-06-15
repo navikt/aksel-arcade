@@ -9,7 +9,7 @@ A shell-neutral user-owned prototype in Aksel Arcade, including its editable sou
 _Avoid_: File, document, artifact
 
 **Arcade project source**:
-The editable code of an **Arcade project**, composed of the **Global config** and one or more ordered **Arcade pages**, each with its own JSX and Hooks. The default experience presents a single page; multi-page authoring is an experimental, locally enabled capability.
+The editable code of an **Arcade project**, composed of the **Global config** and one or more ordered **Arcade pages**, each with its own JSX and Hooks. A new project starts with one page, and added pages remain part of the same permanent source model.
 _Avoid_: Files, filesystem, project code
 
 **Arcade page**:
@@ -49,7 +49,7 @@ A tab-local in-app **Workspace preference** that makes the preview the primary A
 _Avoid_: Fullscreen preview preference, project fullscreen, browser fullscreen
 
 **Workspace preference**:
-A local product-surface preference for arranging Arcade itself around an **Arcade project**, such as editor panel placement or whether experimental multi-page authoring is enabled. In **Web Arcade**, workspace preferences belong to the current **Web Arcade working copy**.
+A local product-surface preference for arranging Arcade itself around an **Arcade project**, such as editor panel placement or whether the **Page panel** is open. In **Web Arcade**, workspace preferences belong to the current **Web Arcade working copy**.
 _Avoid_: Preview preference, project content
 
 **Arcade project package**:
@@ -250,9 +250,9 @@ Developer: "The user needs to keep a Web Arcade prototype after closing the tab.
 
 Domain expert: "Use Share or Export. A closed Web Arcade working copy is not a durable project library entry."
 
-Developer: "The user enabled multi-page authoring and added a second page."
+Developer: "The user added a second page and then closed the Page panel."
 
-Domain expert: "Now the Arcade project source has the Global config plus two Arcade pages. The flag that enabled this is a Workspace preference; it does not travel with the project."
+Domain expert: "Now the Arcade project source has the Global config plus two Arcade pages. Closing the Page panel is a Workspace preference; it changes the workspace layout and does not travel with the project."
 
 Developer: "The user renamed 'Home' to 'Landing'."
 
@@ -272,12 +272,12 @@ Domain expert: "Define it in the Global config JSX as a shared component and use
 
 Developer: "The user shared a multi-page prototype as a Web share URL."
 
-Domain expert: "While multi-page is experimental, the portable artifact carries only the start page. Warn the user that other pages are not included."
+Domain expert: "The Web share URL should carry the full Arcade project source plus the shareable preview preferences. The recipient keeps their own durable Workspace preferences unless the URL includes an explicit share-opening intent such as Preview fullscreen."
 
-Developer: "An agent wants to add a page, but the user never enabled multi-page authoring."
+Developer: "An agent wants to add a page to a one-page Arcade project."
 
-Domain expert: "Then the agent works single-page on the first page, just like the human. Agent multi-page is gated by the same Workspace preference; the Agent operating instructions should tell the agent to ask the human to enable it."
+Domain expert: "Agent sessions always work against the full pages-based Arcade project source, even when there is only one Arcade page. The agent can call the page lifecycle operations directly; the app still assigns the stable page id."
 
-Developer: "Multi-page is enabled and the agent needs to add a page and link to it."
+Developer: "The agent needs to add a page and link to it."
 
 Domain expert: "The agent submits an agent change to add the page; the app gives it back a stable id. The agent then references that id in its page references — both navigation methods point at the id, never the name. The Arcade authoring guidance documents those rules for humans and agents alike."
