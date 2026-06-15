@@ -105,6 +105,21 @@ const createStoredMultiPageProject = () => {
   return setActivePage(project, 'page01')
 }
 
+const createStoredSinglePageProject = () => {
+  let project = createDefaultProject()
+
+  project = updatePageSource(project, 'page01', {
+    jsx: '<Box>Only page content</Box>',
+    hooks: 'export const useOnlyPage = () => "only-page"',
+  })
+  project = updateGlobalConfigSource(project, {
+    jsx: 'export const SharedChrome = () => <Box>Shared chrome</Box>',
+    hooks: 'export const useSharedChrome = () => "shared"',
+  })
+
+  return project
+}
+
 const dispatchSandboxMessage = (data: unknown) => {
   const iframe = screen.getByTestId('preview-iframe') as HTMLIFrameElement
   if (!iframe.contentWindow) {
@@ -158,7 +173,7 @@ describe('Multi-page preview sync', () => {
     saveProject(project, {
       preferences: {
         ...DEFAULT_WEB_ARCADE_WORKING_COPY_PREFERENCES,
-        multiPageEnabled: true,
+        multiPageEnabled: false,
         pagePanelOpen: true,
         selectedEditTarget: 'page',
       },
@@ -199,6 +214,52 @@ describe('Multi-page preview sync', () => {
       expect(screen.getByText('Global config has no preview')).toBeTruthy()
       expect(screen.getByTestId('selected-edit-target').textContent).toBe('global-config')
       expect(screen.getByTestId('preview-iframe')).toBe(previewIframe)
+    })
+
+    dispatchSandboxMessage({
+      type: 'PREVIEW_PAGE_CHANGED',
+      payload: { pageId: 'page02' },
+    })
+
+    await waitFor(() => {
+      expect(screen.getByTestId('active-page-id').textContent).toBe('page02')
+      expect(screen.getByTestId('selected-edit-target').textContent).toBe('global-config')
+      expect(screen.getByText('Global config has no preview')).toBeTruthy()
+    })
+  })
+
+  it('keeps one-page projects on the same pages-based preview model when the legacy flag is false', async () => {
+    const user = userEvent.setup()
+    const project = createStoredSinglePageProject()
+    saveProject(project, {
+      preferences: {
+        ...DEFAULT_WEB_ARCADE_WORKING_COPY_PREFERENCES,
+        multiPageEnabled: false,
+        pagePanelOpen: true,
+        selectedEditTarget: 'global-config',
+      },
+    })
+
+    renderHarness()
+
+    const previewIframe = await screen.findByTestId('preview-iframe')
+    dispatchSandboxMessage({ type: 'SANDBOX_CONNECTED' })
+    dispatchSandboxMessage({ type: 'RENDER_SUCCESS' })
+
+    await waitFor(() => {
+      expect(screen.getByText('Global config has no preview')).toBeTruthy()
+      expect(screen.getByTestId('selected-edit-target').textContent).toBe('global-config')
+      expect(screen.getByTestId('preview-iframe')).toBe(previewIframe)
+      expect(getLastPostedMessage('NAVIGATE_TO_PAGE')?.payload?.pageId).toBe('page01')
+    })
+
+    await user.click(screen.getByRole('button', { name: /^Page 1/i }))
+
+    await waitFor(() => {
+      expect(screen.getByTestId('selected-edit-target').textContent).toBe('page')
+      expect((screen.getByRole('textbox', { name: 'Code editor' }) as HTMLTextAreaElement).value).toBe(
+        '<Box>Only page content</Box>'
+      )
     })
   })
 

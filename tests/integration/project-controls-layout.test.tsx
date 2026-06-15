@@ -2503,10 +2503,11 @@ describe('ProjectControls layout', () => {
     expect(diagnostics).toMatchObject({
       status: 'error',
       compileError: {
-        message: expect.stringMatching(/Unterminated JSX contents/i),
+        message: expect.stringMatching(/page01 JSX: .*Unexpected token/i),
         line: expect.any(Number),
         column: expect.any(Number),
         stack: expect.any(String),
+        pageId: 'page01',
       },
       runtimeError: null,
     })

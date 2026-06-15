@@ -163,9 +163,8 @@ export const updateSourceForEditTarget = (
     : updateActivePageSource(project, updates)
 
 export const resolveSelectedEditTarget = (
-  multiPageEnabled: boolean,
   selectedEditTarget: SelectedEditTarget
-): SelectedEditTarget => (multiPageEnabled ? selectedEditTarget : 'page')
+): SelectedEditTarget => selectedEditTarget
 
 export const nextPageId = (source: Pick<ProjectSource, 'nextPageNumber'>): ArcadePageId =>
   formatPageId(source.nextPageNumber)

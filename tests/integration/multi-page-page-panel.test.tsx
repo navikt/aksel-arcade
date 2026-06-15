@@ -125,7 +125,7 @@ describe('Multi-page page panel', () => {
     saveProject(project, {
       preferences: {
         ...DEFAULT_WEB_ARCADE_WORKING_COPY_PREFERENCES,
-        multiPageEnabled: true,
+        multiPageEnabled: false,
         pagePanelOpen: true,
         selectedEditTarget: 'global-config',
       },

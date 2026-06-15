@@ -194,7 +194,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     setTheme,
   ])
 
-  const effectiveEditTarget = resolveSelectedEditTarget(multiPageEnabled, selectedEditTarget)
+  const effectiveEditTarget = resolveSelectedEditTarget(selectedEditTarget)
 
   useEffect(() => {
     if (shareHydration.status !== 'decoding' || !shareHydration.token) {
@@ -277,10 +277,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
             hooks: updates.hooksCode,
           })
         } else {
-          const editTarget = resolveSelectedEditTarget(
-            multiPageEnabled,
-            updates.editTarget ?? selectedEditTarget
-          )
+          const editTarget = resolveSelectedEditTarget(updates.editTarget ?? selectedEditTarget)
           nextProject = updateSourceForEditTarget(nextProject, editTarget, {
             jsx: updates.jsxCode,
             hooks: updates.hooksCode,

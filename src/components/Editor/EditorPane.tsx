@@ -39,7 +39,6 @@ export const EditorPane = () => {
     closeComponentPalette,
   } = context
   const {
-    multiPageEnabled,
     pagePanelOpen,
     selectedEditTarget,
     setSelectedEditTarget,
@@ -50,7 +49,7 @@ export const EditorPane = () => {
   const editorRef = useRef<CodeEditorRef>(null)
 
   const currentTab = editorState.activeTab
-  const effectiveEditTarget = resolveSelectedEditTarget(multiPageEnabled, selectedEditTarget)
+  const effectiveEditTarget = resolveSelectedEditTarget(selectedEditTarget)
   const activeSource = getSourceForEditTarget(project, effectiveEditTarget)
   const currentContent = currentTab === 'JSX' ? activeSource.jsx : activeSource.hooks
   const pagePanelToggleLabel = pagePanelOpen ? 'Hide pages' : 'Show pages'
@@ -70,28 +69,19 @@ export const EditorPane = () => {
     )
   )
   const pageReferenceAnalysis = useMemo(
-    () =>
-      multiPageEnabled
-        ? analyzeProjectPageReferences(project.source)
-        : {
-            brokenNavigationPageIds: [],
-            globalConfigStaleReferences: [],
-            staleReferencesByPageId: {},
-          },
-    [multiPageEnabled, project.source]
+    () => analyzeProjectPageReferences(project.source),
+    [project.source]
   )
   const deletePageImpacts = useMemo(
     () =>
-      multiPageEnabled
-        ? project.source.pages.reduce<Partial<Record<ArcadePageId, DeletePageImpact>>>(
-            (result, page) => {
-              result[page.id] = getDeletePageImpact(project.source, page.id)
-              return result
-            },
-            {}
-          )
-        : {},
-    [multiPageEnabled, project.source]
+      project.source.pages.reduce<Partial<Record<ArcadePageId, DeletePageImpact>>>(
+        (result, page) => {
+          result[page.id] = getDeletePageImpact(project.source, page.id)
+          return result
+        },
+        {}
+      ),
+    [project.source]
   )
 
   const handleCodeChange = (newContent: string) => {
@@ -220,19 +210,17 @@ export const EditorPane = () => {
       >
         <div className="editor-pane__header">
           <div className="editor-pane__header-start">
-            {multiPageEnabled && (
-              <Button
-                variant="tertiary"
-                data-color="neutral"
+            <Button
+              variant="tertiary"
+              data-color="neutral"
                 size="small"
                 aria-controls="page-panel"
                 aria-pressed={pagePanelOpen}
                 icon={<SidebarLeftIcon aria-hidden />}
                 onClick={togglePagePanel}
-              >
-                {pagePanelToggleLabel}
-              </Button>
-            )}
+            >
+              {pagePanelToggleLabel}
+            </Button>
           </div>
           <div className="editor-pane__header-center">
             <EditorTabs activeTab={currentTab} onTabChange={handleTabChange} />
@@ -251,7 +239,7 @@ export const EditorPane = () => {
       </Box>
 
       <Box className="editor-pane__workspace">
-        {multiPageEnabled && pagePanelOpen && (
+        {pagePanelOpen && (
           <PagePanel
             activePageId={project.activePageId}
             startPageId={project.source.startPageId}
@@ -283,8 +271,8 @@ export const EditorPane = () => {
             onCursorChange={handleCursorChange}
             onFocusChange={(isCodeEditorFocused) => updateEditorState({ isCodeEditorFocused })}
             onFormat={handleFormat}
-            validPageIds={multiPageEnabled ? validPageIds : undefined}
-            pageNavigationTargets={multiPageEnabled ? pageNavigationTargets : undefined}
+            validPageIds={validPageIds}
+            pageNavigationTargets={pageNavigationTargets}
             onApplyCatalogInsertion={currentTab === 'JSX' ? handleAutocompleteInsertion : undefined}
           />
         </Box>
