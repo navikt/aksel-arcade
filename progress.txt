@@ -3075,3 +3075,24 @@ Verification:
 Next note:
 
 - `#259` can build on the always-pages-aware Desktop Agent contract; the old single-page bridge/instructions path is gone, so future regression coverage should assert the full command list and page-target / global-config targeting even for one-page projects.
+
+### 2026-06-15 - Issue #259: Add end-to-end regression coverage for permanent lossless pages
+
+Implemented:
+
+- Worked only on `#259`, using issue `#252`, `CONTEXT.md`, and the existing `progress.txt` notes to keep the scope on permanent-page regression coverage.
+- Added `tests/e2e/permanent-pages-regression.spec.ts` to cover the permanent **Page panel** / Settings UI defaults, full-project Web share recipient behavior with the new `v5` token shape, backward-compatible legacy single-page share loading, full-source `.akselarcade` export/import, and backward-compatible legacy single-page package import.
+- Updated `tests/e2e/agent-diagnostics.spec.ts` so the Desktop Agent-session E2E follows the current English Agent menu copy, keeps the runtime-error scenario pages-aware by targeting `page01`, and adds a one-page regression that exercises the full lifecycle command list plus `global-config` and page-targeted edits before deleting the added page again.
+
+Verification:
+
+- `npm run typecheck`
+- `npm run lint`
+- `npm run test -- --run`
+- `npm run build`
+- `npm run test:e2e -- tests/e2e/permanent-pages-regression.spec.ts tests/e2e/agent-diagnostics.spec.ts`
+- Browser check at `http://127.0.0.1:4196/aksel-arcade/` confirming the default Web surface rendered with the **Page panel** closed, a visible neutral **Show pages** control, a working preview, and no browser console warnings/errors
+
+Next note:
+
+- If later rollout work needs deeper Web-share token contract assertions inside Playwright, prefer helper code that can run in the Node-side test process directly rather than importing browser-bundled share modules from the test runner.

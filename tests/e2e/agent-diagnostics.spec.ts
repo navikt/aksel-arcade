@@ -232,8 +232,18 @@ const installDesktopAgentSurface = async (page: Page) => {
 }
 
 const startAgentAccess = async (page: Page) => {
-  await page.getByTestId('agent-session-menu').click()
-  await page.getByRole('menuitemcheckbox', { name: 'Agent-tilgang' }).click()
+  const menuButton = page.getByTestId('agent-session-menu')
+  const accessToggle = page.getByRole('menuitemcheckbox', { name: /agent bridge/i })
+
+  if (!(await accessToggle.isVisible().catch(() => false))) {
+    await menuButton.click()
+  }
+  if (!(await accessToggle.isVisible().catch(() => false))) {
+    await menuButton.click()
+  }
+
+  await expect(accessToggle).toBeVisible()
+  await accessToggle.click()
   await page.waitForFunction(
     (globalName) =>
       Boolean((window as unknown as Record<string, TestAgentTransport>)[globalName]?.hasHandler()),
@@ -250,7 +260,7 @@ const startAgentAccess = async (page: Page) => {
 }
 
 const copyAgentPairingHandoff = async (page: Page): Promise<string> => {
-  const copyItem = page.getByRole('menuitem', { name: 'Kopier agentkommando' })
+  const copyItem = page.getByRole('menuitem', { name: /copy command|try again/i })
   if (!(await copyItem.isVisible())) {
     await page.getByTestId('agent-session-menu').click()
   }
@@ -291,7 +301,7 @@ const parseAgentPairingHandoff = (command: string): ParsedAgentPairingHandoff =>
   }
 }
 
-const callAgentJsonRpc = async <TData,>(
+const callAgentJsonRpc = async <TData>(
   page: Page,
   endpoint: string,
   authorizationHeader: string,
@@ -326,7 +336,7 @@ const callAgentJsonRpc = async <TData,>(
     }
   )
 
-const callAgentCommand = async <TData,>(
+const callAgentCommand = async <TData>(
   page: Page,
   instructions: AgentInstructionsPayload,
   method: string,
@@ -339,7 +349,7 @@ const callAgentCommand = async <TData,>(
     ...(params === undefined ? {} : { params }),
   })
 
-const expectAgentResultData = <TData,>(result: AgentBridgeCommandResult<TData>): TData => {
+const expectAgentResultData = <TData>(result: AgentBridgeCommandResult<TData>): TData => {
   expect(result.ok).toBe(true)
   if (!result.ok || result.data === undefined) {
     throw new Error(result.error?.message ?? 'Agent bridge command failed.')
@@ -555,6 +565,133 @@ test.describe('Agent diagnostics', () => {
     }
   })
 
+  test('keeps one-page Agent sessions fully pages-aware for lifecycle and targeted edits', async ({
+    page,
+  }) => {
+    await installDesktopAgentSurface(page)
+    await page.goto('/')
+
+    const iframe = page.frameLocator('.live-preview__iframe')
+    await expect(iframe.locator('#root > *')).toBeVisible({ timeout: 10_000 })
+
+    await startAgentAccess(page)
+
+    const handoff = parseAgentPairingHandoff(await copyAgentPairingHandoff(page))
+    const instructions = expectAgentResultData(
+      await callAgentJsonRpc<AgentInstructionsPayload>(
+        page,
+        handoff.endpoint,
+        handoff.authorizationHeader,
+        handoff.body
+      )
+    )
+
+    expect(instructions.instructionsMarkdown).not.toMatch(/experimental multi-page/i)
+    expect(instructions.commandNames).toEqual([
+      'getAgentInstructions',
+      'getProject',
+      'getPreviewContext',
+      'getDiagnostics',
+      'getPreviewEvidence',
+      'getSessionState',
+      'applyAgentChange',
+      'createPage',
+      'renamePage',
+      'deletePage',
+      'setStartPage',
+      'selectActivePage',
+    ])
+
+    const initialProject = expectAgentResultData(
+      await callAgentCommand<AgentProject>(page, instructions, 'getProject')
+    )
+    expect(initialProject).toMatchObject({
+      pageMode: 'multi-page',
+      globalConfig: {
+        jsxCode: '',
+        hooksCode: '',
+      },
+      pages: [expect.objectContaining({ id: 'page01', name: 'Page 1' })],
+      startPageId: 'page01',
+      activePageId: 'page01',
+    })
+
+    expectAgentResultData(await callAgentCommand(page, instructions, 'createPage'))
+    expectAgentResultData(
+      await callAgentCommand(page, instructions, 'renamePage', {
+        pageId: 'page02',
+        name: 'Details',
+      })
+    )
+    expectAgentResultData(
+      await callAgentCommand(page, instructions, 'applyAgentChange', {
+        summary: 'Add shared config hook',
+        target: { type: 'global-config' },
+        hooksCode: 'export const useSharedValue = () => "shared"',
+      })
+    )
+
+    const detailsText = 'Agent details page'
+    expectAgentResultData(
+      await callAgentCommand(page, instructions, 'applyAgentChange', {
+        summary: 'Update details page',
+        target: { type: 'page', pageId: 'page02' },
+        jsxCode: `export default function App() {
+  return <Heading>${detailsText}</Heading>
+}`,
+        hooksCode: 'export const useDetails = () => "details"',
+      })
+    )
+    expectAgentResultData(
+      await callAgentCommand(page, instructions, 'setStartPage', { pageId: 'page02' })
+    )
+    expectAgentResultData(
+      await callAgentCommand(page, instructions, 'selectActivePage', { pageId: 'page02' })
+    )
+
+    const detailsDiagnostics = await waitForDiagnosticsToSettle(page, instructions)
+    expect(detailsDiagnostics.status).toBe('idle')
+    expect(detailsDiagnostics.runtimeError).toBeNull()
+    await expect(iframe.getByText(detailsText)).toBeVisible({ timeout: 10_000 })
+
+    const updatedProject = expectAgentResultData(
+      await callAgentCommand<AgentProject>(page, instructions, 'getProject')
+    )
+    expect(updatedProject).toMatchObject({
+      pageMode: 'multi-page',
+      globalConfig: {
+        jsxCode: '',
+        hooksCode: 'export const useSharedValue = () => "shared"',
+      },
+      startPageId: 'page02',
+      activePageId: 'page02',
+      pages: expect.arrayContaining([
+        expect.objectContaining({
+          id: 'page02',
+          name: 'Details',
+          jsxCode: `export default function App() {
+  return <Heading>${detailsText}</Heading>
+}`,
+          hooksCode: 'export const useDetails = () => "details"',
+        }),
+      ]),
+    })
+
+    expectAgentResultData(
+      await callAgentCommand(page, instructions, 'deletePage', { pageId: 'page02' })
+    )
+
+    const restoredProject = expectAgentResultData(
+      await callAgentCommand<AgentProject>(page, instructions, 'getProject')
+    )
+    expect(restoredProject).toMatchObject({
+      pageMode: 'multi-page',
+      startPageId: 'page01',
+      activePageId: 'page01',
+      pages: [expect.objectContaining({ id: 'page01', name: 'Page 1' })],
+    })
+  })
+
   test('surfaces sandbox React render failures as structured runtime diagnostics', async ({
     page,
   }) => {
@@ -577,6 +714,7 @@ test.describe('Agent diagnostics', () => {
         method: 'applyAgentChange',
         params: {
           summary: 'Trigger render failure',
+          target: { type: 'page', pageId: 'page01' },
           jsxCode: `export default function App() {
   throw new Error('Agent render exploded')
 }`,
