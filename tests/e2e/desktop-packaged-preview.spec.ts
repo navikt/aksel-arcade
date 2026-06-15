@@ -129,6 +129,7 @@ test.describe('Desktop renderer protocol preview', () => {
 
       await expectPreviewSurfaceFlush(page)
       await page.getByRole('button', { name: 'Enter preview fullscreen' }).click()
+      await expect(page.getByRole('button', { name: 'Exit preview fullscreen' })).toBeVisible()
       await expectPreviewSurfaceFlush(page)
       await page.getByRole('button', { name: 'Exit preview fullscreen' }).click()
 
