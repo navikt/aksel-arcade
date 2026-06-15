@@ -4,7 +4,6 @@ import {
   Detail,
   Button,
   HStack,
-  VStack,
   Box,
   ActionMenu,
   BodyLong,
@@ -32,7 +31,6 @@ import type { SaveStatus } from '@/hooks/useAutoSave'
 import {
   ARCADE_PROJECT_IMPORT_ACCEPT,
   exportProject,
-  getPortableArtifactWarning,
   importProject,
 } from '@/services/storage'
 import type { UseShareLinkOptions } from '@/hooks/useShareLink'
@@ -90,11 +88,9 @@ export const AppHeader = ({
   const MAX_PROJECT_SIZE = 5 * 1024 * 1024 // 5MB
   const fileInputRef = useRef<HTMLInputElement>(null)
   const projectNameInputRef = useRef<HTMLInputElement>(null)
-  const [exportConfirmOpen, setExportConfirmOpen] = useState(false)
   const [importConfirmOpen, setImportConfirmOpen] = useState(false)
   const [isEditingProjectName, setIsEditingProjectName] = useState(false)
   const [projectNameDraft, setProjectNameDraft] = useState(projectName)
-  const exportConfirmDialogId = useId()
   const importConfirmDialogId = useId()
   const {
     theme,
@@ -104,18 +100,8 @@ export const AppHeader = ({
   } = useSettings()
   const canUseShareUrl = shellCapabilities.shareUrl.enabled
   const canUseAgentSessions = shellCapabilities.agentSessions.enabled
-  const portableArtifactWarning = getPortableArtifactWarning(currentProject)
 
   const handleExport = () => {
-    if (portableArtifactWarning) {
-      setExportConfirmOpen(true)
-      return
-    }
-    exportProject(currentProject)
-  }
-
-  const handleConfirmExport = () => {
-    setExportConfirmOpen(false)
     exportProject(currentProject)
   }
 
@@ -305,8 +291,6 @@ export const AppHeader = ({
             size="small"
             icon={<FileExportIcon aria-hidden />}
             onClick={handleExport}
-            aria-haspopup={portableArtifactWarning ? 'dialog' : undefined}
-            aria-controls={exportConfirmOpen ? exportConfirmDialogId : undefined}
           >
             Export
           </Button>
@@ -387,31 +371,6 @@ export const AppHeader = ({
           style={{ display: 'none' }}
           aria-label="Import .akselarcade Arcade project package"
         />
-        <Dialog open={exportConfirmOpen} onOpenChange={(open) => setExportConfirmOpen(open)}>
-          <Dialog.Popup
-            id={exportConfirmDialogId}
-            role="alertdialog"
-            aria-label="Confirm export"
-            closeOnOutsideClick={false}
-          >
-            <Dialog.Body>
-              <VStack gap="space-12">
-                <BodyLong>{portableArtifactWarning}</BodyLong>
-                <Detail size="small">Continue with a Start-page-only export?</Detail>
-              </VStack>
-            </Dialog.Body>
-            <Dialog.Footer>
-              <Dialog.CloseTrigger>
-                <Button type="button" variant="secondary" data-color="neutral">
-                  Cancel
-                </Button>
-              </Dialog.CloseTrigger>
-              <Button type="button" onClick={handleConfirmExport}>
-                Export Start page only
-              </Button>
-            </Dialog.Footer>
-          </Dialog.Popup>
-        </Dialog>
         <Dialog open={importConfirmOpen} onOpenChange={(open) => setImportConfirmOpen(open)}>
           <Dialog.Popup
             id={importConfirmDialogId}
