@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { decompressFromEncodedURIComponent } from 'lz-string'
-import type { ProjectSnapshot } from '@/types/project'
+import type { Project, ProjectSnapshot } from '@/types/project'
 import {
   buildShareUrl,
   createShareToken,
@@ -47,16 +47,17 @@ const snapshotFixture: ProjectSnapshot = {
 }
 
 const createNonShareableStateFixture = (): {
+  project: Project
   snapshot: ProjectSnapshot
   expectedPayload: {
-    source: {
-      jsx: string
-      hooks: string
+    project: {
+      name: string
+      source: Project['source']
+      preview: {
+        viewport: Project['viewportSize']
+      }
     }
-    preview: {
-      viewport: ProjectSnapshot['preview']['viewport']
-      theme: ProjectSnapshot['preview']['theme']
-    }
+    theme: ProjectSnapshot['preview']['theme']
   }
   excludedSnippets: string[]
 } => {
@@ -66,6 +67,7 @@ const createNonShareableStateFixture = (): {
   project.version = '9.9.9'
   project.createdAt = '2024-01-01T00:00:00.000Z'
   project.lastModified = '2024-01-02T00:00:00.000Z'
+  project.viewportSize = 'LG'
   project.source = createSinglePageProjectSource(
     'export default function App() { return <div>Shareable JSX</div> }',
     'export function useShareableHook() { return "Shareable Hooks" }'
@@ -113,20 +115,20 @@ const createNonShareableStateFixture = (): {
   snapshot.updatedAt = 1700000000000
 
   return {
+    project,
     snapshot,
     expectedPayload: {
-      source: {
-        jsx: source.jsx,
-        hooks: source.hooks,
+      project: {
+        name: project.name,
+        source: project.source,
+        preview: {
+          viewport: 'LG',
+        },
       },
-      preview: {
-        viewport: 'LG',
-        theme: 'light',
-      },
+      theme: 'light',
     },
     excludedSnippets: [
       project.id,
-      project.name,
       project.version,
       project.createdAt,
       project.lastModified,
@@ -152,6 +154,7 @@ const createNonShareableStateFixture = (): {
       '0.42',
       'sandboxFlags',
       'outlines',
+      'previewFullscreen',
       'warningThreshold',
       'charLimit',
       '1234',
@@ -169,6 +172,15 @@ const createShareUrlForSnapshot = async (
   return buildShareUrl(token, 'https://example.com/playground')
 }
 
+const createShareUrlForProject = async (
+  project: Project,
+  previewTheme: ProjectSnapshot['preview']['theme'] = 'dark'
+): Promise<string> => {
+  const envelope = await encodeSharePayload(project, { previewTheme })
+  const token = createShareToken(envelope)
+  return buildShareUrl(token, 'https://example.com/playground')
+}
+
 describe('shareEncoding utilities', () => {
   it('computes a stable checksum for identical payloads', async () => {
     const serialized = JSON.stringify(snapshotFixture)
@@ -179,8 +191,8 @@ describe('shareEncoding utilities', () => {
     expect(first).toMatch(/^[A-Za-z0-9_-]+$/)
   })
 
-  it('encodes snapshot into URI-safe payload', async () => {
-    const envelope = await encodeSharePayload(snapshotFixture)
+  it('encodes project into a URI-safe payload', async () => {
+    const envelope = await encodeSharePayload(createDefaultProject())
     const token = createShareToken(envelope)
 
     expect(envelope.formatVersion).toBe(SHARE_FORMAT_VERSION)
@@ -190,9 +202,10 @@ describe('shareEncoding utilities', () => {
     expect(token).not.toContain(' ')
   })
 
-  it('serializes newly generated v3 payloads without non-shareable project state', async () => {
-    const { snapshot, expectedPayload, excludedSnippets } = createNonShareableStateFixture()
-    const envelope = await encodeSharePayload(snapshot, {
+  it('serializes newly generated full-project payloads without non-shareable project state', async () => {
+    const { project, expectedPayload, excludedSnippets } = createNonShareableStateFixture()
+    const envelope = await encodeSharePayload(project, {
+      previewTheme: 'light',
       warningThresholdHit: true,
       warningThreshold: 1234,
       charLimit: 2345,
@@ -203,17 +216,18 @@ describe('shareEncoding utilities', () => {
     const payload = JSON.parse(serialized ?? '')
 
     expect(payload).toEqual(expectedPayload)
-    expect(Object.keys(payload).sort()).toEqual(['preview', 'source'])
-    expect(Object.keys(payload.source).sort()).toEqual(['hooks', 'jsx'])
-    expect(Object.keys(payload.preview).sort()).toEqual(['theme', 'viewport'])
+    expect(Object.keys(payload).sort()).toEqual(['project', 'theme'])
+    expect(Object.keys(payload.project).sort()).toEqual(['name', 'preview', 'source'])
+    expect(Object.keys(payload.project.preview).sort()).toEqual(['viewport'])
     for (const snippet of excludedSnippets) {
       expect(serialized).not.toContain(snippet)
     }
   })
 
   it('serializes preview fullscreen opening intent only when requested', async () => {
-    const { snapshot, expectedPayload } = createNonShareableStateFixture()
-    const envelope = await encodeSharePayload(snapshot, {
+    const { project, expectedPayload } = createNonShareableStateFixture()
+    const envelope = await encodeSharePayload(project, {
+      previewTheme: 'light',
       openingIntent: { previewFullscreen: true },
     })
     const serialized = decompressFromEncodedURIComponent(envelope.compressed)
@@ -226,17 +240,23 @@ describe('shareEncoding utilities', () => {
     })
   })
 
-  it('generates shorter v3 Web share URLs than equivalent legacy v2 full-snapshot URLs', async () => {
-    const representativeSnapshots = [
-      createShareSnapshot(createDefaultProject()),
-      createNonShareableStateFixture().snapshot,
+  it('generates shorter full-project Web share URLs than equivalent legacy v2 full-snapshot URLs', async () => {
+    const representativeProjects = [
+      { project: createDefaultProject(), previewTheme: 'dark' as const },
+      { project: createNonShareableStateFixture().project, previewTheme: 'light' as const },
     ]
 
-    for (const snapshot of representativeSnapshots) {
-      const v3Url = await createShareUrlForSnapshot(snapshot)
+    for (const { project, previewTheme } of representativeProjects) {
+      const snapshot = createShareSnapshot(project, {
+        preview: {
+          viewport: project.viewportSize,
+          theme: previewTheme,
+        },
+      })
+      const currentUrl = await createShareUrlForProject(project, previewTheme)
       const legacyV2Url = await createShareUrlForSnapshot(snapshot, LEGACY_SHARE_FORMAT_VERSION)
 
-      expect(v3Url.length).toBeLessThan(legacyV2Url.length)
+      expect(currentUrl.length).toBeLessThan(legacyV2Url.length)
     }
   })
 
@@ -283,10 +303,8 @@ describe('shareEncoding utilities', () => {
     expect(url).toContain('%2F')
   })
 
-  it('keeps default project snapshot under share limit', async () => {
-    const project = createDefaultProject()
-    const snapshot = createShareSnapshot(project)
-    const envelope = await encodeSharePayload(snapshot)
+  it('keeps the default project under the share limit', async () => {
+    const envelope = await encodeSharePayload(createDefaultProject())
     const token = createShareToken(envelope)
 
     expect(token.length).toBeLessThanOrEqual(SHARE_URL_CHAR_LIMIT)

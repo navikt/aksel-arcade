@@ -3014,3 +3014,27 @@ Verification:
 Next note:
 
 - Keep the parser branch order intentional: v1 compatibility should be handled before the strict clean-package root-key assertion, while v3 and raw JSON rejections should continue to fail closed on extra top-level fields.
+
+### 2026-06-15 - Issue #257: Make Web share URLs lossless for full Arcade project source
+
+Implemented:
+
+- Selected `#257` as the highest-priority `ready-for-agent` feature from `#257`-`#259` because `#259` is explicitly blocked by `#257` and `#258`, and `#257` is the broader user-facing portability dependency while `#258` is the narrower Desktop Agent follow-up.
+- Read issue `#252`, `CONTEXT.md`, and the existing `progress.txt` notes before changing code.
+- Reworked the Web share payload path in `src/utils/shareEncoding.ts`, `src/utils/sharePayload.ts`, `src/utils/shareDecoding.ts`, `src/hooks/useShareLink.ts`, and `src/hooks/useProject.tsx` so newly generated links now use full-project share formats `v5` / `v6`, carrying the shared project name, full clean `project.source`, Start page metadata, preview viewport, and preview theme while preserving explicit opening intents like preview fullscreen.
+- Reused the clean portable project boundary from package export/import by promoting shared helpers in `src/services/storage.ts`, so Web share decode now rebuilds a fresh local project identity from the same strict lossless source contract instead of collapsing back to a single-page snapshot.
+- Removed the lossy multi-page share warning from `src/components/Share/SharePopoverButton.tsx`, updated the share-regeneration fingerprint to follow whole-project changes, and kept the oversize Web-share fallback directing users to Export when the URL guardrail is exceeded.
+- Refreshed regression coverage in `tests/unit/utils/shareEncoding.test.ts`, `tests/unit/utils/shareDecoding.test.ts`, `tests/integration/share-decode.test.tsx`, `tests/integration/share-popover.test.tsx`, and `tests/integration/fullscreen-share-popover.test.tsx` so the suite now asserts full-source share payloads, recipient-side Start-page loading, shared project-name hydration, page-panel preference preservation, fullscreen opening intent, and backward-compatible decoding of older single-page Web share URLs.
+
+Verification:
+
+- `npm run typecheck`
+- `npm run lint`
+- `npm run test -- --run`
+- `npm run build`
+- Browser check at `http://127.0.0.1:5192/aksel-arcade/` confirming a two-page shared working copy generated a Web share URL with no lossy warning, and loading that URL in a fresh tab preserved the recipient-local open Page panel while restoring the shared project name, both pages, global config, Start page on the **JSX** tab, and a clean console
+
+Next note:
+
+- `#258` is now the remaining pages-awareness rollout slice for Desktop Agent sessions; it can build on the new full-project Web share/package portability boundary without reintroducing single-page fallback assumptions.
+- `#259` should now keep treating Web share compatibility as covered by both the legacy single-page decode assertions and the new full-project recipient-flow regression coverage added here.

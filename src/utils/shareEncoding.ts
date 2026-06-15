@@ -1,13 +1,16 @@
 import { compressToEncodedURIComponent } from 'lz-string'
 import type {
   CompressionStrategyId,
+  Project,
   ProjectSnapshot,
   SharePayloadEnvelope,
   ShareUrlOpeningIntent,
 } from '@/types/project'
 import { fromBase64Url, toBase64Url } from '@/utils/base64'
 import {
+  createLegacyWebShareUrlPayload,
   createWebShareUrlPayload,
+  serializeLegacyWebShareUrlPayload,
   serializeWebShareUrlPayload,
 } from '@/utils/sharePayload'
 
@@ -15,8 +18,10 @@ export const SHARE_URL_PARAM = 'share'
 export const SHARE_URL_WARNING_THRESHOLD = 3600
 export const SHARE_URL_CHAR_LIMIT = 4000
 export const LEGACY_SHARE_FORMAT_VERSION = 2
-export const SHARE_FORMAT_VERSION = 3
-export const SHARE_FULLSCREEN_INTENT_FORMAT_VERSION = 4
+export const LEGACY_MINIMAL_SHARE_FORMAT_VERSION = 3
+export const LEGACY_MINIMAL_SHARE_FULLSCREEN_INTENT_FORMAT_VERSION = 4
+export const SHARE_FORMAT_VERSION = 5
+export const SHARE_FULLSCREEN_INTENT_FORMAT_VERSION = 6
 export const SHARE_METADATA_VERSION = 1
 export const SHARE_URL_ESTIMATE_MULTIPLIER = 1.4
 export const DEFAULT_COMPRESSION_STRATEGY_ID: CompressionStrategyId = 'lz-string-uri'
@@ -35,6 +40,7 @@ interface EncodeOptions {
   metadataVersion?: number
   compressed?: string
   openingIntent?: ShareUrlOpeningIntent
+  previewTheme?: ProjectSnapshot['preview']['theme']
 }
 
 interface ShareTokenMetadataPayloadWire {
@@ -72,9 +78,20 @@ export const serializeSnapshot = (snapshot: ProjectSnapshot): string => {
 }
 
 export const serializeSharePayload = (
-  snapshot: ProjectSnapshot,
-  options?: { openingIntent?: ShareUrlOpeningIntent }
-): string => serializeWebShareUrlPayload(createWebShareUrlPayload(snapshot, options))
+  source: ProjectSnapshot | Project,
+  options?: {
+    openingIntent?: ShareUrlOpeningIntent
+    previewTheme?: ProjectSnapshot['preview']['theme']
+  }
+): string =>
+  isProjectSnapshot(source)
+    ? serializeLegacyWebShareUrlPayload(createLegacyWebShareUrlPayload(source, options))
+    : serializeWebShareUrlPayload(
+        createWebShareUrlPayload(source, {
+          theme: options?.previewTheme ?? 'dark',
+          openingIntent: options?.openingIntent,
+        })
+      )
 
 export const computeChecksum = async (payload: string): Promise<string> => {
   const encoder = new TextEncoder()
@@ -84,19 +101,30 @@ export const computeChecksum = async (payload: string): Promise<string> => {
 }
 
 export const encodeSharePayload = async (
-  snapshot: ProjectSnapshot,
+  source: ProjectSnapshot | Project,
   options?: EncodeOptions
 ): Promise<SharePayloadEnvelope> => {
   const formatVersion = options?.formatVersion
     ?? (
-      options?.openingIntent?.previewFullscreen
-        ? SHARE_FULLSCREEN_INTENT_FORMAT_VERSION
-        : SHARE_FORMAT_VERSION
+      isProjectSnapshot(source)
+        ? (
+            options?.openingIntent?.previewFullscreen
+              ? LEGACY_MINIMAL_SHARE_FULLSCREEN_INTENT_FORMAT_VERSION
+              : LEGACY_MINIMAL_SHARE_FORMAT_VERSION
+          )
+        : (
+            options?.openingIntent?.previewFullscreen
+              ? SHARE_FULLSCREEN_INTENT_FORMAT_VERSION
+              : SHARE_FORMAT_VERSION
+          )
     )
   const json = options?.serialized ?? (
     formatVersion === LEGACY_SHARE_FORMAT_VERSION
-      ? serializeSnapshot(snapshot)
-      : serializeSharePayload(snapshot, { openingIntent: options?.openingIntent })
+      ? serializeSnapshot(assertProjectSnapshot(source))
+      : serializeSharePayload(source, {
+          openingIntent: options?.openingIntent,
+          previewTheme: options?.previewTheme,
+        })
   )
   const checksumPayload = options?.checksumSource ?? json
   const checksum = options?.checksum ?? (await computeChecksum(checksumPayload))
@@ -205,4 +233,15 @@ function encodeShareTokenMetadata(
 
 function createChecksumPlaceholder(): string {
   return toBase64Url(new Uint8Array(32))
+}
+
+const isProjectSnapshot = (value: ProjectSnapshot | Project): value is ProjectSnapshot =>
+  'files' in value
+
+const assertProjectSnapshot = (value: ProjectSnapshot | Project): ProjectSnapshot => {
+  if (!isProjectSnapshot(value)) {
+    throw new Error('Legacy Web share URL generation requires a project snapshot')
+  }
+
+  return value
 }

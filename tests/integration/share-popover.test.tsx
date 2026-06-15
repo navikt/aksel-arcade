@@ -26,7 +26,6 @@ import type {
 } from '@/services/desktopAgentTransportProtocol'
 import * as shareEncoding from '@/utils/shareEncoding'
 import * as storage from '@/services/storage'
-import { MULTI_PAGE_WEB_SHARE_WARNING } from '@/services/storage'
 import type { CompressionStrategy } from '@/services/compressionStrategies'
 import * as compressionStrategies from '@/services/compressionStrategies'
 import {
@@ -478,7 +477,7 @@ describe('Share popover integration', () => {
     expect(screen.queryByText(/Copied!/i)).toBeNull()
   })
 
-  it('serializes only the v3 Web share payload when generating links', async () => {
+  it('serializes only the clean full-project Web share payload when generating links', async () => {
     renderHeader()
 
     fireEvent.click(screen.getByLabelText(/share project/i))
@@ -490,16 +489,34 @@ describe('Share popover integration', () => {
     }
 
     const payload = JSON.parse(serialized)
-    expect(Object.keys(payload).sort()).toEqual(['preview', 'source'])
-    expect(Object.keys(payload.source).sort()).toEqual(['hooks', 'jsx'])
-    expect(Object.keys(payload.preview).sort()).toEqual(['theme', 'viewport'])
-    expect(payload.source.jsx).toEqual(expect.any(String))
-    expect(payload.source.hooks).toEqual(expect.any(String))
-    expect(payload.preview).toEqual({
+    expect(Object.keys(payload).sort()).toEqual(['project', 'theme'])
+    expect(Object.keys(payload.project).sort()).toEqual(['name', 'preview', 'source'])
+    expect(payload.project.name).toBe('Untitled Project')
+    expect(payload.project.preview).toEqual({
       viewport: 'MD',
-      theme: 'dark',
     })
-    expect(serialized).not.toContain('activeFileId')
+    expect(payload.project.source.globalConfig).toEqual({
+      jsx: '',
+      hooks: '',
+    })
+    expect(payload.project.source.pages).toEqual([
+      {
+        id: 'page01',
+        name: 'Page 1',
+        source: {
+          jsx: expect.any(String),
+          hooks: expect.any(String),
+        },
+      },
+    ])
+    expect(payload.project.source.startPageId).toBe('page01')
+    expect(payload.project.source.nextPageNumber).toBe(2)
+    expect(payload.theme).toEqual('dark')
+    expect(serialized).not.toContain('activePageId')
+    expect(serialized).not.toContain('panelLayout')
+    expect(serialized).not.toContain('createdAt')
+    expect(serialized).not.toContain('lastModified')
+    expect(serialized).not.toContain('version')
     expect(serialized).not.toContain('settings')
     expect(serialized).not.toContain('updatedAt')
     expect(serialized).not.toContain('warningThreshold')
@@ -521,19 +538,36 @@ describe('Share popover integration', () => {
 
     const payload = JSON.parse(serialized)
     expect(payload).toEqual({
-      source: {
-        jsx: expect.any(String),
-        hooks: expect.any(String),
+      project: {
+        name: 'Untitled Project',
+        source: {
+          globalConfig: {
+            jsx: '',
+            hooks: '',
+          },
+          pages: [
+            {
+              id: 'page01',
+              name: 'Page 1',
+              source: {
+                jsx: expect.any(String),
+                hooks: expect.any(String),
+              },
+            },
+          ],
+          startPageId: 'page01',
+          nextPageNumber: 2,
+        },
+        preview: {
+          viewport: 'MD',
+        },
       },
-      preview: {
-        viewport: 'MD',
-        theme: 'dark',
-      },
+      theme: 'dark',
       previewFullscreen: true,
     })
   })
 
-  it('warns that multi-page sharing includes only the Start page', async () => {
+  it('shares the full multi-page project source without warning', async () => {
     renderHeader()
     act(() => {
       document.dispatchEvent(new Event('test:load-lossy-multi-page-project'))
@@ -541,8 +575,8 @@ describe('Share popover integration', () => {
 
     fireEvent.click(screen.getByLabelText(/share project/i))
 
-    expect(await screen.findByText(MULTI_PAGE_WEB_SHARE_WARNING)).toBeTruthy()
     await waitFor(() => expect(encodeSpy).toHaveBeenCalled())
+    expect(screen.queryByRole('alert')).toBeNull()
 
     const serialized = encodeSpy.mock.calls.at(-1)?.[1]?.serialized
     if (!serialized) {
@@ -550,13 +584,39 @@ describe('Share popover integration', () => {
     }
 
     const payload = JSON.parse(serialized)
-    expect(payload.source).toEqual({
-      jsx: '<Box>Portable start page</Box>',
-      hooks: 'export const usePortableStartPage = () => "start"',
+    expect(payload.project).toEqual({
+      name: 'Lossy Multi-page Project',
+      source: {
+        globalConfig: {
+          jsx: 'const SharedChrome = () => <Box>Shared chrome</Box>',
+          hooks: 'export const sharedConfig = "shared"',
+        },
+        pages: [
+          {
+            id: 'page01',
+            name: 'Page 1',
+            source: {
+              jsx: '<Box>Non-start page</Box>',
+              hooks: 'export const useFirstPage = () => "first"',
+            },
+          },
+          {
+            id: 'page02',
+            name: 'Page 2',
+            source: {
+              jsx: '<Box>Portable start page</Box>',
+              hooks: 'export const usePortableStartPage = () => "start"',
+            },
+          },
+        ],
+        startPageId: 'page02',
+        nextPageNumber: 3,
+      },
+      preview: {
+        viewport: 'MD',
+      },
     })
-    expect(serialized).not.toContain('Non-start page')
-    expect(serialized).not.toContain('Shared chrome')
-    expect(serialized).not.toContain('sharedConfig')
+    expect(payload.theme).toBe('dark')
   })
 
   it('exports a multi-page project directly because packages are lossless', async () => {

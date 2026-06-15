@@ -13,7 +13,6 @@ import {
   WEB_ARCADE_CAPABILITIES,
   type ShellCapabilities,
 } from '@/services/shellCapabilities'
-import { MULTI_PAGE_WEB_SHARE_WARNING } from '@/services/storage'
 import { createArcadePage, createArcadeSourceFile } from '@/services/projectSource'
 import { createDefaultProject } from '@/utils/projectDefaults'
 import * as shareEncoding from '@/utils/shareEncoding'
@@ -251,7 +250,7 @@ describe('Fullscreen share popover integration', () => {
     })
   })
 
-  it('keeps the multi-page warning and Start-page-only payload in fullscreen sharing', async () => {
+  it('shares the full multi-page payload in fullscreen sharing', async () => {
     const user = userEvent.setup()
 
     renderHarness()
@@ -260,10 +259,8 @@ describe('Fullscreen share popover integration', () => {
     await user.click(screen.getByRole('button', { name: 'Enter preview fullscreen' }))
     await user.click(screen.getByRole('button', { name: 'Share fullscreen preview' }))
 
-    expect(
-      (await screen.findAllByText(MULTI_PAGE_WEB_SHARE_WARNING)).length
-    ).toBeGreaterThan(0)
     await waitFor(() => expect(encodeSpy).toHaveBeenCalled())
+    expect(screen.queryByRole('alert')).toBeNull()
 
     const serialized = encodeSpy.mock.calls.at(-1)?.[1]?.serialized
     if (!serialized) {
@@ -272,13 +269,39 @@ describe('Fullscreen share popover integration', () => {
 
     const payload = JSON.parse(serialized)
     expect(payload.previewFullscreen).toBe(true)
-    expect(payload.source).toEqual({
-      jsx: '<Box>Portable start page</Box>',
-      hooks: 'export const usePortableStartPage = () => "start"',
+    expect(payload.project).toEqual({
+      name: 'Lossy Multi-page Project',
+      source: {
+        globalConfig: {
+          jsx: 'const SharedChrome = () => <Box>Shared chrome</Box>',
+          hooks: 'export const sharedConfig = "shared"',
+        },
+        pages: [
+          {
+            id: 'page01',
+            name: 'Page 1',
+            source: {
+              jsx: '<Box>Non-start page</Box>',
+              hooks: 'export const useFirstPage = () => "first"',
+            },
+          },
+          {
+            id: 'page02',
+            name: 'Page 2',
+            source: {
+              jsx: '<Box>Portable start page</Box>',
+              hooks: 'export const usePortableStartPage = () => "start"',
+            },
+          },
+        ],
+        startPageId: 'page02',
+        nextPageNumber: 3,
+      },
+      preview: {
+        viewport: 'MD',
+      },
     })
-    expect(serialized).not.toContain('Non-start page')
-    expect(serialized).not.toContain('Shared chrome')
-    expect(serialized).not.toContain('sharedConfig')
+    expect(payload.theme).toBe('dark')
   })
 
   it('omits the fullscreen share button when Web share URLs are unavailable', async () => {

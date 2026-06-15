@@ -7,6 +7,8 @@ import type {
 import {
   computeChecksum,
   LEGACY_SHARE_FORMAT_VERSION,
+  LEGACY_MINIMAL_SHARE_FORMAT_VERSION,
+  LEGACY_MINIMAL_SHARE_FULLSCREEN_INTENT_FORMAT_VERSION,
   SHARE_FULLSCREEN_INTENT_FORMAT_VERSION,
   SHARE_FORMAT_VERSION,
   SHARE_METADATA_VERSION,
@@ -22,7 +24,9 @@ import {
 } from '@/utils/snapshotPacking'
 import { recordShareDecodeTelemetry } from '@/services/telemetry'
 import {
+  type DecodedWebShareProject,
   extractShareUrlOpeningIntent,
+  parseLegacyWebShareUrlPayload,
   normalizeLegacyV2FullSnapshotToWebShareSnapshot,
   parseWebShareUrlPayload,
   webShareUrlPayloadToSnapshot,
@@ -43,6 +47,7 @@ export interface ShareDecodeError {
 export interface ShareDecodeResult {
   metadata?: ShareUrlMetadata
   snapshot?: ProjectSnapshot
+  sharedProject?: DecodedWebShareProject
   openingIntent?: ShareUrlOpeningIntent
   checksumValid: boolean
   error?: ShareDecodeError
@@ -86,7 +91,7 @@ export const decodeShareToken = async (token: string): Promise<ShareDecodeResult
   try {
     const decoded = await decodeSharePayloadWithStrategy(metadata)
     repairApplied = decoded.repairApplied
-    const { snapshot, checksumPayload, openingIntent } = decoded
+    const { snapshot, sharedProject, checksumPayload, openingIntent } = decoded
     const computedChecksum = await computeChecksum(checksumPayload)
 
     if (computedChecksum !== metadata.checksum) {
@@ -112,6 +117,7 @@ export const decodeShareToken = async (token: string): Promise<ShareDecodeResult
     return {
       metadata,
       snapshot,
+      sharedProject,
       openingIntent,
       checksumValid: true,
     }
@@ -155,16 +161,45 @@ const decodeSnapshotWithStrategy = async (
 const decodeSharePayloadWithStrategy = async (
   metadata: ShareUrlMetadata,
 ): Promise<{
-  snapshot: ProjectSnapshot
+  snapshot?: ProjectSnapshot
+  sharedProject?: DecodedWebShareProject
   checksumPayload: string
   repairApplied: boolean
   openingIntent?: ShareUrlOpeningIntent
 }> => {
-  if (isMinimalWebShareFormatVersion(metadata.formatVersion)) {
+  if (isLegacyMinimalWebShareFormatVersion(metadata.formatVersion)) {
     const serialized = await decodeSerializedPayload(metadata.strategyId, metadata.payload)
-    const payload = parseWebShareUrlPayload(serialized)
+    const payload = parseLegacyWebShareUrlPayload(serialized)
     return {
       snapshot: webShareUrlPayloadToSnapshot(payload),
+      checksumPayload: serialized,
+      repairApplied: false,
+      openingIntent: extractShareUrlOpeningIntent(payload),
+    }
+  }
+
+  if (isFullProjectWebShareFormatVersion(metadata.formatVersion)) {
+    const serialized = await decodeSerializedPayload(metadata.strategyId, metadata.payload)
+    const payload = parseWebShareUrlPayload(serialized)
+    const startPage =
+      payload.project.source.pages.find((page) => page.id === payload.project.source.startPageId)
+      ?? payload.project.source.pages[0]
+
+    return {
+      snapshot: webShareUrlPayloadToSnapshot({
+        source: {
+          jsx: startPage?.source.jsx ?? '',
+          hooks: startPage?.source.hooks ?? '',
+        },
+        preview: {
+          viewport: payload.project.preview.viewport,
+          theme: payload.theme,
+        },
+      }),
+      sharedProject: {
+        project: payload.project,
+        theme: payload.theme,
+      },
       checksumPayload: serialized,
       repairApplied: false,
       openingIntent: extractShareUrlOpeningIntent(payload),
@@ -329,8 +364,14 @@ const createDecodeError = (code: ShareDecodeErrorCode): ShareDecodeError => {
 
 const isSupportedShareFormatVersion = (version: number): boolean =>
   version === LEGACY_SHARE_FORMAT_VERSION
+  || version === LEGACY_MINIMAL_SHARE_FORMAT_VERSION
+  || version === LEGACY_MINIMAL_SHARE_FULLSCREEN_INTENT_FORMAT_VERSION
   || version === SHARE_FORMAT_VERSION
   || version === SHARE_FULLSCREEN_INTENT_FORMAT_VERSION
 
-const isMinimalWebShareFormatVersion = (version: number): boolean =>
+const isLegacyMinimalWebShareFormatVersion = (version: number): boolean =>
+  version === LEGACY_MINIMAL_SHARE_FORMAT_VERSION
+  || version === LEGACY_MINIMAL_SHARE_FULLSCREEN_INTENT_FORMAT_VERSION
+
+const isFullProjectWebShareFormatVersion = (version: number): boolean =>
   version === SHARE_FORMAT_VERSION || version === SHARE_FULLSCREEN_INTENT_FORMAT_VERSION
