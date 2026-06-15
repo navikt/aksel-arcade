@@ -311,6 +311,7 @@ describe('share decode integration', () => {
     await waitFor(() => {
       expect(screen.getByTestId('settings-theme').textContent).toBe('light')
       expect(screen.getByTestId('settings-panel-order').textContent).toBe('preview-left')
+      expect(screen.getByTestId('settings-multi-page-enabled').textContent).toBe('true')
       expect(screen.getByTestId('settings-preview-fullscreen').textContent).toBe('true')
     })
   })
@@ -412,7 +413,6 @@ describe('share decode integration', () => {
 
     await waitFor(() => {
       expect(screen.getByTestId('project-name').textContent).toBe('Imported replacement project')
-      expect(screen.getByTestId('settings-multi-page-enabled').textContent).toBe('false')
       expect(screen.getByTestId('settings-page-panel-open').textContent).toBe('false')
     })
   })
@@ -535,9 +535,8 @@ describe('share decode integration', () => {
     await waitFor(() => {
       expect(screen.getByTestId('share-status').textContent).toBe('idle')
     })
-
     expect(screen.getByTestId('jsx-code').textContent).toContain('Shared multi-page affordance')
-    expect(screen.getByTestId('settings-multi-page-enabled').textContent).toBe('true')
+    expect(screen.getByTestId('jsx-code').textContent).toContain('Shared multi-page affordance')
     expect(screen.getByTestId('settings-page-panel-open').textContent).toBe('false')
   })
 
@@ -764,6 +763,9 @@ describe('share decode integration', () => {
       'Original tab working copy'
     )
     await waitFor(() => {
+      expect(within(originalTab.container).getByTestId('settings-multi-page-enabled').textContent).toBe(
+        'true'
+      )
       expect(within(originalTab.container).getByTestId('settings-theme').textContent).toBe('light')
       expect(within(originalTab.container).getByTestId('settings-panel-order').textContent).toBe(
         'preview-left'
@@ -813,8 +815,11 @@ describe('share decode integration', () => {
         expect(getStartPageSource(stored.project).jsx).toContain('Shared isolated JSX')
         expect(stored.project.viewportSize).toBe('XL')
         expect(stored.preferences).toEqual({
-          ...DEFAULT_WEB_ARCADE_WORKING_COPY_PREFERENCES,
           theme: 'light',
+          panelOrder: DEFAULT_WEB_ARCADE_WORKING_COPY_PREFERENCES.panelOrder,
+          pagePanelOpen: DEFAULT_WEB_ARCADE_WORKING_COPY_PREFERENCES.pagePanelOpen,
+          selectedEditTarget: DEFAULT_WEB_ARCADE_WORKING_COPY_PREFERENCES.selectedEditTarget,
+          previewFullscreen: DEFAULT_WEB_ARCADE_WORKING_COPY_PREFERENCES.previewFullscreen,
         })
       },
       { timeout: 2500 }
@@ -832,7 +837,13 @@ describe('share decode integration', () => {
     expect(getStartPageSource(storedOriginalTab.project).hooks).toBe(
       'export function useOriginalIsolatedHook() { return "Original Hooks" }'
     )
-    expect(storedOriginalTab.preferences).toEqual(originalTabPreferences)
+    expect(storedOriginalTab.preferences).toEqual({
+      theme: 'light',
+      panelOrder: 'preview-left',
+      pagePanelOpen: DEFAULT_WEB_ARCADE_WORKING_COPY_PREFERENCES.pagePanelOpen,
+      selectedEditTarget: DEFAULT_WEB_ARCADE_WORKING_COPY_PREFERENCES.selectedEditTarget,
+      previewFullscreen: DEFAULT_WEB_ARCADE_WORKING_COPY_PREFERENCES.previewFullscreen,
+    })
     expect(within(originalTab.container).getByTestId('project-name').textContent).toBe(
       'Original tab working copy'
     )
@@ -1125,7 +1136,7 @@ const parseStoredWorkingCopy = (storage: MockSessionStorage) => {
 
   return JSON.parse(stored) as {
     project: Project
-    preferences: WebArcadeWorkingCopyPreferences
+    preferences: Partial<WebArcadeWorkingCopyPreferences>
   }
 }
 

@@ -56,6 +56,11 @@ export interface WebArcadeWorkingCopyPreferences {
   previewFullscreen: boolean
 }
 
+interface PersistedWebArcadeWorkingCopyPreferences
+  extends Omit<WebArcadeWorkingCopyPreferences, 'multiPageEnabled'> {
+  multiPageEnabled?: boolean
+}
+
 export interface SaveProjectOptions {
   preferences?: WebArcadeWorkingCopyPreferences
   updateLastModified?: boolean
@@ -65,7 +70,7 @@ interface WebArcadeWorkingCopyEnvelope {
   format: typeof WEB_ARCADE_WORKING_COPY_FORMAT
   formatVersion: typeof WEB_ARCADE_WORKING_COPY_FORMAT_VERSION
   project: Project
-  preferences: WebArcadeWorkingCopyPreferences
+  preferences: PersistedWebArcadeWorkingCopyPreferences
 }
 
 export interface LoadResult {
@@ -114,7 +119,7 @@ export interface ShareSnapshotOverrides {
 export const DEFAULT_WEB_ARCADE_WORKING_COPY_PREFERENCES: WebArcadeWorkingCopyPreferences = {
   theme: 'dark',
   panelOrder: 'code-left',
-  multiPageEnabled: false,
+  multiPageEnabled: true,
   pagePanelOpen: false,
   selectedEditTarget: 'page',
   previewFullscreen: false,
@@ -189,7 +194,7 @@ export const saveProject = (project: Project, options?: SaveProjectOptions): Sav
     format: WEB_ARCADE_WORKING_COPY_FORMAT,
     formatVersion: WEB_ARCADE_WORKING_COPY_FORMAT_VERSION,
     project: projectToSave,
-    preferences,
+    preferences: createPersistedWorkingCopyPreferences(preferences),
   }
   const json = JSON.stringify(workingCopy)
   const sizeBytes = new Blob([json]).size
@@ -661,10 +666,13 @@ const validateWorkingCopyPreferences = (preferences: unknown): WebArcadeWorkingC
     throw new Error('Invalid Web Arcade working copy panel order')
   }
 
-  const multiPageEnabled =
-    'multiPageEnabled' in preferences ? preferences.multiPageEnabled : DEFAULT_WEB_ARCADE_WORKING_COPY_PREFERENCES.multiPageEnabled
+  const legacyMultiPageEnabled =
+    'multiPageEnabled' in preferences ? preferences.multiPageEnabled : undefined
 
-  if (typeof multiPageEnabled !== 'boolean') {
+  if (
+    legacyMultiPageEnabled !== undefined &&
+    typeof legacyMultiPageEnabled !== 'boolean'
+  ) {
     throw new Error('Invalid Web Arcade working copy multi-page preference')
   }
 
@@ -696,12 +704,24 @@ const validateWorkingCopyPreferences = (preferences: unknown): WebArcadeWorkingC
   return {
     theme: preferences.theme,
     panelOrder: preferences.panelOrder,
-    multiPageEnabled,
+    // Permanent pages supersede the old experiment flag. Keep reading it for
+    // compatibility, but always restore the current always-on behavior.
+    multiPageEnabled: true,
     pagePanelOpen,
     selectedEditTarget,
     previewFullscreen,
   }
 }
+
+const createPersistedWorkingCopyPreferences = (
+  preferences: WebArcadeWorkingCopyPreferences
+): PersistedWebArcadeWorkingCopyPreferences => ({
+  theme: preferences.theme,
+  panelOrder: preferences.panelOrder,
+  pagePanelOpen: preferences.pagePanelOpen,
+  selectedEditTarget: preferences.selectedEditTarget,
+  previewFullscreen: preferences.previewFullscreen,
+})
 
 const isThemeMode = (value: unknown): value is ThemeMode => value === 'light' || value === 'dark'
 

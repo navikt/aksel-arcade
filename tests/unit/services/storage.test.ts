@@ -162,7 +162,13 @@ describe('Storage Service', () => {
       expect(stored).toBeTruthy()
       const parsed = JSON.parse(stored!)
       expect(parsed.project.name).toBe('Test Project')
-      expect(parsed.preferences).toEqual(DEFAULT_WEB_ARCADE_WORKING_COPY_PREFERENCES)
+      expect(parsed.preferences).toEqual({
+        theme: DEFAULT_WEB_ARCADE_WORKING_COPY_PREFERENCES.theme,
+        panelOrder: DEFAULT_WEB_ARCADE_WORKING_COPY_PREFERENCES.panelOrder,
+        pagePanelOpen: DEFAULT_WEB_ARCADE_WORKING_COPY_PREFERENCES.pagePanelOpen,
+        selectedEditTarget: DEFAULT_WEB_ARCADE_WORKING_COPY_PREFERENCES.selectedEditTarget,
+        previewFullscreen: DEFAULT_WEB_ARCADE_WORKING_COPY_PREFERENCES.previewFullscreen,
+      })
     })
 
     it('should reject projects larger than 5MB', () => {
@@ -270,7 +276,14 @@ describe('Storage Service', () => {
         viewportSize: 'XL',
         panelLayout: 'editor-right',
       })
-      expect(parsed.preferences).toEqual(preferences)
+      expect(parsed.preferences).toEqual({
+        theme: 'light',
+        panelOrder: 'preview-left',
+        pagePanelOpen: DEFAULT_WEB_ARCADE_WORKING_COPY_PREFERENCES.pagePanelOpen,
+        selectedEditTarget: DEFAULT_WEB_ARCADE_WORKING_COPY_PREFERENCES.selectedEditTarget,
+        previewFullscreen: true,
+      })
+      expect(parsed.preferences).not.toHaveProperty('multiPageEnabled')
     })
   })
 
@@ -404,7 +417,10 @@ describe('Storage Service', () => {
         viewportSize: 'LG',
         panelLayout: 'editor-right',
       })
-      expect(result.preferences).toEqual(preferences)
+      expect(result.preferences).toEqual({
+        ...preferences,
+        multiPageEnabled: DEFAULT_WEB_ARCADE_WORKING_COPY_PREFERENCES.multiPageEnabled,
+      })
     })
 
     it('defaults newer workspace preferences when restoring older working copies', () => {
@@ -430,11 +446,25 @@ describe('Storage Service', () => {
       expect(result.preferences).toEqual({
         theme: 'light',
         panelOrder: 'preview-left',
-        multiPageEnabled: true,
+        multiPageEnabled: DEFAULT_WEB_ARCADE_WORKING_COPY_PREFERENCES.multiPageEnabled,
         pagePanelOpen: DEFAULT_WEB_ARCADE_WORKING_COPY_PREFERENCES.pagePanelOpen,
         selectedEditTarget: DEFAULT_WEB_ARCADE_WORKING_COPY_PREFERENCES.selectedEditTarget,
         previewFullscreen: DEFAULT_WEB_ARCADE_WORKING_COPY_PREFERENCES.previewFullscreen,
       })
+    })
+
+    it('restores legacy multiPageEnabled false working copies as permanent pages-enabled sessions', () => {
+      const project = createTestProject({ name: 'Legacy false multi-page preference' })
+      saveProject(project)
+
+      const stored = sessionStorage.getItem(WEB_ARCADE_WORKING_COPY_STORAGE_KEY)
+      const parsed = JSON.parse(stored!)
+      parsed.preferences.multiPageEnabled = false
+      sessionStorage.setItem(WEB_ARCADE_WORKING_COPY_STORAGE_KEY, JSON.stringify(parsed))
+
+      const result = loadProject()
+
+      expect(result.preferences.multiPageEnabled).toBe(true)
     })
 
     it('should model duplicated tabs as forked sessionStorage working copies', () => {
@@ -469,7 +499,10 @@ describe('Storage Service', () => {
       expect(getPrimarySource(duplicatedLoad.project!).hooks).toBe(
         'export const useOriginal = () => "original"'
       )
-      expect(duplicatedLoad.preferences).toEqual(initialPreferences)
+      expect(duplicatedLoad.preferences).toEqual({
+        ...initialPreferences,
+        multiPageEnabled: DEFAULT_WEB_ARCADE_WORKING_COPY_PREFERENCES.multiPageEnabled,
+      })
 
       saveProject(
         {
@@ -521,7 +554,13 @@ describe('Storage Service', () => {
       expect(getPrimarySource(originalStored.project).hooks).toBe(
         'export const useOriginal = () => "edited original"'
       )
-      expect(originalStored.preferences).toEqual(initialPreferences)
+      expect(originalStored.preferences).toEqual({
+        theme: 'light',
+        panelOrder: 'preview-left',
+        pagePanelOpen: DEFAULT_WEB_ARCADE_WORKING_COPY_PREFERENCES.pagePanelOpen,
+        selectedEditTarget: DEFAULT_WEB_ARCADE_WORKING_COPY_PREFERENCES.selectedEditTarget,
+        previewFullscreen: true,
+      })
       expect(duplicatedStored.project).toMatchObject({
         name: 'Duplicated tab edit',
         viewportSize: 'SM',
@@ -534,7 +573,6 @@ describe('Storage Service', () => {
       expect(duplicatedStored.preferences).toEqual({
         theme: 'dark',
         panelOrder: 'code-left',
-        multiPageEnabled: false,
         pagePanelOpen: DEFAULT_WEB_ARCADE_WORKING_COPY_PREFERENCES.pagePanelOpen,
         selectedEditTarget: DEFAULT_WEB_ARCADE_WORKING_COPY_PREFERENCES.selectedEditTarget,
         previewFullscreen: false,
@@ -1144,6 +1182,6 @@ const parseStoredProject = (storage: MockSessionStorage) => {
   }
   return JSON.parse(stored) as {
     project: Project
-    preferences: WebArcadeWorkingCopyPreferences
+    preferences: Partial<WebArcadeWorkingCopyPreferences>
   }
 }

@@ -2932,3 +2932,42 @@ Verification:
 Next note:
 
 - `#254` can now remove the obsolete Settings checkbox and stop writing `multiPageEnabled` without preserving any editor/preview fallback path; legacy false values already behave like always-on page projects.
+
+### 2026-06-15 - Issue #254: Permanent pages Settings and workspace-preference cleanup
+
+Implemented:
+
+- Selected `#254` as the highest-priority `ready-for-agent` feature from `#254`-`#259` because it is the only unblocked item in the set and it removes the last user-facing experiment chrome that the later portability and agent issues depend on.
+- Read issue `#252`, `CONTEXT.md`, and the existing `progress.txt` notes before changing code.
+- Removed the obsolete **Multiple pages** checkbox plus the empty **Experiments** section/divider from `src/components/Header/AppHeader.tsx`, leaving the Settings menu with Theme, Templates, and Editor only.
+- Stopped persisting `multiPageEnabled` in new Web Arcade working-copy saves by introducing a persisted-preferences shape in `src/services/storage.ts` that still accepts legacy stored values on read but strips the obsolete flag on write.
+- Updated regression coverage in `tests/unit/services/storage.test.ts`, `tests/integration/share-decode.test.tsx`, and `tests/integration/project-controls-layout.test.tsx` so tests now assert the new persisted-preference shape, the removed Settings experiment UI, and the remaining recipient-local page-panel behavior without expecting the obsolete flag to round-trip.
+
+Verification:
+
+- `npm run typecheck`
+- `npm run test -- --run`
+- Browser check at `http://127.0.0.1:4173/aksel-arcade/` confirming the Settings menu no longer shows **Experiments** or **Multiple pages**, and the page loaded without console errors
+
+Next note:
+
+- `multiPageEnabled` still exists as an internal compatibility input for the later agent/runtime rollout, but new working-copy storage no longer writes it. `#255` / `#258` should remove the remaining internal reads instead of reintroducing persisted preference behavior.
+
+### 2026-06-15 - PR #262 review follow-up for Issue #254
+
+Fixed after PR review:
+
+- The first review pass found that removing the Settings checkbox left Desktop agent sessions stranded in the old single-page bridge mode, and that reloading legacy working copies after autosave would silently fall back to `multiPageEnabled: false` because new saves omit the field.
+- Changed `src/contexts/SettingsContext.tsx` and `src/services/storage.ts` so permanent pages restore as always-on behavior: fresh defaults now treat `multiPageEnabled` as enabled, legacy stored boolean values are tolerated but ignored on restore, and new saves still omit the obsolete field.
+- Updated `tests/integration/project-controls-layout.test.tsx` so the default Desktop agent-session path is pages-aware without any harness-only enable step, command-list assertions include page lifecycle commands, and the stale transport-method assertion no longer hardcodes the pre-pages-aware method list.
+- Added/updated regression coverage in `tests/unit/services/storage.test.ts` and `tests/integration/share-decode.test.tsx` to prove old `multiPageEnabled: false` working copies reload as permanent pages-enabled sessions while page-panel workspace state remains local.
+
+Verification:
+
+- `npm run typecheck`
+- `npm run test -- --run`
+- Browser check at `http://127.0.0.1:4173/aksel-arcade/` confirming the Settings menu no longer shows **Experiments** / **Multiple pages**, the editor still shows a neutral **Show pages** control, and the browser console stayed free of errors
+
+Next note:
+
+- The old `multiPageEnabled` state is now compatibility-only in practice. Follow-up work can delete the remaining internal single-page bridge branch once the dedicated agent-session cleanup issue lands, without needing to preserve legacy stored false values.
