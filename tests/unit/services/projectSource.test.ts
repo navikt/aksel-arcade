@@ -108,8 +108,8 @@ describe('projectSource service', () => {
     expect(getActiveSource(updatedGlobalConfig).jsx).toBe('<Box>Page 1</Box>')
   })
 
-  it('falls back to page editing when multi-page is disabled', () => {
-    expect(resolveSelectedEditTarget(true, 'global-config')).toBe('global-config')
-    expect(resolveSelectedEditTarget(false, 'global-config')).toBe('page')
+  it('keeps the selected edit target on the canonical pages-based model', () => {
+    expect(resolveSelectedEditTarget('global-config')).toBe('global-config')
+    expect(resolveSelectedEditTarget('page')).toBe('page')
   })
 })

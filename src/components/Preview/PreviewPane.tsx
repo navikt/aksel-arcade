@@ -3,8 +3,8 @@ import { Alert, BodyShort, Box, Button, Detail, VStack } from '@navikt/ds-react'
 import { ExpandIcon, ShrinkIcon } from '@navikt/aksel-icons'
 import { SharePopoverButton } from '@/components/Share/SharePopoverButton'
 import { AppContext } from '@/hooks/useProject'
-import { transpileCode, transpileProjectSource } from '@/services/transpiler'
-import { getActiveSource, resolveSelectedEditTarget } from '@/services/projectSource'
+import { transpileProjectSource } from '@/services/transpiler'
+import { resolveSelectedEditTarget } from '@/services/projectSource'
 import { WEB_ARCADE_CAPABILITIES, type ShellCapabilities } from '@/services/shellCapabilities'
 import { useSettings } from '@/contexts/SettingsContext'
 import { LivePreview } from './LivePreview'
@@ -36,15 +36,10 @@ export const PreviewPane = ({
     recordSandboxConsoleMessage,
     updateProject,
   } = context
-  const { multiPageEnabled, theme, selectedEditTarget, previewFullscreen, setPreviewFullscreen } =
-    useSettings()
+  const { theme, selectedEditTarget, previewFullscreen, setPreviewFullscreen } = useSettings()
   const canUseShareUrl = shellCapabilities.shareUrl.enabled
-  const effectiveEditTarget = resolveSelectedEditTarget(multiPageEnabled, selectedEditTarget)
-  const activeSource = getActiveSource(project)
-  const singlePagePreviewJsx = multiPageEnabled ? null : activeSource.jsx
-  const singlePagePreviewHooks = multiPageEnabled ? null : activeSource.hooks
-  const multiPagePreviewSource = multiPageEnabled ? project.source : null
-  const showGlobalConfigPlaceholder = multiPageEnabled && effectiveEditTarget === 'global-config'
+  const effectiveEditTarget = resolveSelectedEditTarget(selectedEditTarget)
+  const showGlobalConfigPlaceholder = effectiveEditTarget === 'global-config'
   const [transpiledCode, setTranspiledCode] = useState<string | null>(null)
   const [compileError, setCompileError] = useState<CompileError | null>(null)
   const [runtimeError, setRuntimeError] = useState<RuntimeError | null>(null)
@@ -118,9 +113,9 @@ export const PreviewPane = ({
     lastTranspileProjectIdRef.current = project.id
 
     const runTranspilation = () => {
-      const transpilePromise = multiPagePreviewSource
-        ? transpileProjectSource(multiPagePreviewSource, { previewSessionKey: project.id })
-        : transpileCode(singlePagePreviewJsx ?? '', singlePagePreviewHooks ?? '')
+      const transpilePromise = transpileProjectSource(project.source, {
+        previewSessionKey: project.id,
+      })
 
       transpilePromise
         .then((result) => {
@@ -181,11 +176,8 @@ export const PreviewPane = ({
     }
   }, [
     project.id,
-    multiPagePreviewSource,
-    multiPageEnabled,
+    project.source,
     queueCompileError,
-    singlePagePreviewHooks,
-    singlePagePreviewJsx,
     updatePreviewState,
   ])
 
@@ -232,10 +224,6 @@ export const PreviewPane = ({
   }
 
   const handlePreviewPageChange = (pageId: (typeof project.source.pages)[number]['id']) => {
-    if (effectiveEditTarget === 'global-config') {
-      return
-    }
-
     if (pageId !== project.activePageId) {
       updateProject({ activePageId: pageId })
     }
@@ -398,7 +386,7 @@ export const PreviewPane = ({
           onRuntimeError={handleRuntimeError}
           onConsoleMessage={handleConsoleMessage}
           onPreviewPageChange={handlePreviewPageChange}
-          previewPageId={multiPageEnabled ? project.activePageId : null}
+          previewPageId={project.activePageId}
           viewportWidth={project.viewportSize}
           isInspectMode={isInspectMode}
           theme={theme}

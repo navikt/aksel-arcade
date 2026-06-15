@@ -2910,3 +2910,25 @@ Verification:
 
 - `npm run typecheck`
 - `npm test -- --run`
+
+### 2026-06-15 - Issue #255: Make editor and preview page flows always on
+
+Implemented:
+
+- Selected `#255` as the highest-priority `ready-for-agent` feature from `#254`-`#259` because `#253` is already closed, `#255` is the core always-on pages model change, and it directly unblocks the lossless share/package/agent follow-ups in `#256`-`#258`.
+- Read issue `#252`, `CONTEXT.md`, and the current `progress.txt` notes before changing code.
+- Removed the editor/preview runtime gate from `src/services/projectSource.ts`, `src/hooks/useProject.tsx`, `src/components/Editor/EditorPane.tsx`, and `src/components/Preview/PreviewPane.tsx` so selected edit targets, page-panel visibility, preview transpilation, and preview page navigation always use the canonical pages-based **Arcade project source** model.
+- The editor now keeps **Show pages** / **Hide pages**, **Global config**, page navigation targets, stale-page-reference analysis, delete impact counts, and page-level error indicators available even when restored working-copy preferences still carry `multiPageEnabled: false`.
+- The preview now always transpiles `project.source` through the pages-aware runtime and always drives the sandbox with `activePageId`, so one-page projects and multi-page projects share the same preview contract and page-scoped diagnostics stay attributed to stable page ids.
+- Updated regression coverage in `tests/unit/services/projectSource.test.ts`, `tests/integration/multi-page-page-panel.test.tsx`, `tests/integration/multi-page-preview-sync.test.tsx`, `tests/integration/preview-fullscreen-entry.test.tsx`, and `tests/integration/project-controls-layout.test.tsx` to cover legacy `multiPageEnabled: false` restores plus the page-scoped compile diagnostics emitted from the always-on runtime.
+
+Verification:
+
+- `npm run typecheck`
+- `npm run test -- --run`
+- `npm run build`
+- Browser check at `http://127.0.0.1:4195/aksel-arcade/`: on a fresh working copy with the legacy flag still off, confirmed **Show pages** is visible, opened the **Page panel**, selected **Global config** and saw the no-preview placeholder while the sandbox stayed mounted, added **Page 2**, switched to it, and saw no browser console warnings/errors during the verified flow.
+
+Next note:
+
+- `#254` can now remove the obsolete Settings checkbox and stop writing `multiPageEnabled` without preserving any editor/preview fallback path; legacy false values already behave like always-on page projects.

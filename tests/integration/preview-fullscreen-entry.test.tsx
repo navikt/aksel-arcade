@@ -50,7 +50,7 @@ describe('Preview fullscreen entry control', () => {
 
   it('starts transpiling immediately on initial mount when the editor is not focused', async () => {
     vi.useFakeTimers()
-    vi.spyOn(transpiler, 'transpileCode').mockResolvedValue({
+    vi.spyOn(transpiler, 'transpileProjectSource').mockResolvedValue({
       success: true,
       code: 'export default function App() { return null }',
       error: null,
@@ -69,7 +69,7 @@ describe('Preview fullscreen entry control', () => {
         await vi.advanceTimersByTimeAsync(1)
       })
 
-      expect(transpiler.transpileCode).toHaveBeenCalledTimes(1)
+      expect(transpiler.transpileProjectSource).toHaveBeenCalledTimes(1)
     } finally {
       vi.useRealTimers()
     }
@@ -165,7 +165,7 @@ describe('Preview fullscreen entry control', () => {
   })
 
   it('exits fullscreen with Escape from the fullscreen error chrome and restores focus to the toggle', async () => {
-    vi.spyOn(transpiler, 'transpileCode').mockResolvedValue({
+    vi.spyOn(transpiler, 'transpileProjectSource').mockResolvedValue({
       success: false,
       code: null,
       error: {
