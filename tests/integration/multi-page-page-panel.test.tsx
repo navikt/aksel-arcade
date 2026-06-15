@@ -374,6 +374,45 @@ describe('Multi-page page panel', () => {
     })
   })
 
+  it('keeps the collapsed Show pages control neutral when stale references exist', async () => {
+    const user = userEvent.setup()
+    let project = createStoredMultiPageProject()
+    project = updatePageSource(project, 'page01', {
+      jsx: "<Button onClick={() => goToPage('page02')}>Open details</Button>",
+    })
+    saveProject(project, {
+      preferences: {
+        ...DEFAULT_WEB_ARCADE_WORKING_COPY_PREFERENCES,
+        multiPageEnabled: true,
+        pagePanelOpen: true,
+        selectedEditTarget: 'page',
+      },
+    })
+
+    renderHarness()
+
+    await openPageActions(user, 'Details')
+    await user.click(await screen.findByRole('menuitem', { name: /delete page/i }))
+    await user.click(await screen.findByRole('button', { name: /delete page/i }))
+
+    await waitFor(() => {
+      expect(
+        screen
+          .getByRole('button', { name: /^Page 1/i })
+          .querySelector('[aria-label="Broken page navigation"]')
+      ).toBeTruthy()
+    })
+
+    await user.click(screen.getByRole('button', { name: /^hide pages$/i }))
+
+    const showPagesButton = screen.getByRole('button', { name: /^show pages$/i })
+    expect(showPagesButton.textContent).toContain('Show pages')
+    expect(showPagesButton.className).not.toMatch(/warning|danger|error|stale/i)
+    expect(showPagesButton.getAttribute('aria-pressed')).toBe('false')
+    expect(screen.queryByLabelText('Config')).toBeNull()
+    expect(screen.queryByLabelText('Broken page navigation')).toBeNull()
+  })
+
   it('updates broken-navigation indicators live when Global config stale references are fixed', async () => {
     const user = userEvent.setup()
     const project = updateGlobalConfigSource(createStoredMultiPageProject(), {

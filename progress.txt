@@ -2898,3 +2898,15 @@ Verification:
 Next note:
 
 - `#255` can now remove the remaining editor/preview multi-page gating without preserving the old open-by-default panel assumption. `pagePanelOpen` is now a closed-by-default workspace preference; share hydration still preserves the recipient-local value, while reset/import replacements deliberately restore the closed default.
+
+### 2026-06-15 - PR #260 review follow-up for issue #253
+
+Fixed after review:
+
+- Tightened `tests/unit/services/storage.test.ts` so the empty-storage `loadProject()` path now asserts the full default working-copy preferences, including `pagePanelOpen: false`, covering the true fresh-working-copy default instead of only stored-preference restores.
+- Extended `tests/integration/multi-page-page-panel.test.tsx` with a stale-reference regression that closes the page panel after broken-navigation state exists and confirms the collapsed **Show pages** control stays neutral rather than surfacing warning/error state.
+
+Verification:
+
+- `npm run typecheck`
+- `npm test -- --run`

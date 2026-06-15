@@ -283,6 +283,8 @@ describe('Storage Service', () => {
       expect(result.migrated).toBe(false)
       expect(result.error).toBeUndefined()
       expect(result.project!.name).toBe('Untitled Project')
+      expect(result.preferences).toEqual(DEFAULT_WEB_ARCADE_WORKING_COPY_PREFERENCES)
+      expect(result.preferences.pagePanelOpen).toBe(false)
     })
 
     it('should restore saved project correctly', () => {
