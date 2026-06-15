@@ -119,7 +119,7 @@ export interface ShareSnapshotOverrides {
 export const DEFAULT_WEB_ARCADE_WORKING_COPY_PREFERENCES: WebArcadeWorkingCopyPreferences = {
   theme: 'dark',
   panelOrder: 'code-left',
-  multiPageEnabled: false,
+  multiPageEnabled: true,
   pagePanelOpen: false,
   selectedEditTarget: 'page',
   previewFullscreen: false,
@@ -666,10 +666,13 @@ const validateWorkingCopyPreferences = (preferences: unknown): WebArcadeWorkingC
     throw new Error('Invalid Web Arcade working copy panel order')
   }
 
-  const multiPageEnabled =
-    'multiPageEnabled' in preferences ? preferences.multiPageEnabled : DEFAULT_WEB_ARCADE_WORKING_COPY_PREFERENCES.multiPageEnabled
+  const legacyMultiPageEnabled =
+    'multiPageEnabled' in preferences ? preferences.multiPageEnabled : undefined
 
-  if (typeof multiPageEnabled !== 'boolean') {
+  if (
+    legacyMultiPageEnabled !== undefined &&
+    typeof legacyMultiPageEnabled !== 'boolean'
+  ) {
     throw new Error('Invalid Web Arcade working copy multi-page preference')
   }
 
@@ -701,7 +704,9 @@ const validateWorkingCopyPreferences = (preferences: unknown): WebArcadeWorkingC
   return {
     theme: preferences.theme,
     panelOrder: preferences.panelOrder,
-    multiPageEnabled,
+    // Permanent pages supersede the old experiment flag. Keep reading it for
+    // compatibility, but always restore the current always-on behavior.
+    multiPageEnabled: true,
     pagePanelOpen,
     selectedEditTarget,
     previewFullscreen,

@@ -311,6 +311,7 @@ describe('share decode integration', () => {
     await waitFor(() => {
       expect(screen.getByTestId('settings-theme').textContent).toBe('light')
       expect(screen.getByTestId('settings-panel-order').textContent).toBe('preview-left')
+      expect(screen.getByTestId('settings-multi-page-enabled').textContent).toBe('true')
       expect(screen.getByTestId('settings-preview-fullscreen').textContent).toBe('true')
     })
   })
@@ -404,6 +405,7 @@ describe('share decode integration', () => {
     renderHarness()
 
     await waitFor(() => {
+      expect(screen.getByTestId('settings-multi-page-enabled').textContent).toBe('true')
       expect(screen.getByTestId('settings-page-panel-open').textContent).toBe('true')
     })
 
@@ -525,6 +527,7 @@ describe('share decode integration', () => {
     renderHarness()
 
     await screen.findByText('share-ready')
+    expect(screen.getByTestId('settings-multi-page-enabled').textContent).toBe('true')
     expect(screen.getByTestId('settings-page-panel-open').textContent).toBe('false')
 
     await user.click(screen.getByRole('button', { name: /load shared project/i }))
@@ -760,6 +763,9 @@ describe('share decode integration', () => {
       'Original tab working copy'
     )
     await waitFor(() => {
+      expect(within(originalTab.container).getByTestId('settings-multi-page-enabled').textContent).toBe(
+        'true'
+      )
       expect(within(originalTab.container).getByTestId('settings-theme').textContent).toBe('light')
       expect(within(originalTab.container).getByTestId('settings-panel-order').textContent).toBe(
         'preview-left'

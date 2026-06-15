@@ -2952,3 +2952,22 @@ Verification:
 Next note:
 
 - `multiPageEnabled` still exists as an internal compatibility input for the later agent/runtime rollout, but new working-copy storage no longer writes it. `#255` / `#258` should remove the remaining internal reads instead of reintroducing persisted preference behavior.
+
+### 2026-06-15 - PR #262 review follow-up for Issue #254
+
+Fixed after PR review:
+
+- The first review pass found that removing the Settings checkbox left Desktop agent sessions stranded in the old single-page bridge mode, and that reloading legacy working copies after autosave would silently fall back to `multiPageEnabled: false` because new saves omit the field.
+- Changed `src/contexts/SettingsContext.tsx` and `src/services/storage.ts` so permanent pages restore as always-on behavior: fresh defaults now treat `multiPageEnabled` as enabled, legacy stored boolean values are tolerated but ignored on restore, and new saves still omit the obsolete field.
+- Updated `tests/integration/project-controls-layout.test.tsx` so the default Desktop agent-session path is pages-aware without any harness-only enable step, command-list assertions include page lifecycle commands, and the stale transport-method assertion no longer hardcodes the pre-pages-aware method list.
+- Added/updated regression coverage in `tests/unit/services/storage.test.ts` and `tests/integration/share-decode.test.tsx` to prove old `multiPageEnabled: false` working copies reload as permanent pages-enabled sessions while page-panel workspace state remains local.
+
+Verification:
+
+- `npm run typecheck`
+- `npm run test -- --run`
+- Browser check at `http://127.0.0.1:4173/aksel-arcade/` confirming the Settings menu no longer shows **Experiments** / **Multiple pages**, the editor still shows a neutral **Show pages** control, and the browser console stayed free of errors
+
+Next note:
+
+- The old `multiPageEnabled` state is now compatibility-only in practice. Follow-up work can delete the remaining internal single-page bridge branch once the dedicated agent-session cleanup issue lands, without needing to preserve legacy stored false values.

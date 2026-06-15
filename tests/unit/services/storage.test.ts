@@ -453,6 +453,20 @@ describe('Storage Service', () => {
       })
     })
 
+    it('restores legacy multiPageEnabled false working copies as permanent pages-enabled sessions', () => {
+      const project = createTestProject({ name: 'Legacy false multi-page preference' })
+      saveProject(project)
+
+      const stored = sessionStorage.getItem(WEB_ARCADE_WORKING_COPY_STORAGE_KEY)
+      const parsed = JSON.parse(stored!)
+      parsed.preferences.multiPageEnabled = false
+      sessionStorage.setItem(WEB_ARCADE_WORKING_COPY_STORAGE_KEY, JSON.stringify(parsed))
+
+      const result = loadProject()
+
+      expect(result.preferences.multiPageEnabled).toBe(true)
+    })
+
     it('should model duplicated tabs as forked sessionStorage working copies', () => {
       const originalTabStorage = setupSessionStorageMock()
       const initialProject = createTestProject({

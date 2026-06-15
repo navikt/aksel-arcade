@@ -81,7 +81,7 @@ const Harness = ({
     shareHydration,
     applySharedSnapshot,
   } = useProject()
-  const { setTheme, setMultiPageEnabled } = useSettings()
+  const { setTheme } = useSettings()
 
   return (
     <>
@@ -110,9 +110,6 @@ const Harness = ({
         }}
       >
         Update Agent read fixture
-      </button>
-      <button type="button" onClick={() => setMultiPageEnabled(true)}>
-        Enable legacy multi-page mode
       </button>
       <div data-testid="project-jsx-code" hidden>
         {getActiveSource(project).jsx}
@@ -901,6 +898,11 @@ describe('ProjectControls layout', () => {
         'getPreviewEvidence',
         'getSessionState',
         'applyAgentChange',
+        'createPage',
+        'renamePage',
+        'deletePage',
+        'setStartPage',
+        'selectActivePage',
       ],
     })
     expect(activeBridge?.getAgentInstructions).toEqual(expect.any(Function))
@@ -1187,6 +1189,11 @@ describe('ProjectControls layout', () => {
             'getPreviewEvidence',
             'getSessionState',
             'applyAgentChange',
+            'createPage',
+            'renamePage',
+            'deletePage',
+            'setStartPage',
+            'selectActivePage',
           ],
         },
       },
@@ -1287,8 +1294,9 @@ describe('ProjectControls layout', () => {
     ).toMatchObject({
       error: {
         code: -32601,
-        message:
-          'Unsupported Agent transport method "applySourceChange". Supported methods: getAgentInstructions, getProject, getPreviewContext, getDiagnostics, getPreviewEvidence, getSessionState, applyAgentChange.',
+        message: expect.stringMatching(
+          /^Unsupported Agent transport method "applySourceChange"\. Supported methods: /
+        ),
         data: {
           code: 'unsupported-method',
         },
@@ -1630,7 +1638,7 @@ describe('ProjectControls layout', () => {
     const projectData = expectBridgeSuccess(projectResult)
     expect(projectData).toMatchObject({
       name: expect.any(String),
-      pageMode: 'single-page',
+      pageMode: 'multi-page',
       jsxCode: expect.any(String),
       hooksCode: expect.any(String),
       globalConfig: {
@@ -1683,6 +1691,11 @@ describe('ProjectControls layout', () => {
           'getPreviewEvidence',
           'getSessionState',
           'applyAgentChange',
+          'createPage',
+          'renamePage',
+          'deletePage',
+          'setStartPage',
+          'selectActivePage',
         ],
       },
     })
@@ -1937,57 +1950,9 @@ describe('ProjectControls layout', () => {
     })
   })
 
-  it('keeps the Agent bridge single-page until the human enables multi-page authoring', async () => {
+  it('exposes pages-aware bridge commands and targeted source edits by default', async () => {
     renderHeader()
 
-    const bridge = await startAgentAccess()
-    const project = expectBridgeSuccess(callBridgeCommand(() => bridge.getProject()))
-    const instructions = expectBridgeSuccess(callBridgeCommand(() => bridge.getAgentInstructions()))
-
-    expect(project).toMatchObject({
-      pageMode: 'single-page',
-      globalConfig: {
-        jsxCode: '',
-        hooksCode: '',
-      },
-      pages: [
-        {
-          id: 'page01',
-          name: 'Page 1',
-        },
-      ],
-      startPageId: 'page01',
-      activePageId: 'page01',
-    })
-    expect(bridge.commandNames).not.toContain('createPage')
-    expect(instructions.commandNames).not.toContain('createPage')
-    expect(instructions.instructionsMarkdown).toMatch(
-      /ask the human to enable experimental multi-page authoring/i
-    )
-
-    const lifecycleError = expectBridgeFailure(
-      callBridgeCommand(() => bridge.createPage({})),
-      'unsupported-command'
-    )
-    expect(lifecycleError.message).toMatch(/enable experimental multi-page authoring/i)
-
-    const globalConfigError = expectBridgeFailure(
-      callBridgeCommand(() =>
-        bridge.applyAgentChange({
-          summary: 'Try hidden global config edit',
-          target: { type: 'global-config' },
-          jsxCode: '<Box>Hidden</Box>',
-        })
-      ),
-      'invalid-request'
-    )
-    expect(globalConfigError.message).toMatch(/Global config edits require experimental multi-page/i)
-  })
-
-  it('exposes pages-aware bridge commands and targeted source edits when multi-page is enabled', async () => {
-    renderHeader()
-
-    fireEvent.click(screen.getByRole('button', { name: /enable legacy multi-page mode/i }))
     const bridge = await startAgentAccess()
     await waitFor(() => {
       expect(expectBridgeSuccess(callBridgeCommand(() => bridge.getProject())).pageMode).toBe(
@@ -2012,6 +1977,9 @@ describe('ProjectControls layout', () => {
 
     const instructions = expectBridgeSuccess(callBridgeCommand(() => bridge.getAgentInstructions()))
     expect(instructions.commandNames).toEqual(bridge.commandNames)
+    expect(instructions.instructionsMarkdown).not.toMatch(
+      /enable experimental multi-page authoring/i
+    )
     expect(instructions.instructionsMarkdown).toMatch(
       /createPage, renamePage, deletePage, setStartPage, and selectActivePage/i
     )
