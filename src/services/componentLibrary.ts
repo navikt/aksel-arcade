@@ -333,16 +333,6 @@ const MANUAL_AKSEL_SNIPPETS: ComponentSnippet[] = [
     import: "import { HelpText } from '@navikt/ds-react';",
   },
   {
-    id: 'dropdown',
-    name: 'Dropdown',
-    category: 'component',
-    keywords: ['dropdown', 'menu', 'list', 'options'],
-    template:
-      '<Dropdown>\n  <Button as={Dropdown.Toggle}>${1:Open menu}</Button>\n  <Dropdown.Menu>\n    <Dropdown.Menu.List>\n      <Dropdown.Menu.List.Item>${2:Item}</Dropdown.Menu.List.Item>\n    </Dropdown.Menu.List>\n  </Dropdown.Menu>\n</Dropdown>',
-    description: 'Dropdown menu',
-    import: "import { Dropdown } from '@navikt/ds-react';",
-  },
-  {
     id: 'actionmenu',
     name: 'ActionMenu',
     category: 'component',

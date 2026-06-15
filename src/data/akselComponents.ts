@@ -448,15 +448,6 @@ export const uiComponents: ComponentMetadata[] = [
     snippet: '<DatePicker>\n  <DatePicker.Input label="Select date" />\n</DatePicker>',
   },
   {
-    name: 'Dropdown',
-    category: 'component',
-    import: '@navikt/ds-react',
-    description: 'Dropdown menu',
-    props: [{ name: 'placement', type: 'string', description: 'Menu placement' }],
-    snippet:
-      '<Dropdown>\n  <Button as={Dropdown.Toggle}>Open menu</Button>\n  <Dropdown.Menu>\n    <Dropdown.Menu.List>\n      <Dropdown.Menu.List.Item>Item</Dropdown.Menu.List.Item>\n    </Dropdown.Menu.List>\n  </Dropdown.Menu>\n</Dropdown>',
-  },
-  {
     name: 'ErrorSummary',
     category: 'component',
     import: '@navikt/ds-react',

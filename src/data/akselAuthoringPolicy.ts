@@ -7,6 +7,13 @@ const HIDDEN_NEW_AUTHORING_ROOTS = {
     reason: 'replaced',
     replacements: ['Dialog'],
   },
+  // Keep Dropdown available as a legacy compatibility entry, but intentionally
+  // hide it from all new authoring paths so future catalog refreshes do not
+  // steer authors back to it instead of ActionMenu.
+  Dropdown: {
+    reason: 'replaced',
+    replacements: ['ActionMenu'],
+  },
 } as const
 
 function hasHiddenNewAuthoringRoot(componentName: string): componentName is HiddenNewAuthoringRoot {
