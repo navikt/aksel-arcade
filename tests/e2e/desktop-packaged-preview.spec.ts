@@ -13,6 +13,47 @@ async function replaceEditorText(page: Page, text: string) {
   await page.keyboard.insertText(text)
 }
 
+async function expectPreviewSurfaceFlush(page: Page) {
+  const geometry = await page.evaluate(() => {
+    const previewSurface = document.querySelector<HTMLElement>('[data-name="Preview"]')
+    const livePreview = document.querySelector<HTMLElement>('[data-testid="live-preview"]')
+
+    if (!previewSurface || !livePreview) {
+      throw new Error('Preview shell elements were not rendered.')
+    }
+
+    const previewSurfaceRect = previewSurface.getBoundingClientRect()
+    const livePreviewRect = livePreview.getBoundingClientRect()
+    const previewSurfaceStyles = getComputedStyle(previewSurface)
+
+    return {
+      padding: {
+        top: previewSurfaceStyles.paddingTop,
+        right: previewSurfaceStyles.paddingRight,
+        bottom: previewSurfaceStyles.paddingBottom,
+        left: previewSurfaceStyles.paddingLeft,
+      },
+      offsets: {
+        top: livePreviewRect.top - previewSurfaceRect.top,
+        right: previewSurfaceRect.right - livePreviewRect.right,
+        bottom: previewSurfaceRect.bottom - livePreviewRect.bottom,
+        left: livePreviewRect.left - previewSurfaceRect.left,
+      },
+    }
+  })
+
+  expect(geometry.padding).toEqual({
+    top: '0px',
+    right: '0px',
+    bottom: '0px',
+    left: '0px',
+  })
+
+  for (const offset of Object.values(geometry.offsets)) {
+    expect(Math.abs(offset)).toBeLessThanOrEqual(1)
+  }
+}
+
 test.describe('Desktop renderer protocol preview', () => {
   test.beforeAll(() => {
     execFileSync(npmCommand, ['run', 'desktop:build'], { stdio: 'inherit' })
@@ -85,6 +126,12 @@ test.describe('Desktop renderer protocol preview', () => {
         }
       })
       expect(sandboxBackground.html).toBe(sandboxBackground.expected)
+
+      await expectPreviewSurfaceFlush(page)
+      await page.getByRole('button', { name: 'Enter preview fullscreen' }).click()
+      await expect(page.getByRole('button', { name: 'Exit preview fullscreen' })).toBeVisible()
+      await expectPreviewSurfaceFlush(page)
+      await page.getByRole('button', { name: 'Exit preview fullscreen' }).click()
 
       await replaceEditorText(page, '<Button size="')
       await page.keyboard.press('Control+Space')
