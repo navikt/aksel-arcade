@@ -172,6 +172,37 @@ describe('Multi-page page panel', () => {
     expect(await screen.findByLabelText('Config')).toBeTruthy()
   })
 
+  it('defaults the page panel closed and keeps a visible Show pages control in the header', async () => {
+    const user = userEvent.setup()
+    const project = createStoredMultiPageProject()
+    saveProject(project, {
+      preferences: {
+        ...DEFAULT_WEB_ARCADE_WORKING_COPY_PREFERENCES,
+        multiPageEnabled: true,
+        pagePanelOpen: false,
+        selectedEditTarget: 'page',
+      },
+    })
+
+    renderHarness()
+
+    const showPagesButton = await screen.findByRole('button', { name: /^show pages$/i })
+    expect(showPagesButton.textContent).toContain('Show pages')
+    expect(screen.queryByLabelText('Config')).toBeNull()
+
+    await user.click(showPagesButton)
+
+    expect(await screen.findByLabelText('Config')).toBeTruthy()
+    expect(screen.getByRole('button', { name: /^hide pages$/i })).toBeTruthy()
+
+    await user.click(screen.getByRole('button', { name: /^hide pages$/i }))
+
+    expect(screen.getByRole('button', { name: /^show pages$/i }).textContent).toContain(
+      'Show pages'
+    )
+    expect(screen.queryByLabelText('Config')).toBeNull()
+  })
+
   it('adds a page from Global config and renames it inline with Escape and Enter', async () => {
     const user = userEvent.setup()
     const project = createStoredMultiPageProject()

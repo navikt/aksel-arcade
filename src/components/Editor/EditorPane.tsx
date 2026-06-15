@@ -53,6 +53,7 @@ export const EditorPane = () => {
   const effectiveEditTarget = resolveSelectedEditTarget(multiPageEnabled, selectedEditTarget)
   const activeSource = getSourceForEditTarget(project, effectiveEditTarget)
   const currentContent = currentTab === 'JSX' ? activeSource.jsx : activeSource.hooks
+  const pagePanelToggleLabel = pagePanelOpen ? 'Hide pages' : 'Show pages'
   const pageNavigationTargets = useMemo(
     () => project.source.pages.map(({ id, name }) => ({ id, name })),
     [project.source.pages]
@@ -223,14 +224,14 @@ export const EditorPane = () => {
               <Button
                 variant="tertiary"
                 data-color="neutral"
-                size="xsmall"
-                className="editor-pane__panel-toggle"
-                aria-label={pagePanelOpen ? 'Hide pages' : 'Show pages'}
+                size="small"
                 aria-controls="page-panel"
                 aria-pressed={pagePanelOpen}
                 icon={<SidebarLeftIcon aria-hidden />}
                 onClick={togglePagePanel}
-              />
+              >
+                {pagePanelToggleLabel}
+              </Button>
             )}
           </div>
           <div className="editor-pane__header-center">

@@ -2875,3 +2875,26 @@ Verification:
 Next note:
 
 - Any future Desktop/non-share-capable preview integration test that mounts `PreviewPane` must thread the intended `shellCapabilities` through the harness; otherwise the preview silently uses Web defaults and can hide capability-boundary regressions like the fullscreen share button appearing where it should be omitted.
+
+### 2026-06-15 - Issue #253: Default the Page panel closed and fix the toggle wrapper
+
+Implemented:
+
+- Selected `#253` as the highest-priority `ready-for-agent` feature from `#253`-`#259` because it is unblocked, user-visible, and it directly unblocks the always-on pages work in `#255` plus the later lossless share/package/agent follow-ups.
+- Read issue `#233`, `docs/prd/0030-multi-page-support.md`, `CONTEXT.md`, and the existing `progress.txt` notes before changing code.
+- Changed the default working-copy `pagePanelOpen` preference to `false` in `src/services/storage.ts` and `src/contexts/SettingsContext.tsx` so fresh Web/Desktop working copies, **Reset editor**, and imported replacement working copies now start from the closed-panel default.
+- Kept share hydration recipient-local in `src/hooks/useProject.tsx`: Web share loads still preserve the current tab's `pagePanelOpen` value, while reset/import replacements intentionally snap back to the closed default.
+- Replaced the bespoke xsmall icon-only page toggle in `src/components/Editor/EditorPane.tsx` and `src/components/Editor/EditorPane.css` with a neutral small Aksel button that visibly says **Show pages** / **Hide pages** and uses standard button sizing instead of the custom 24px wrapper hack.
+- Added regression coverage in `tests/integration/multi-page-page-panel.test.tsx` for the closed-default **Show pages** control, and in `tests/integration/share-decode.test.tsx` for **Reset editor** plus imported replacement working copies restoring the closed page-panel default.
+
+Verification:
+
+- `npm install`
+- `npm run typecheck`
+- `npm test -- --run`
+- `npm run lint` (existing `InspectionPopover` hook dependency warning only)
+- Browser check at `http://127.0.0.1:4193/aksel-arcade/`: enabled **Multiple pages** on a fresh working copy, confirmed the visible **Show pages** control with the panel closed, opened it to the `Config` / `Pages` sections plus **Add page**, and saw no browser console warnings/errors during the verified flow
+
+Next note:
+
+- `#255` can now remove the remaining editor/preview multi-page gating without preserving the old open-by-default panel assumption. `pagePanelOpen` is now a closed-by-default workspace preference; share hydration still preserves the recipient-local value, while reset/import replacements deliberately restore the closed default.
