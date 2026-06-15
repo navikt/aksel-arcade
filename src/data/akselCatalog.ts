@@ -1072,7 +1072,7 @@ export const AKSEL_CATALOG: AkselCatalogEntry[] = [
     id: 'dropdown',
     name: 'Dropdown',
     group: 'component',
-    status: 'current',
+    status: 'legacy',
     package: '@navikt/ds-react',
     importName: 'Dropdown',
     importGuidance: "import { Button, Dropdown } from '@navikt/ds-react';",

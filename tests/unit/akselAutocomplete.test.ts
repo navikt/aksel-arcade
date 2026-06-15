@@ -175,12 +175,16 @@ describe('Aksel-aware autocomplete contract', () => {
     expect(labels).not.toContain('UNSAFE_Combobox')
   })
 
-  it('hides deprecated Alert and replaced Modal from new authoring autocomplete surfaces', () => {
+  it('hides deprecated Alert, replaced Modal, and replaced Dropdown from new authoring autocomplete surfaces', () => {
     expect(labelsFor('<A')).toContain('ActionMenu')
     expect(labelsFor('<A')).not.toContain('Alert')
     expect(labelsFor('<M')).toContain('MonthPicker')
     expect(labelsFor('<M')).not.toContain('Modal')
+    expect(labelsFor('<D')).not.toContain('Dropdown')
+    expect(optionFor('<Drop', 'Dropdown')).toBeUndefined()
     expect(labelsFor('<Modal.')).toEqual([])
+    expect(labelsFor('<Dropdown.')).toEqual([])
+    expect(labelsFor('<Dropdown>\n  <')).toEqual([])
     expect(labelsFor('<Alert v')).toEqual([])
     expect(labelsFor('<Alert variant="i')).toEqual([])
     expect(labelsFor('<Modal o')).toEqual([])
@@ -412,11 +416,6 @@ describe('Aksel-aware autocomplete contract', () => {
     )
     expect(applyFor('<Action', 'ActionMenu')).toContain('<ActionMenu.Trigger>')
     expect(applyFor('<Action', 'ActionMenu')).toContain('<ActionMenu.Group label="Case actions">')
-    expect(optionFor('<Drop', 'Dropdown')?.detail).toBe(
-      'Dropdown menu with grouped and simple item lists.'
-    )
-    expect(applyFor('<Drop', 'Dropdown')).toContain('<Dropdown.Menu.GroupedList>')
-    expect(applyFor('<Drop', 'Dropdown')).toContain('<Dropdown.Menu.Divider />')
     expect(optionFor('<Help', 'HelpText')?.detail).toBe(
       'Inline help trigger with explanatory text.'
     )
@@ -787,7 +786,6 @@ describe('Aksel-aware autocomplete contract', () => {
       'Accordion.Content',
     ])
     expect(labelsFor('<ActionMenu>\n  <')).toEqual(['ActionMenu.Trigger', 'ActionMenu.Content'])
-    expect(labelsFor('<Dropdown>\n  <')).toEqual(['Dropdown.Toggle', 'Dropdown.Menu'])
     expect(labelsFor('<ExpansionCard>\n  <')).toEqual([
       'ExpansionCard.Header',
       'ExpansionCard.Content',
@@ -820,15 +818,10 @@ describe('Aksel-aware autocomplete contract', () => {
     )
   })
 
-  it('keeps contextual Dropdown divider suggestions aligned with the runtime subcomponent name', () => {
-    expect(labelsFor('<Dropdown>\n  <Dropdown.Menu>\n    <')).toEqual([
-      'Dropdown.Menu.List',
-      'Dropdown.Menu.GroupedList',
-      'Dropdown.Menu.Divider',
-    ])
-    expect(applyFor('<Dropdown>\n  <Dropdown.Menu>\n    <D', 'Dropdown.Menu.Divider')).toBe(
-      'Dropdown.Menu.Divider />'
-    )
+  it('keeps Dropdown hidden even inside already-written Dropdown code', () => {
+    expect(labelsFor('<Dropdown>\n  <')).toEqual([])
+    expect(labelsFor('<Dropdown>\n  <Dropdown.Menu>\n    <')).toEqual([])
+    expect(labelsFor('<Dropdown>\n  <Dropdown.Menu.List>\n    <')).toEqual([])
   })
 
   it('shows parent-bound child suggestions only inside useful group contexts', () => {
@@ -928,9 +921,6 @@ describe('Aksel-aware autocomplete contract', () => {
     expect(labelsFor('<Accordion>\n  <')).not.toContain('Box')
     expect(labelsFor('<ActionMenu>\n  <ActionMenu.Content>\n    <')).not.toContain('Button')
     expect(labelsFor('<Tabs>\n  <Tabs.List>\n    <')).not.toContain('Box')
-    expect(labelsFor('<Dropdown>\n  <Dropdown.Menu.List>\n    <')).toEqual([
-      'Dropdown.Menu.List.Item',
-    ])
   })
 
   it('removes generic docs-only detail text from autocomplete options', () => {

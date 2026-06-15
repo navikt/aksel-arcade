@@ -16,6 +16,10 @@ import {
   AKSEL_METADATA,
   extractUsedComponents,
 } from '../../src/data/akselMetadata'
+import {
+  getNewAuthoringPolicy,
+  listHiddenNewAuthoringRoots,
+} from '../../src/data/akselAuthoringPolicy'
 import { getComponentProps, getPropValues } from '../../src/services/akselMetadata'
 import { AKSEL_SNIPPETS, searchSnippets } from '../../src/services/componentLibrary'
 
@@ -114,24 +118,47 @@ describe('Aksel catalog starter path', () => {
     expect(searchSnippets('boxnew')).toHaveLength(0)
   })
 
-  it('keeps Alert and Modal available for compatibility but hides them from new authoring discovery', () => {
+  it('keeps Alert, Modal, and Dropdown available for compatibility but hides them from new authoring discovery', () => {
     const legacyEntries = listCatalogEntries({ statuses: ['legacy'] })
     const paletteComponents = getCatalogPaletteComponents()
 
-    expect(legacyEntries.map((entry) => entry.name)).toEqual(expect.arrayContaining(['Alert']))
+    expect(legacyEntries.map((entry) => entry.name)).toEqual(
+      expect.arrayContaining(['Alert', 'Dropdown'])
+    )
+    expect(listHiddenNewAuthoringRoots()).toEqual(
+      expect.arrayContaining(['Alert', 'Modal', 'Dropdown'])
+    )
+    expect(getNewAuthoringPolicy('Dropdown')).toEqual({
+      reason: 'replaced',
+      replacements: ['ActionMenu'],
+    })
     expect(getCatalogComponent('Alert')?.status).toBe('legacy')
+    expect(getCatalogComponent('Dropdown')?.status).toBe('legacy')
     expect(paletteComponents.some((component) => component.name === 'Alert')).toBe(false)
     expect(paletteComponents.some((component) => component.name === 'Modal')).toBe(false)
+    expect(paletteComponents.some((component) => component.name === 'Dropdown')).toBe(false)
     expect(
       getComponentsByCategory('component').some((component) => component.name === 'Alert')
     ).toBe(false)
     expect(
       getComponentsByCategory('component').some((component) => component.name === 'Modal')
     ).toBe(false)
+    expect(
+      getComponentsByCategory('component').some((component) => component.name === 'Dropdown')
+    ).toBe(false)
     expect(AKSEL_SNIPPETS.some((snippet) => snippet.name === 'Alert')).toBe(false)
     expect(AKSEL_SNIPPETS.some((snippet) => snippet.name === 'Modal')).toBe(false)
+    expect(AKSEL_SNIPPETS.some((snippet) => snippet.name === 'Dropdown')).toBe(false)
     expect(searchComponents('alert')).not.toContainEqual(expect.objectContaining({ name: 'Alert' }))
     expect(searchComponents('modal')).not.toContainEqual(expect.objectContaining({ name: 'Modal' }))
+    expect(searchComponents('dropdown')).not.toContainEqual(
+      expect.objectContaining({ name: 'Dropdown' })
+    )
+    expect(searchComponents('dropdown')).toContainEqual(expect.objectContaining({ name: 'ActionMenu' }))
+    expect(searchSnippets('dropdown')).not.toContainEqual(
+      expect.objectContaining({ name: 'Dropdown' })
+    )
+    expect(searchSnippets('dropdown')).toContainEqual(expect.objectContaining({ name: 'ActionMenu' }))
   })
 
   it('makes the active palette helpers prefer catalog data for the starter subset', () => {
@@ -546,12 +573,12 @@ describe('Aksel catalog starter path', () => {
     const tooltipEntry = getCatalogComponent('Tooltip')
 
     expect(componentEntries.map((entry) => entry.name)).toEqual(
-      expect.arrayContaining(['ActionMenu', 'Dropdown', 'HelpText', 'Popover', 'Tooltip'])
+      expect.arrayContaining(['ActionMenu', 'HelpText', 'Popover', 'Tooltip'])
     )
+    expect(componentEntries.map((entry) => entry.name)).not.toContain('Dropdown')
     expect(actionMenuEntry?.snippet.code).toContain('<ActionMenu.Trigger>')
     expect(actionMenuEntry?.snippet.code).toContain('<ActionMenu.Group label="Case actions">')
-    expect(dropdownEntry?.snippet.code).toContain('<Dropdown.Menu.GroupedList>')
-    expect(dropdownEntry?.snippet.code).toContain('<Dropdown.Menu.Divider />')
+    expect(dropdownEntry?.status).toBe('legacy')
     expect(helpTextEntry?.snippet.code).toContain('<HStack gap="space-4" align="center">')
     expect(helpTextEntry?.snippet.code).toContain('<HelpText title="How is this calculated?">')
     expect(popoverEntry?.snippet.code).toContain('<Button')
@@ -574,6 +601,9 @@ describe('Aksel catalog starter path', () => {
     ).toContain('<ActionMenu.Trigger>')
     expect(searchComponents('overflow')).toContainEqual(
       expect.objectContaining({ name: 'ActionMenu' })
+    )
+    expect(searchComponents('dropdown')).not.toContainEqual(
+      expect.objectContaining({ name: 'Dropdown' })
     )
     expect(searchComponents('anchor')).toContainEqual(expect.objectContaining({ name: 'Popover' }))
   })
@@ -784,6 +814,8 @@ describe('Aksel catalog starter path', () => {
     expect(getPropValues('Button', 'variant')).toContain('primary-neutral')
     expect(getComponentProps('Button')).toContain('type')
     expect(getPropValues('Button', 'type')).toContain('submit')
+    expect(getComponentProps('Dropdown')).toEqual([])
+    expect(getPropValues('Dropdown', 'open')).toEqual([])
   })
 
   it('uses catalog docs metadata when exporting detected components and icons', () => {

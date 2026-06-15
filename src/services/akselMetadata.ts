@@ -3,6 +3,7 @@ import {
   getCatalogPropDefinition,
   getCatalogPropValues,
 } from '@/data/akselCatalog'
+import { isHiddenFromNewAuthoring } from '@/data/akselAuthoringPolicy'
 
 /**
  * Aksel v8 Component Metadata
@@ -1560,18 +1561,6 @@ export const AKSEL_COMPONENTS: Record<string, ComponentMetadata> = {
     ],
   },
 
-  Dropdown: {
-    name: 'Dropdown',
-    description: 'Dropdown menu',
-    props: [
-      {
-        name: 'placement',
-        type: 'string',
-        description: 'Menu placement',
-      },
-    ],
-  },
-
   ErrorSummary: {
     name: 'ErrorSummary',
     description: 'Summary of form errors',
@@ -2604,6 +2593,10 @@ export const AKSEL_COMPONENTS: Record<string, ComponentMetadata> = {
  * Get all prop names for a component
  */
 export function getComponentProps(componentName: string): string[] {
+  if (isHiddenFromNewAuthoring(componentName)) {
+    return []
+  }
+
   const catalogComponent = getCatalogComponent(componentName)
   const metadata = AKSEL_COMPONENTS[componentName]
   const catalogProps = catalogComponent?.props.map((p) => p.name) ?? []
@@ -2616,6 +2609,10 @@ export function getComponentProps(componentName: string): string[] {
  * Get valid values for a specific prop
  */
 export function getPropValues(componentName: string, propName: string): string[] {
+  if (isHiddenFromNewAuthoring(componentName)) {
+    return []
+  }
+
   const catalogProp = getCatalogPropDefinition(componentName, propName)
   if (catalogProp) return getCatalogPropValues(componentName, propName)
 
@@ -2633,6 +2630,10 @@ export function getPropDefinition(
   componentName: string,
   propName: string
 ): PropDefinition | undefined {
+  if (isHiddenFromNewAuthoring(componentName)) {
+    return undefined
+  }
+
   const catalogProp = getCatalogPropDefinition(componentName, propName)
   if (catalogProp) {
     return {
