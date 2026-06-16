@@ -1189,6 +1189,9 @@ describe('desktopMcpServer', () => {
       'Start with `tools/list`, `resources/list`, and `resources/read`'
     )
     expect(operatingGuidePayload.result.contents[0].text).toContain(
+      'Tool-only hosts can exercise the two v1 tools but cannot complete the resource-read portions of the checklist from MCP alone'
+    )
+    expect(operatingGuidePayload.result.contents[0].text).toContain(
       '`arcade://desktop/capabilities` is the shortest single place to inspect the published v1 contract'
     )
     expect(operatingGuidePayload.result.contents[0].text).toContain(
@@ -1259,6 +1262,9 @@ describe('desktopMcpServer', () => {
       discoveryAdvice: {
         preferredFirstResourceUri: 'arcade://desktop/capabilities',
         preferredDiscoveryMethods: ['tools/list', 'resources/list', 'resources/read'],
+      },
+      smokeChecklistRequirements: {
+        requiresClientResourceReads: true,
       },
       applyChangesOperationTypes: [
         'replace_source',
@@ -1351,6 +1357,9 @@ describe('desktopMcpServer', () => {
     })
     expect(capabilities.discoveryAdvice.note).toContain(
       'Use tools/list plus resources/list/resources/read to discover the published v1 surface.'
+    )
+    expect(capabilities.smokeChecklistRequirements.note).toContain(
+      'Tool-only hosts can call capture_preview_evidence and apply_changes but cannot complete the stable-resource, diagnostics, or evidence-resource read checks from MCP alone.'
     )
     expect(capabilities.verificationBoundaries).toMatchObject({
       mcpVerifiable: expect.arrayContaining([

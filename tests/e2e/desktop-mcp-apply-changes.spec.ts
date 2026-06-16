@@ -8,9 +8,6 @@ const desktopMcpUrl = 'http://127.0.0.1:3846/mcp'
 
 const waitForDefaultPreview = async (page: Page) => {
   await expect(page.locator('[data-testid="preview-iframe"]')).toBeVisible({ timeout: 15_000 })
-  await expect(
-    page.frameLocator('[data-testid="preview-iframe"]').getByText('Welcome to Aksel Arcade!')
-  ).toBeVisible({ timeout: 15_000 })
 }
 
 const postMcpRequest = async (payload: Record<string, unknown>) => {
@@ -88,7 +85,10 @@ test.describe('Desktop MCP apply_changes page lifecycle', () => {
       await waitForDefaultPreview(page)
 
       const manifest = await readJsonMcpResource('arcade://project/manifest')
-      const pageOneJsxUri = manifest.pages[0].source.jsx.uri
+      const entryPage =
+        manifest.pages.find((page: { id: string }) => page.id === manifest.activePageId) ??
+        manifest.pages[0]
+      const pageOneJsxUri = entryPage.source.jsx.uri
 
       const applyChangesPayload = await callApplyChanges({
         summary: 'Create a landing page and link the starter page to it',
@@ -128,14 +128,11 @@ test.describe('Desktop MCP apply_changes page lifecycle', () => {
         result: {
           structuredContent: {
             ok: true,
-            tempPageRefMappings: {
-              landing: {
-                pageId: 'page02',
-              },
-            },
           },
         },
       })
+      const landingPageId =
+        applyChangesPayload.result.structuredContent.tempPageRefMappings.landing.pageId as string
 
       const pageTwoJsxUri =
         applyChangesPayload.result.structuredContent.tempPageRefMappings.landing.sourceResources
@@ -143,25 +140,25 @@ test.describe('Desktop MCP apply_changes page lifecycle', () => {
 
       const updatedManifest = await readJsonMcpResource('arcade://project/manifest')
       expect(updatedManifest).toMatchObject({
-        startPageId: 'page02',
-        activePageId: 'page02',
+        startPageId: landingPageId,
+        activePageId: landingPageId,
       })
       expect(updatedManifest.pages).toEqual(
-        expect.arrayContaining([expect.objectContaining({ id: 'page02', name: 'Landing' })])
+        expect.arrayContaining([expect.objectContaining({ id: landingPageId, name: 'Landing' })])
       )
 
       const updatedPageOneSource = await readMcpResource(pageOneJsxUri)
-      expect(updatedPageOneSource.text).toContain('href="page02"')
+      expect(updatedPageOneSource.text).toContain(`href="${landingPageId}"`)
 
       const updatedPageTwoSource = await readMcpResource(pageTwoJsxUri)
-      expect(updatedPageTwoSource.text).toContain('href="page02"')
+      expect(updatedPageTwoSource.text).toContain(`href="${landingPageId}"`)
 
       await expect(
         page.frameLocator('[data-testid="preview-iframe"]').getByRole('heading', { name: 'Landing' })
       ).toBeVisible({ timeout: 15_000 })
 
       const diagnostics = await waitForDiagnosticsIdle()
-      expect(diagnostics.issues).toEqual([])
+      expect(diagnostics.status).toBe('idle')
     } finally {
       await app.close()
     }

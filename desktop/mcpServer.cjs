@@ -1709,6 +1709,7 @@ const createDesktopStableResourceText = (uri) => {
         '- Work through `arcade://` resources and MCP tools only; do not edit repository files, package metadata, or the local filesystem.',
         '- Default loop: read this guide, read `arcade://project/manifest`, read the relevant source resources, use `apply_changes` for durable edits, read `arcade://project/diagnostics` unless the human asked for a different workflow, then capture Preview evidence when visual validation is needed.',
         '- Start with `tools/list`, `resources/list`, and `resources/read`; `arcade://desktop/capabilities` is the shortest single place to inspect the published v1 contract.',
+        '- To complete the full smoke checklist from inside a client, the host must expose `resources/list` and `resources/read` (or an equivalent resource inspector). Tool-only hosts can exercise the two v1 tools but cannot complete the resource-read portions of the checklist from MCP alone.',
         '- Durable project edits happen through `apply_changes`, not by patching files outside the active Arcade project.',
         '- Use `create_page.newPageRef`, later `tempPageRef` targets, and `{{pageRef:name}}` placeholders when one batch must create a page and link to it.',
         '- `capture_preview_evidence({ pageId })` is the normal autonomous inspection path for pages and targeted visual states.',
@@ -1750,6 +1751,10 @@ const createDesktopStableResourceText = (uri) => {
           preferredFirstResourceUri: 'arcade://desktop/capabilities',
           preferredDiscoveryMethods: ['tools/list', 'resources/list', 'resources/read'],
           note: 'Use tools/list plus resources/list/resources/read to discover the published v1 surface. Read arcade://desktop/capabilities first when you want the full contract in one place.',
+        },
+        smokeChecklistRequirements: {
+          requiresClientResourceReads: true,
+          note: 'Use an MCP client that exposes resources/list and resources/read, or verify those resource steps manually in a resource inspector. Tool-only hosts can call capture_preview_evidence and apply_changes but cannot complete the stable-resource, diagnostics, or evidence-resource read checks from MCP alone.',
         },
         toolNames: MCP_TOOL_DEFINITIONS.map((toolDefinition) => toolDefinition.name),
         stableResourceUris: MCP_STABLE_RESOURCE_DEFINITIONS.map(

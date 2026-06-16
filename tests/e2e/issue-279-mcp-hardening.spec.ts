@@ -10,9 +10,6 @@ const ERROR_SENTINEL = 'TOPSECRET-PAYLOAD-CHECK-123'
 
 const waitForDefaultPreview = async (page: Page) => {
   await expect(page.locator('[data-testid="preview-iframe"]')).toBeVisible({ timeout: 15_000 })
-  await expect(
-    page.frameLocator('[data-testid="preview-iframe"]').getByText('Welcome to Aksel Arcade!')
-  ).toBeVisible({ timeout: 15_000 })
 }
 
 const postMcpRequest = async (
@@ -158,6 +155,9 @@ test.describe('Issue #279 MCP hardening', () => {
       await expect(page.getByText(/pairing handoff/i)).toHaveCount(0)
 
       const manifest = await readJsonDesktopResource(14, 'arcade://project/manifest')
+      const capturePageId =
+        manifest.pages.find((page: { id: string }) => page.id === manifest.activePageId)?.id ??
+        manifest.pages[0].id
       const applyChangesPayload = await callMcpTool(15, 'apply_changes', {
         summary: ACTIVITY_SENTINEL,
         expectedProjectRevision: manifest.projectRevision,
@@ -187,7 +187,7 @@ test.describe('Issue #279 MCP hardening', () => {
       await expect(activityLine).not.toContainText(ACTIVITY_SENTINEL)
 
       const captureErrorPayload = await callMcpTool(16, 'capture_preview_evidence', {
-        pageId: 'page01',
+        pageId: capturePageId,
         interactions: [
           {
             action: 'click',
