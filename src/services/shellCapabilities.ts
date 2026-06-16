@@ -60,7 +60,7 @@ export const WEB_ARCADE_CAPABILITIES: ShellCapabilities = Object.freeze({
 export const DESKTOP_ARCADE_CAPABILITIES: ShellCapabilities = Object.freeze({
   surface: 'desktop',
   shareUrl: Object.freeze({ enabled: false }),
-  agentSessions: Object.freeze({ enabled: true }),
+  agentSessions: Object.freeze({ enabled: false }),
   projectPackages: Object.freeze({
     enabled: true,
     defaultExtension: '.akselarcade',

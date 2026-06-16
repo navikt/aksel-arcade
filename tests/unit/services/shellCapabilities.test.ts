@@ -27,11 +27,11 @@ describe('shellCapabilities', () => {
     })
   })
 
-  it('defines Desktop Arcade capabilities with Agent sessions enabled and Share URL disabled', () => {
+  it('defines Desktop Arcade capabilities with the legacy Agent-session UI disabled and Share URL disabled', () => {
     expect(DESKTOP_ARCADE_CAPABILITIES).toMatchObject({
       surface: 'desktop',
       shareUrl: { enabled: false },
-      agentSessions: { enabled: true },
+      agentSessions: { enabled: false },
       projectPackages: {
         enabled: true,
         defaultExtension: '.akselarcade',

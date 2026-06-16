@@ -1005,7 +1005,7 @@ const routeToolsCallRequest = async (
                   ? { manifestResourceUri: captureResult.manifestResourceUri }
                   : {}),
                 ...(captureResult.interactions !== undefined
-                  ? { interactions: captureResult.interactions }
+                    ? { interactions: redactCapturePreviewFailureInteractions(captureResult.interactions) }
                   : {}),
                 ...(captureResult.currentPageId !== undefined
                   ? { currentPageId: captureResult.currentPageId }
@@ -1774,12 +1774,14 @@ const createDesktopStableResourceText = (uri) => {
         '- Work through `arcade://` resources and MCP tools only; do not edit repository files, package metadata, or the local filesystem.',
         '- Default loop: read this guide, read `arcade://project/manifest`, read the relevant source resources, use `apply_changes` for durable edits, read `arcade://project/diagnostics` unless the human asked for a different workflow, then capture Preview evidence when visual validation is needed.',
         '- If your MCP host does not expose raw `resources/read`, use `read_resource({ uri })` as a compatibility bridge for any returned `arcade://...` resource URI.',
+        '- If your MCP host hides raw discovery UI, start by reading `arcade://desktop/capabilities` through `read_resource({ uri: "arcade://desktop/capabilities" })` so MCP itself can describe the published tools, resources, limits, and verification boundaries.',
         '- Durable project edits happen through `apply_changes`, not by patching files outside the active Arcade project.',
         '- Use `create_page.newPageRef`, later `tempPageRef` targets, and `{{pageRef:name}}` placeholders when one batch must create a page and link to it.',
         '- `capture_preview_evidence({ pageId })` is the normal autonomous inspection path for pages and targeted visual states.',
         '- Use `select_active_page` only when you intentionally want the human-visible Active page to change; ordinary inspection should keep using `capture_preview_evidence({ pageId })`.',
         '- Saved Preview preferences live in `arcade://project/preview-context`; capture-only overrides must not mutate them.',
         '- If `apply_changes` returns `project-unavailable`, wait for an active Desktop Arcade window instead of falling back to repository or filesystem edits.',
+        '- Product-chrome checks such as Desktop Settings copy, Web/Desktop UI boundaries, portable share/package contents, host-process logs, and window-close lifecycle are intentionally outside the MCP surface; use the capabilities resource as the authoritative contract for those boundaries and rely on app-side or human checks when you must verify them directly.',
         '- Preview capture supports `screenshot`, `accessibility`, `dom_layout_style`, and `frame` layers, with `viewport`, `full_page`, and `region` screenshot scopes. Omit `layers` to capture all available layers.',
         `- Preview capture interactions support ${VALID_PREVIEW_INTERACTION_ACTIONS.join(', ')} with at most ${MAX_PREVIEW_INTERACTION_STEPS} steps and ${MAX_PREVIEW_INTERACTION_TOTAL_TIME_MS} ms total interaction time per capture.`,
         '- Interaction targets prefer accessibility fields (`role`, `name`, `text`, `label`) and allow Preview-root-scoped CSS selector fallback only.',
@@ -1810,6 +1812,11 @@ const createDesktopStableResourceText = (uri) => {
         authDescription: DESKTOP_MCP_AUTH_DESCRIPTION,
         contractNote:
           'This resource lists the stable v1 MCP contract and the current implementation status for each published tool and preview surface.',
+        discoveryAdvice: {
+          preferredFirstResourceUri: 'arcade://desktop/capabilities',
+          resourceReadFallbackTool: 'read_resource',
+          note: 'If your MCP host does not expose raw resources/read or discovery UI, call read_resource({ uri: "arcade://desktop/capabilities" }) first so MCP itself can describe the published v1 surface.',
+        },
         toolNames: MCP_TOOL_DEFINITIONS.map((toolDefinition) => toolDefinition.name),
         stableResourceUris: MCP_STABLE_RESOURCE_DEFINITIONS.map(
           (resourceDefinition) => resourceDefinition.uri
@@ -1837,6 +1844,25 @@ const createDesktopStableResourceText = (uri) => {
           captureLayers: CAPTURE_LAYER_STATUS,
           screenshotScopes: SCREENSHOT_SCOPE_STATUS,
           interactionActions: INTERACTION_ACTION_STATUS,
+        },
+        verificationBoundaries: {
+          mcpVerifiable: [
+            'No token/header is required for the desktop-arcade MCP endpoint.',
+            'The published v1 tool/resource contract and omissions are discoverable from MCP itself.',
+            'Business failures stay structured and redacted in MCP tool/resource responses.',
+            'Unknown browser Origins are rejected and GET/SSE entrypoints stay unsupported.',
+            'Safe activity metadata in MCP results contains tool/resource names, timestamps, status/error codes, and bounded safe metadata only.',
+          ],
+          hostOnly: [
+            'Desktop Settings shows MCP configuration instead of a pairing handoff.',
+            'Desktop Arcade shows no public Agent access toggle, pairing credential, or pairing handoff UI.',
+            'Web Arcade shows no MCP or Agent UI and exposes no Web MCP endpoint.',
+            'Desktop Settings renders last activity with safe metadata only.',
+            'Technical host logs redact source, evidence, screenshot, and request payload contents.',
+            'Portable Web share URLs and Arcade project packages exclude MCP resources, evidence, diagnostics, instructions, and activity data.',
+            'Closing Desktop Arcade windows leaves MCP project calls failing clearly without auto-opening or focusing UI.',
+          ],
+          note: 'hostOnly items are intentionally outside the MCP surface; verify them through Desktop/Web UI checks, host-process tests, or human validation rather than expecting MCP resources/tools to introspect product chrome or logs.',
         },
         v1Omissions: CAPABILITY_V1_OMISSIONS,
       })
@@ -2077,6 +2103,29 @@ const toPublicCapturePreviewResult = (captureResult) => ({
   layerResources: captureResult.layerResources,
   ...(captureResult.interactions !== undefined ? { interactions: captureResult.interactions } : {}),
   safeActivity: captureResult.safeActivity,
+})
+
+const redactCapturePreviewFailureInteractions = (interactionState) => ({
+  requested: interactionState.requested.map((step) => ({
+    action: step.action,
+  })),
+  executed: interactionState.executed.map((entry) => ({
+    index: entry.index,
+    step: {
+      action: entry.step.action,
+    },
+  })),
+  ...(interactionState.failedStep !== undefined
+    ? {
+        failedStep: {
+          index: interactionState.failedStep.index,
+          step: {
+            action: interactionState.failedStep.step.action,
+          },
+          reason: interactionState.failedStep.reason,
+        },
+      }
+    : {}),
 })
 
 const isApplyChangesResult = (value) =>

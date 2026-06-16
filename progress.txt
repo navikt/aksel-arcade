@@ -3570,3 +3570,112 @@ Verification:
 Next note:
 
 - If the Desktop MCP preview-capture e2e unexpectedly talks to the wrong project state, first check for a stale local Electron process still listening on `127.0.0.1:3846`; that can make the test hit an old MCP server even when the newly launched window looks correct.
+
+### 2026-06-16 - Issue #279: Harden MCP bridge and remove superseded Agent pairing model
+
+Implemented:
+
+- Selected `#279` as the single highest-priority open `ready-for-agent` feature from `#279`-`#280` after checking parent PRD `#269`, `CONTEXT.md`, and the existing `progress.txt` notes. `#280` is explicitly blocked by `#279`, so the MCP hardening and superseded-pairing cleanup had to land first.
+- Disabled the old public Desktop Agent-session path in the normal Desktop capability set by switching `agentSessions.enabled` off in both the shared renderer capability map and the Electron main-process clone. Production Desktop Arcade now exposes the MCP setup path in Settings without showing the legacy Agent access/pairing button, while the legacy transport remains available only in explicitly opted-in compatibility tests.
+- Updated the public-surface regression coverage instead of deleting the old transport internals:
+  - `tests/integration/desktop-mcp-settings.test.tsx` now asserts the desktop MCP configuration appears without the old Agent-session button, and Web Arcade still shows neither MCP nor Agent UI.
+  - `tests/integration/project-controls-layout.test.tsx` now uses a test-only legacy capability fixture for compatibility-only bridge coverage while asserting the real Desktop capability set hides the public Agent-session UI and still shows the MCP settings surface.
+  - `tests/integration/share-popover.test.tsx` keeps the compatibility-only export-cleanliness path under the same test-only legacy fixture and broadens the forbidden artifact pattern to include MCP/instruction vocabulary as well as the older Agent-session terms.
+- Updated `tests/unit/services/shellCapabilities.test.ts` to lock the new Desktop default and revised `CONTEXT.md` so the old Agent session/access/transport/pairing vocabulary is clearly marked as legacy/superseded while the current `Agent bridge` / `Agent change` language reflects the local MCP model.
+
+Human-testable verification notes:
+
+- Directly smoke-checked in a browser against a built preview:
+  - Web Arcade still shows Share, shows no Agent button, and Settings shows no Desktop MCP section.
+  - A desktop-preload simulation (Electron user agent + preload bridge injected before load) shows no Share button, no Agent button, and Settings shows the MCP configuration (`desktop-arcade`, `HTTP (MCP Streamable HTTP)`, `http://127.0.0.1:3846/mcp`, no token/header) with no console errors.
+- Covered by automated Electron/MCP tests in this headless session because they are not directly human-testable from a plain browser smoke pass:
+  - `tests/unit/services/desktopMcpServer.test.ts` covers no-token operation, fixed endpoint behavior, browser-Origin rejection, GET/SSE rejection, and clear `project-unavailable` failures instead of auto-opening UI.
+  - `tests/integration/desktop-mcp-settings.test.tsx` covers safe last-activity metadata only.
+  - `tests/integration/share-popover.test.tsx` and `tests/integration/project-controls-layout.test.tsx` cover clean export/share payload boundaries so MCP/legacy activity, diagnostics, evidence, and instruction-shaped artifacts do not leak into portable project data.
+
+Verification:
+
+- npm run typecheck
+- npm run lint
+- CI=1 npm run test -- --run
+- npm run build
+- Browser smoke at `http://127.0.0.1:4173/aksel-arcade/` plus a desktop-preload simulation of the same build, confirming the MCP-only desktop chrome and the Web/Desktop UI boundary without runtime console errors
+
+Next note:
+
+- The old loopback transport files/tests now survive only as explicit compatibility coverage. If a follow-up fully removes that path instead of keeping it as a guarded internal fallback, the test-only legacy capability fixtures in `project-controls-layout.test.tsx` and `share-popover.test.tsx` are the first places to simplify or delete.
+
+### 2026-06-16 - Issue #279 follow-up: MCP-only verification contract
+
+Implemented:
+
+- Followed up on a real post-PR verification gap reported by an MCP-only tester: the MCP bridge itself was working, but the Desktop MCP operating guide/capabilities resource did not clearly tell a host-limited agent how to discover the surface or which acceptance checks were intentionally outside MCP.
+- Updated `arcade://desktop/operating-guide` so MCP-only clients are explicitly told to start with `arcade://desktop/capabilities` and to use `read_resource({ uri })` when the host does not expose raw resource/discovery UI.
+- Expanded `arcade://desktop/capabilities` with two new contract sections:
+  - `discoveryAdvice`, which points agents at `arcade://desktop/capabilities` plus the `read_resource` fallback path.
+  - `verificationBoundaries`, which separates MCP-verifiable checks (auth-free access, structured/redacted failures, origin/transport rejection, safe activity metadata) from host/UI-only checks (Desktop Settings chrome, Web/Desktop UI boundaries, share/package payload cleanliness, host logs, and closed-window lifecycle).
+- Added regression coverage in `tests/unit/services/desktopMcpServer.test.ts` so the Desktop MCP self-description keeps documenting this boundary and MCP-only agents do not have to guess again.
+
+Human-testable verification notes:
+
+- The original tester report was valid: several issue-279 acceptance items are not directly observable from the MCP surface alone. The fix here is to make that boundary explicit and discoverable from MCP itself, not to expose Desktop/Web chrome or host logs through MCP.
+- After this follow-up, an MCP-only agent can determine up front which checks it can complete autonomously and which ones must remain app-side or human-driven.
+
+Verification:
+
+- CI=1 npm run test -- --run tests/unit/services/desktopMcpServer.test.ts
+- npm run typecheck
+- npm run lint
+- CI=1 npm run test -- --run
+- npm run build
+
+Next note:
+
+- If a future issue wants full autonomous verification of host/UI-only items, that is a new product capability discussion. The current contract remains intentional: MCP can describe those boundaries authoritatively, but it should not introspect Desktop chrome, host logs, or window lifecycle just to satisfy a test harness.
+
+### 2026-06-17 - Issue #279 follow-up: execute the full verification loop and fix payload redaction
+
+Implemented:
+
+- Took the issue `#279` human-testable checklist literally and converted it into an executable regression loop instead of relying on a documentation-only interpretation:
+  - `tests/e2e/issue-279-mcp-hardening.spec.ts` now drives the real Electron desktop app plus direct MCP HTTP calls to verify:
+    - Settings shows Desktop MCP configuration instead of the old pairing path
+    - no in-app Agent toggle is required before `tools/list` / `resources/list`
+    - no token/header is required
+    - MCP request activity shows only safe metadata in Settings
+    - MCP error paths do not echo payload text in the public error surface
+    - closing the Desktop Arcade window on macOS leaves the app process running but makes project calls fail clearly with `project-unavailable` instead of reopening UI
+  - the same spec also checks the live Web surface for no Agent/MCP UI and no `/mcp` endpoint behavior.
+- Fixed a real privacy bug found by the new loop:
+  - `src/services/previewEvidence.ts` no longer interpolates caller-supplied selector/text/value/key payloads into Preview interaction failure messages.
+  - `desktop/mcpServer.cjs` now redacts `capture_preview_evidence` failure interaction payloads before they become MCP tool output. Error results keep only safe step metadata (`action`, `index`, `reason`) instead of echoing the original target/value payload.
+- Added focused regression coverage for the redaction fix:
+  - `tests/unit/services/previewInteractions.test.ts` now proves failed interaction messages and reasons do not echo a sentinel payload.
+  - `tests/unit/services/desktopMcpServer.test.ts` now proves `capture_preview_evidence` failure tool output redacts the raw interaction payload while preserving safe failure metadata.
+- Regenerated `public/preview-evidence-global.js` after changing the Preview evidence runtime source.
+
+Human-testable verification notes:
+
+- The issue loop now passes in-session for the exact checklist the issue calls out:
+  - Desktop Settings MCP configuration
+  - no Agent toggle before MCP listing
+  - no auth header
+  - Web has no MCP/Agent UI or endpoint behavior
+  - clean portable share/package artifact boundary (covered by `tests/integration/share-popover.test.tsx`)
+  - safe Settings last activity
+  - redacted MCP error payload/log surface
+  - clear `project-unavailable` after closing the Desktop window where applicable
+- Also did one live Web spot-check against `npm run dev` at `http://127.0.0.1:4173/aksel-arcade/`: Share was present, Settings had no Desktop MCP section, and the browser console stayed free of errors/warnings.
+
+Verification:
+
+- CI=1 npm run test -- --run tests/unit/services/previewInteractions.test.ts tests/unit/services/desktopMcpServer.test.ts tests/integration/share-popover.test.tsx
+- npm run test:e2e -- tests/e2e/issue-279-mcp-hardening.spec.ts --reporter=line
+- npm run typecheck
+- npm run lint
+- CI=1 npm run test -- --run
+- npm run build
+
+Next note:
+
+- The new `issue-279-mcp-hardening` e2e spec is the right first stop if a future change regresses Desktop Settings copy, auth-free MCP access, payload redaction, or the closed-window `project-unavailable` behavior. If it fails locally because port `127.0.0.1:3846` is already occupied, clear the stale local Electron instance before trusting any Desktop MCP result.

@@ -84,6 +84,7 @@ describe('Desktop Arcade MCP settings', () => {
       desktopMcpServerState: AVAILABLE_MCP_STATE,
     })
 
+    expect(screen.queryByTestId('agent-session-menu')).toBeNull()
     await user.click(screen.getByRole('button', { name: /settings/i }))
 
     expect(await screen.findByText('Desktop Arcade MCP')).toBeTruthy()
@@ -153,6 +154,7 @@ describe('Desktop Arcade MCP settings', () => {
     const user = userEvent.setup()
     renderHeader({ shellCapabilities: WEB_ARCADE_CAPABILITIES })
 
+    expect(screen.queryByTestId('agent-session-menu')).toBeNull()
     await user.click(screen.getByRole('button', { name: /settings/i }))
 
     expect(screen.queryByText('Desktop Arcade MCP')).toBeNull()
