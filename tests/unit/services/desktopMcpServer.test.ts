@@ -25,6 +25,10 @@ const {
       applyChanges: (
         request: Record<string, unknown>
       ) => ApplyChangesResult | Promise<ApplyChangesResult>
+      capturePreviewEvidence: (
+        request: Record<string, unknown>
+      ) => CapturePreviewResult | Promise<CapturePreviewResult>
+      previewCaptureTtlMs: number
     }>
   ) => DesktopMcpServer
 } = require('../../../desktop/mcpServer.cjs')
@@ -97,6 +101,48 @@ interface ApplyChangesFailure {
 
 type ApplyChangesResult = ApplyChangesSuccess | ApplyChangesFailure
 
+interface CapturePreviewSuccess {
+  ok: true
+  summary: string
+  captureId: string
+  manifestResourceUri: string
+  producedResources: string[]
+  page: {
+    id: string
+    name: string
+  }
+  requestedLayers: string[]
+  producedLayers: string[]
+  layerResources: {
+    screenshot?: string
+    frame?: string
+  }
+  resources: Array<{
+    uri: string
+    mimeType: string
+    text: string
+  }>
+  safeActivity: {
+    toolName: 'capture_preview_evidence'
+    operationTypes?: string[]
+    timestamp: string
+  }
+}
+
+interface CapturePreviewFailure {
+  ok: false
+  code:
+    | 'project-unavailable'
+    | 'invalid-page-id'
+    | 'invalid-capture-target'
+    | 'render-timeout'
+    | 'render-failed'
+  message: string
+  manifestResourceUri?: string
+}
+
+type CapturePreviewResult = CapturePreviewSuccess | CapturePreviewFailure
+
 const activeServers: DesktopMcpServer[] = []
 const occupiedServers: Server[] = []
 
@@ -107,6 +153,10 @@ const createManagedServer = (
     path: string
     readProjectResource: (request: { uri: string }) => ProjectResourceReadResult | Promise<ProjectResourceReadResult>
     applyChanges: (request: Record<string, unknown>) => ApplyChangesResult | Promise<ApplyChangesResult>
+    capturePreviewEvidence: (
+      request: Record<string, unknown>
+    ) => CapturePreviewResult | Promise<CapturePreviewResult>
+    previewCaptureTtlMs: number
   }>
 ): DesktopMcpServer => {
   const server = createDesktopMcpServer(options)
@@ -271,7 +321,7 @@ describe('desktopMcpServer', () => {
     })
   })
 
-  it('returns structured placeholder failures for capture_preview_evidence and rejects unknown tools or unsupported fields', async () => {
+  it('returns structured project-unavailable failures for capture_preview_evidence and rejects unknown tools or unsupported fields', async () => {
     const server = createManagedServer({ port: 0 })
     const state = await server.start()
 
@@ -298,15 +348,16 @@ describe('desktopMcpServer', () => {
         content: [
           {
             type: 'text',
-            text: 'Desktop Arcade MCP tool "capture_preview_evidence" is not implemented yet.',
+            text:
+              'Desktop Arcade MCP capture_preview_evidence is unavailable because no active preview capture bridge is connected.',
           },
         ],
         isError: true,
         structuredContent: {
-          code: 'not-yet-implemented',
+          code: 'project-unavailable',
           toolName: 'capture_preview_evidence',
           message:
-            'Desktop Arcade MCP tool "capture_preview_evidence" is not implemented yet.',
+            'Desktop Arcade MCP capture_preview_evidence is unavailable because no active preview capture bridge is connected.',
         },
       },
     })
@@ -355,6 +406,207 @@ describe('desktopMcpServer', () => {
           code: 'invalid-tool-arguments',
           toolName: 'capture_preview_evidence',
         },
+      },
+    })
+  })
+
+  it('routes capture_preview_evidence through the injected preview capture bridge and serves expiring resources', async () => {
+    const capturePreviewEvidence = vi
+      .fn<(request: Record<string, unknown>) => Promise<CapturePreviewResult>>()
+      .mockResolvedValue({
+        ok: true,
+        summary: 'Captured Details (page02) in dark MD preview with screenshot and frame evidence (region).',
+        captureId: 'capture-demo',
+        manifestResourceUri: 'arcade://preview/captures/capture-demo/manifest',
+        producedResources: [
+          'arcade://preview/captures/capture-demo/manifest',
+          'arcade://preview/captures/capture-demo/frame',
+          'arcade://preview/captures/capture-demo/screenshot',
+        ],
+        page: {
+          id: 'page02',
+          name: 'Details',
+        },
+        requestedLayers: ['screenshot', 'frame'],
+        producedLayers: ['screenshot', 'frame'],
+        layerResources: {
+          screenshot: 'arcade://preview/captures/capture-demo/screenshot',
+          frame: 'arcade://preview/captures/capture-demo/frame',
+        },
+        resources: [
+          {
+            uri: 'arcade://preview/captures/capture-demo/manifest',
+            mimeType: 'application/json',
+            text: '{"captureId":"capture-demo"}',
+          },
+          {
+            uri: 'arcade://preview/captures/capture-demo/frame',
+            mimeType: 'application/json',
+            text: '{"page":{"id":"page02"}}',
+          },
+          {
+            uri: 'arcade://preview/captures/capture-demo/screenshot',
+            mimeType: 'image/svg+xml',
+            text: '<svg xmlns="http://www.w3.org/2000/svg"></svg>',
+          },
+        ],
+        safeActivity: {
+          toolName: 'capture_preview_evidence',
+          operationTypes: ['screenshot', 'frame'],
+          timestamp: '2026-06-16T12:30:00.000Z',
+        },
+      })
+
+    const server = createManagedServer({
+      port: 0,
+      capturePreviewEvidence,
+      previewCaptureTtlMs: 50,
+    })
+    const state = await server.start()
+
+    const toolResponse = await postJson(state.url, {
+      jsonrpc: '2.0',
+      id: 61,
+      method: 'tools/call',
+      params: {
+        name: 'capture_preview_evidence',
+        arguments: {
+          pageId: 'page02',
+          viewportSize: 'MD',
+          layers: ['screenshot', 'frame'],
+          screenshotScope: 'region',
+          target: {
+            role: 'button',
+            name: 'Continue',
+          },
+        },
+      },
+    })
+    expect(toolResponse.status).toBe(200)
+    await expect(toolResponse.json()).resolves.toEqual({
+      jsonrpc: '2.0',
+      id: 61,
+      result: {
+        content: [
+          {
+            type: 'text',
+            text: 'Captured Preview evidence: Captured Details (page02) in dark MD preview with screenshot and frame evidence (region).',
+          },
+        ],
+        structuredContent: {
+          ok: true,
+          summary:
+            'Captured Details (page02) in dark MD preview with screenshot and frame evidence (region).',
+          captureId: 'capture-demo',
+          manifestResourceUri: 'arcade://preview/captures/capture-demo/manifest',
+          producedResources: [
+            'arcade://preview/captures/capture-demo/manifest',
+            'arcade://preview/captures/capture-demo/frame',
+            'arcade://preview/captures/capture-demo/screenshot',
+          ],
+          page: {
+            id: 'page02',
+            name: 'Details',
+          },
+          requestedLayers: ['screenshot', 'frame'],
+          producedLayers: ['screenshot', 'frame'],
+          layerResources: {
+            screenshot: 'arcade://preview/captures/capture-demo/screenshot',
+            frame: 'arcade://preview/captures/capture-demo/frame',
+          },
+          safeActivity: {
+            toolName: 'capture_preview_evidence',
+            operationTypes: ['screenshot', 'frame'],
+            timestamp: '2026-06-16T12:30:00.000Z',
+          },
+        },
+      },
+    })
+    expect(server.getState()).toMatchObject({
+      lastActivity: {
+        toolName: 'capture_preview_evidence',
+        operationTypes: ['screenshot', 'frame'],
+        timestamp: '2026-06-16T12:30:00.000Z',
+      },
+    })
+
+    const manifestResponse = await postJson(state.url, {
+      jsonrpc: '2.0',
+      id: 62,
+      method: 'resources/read',
+      params: {
+        uri: 'arcade://preview/captures/capture-demo/manifest',
+      },
+    })
+    expect(manifestResponse.status).toBe(200)
+    await expect(manifestResponse.json()).resolves.toEqual({
+      jsonrpc: '2.0',
+      id: 62,
+      result: {
+        contents: [
+          {
+            uri: 'arcade://preview/captures/capture-demo/manifest',
+            mimeType: 'application/json',
+            text: '{"captureId":"capture-demo"}',
+          },
+        ],
+      },
+    })
+
+    const screenshotResponse = await postJson(state.url, {
+      jsonrpc: '2.0',
+      id: 63,
+      method: 'resources/read',
+      params: {
+        uri: 'arcade://preview/captures/capture-demo/screenshot',
+      },
+    })
+    expect(screenshotResponse.status).toBe(200)
+    await expect(screenshotResponse.json()).resolves.toEqual({
+      jsonrpc: '2.0',
+      id: 63,
+      result: {
+        contents: [
+          {
+            uri: 'arcade://preview/captures/capture-demo/screenshot',
+            mimeType: 'image/svg+xml',
+            text: '<svg xmlns="http://www.w3.org/2000/svg"></svg>',
+          },
+        ],
+      },
+    })
+
+    await new Promise((resolve) => setTimeout(resolve, 75))
+    const expiredResponse = await postJson(state.url, {
+      jsonrpc: '2.0',
+      id: 64,
+      method: 'resources/read',
+      params: {
+        uri: 'arcade://preview/captures/capture-demo/screenshot',
+      },
+    })
+    expect(expiredResponse.status).toBe(200)
+    await expect(expiredResponse.json()).resolves.toEqual({
+      jsonrpc: '2.0',
+      id: 64,
+      error: {
+        code: -32002,
+        message:
+          'Desktop Arcade MCP resource "arcade://preview/captures/capture-demo/screenshot" is unavailable because the Preview capture does not exist or has expired.',
+        data: {
+          code: 'resource-not-found',
+          resourceUri: 'arcade://preview/captures/capture-demo/screenshot',
+        },
+      },
+    })
+    expect(capturePreviewEvidence).toHaveBeenCalledWith({
+      pageId: 'page02',
+      viewportSize: 'MD',
+      layers: ['screenshot', 'frame'],
+      screenshotScope: 'region',
+      target: {
+        role: 'button',
+        name: 'Continue',
       },
     })
   })
@@ -561,7 +813,7 @@ describe('desktopMcpServer', () => {
       'If `apply_changes` returns `project-unavailable`, wait for an active Desktop Arcade window'
     )
     expect(operatingGuidePayload.result.contents[0].text).toContain(
-      '`capture_preview_evidence` still returns `not-yet-implemented`'
+      'Baseline Preview capture currently supports `screenshot` and `frame` layers'
     )
 
     const authoringGuideResponse = await postJson(state.url, {
@@ -648,19 +900,20 @@ describe('desktopMcpServer', () => {
       stableDesktopResourceReads: 'available',
       projectResourceReads: 'available when an active project reader is connected',
       toolExecution: {
-        capture_preview_evidence: 'not-yet-implemented',
+        capture_preview_evidence:
+          'available when an active preview capture bridge is connected',
         apply_changes: 'available when an active project writer is connected',
       },
       captureLayers: {
-        screenshot: 'not-yet-implemented',
+        screenshot: 'available',
         accessibility: 'not-yet-implemented',
         dom_layout_style: 'not-yet-implemented',
-        frame: 'not-yet-implemented',
+        frame: 'available',
       },
       screenshotScopes: {
-        viewport: 'not-yet-implemented',
-        full_page: 'not-yet-implemented',
-        region: 'not-yet-implemented',
+        viewport: 'available',
+        full_page: 'available',
+        region: 'available',
       },
       interactionActions: {
         click: 'not-yet-implemented',
@@ -672,9 +925,12 @@ describe('desktopMcpServer', () => {
       },
     })
     expect(capabilities.implementationStatus.previewEvidenceUriTemplates).toMatchObject({
-      'arcade://preview/captures/{captureId}/manifest': 'not-yet-implemented',
-      'arcade://preview/captures/{captureId}/screenshot': 'not-yet-implemented',
-      'arcade://preview/captures/{captureId}/frame': 'not-yet-implemented',
+      'arcade://preview/captures/{captureId}/manifest':
+        'available after a successful capture until the capture expires',
+      'arcade://preview/captures/{captureId}/screenshot':
+        'available after a successful capture until the capture expires',
+      'arcade://preview/captures/{captureId}/frame':
+        'available after a successful capture until the capture expires',
       'arcade://preview/captures/{captureId}/accessibility': 'not-yet-implemented',
       'arcade://preview/captures/{captureId}/dom-layout-style': 'not-yet-implemented',
     })

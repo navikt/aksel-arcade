@@ -18,6 +18,10 @@ const ROUTE_DESKTOP_MCP_APPLY_CHANGES_REQUEST_CHANNEL =
   'aksel-arcade:route-desktop-mcp-apply-changes-request'
 const ROUTE_DESKTOP_MCP_APPLY_CHANGES_RESPONSE_CHANNEL =
   'aksel-arcade:route-desktop-mcp-apply-changes-response'
+const ROUTE_DESKTOP_MCP_PREVIEW_CAPTURE_REQUEST_CHANNEL =
+  'aksel-arcade:route-desktop-mcp-preview-capture-request'
+const ROUTE_DESKTOP_MCP_PREVIEW_CAPTURE_RESPONSE_CHANNEL =
+  'aksel-arcade:route-desktop-mcp-preview-capture-response'
 const DEFAULT_RENDERER_URL = 'http://127.0.0.1:5173/aksel-arcade/'
 const DIST_DIR = path.resolve(__dirname, '..', 'dist-desktop')
 const DESKTOP_RENDERER_PROTOCOL = 'aksel-arcade'
@@ -27,12 +31,14 @@ const DESKTOP_RENDERER_URL = `${DESKTOP_RENDERER_ORIGIN}/index.html`
 const AGENT_TRANSPORT_ROUTE_TIMEOUT_MS = 5000
 const DESKTOP_MCP_PROJECT_RESOURCE_ROUTE_TIMEOUT_MS = 5000
 const DESKTOP_MCP_APPLY_CHANGES_ROUTE_TIMEOUT_MS = 5000
+const DESKTOP_MCP_PREVIEW_CAPTURE_ROUTE_TIMEOUT_MS = 30000
 const agentLoopbackTransport = createAgentLoopbackJsonRpcTransport({
   routeRequest: routeAgentTransportRequest,
 })
 const desktopMcpServer = createDesktopMcpServer({
   readProjectResource: routeDesktopMcpProjectResourceRead,
   applyChanges: routeDesktopMcpApplyChanges,
+  capturePreviewEvidence: routeDesktopMcpPreviewCapture,
 })
 let activeMainWindow = null
 let nextAgentTransportRouteRequestId = 0
@@ -41,6 +47,8 @@ let nextDesktopMcpProjectResourceRequestId = 0
 const pendingDesktopMcpProjectResourceRequests = new Map()
 let nextDesktopMcpApplyChangesRequestId = 0
 const pendingDesktopMcpApplyChangesRequests = new Map()
+let nextDesktopMcpPreviewCaptureRequestId = 0
+const pendingDesktopMcpPreviewCaptureRequests = new Map()
 let desktopRendererProtocolRegistered = false
 const DESKTOP_ARCADE_CAPABILITIES = Object.freeze({
   surface: 'desktop',
@@ -97,6 +105,10 @@ const registerDesktopIpc = () => {
     ROUTE_DESKTOP_MCP_APPLY_CHANGES_RESPONSE_CHANNEL,
     handleDesktopMcpApplyChangesResponse
   )
+  ipcMain.on(
+    ROUTE_DESKTOP_MCP_PREVIEW_CAPTURE_RESPONSE_CHANNEL,
+    handleDesktopMcpPreviewCaptureResponse
+  )
 }
 
 const removeDesktopIpc = () => {
@@ -110,6 +122,10 @@ const removeDesktopIpc = () => {
     handleDesktopMcpProjectResourceResponse
   )
   ipcMain.off(ROUTE_DESKTOP_MCP_APPLY_CHANGES_RESPONSE_CHANNEL, handleDesktopMcpApplyChangesResponse)
+  ipcMain.off(
+    ROUTE_DESKTOP_MCP_PREVIEW_CAPTURE_RESPONSE_CHANNEL,
+    handleDesktopMcpPreviewCaptureResponse
+  )
 }
 
 const registerDesktopRendererProtocol = () => {
@@ -290,6 +306,54 @@ function routeDesktopMcpApplyChanges(request) {
   })
 }
 
+function routeDesktopMcpPreviewCapture(request) {
+  const targetWindow = getDesktopMcpProjectResourceWindow()
+  if (!targetWindow) {
+    return Promise.resolve(
+      createDesktopMcpPreviewCaptureFailure(
+        'project-unavailable',
+        'Desktop Arcade MCP capture_preview_evidence is unavailable because no renderer window is available.'
+      )
+    )
+  }
+
+  const requestId = `desktop-mcp-preview-capture-${++nextDesktopMcpPreviewCaptureRequestId}`
+
+  return new Promise((resolve) => {
+    const timeout = setTimeout(() => {
+      pendingDesktopMcpPreviewCaptureRequests.delete(requestId)
+      resolve(
+        createDesktopMcpPreviewCaptureFailure(
+          'render-timeout',
+          'Desktop Arcade MCP capture_preview_evidence timed out before the renderer responded.'
+        )
+      )
+    }, DESKTOP_MCP_PREVIEW_CAPTURE_ROUTE_TIMEOUT_MS)
+
+    pendingDesktopMcpPreviewCaptureRequests.set(requestId, {
+      resolve,
+      timeout,
+      webContentsId: targetWindow.webContents.id,
+    })
+
+    try {
+      targetWindow.webContents.send(ROUTE_DESKTOP_MCP_PREVIEW_CAPTURE_REQUEST_CHANNEL, {
+        requestId,
+        ...request,
+      })
+    } catch {
+      pendingDesktopMcpPreviewCaptureRequests.delete(requestId)
+      clearTimeout(timeout)
+      resolve(
+        createDesktopMcpPreviewCaptureFailure(
+          'project-unavailable',
+          'Desktop Arcade MCP capture_preview_evidence is unavailable because the renderer window is no longer reachable.'
+        )
+      )
+    }
+  })
+}
+
 function handleAgentTransportRouteResponse(event, payload) {
   if (!isRecord(payload) || typeof payload.requestId !== 'string') {
     return
@@ -371,6 +435,32 @@ function handleDesktopMcpApplyChangesResponse(event, payload) {
   pendingRequest.resolve(payload.response)
 }
 
+function handleDesktopMcpPreviewCaptureResponse(event, payload) {
+  if (!isRecord(payload) || typeof payload.requestId !== 'string') {
+    return
+  }
+
+  const pendingRequest = pendingDesktopMcpPreviewCaptureRequests.get(payload.requestId)
+  if (!pendingRequest || pendingRequest.webContentsId !== event.sender.id) {
+    return
+  }
+
+  pendingDesktopMcpPreviewCaptureRequests.delete(payload.requestId)
+  clearTimeout(pendingRequest.timeout)
+
+  if (!isDesktopMcpPreviewCaptureResult(payload.response)) {
+    pendingRequest.resolve(
+      createDesktopMcpPreviewCaptureFailure(
+        'project-unavailable',
+        'Desktop Arcade MCP capture_preview_evidence is unavailable because the renderer returned an invalid response.'
+      )
+    )
+    return
+  }
+
+  pendingRequest.resolve(payload.response)
+}
+
 const getAgentTransportWindow = () => {
   if (activeMainWindow && !activeMainWindow.isDestroyed()) {
     return activeMainWindow
@@ -411,6 +501,14 @@ const resolvePendingDesktopMcpApplyChangesRequests = (responseFactory) => {
   }
 }
 
+const resolvePendingDesktopMcpPreviewCaptureRequests = (responseFactory) => {
+  for (const [requestId, pendingRequest] of pendingDesktopMcpPreviewCaptureRequests) {
+    pendingDesktopMcpPreviewCaptureRequests.delete(requestId)
+    clearTimeout(pendingRequest.timeout)
+    pendingRequest.resolve(responseFactory(pendingRequest))
+  }
+}
+
 const createAgentTransportRouteErrorResponse = (id, jsonRpcCode, code, message) => ({
   jsonrpc: '2.0',
   id: isJsonRpcId(id) ? id : null,
@@ -431,6 +529,13 @@ const createDesktopMcpProjectResourceFailure = (code, resourceUri, message) => (
 })
 
 const createDesktopMcpApplyChangesFailure = (code, message, extras = {}) => ({
+  ok: false,
+  code,
+  message,
+  ...extras,
+})
+
+const createDesktopMcpPreviewCaptureFailure = (code, message, extras = {}) => ({
   ok: false,
   code,
   message,
@@ -573,6 +678,12 @@ const createWindow = async () => {
         'Desktop Arcade MCP apply_changes is unavailable because the renderer window closed.'
       )
     )
+    resolvePendingDesktopMcpPreviewCaptureRequests(() =>
+      createDesktopMcpPreviewCaptureFailure(
+        'project-unavailable',
+        'Desktop Arcade MCP capture_preview_evidence is unavailable because the renderer window closed.'
+      )
+    )
   })
 
   mainWindow.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
@@ -637,6 +748,12 @@ app.on('will-quit', () => {
     createDesktopMcpApplyChangesFailure(
       'project-unavailable',
       'Desktop Arcade MCP apply_changes is unavailable because the renderer is shutting down.'
+    )
+  )
+  resolvePendingDesktopMcpPreviewCaptureRequests(() =>
+    createDesktopMcpPreviewCaptureFailure(
+      'project-unavailable',
+      'Desktop Arcade MCP capture_preview_evidence is unavailable because the renderer is shutting down.'
     )
   )
   removeDesktopIpc()
@@ -728,5 +845,61 @@ const isDesktopMcpApplyChangesResult = (value) => {
     typeof value.expectedProjectRevision === 'string') &&
     (value.currentProjectRevision === undefined ||
     typeof value.currentProjectRevision === 'string')
+  )
+}
+
+const isDesktopMcpPreviewCaptureResult = (value) => {
+  if (!isRecord(value) || typeof value.ok !== 'boolean') {
+    return false
+  }
+
+  if (value.ok) {
+    return (
+      typeof value.summary === 'string' &&
+      value.summary.trim().length > 0 &&
+      typeof value.captureId === 'string' &&
+      value.captureId.trim().length > 0 &&
+      typeof value.manifestResourceUri === 'string' &&
+      value.manifestResourceUri.trim().length > 0 &&
+      Array.isArray(value.producedResources) &&
+      value.producedResources.every((resourceUri) => typeof resourceUri === 'string') &&
+      isRecord(value.page) &&
+      typeof value.page.id === 'string' &&
+      typeof value.page.name === 'string' &&
+      Array.isArray(value.requestedLayers) &&
+      value.requestedLayers.every((layer) => typeof layer === 'string') &&
+      Array.isArray(value.producedLayers) &&
+      value.producedLayers.every((layer) => typeof layer === 'string') &&
+      isRecord(value.layerResources) &&
+      (value.layerResources.screenshot === undefined ||
+        typeof value.layerResources.screenshot === 'string') &&
+      (value.layerResources.frame === undefined ||
+        typeof value.layerResources.frame === 'string') &&
+      Array.isArray(value.resources) &&
+      value.resources.every(
+        (resource) =>
+          isRecord(resource) &&
+          typeof resource.uri === 'string' &&
+          typeof resource.mimeType === 'string' &&
+          typeof resource.text === 'string'
+      ) &&
+      isRecord(value.safeActivity) &&
+      value.safeActivity.toolName === 'capture_preview_evidence' &&
+      typeof value.safeActivity.timestamp === 'string' &&
+      (value.safeActivity.operationTypes === undefined ||
+        (Array.isArray(value.safeActivity.operationTypes) &&
+          value.safeActivity.operationTypes.every((operationType) => typeof operationType === 'string')))
+    )
+  }
+
+  return (
+    (value.code === 'project-unavailable' ||
+      value.code === 'invalid-page-id' ||
+      value.code === 'invalid-capture-target' ||
+      value.code === 'render-timeout' ||
+      value.code === 'render-failed') &&
+    typeof value.message === 'string' &&
+    value.message.trim().length > 0 &&
+    (value.manifestResourceUri === undefined || typeof value.manifestResourceUri === 'string')
   )
 }

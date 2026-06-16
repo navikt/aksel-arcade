@@ -155,8 +155,8 @@
       postMessageToParent,
     } = window.sandboxMessaging;
     const {
+      capturePreviewEvidenceSnapshot,
       PREVIEW_EVIDENCE_ROOT_SELECTOR,
-      serializePreviewEvidence,
     } = window.previewEvidenceUtils;
 
     // React and Aksel are loaded from the pre-bundled sandbox runtime.
@@ -209,7 +209,7 @@
 
     // Load Aksel + React - detect environment (Vite dev server runs on port 5173)
     const isDev = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') && window.location.port === '5173';
-    
+
     console.log(`🔧 Environment: ${isDev ? 'Development' : 'Production'}`);
     
     // Function to load pre-bundled sandbox (production)
@@ -515,32 +515,80 @@
         return;
       }
 
-      try {
-        const root = document.querySelector(PREVIEW_EVIDENCE_ROOT_SELECTOR);
-        if (!root) {
+      const expectedPageId =
+        typeof payload?.expectedPageId === 'string' && payload.expectedPageId.length > 0
+          ? payload.expectedPageId
+          : null;
+      const layers = Array.isArray(payload?.layers) ? payload.layers : undefined;
+      const screenshotScope =
+        typeof payload?.screenshotScope === 'string' ? payload.screenshotScope : undefined;
+      const viewportWidth =
+        typeof payload?.viewportWidth === 'number' ? payload.viewportWidth : undefined;
+      const viewportHeight =
+        typeof payload?.viewportHeight === 'number' ? payload.viewportHeight : undefined;
+      const target =
+        payload?.target && typeof payload.target === 'object' ? payload.target : undefined;
+      const maxFrames = 30;
+
+      const captureWhenReady = (remainingFrames = maxFrames) => {
+        if (expectedPageId && getCurrentPreviewPageId() !== expectedPageId) {
+          if (remainingFrames <= 0) {
+            sendPreviewEvidenceResult(requestId, {
+              ok: false,
+              error: {
+                code: 'render-timeout',
+                message: `Preview did not reach page "${expectedPageId}" before capture timed out.`,
+              },
+            });
+            return;
+          }
+
+          window.setTimeout(() => captureWhenReady(remainingFrames - 1), 16);
+          return;
+        }
+
+        try {
+          const root = document.querySelector(PREVIEW_EVIDENCE_ROOT_SELECTOR);
+          if (!root) {
+            sendPreviewEvidenceResult(requestId, {
+              ok: false,
+              error: {
+                code: 'preview-unavailable',
+                message: 'Preview root element was not found in the sandbox.',
+              },
+            });
+            return;
+          }
+
+          sendPreviewEvidenceResult(
+            requestId,
+            capturePreviewEvidenceSnapshot(
+              root,
+              {
+                layers,
+                screenshotScope,
+                viewportFallback:
+                  typeof viewportWidth === 'number' && typeof viewportHeight === 'number'
+                    ? { width: viewportWidth, height: viewportHeight }
+                    : undefined,
+                target,
+                currentPageId: getCurrentPreviewPageId(),
+              },
+              window
+            )
+          );
+        } catch (error) {
           sendPreviewEvidenceResult(requestId, {
             ok: false,
             error: {
               code: 'preview-unavailable',
-              message: 'Preview root element was not found in the sandbox.',
+              message: `Preview evidence could not be captured: ${getErrorMessage(error)}`,
             },
           });
-          return;
         }
+      };
 
-        sendPreviewEvidenceResult(requestId, {
-          ok: true,
-          evidence: serializePreviewEvidence(root, window),
-        });
-      } catch (error) {
-        sendPreviewEvidenceResult(requestId, {
-          ok: false,
-          error: {
-            code: 'preview-unavailable',
-            message: `Preview evidence could not be captured: ${getErrorMessage(error)}`,
-          },
-        });
-      }
+      captureWhenReady();
     }
 
     function sendPreviewEvidenceResult(requestId, result) {
@@ -1177,6 +1225,20 @@
     }
 
     function createRenderSuccessReporter(renderId) {
+      if (window.name === 'desktop-mcp-preview-capture') {
+        return function RenderSuccessReporter() {
+          React.useLayoutEffect(() => {
+            if (renderId === currentRenderId && failedRenderId !== renderId) {
+              sendMessage('RENDER_SUCCESS', {});
+              flushPendingNavigation();
+              console.log('✅ Render success');
+            }
+          }, []);
+
+          return null;
+        };
+      }
+
       return function RenderSuccessReporter() {
         React.useEffect(() => {
           if (renderId === currentRenderId && failedRenderId !== renderId) {

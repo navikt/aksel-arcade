@@ -92,6 +92,9 @@ export type AgentBridgeErrorCode =
   | 'unsupported-command'
   | 'payload-too-large'
   | 'preview-unavailable'
+  | 'invalid-capture-target'
+  | 'render-timeout'
+  | 'render-failed'
 
 export const AGENT_BRIDGE_PROTOCOL_VERSION = 3
 

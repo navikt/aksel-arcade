@@ -37,6 +37,7 @@ function App({
     loadFormSummaryTemplate,
     loadHooksDemo,
     previewState,
+    previewIframeRef,
     updatePreviewState,
     shareHydration,
     applySharedSnapshot,
@@ -82,6 +83,7 @@ function App({
   useDesktopMcpProjectResourceBridge({
     project,
     previewState,
+    previewIframeRef,
     theme,
     workingCopyPreferences,
     setTheme,

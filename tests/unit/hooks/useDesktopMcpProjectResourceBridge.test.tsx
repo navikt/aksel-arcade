@@ -1,4 +1,5 @@
 import { render } from '@testing-library/react'
+import { useRef } from 'react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { DesktopMcpApplyChangesHandler } from '@/services/desktopMcpApplyChangesProtocol'
 import { useDesktopMcpProjectResourceBridge } from '@/hooks/useDesktopMcpProjectResourceBridge'
@@ -49,10 +50,12 @@ const HookHarness = ({
 }) => {
   const project = createDefaultProject()
   const previewState = createDefaultPreviewState(project.viewportSize)
+  const previewIframeRef = useRef<HTMLIFrameElement | null>(null)
 
   useDesktopMcpProjectResourceBridge({
     project,
     previewState,
+    previewIframeRef,
     theme,
     workingCopyPreferences: {
       ...DEFAULT_WEB_ARCADE_WORKING_COPY_PREFERENCES,

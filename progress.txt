@@ -188,6 +188,30 @@ Verification:
 - CI=1 npm run test -- --run
 - Browser check at `http://127.0.0.1:4177/aksel-arcade/` for multi-page preview navigation to Page 2, staying on Page 2 after editing Page 1, corrected labeled compile errors during an induced broken Page 2 edit, and no console errors on a clean reload
 
+### 2026-06-16 - Issue #274: Baseline targeted Preview evidence capture
+
+Implemented:
+
+- Selected `#274` as the highest-priority open `ready-for-agent` feature from `#274`-`#280` after checking issue `#269`, `CONTEXT.md`, and the existing `progress.txt` notes; it is the first unblocked Preview-capture slice and the foundation that later evidence-layer and interaction follow-ups build on.
+- Added a dedicated Desktop MCP preview-capture bridge across `desktop/main.cjs`, `desktop/preload.cjs`, `src/services/shellCapabilities.ts`, `src/services/agentBridge.ts`, `src/App.tsx`, and `src/hooks/useDesktopMcpProjectResourceBridge.ts` so `capture_preview_evidence` routes through the active Desktop renderer without focusing the window or mutating the visible project session.
+- Added `src/services/desktopMcpPreviewCaptureProtocol.ts`, `src/services/desktopMcpPreviewCaptureAdapter.ts`, `src/services/desktopMcpPreviewCapture.ts`, and `src/services/desktopMcpPreviewCaptureSandbox.ts` to validate/default capture requests, resolve target pages from the active project, run each capture through a fresh hidden sandbox iframe, and finalize the short-lived manifest / frame / screenshot MCP resources.
+- Extended `src/services/previewEvidence.ts`, `public/sandbox.html`, and `src/types/messages.ts` so the sandbox capture path now supports baseline `screenshot` and `frame` layers, screenshot scopes `viewport` / `full_page` / `region`, accessibility-or-selector region targeting, SVG screenshot output, and structured capture failures for invalid targets or render timeouts.
+- Updated `desktop/mcpServer.cjs` to expose the live `capture_preview_evidence` capability status, keep short-lived `arcade://preview/captures/{captureId}/*` resources in an expiring in-memory store, and serve manifest/frame/screenshot reads independently from the durable `arcade://project/*` resource path.
+- Added regression coverage in `tests/unit/services/desktopMcpServer.test.ts` for routed capture success, expired capture-resource reads, and updated capability text, plus the small hook test fix in `tests/unit/hooks/useDesktopMcpProjectResourceBridge.test.tsx` for the new preview-iframe bridge dependency.
+
+Verification:
+
+- npm run typecheck
+- CI=1 npm test -- --run
+- npm run lint
+- npm run build
+- Browser/console smoke check at `http://127.0.0.1:4193/aksel-arcade/` using `npm run preview -- --host 127.0.0.1 --port 4193 --strictPort`, confirming the default preview renders and the browser console stays free of errors and warnings
+
+Next note:
+
+- `#277` should build on the existing isolated hidden-sandbox capture bridge and expiring `arcade://preview/captures/{captureId}/*` store instead of trying to inspect the human-visible preview iframe directly; the production sandbox still runs without `allow-same-origin`, so parent-side DOM scraping is the wrong architecture for later evidence layers too.
+- `capture_preview_evidence` now intentionally stops at baseline `screenshot` + `frame` resources. `accessibility` and `dom_layout_style` layers are still explicitly unimplemented and should layer onto the same manifest/store contract instead of inventing a second capture path.
+
 2026-05-23 - Issue #7: Palette groups, statuses, and docs links
 
 Selected #7 as the highest-priority ready-for-agent feature because it is unblocked by #6 and unlocks later contextual icon autocomplete (#9) and v8 chrome work (#12).
@@ -3306,3 +3330,66 @@ Verification:
 - CI=1 npm run test -- --run
 - npm run build
 - Browser/console smoke check at `http://127.0.0.1:4174/aksel-arcade/` via `npm run dev -- --host 127.0.0.1 --port 4174`, confirming the app shell and live preview render and the console stays free of warnings/errors in the clean flow
+
+### 2026-06-16 - Issue #274 follow-up: fix Desktop MCP hidden Preview capture timeout
+
+Implemented:
+
+- Investigated the reported `capture_preview_evidence({})` failure with a real Electron + MCP regression at `tests/e2e/desktop-mcp-preview-capture.spec.ts` that launches Desktop Arcade, waits for the default Preview, and calls the live MCP HTTP endpoint.
+- Confirmed the first misleading local symptom was a stale Electron process still bound to port `3846`; after clearing that, the real bug reproduced inside the hidden isolated capture sandbox.
+- Narrowed the timeout to the hidden iframe capture path in `public/sandbox.html`: the isolated render reached `RENDER_SUCCESS`, but the follow-up capture never completed because the offscreen iframe was waiting on nested `requestAnimationFrame` callbacks before collecting evidence.
+- Replaced that hidden-sandbox capture scheduling with timer-based settling (`setTimeout`-driven retries / double-settle) so Desktop Electron does not stall the capture step for an offscreen iframe before posting `PREVIEW_EVIDENCE_CAPTURED`.
+- Removed the temporary `[DEBUG-*]` route/capture instrumentation after confirming the fix, and kept the new Electron Playwright regression as the permanent seam for this exact Desktop MCP flow.
+
+Verification:
+
+- npm run type-check
+- CI=1 npm test -- --run
+- npm run lint
+- npm run build
+- npx playwright test tests/e2e/desktop-mcp-preview-capture.spec.ts --reporter=line
+
+Next note:
+
+- If a future follow-up touches isolated Preview capture timing, keep the regression at `tests/e2e/desktop-mcp-preview-capture.spec.ts` green and prefer timer-based settling over `requestAnimationFrame` inside the offscreen sandbox unless Electron behavior is revalidated.
+### 2026-06-16 - Issue #274 follow-up: stabilize default Desktop MCP Preview capture
+
+Implemented:
+
+- Fixed the remaining default `capture_preview_evidence({})` regressions reported after the initial #274 delivery.
+- Threaded the host-requested hidden-preview viewport dimensions into the sandbox capture payload and used them as a fallback in `src/services/previewEvidence.ts`, so frame metadata and SVG screenshots no longer collapse to `0x0` / `1x1` when Electron reports zero inner-window metrics in the hidden iframe path.
+- Removed the extra post-render timer chain inside `public/sandbox.html` capture execution and now capture immediately once the expected page is present; this eliminated the flaky hidden-iframe stall where fresh default captures could time out after render success but before any capture result returned.
+- Tightened the Desktop MCP Playwright regression to cover repeated default captures across multiple fresh Electron launches, so the suite now protects against both timeout flakes and zero-sized output.
+
+Verification:
+
+- npm run type-check
+- CI=1 npm test -- --run
+- npm run lint
+- npm run build
+- npx playwright test tests/e2e/desktop-mcp-preview-capture.spec.ts --reporter=line
+- Direct Electron + MCP JSON-RPC stress loop over repeated fresh launches confirmed default captures now return nonzero frame viewport metadata and matching screenshot dimensions consistently
+
+Next note:
+
+- The current default project still exposes only `page01`, so the exact "capture a non-active page without changing the visible active page" verifier step remains non-executable until a multi-page default fixture exists; keep treating that as fixture coverage, not a regression in the capture pipeline.
+
+### 2026-06-16 - PR #286 review follow-up for issue #274
+
+Fixed after review:
+
+- Screenshot evidence now preserves the actual Preview canvas backdrop instead of inheriting the transparent sandbox body. `src/services/previewEvidence.ts` resolves the capture background from the real document canvas (`body`, then `documentElement`) so Desktop MCP screenshots match the themed Preview surface.
+- Region capture targets that rely on `text`, `name`, or `label` now choose the most specific matching element instead of stopping at an ancestor like `#root` whose descendant text happens to match. This keeps targeted region crops aligned with the intended control.
+- Added focused unit coverage for both review fixes in `tests/unit/services/previewEvidence.test.ts`, including the transparent-body/html-background capture path and text-based region targeting resolving to the button-sized crop.
+
+Verification:
+
+- npm run type-check
+- CI=1 npm test -- --run
+- npm run lint
+- npm run build
+- npx playwright test tests/e2e/desktop-mcp-preview-capture.spec.ts --reporter=line
+
+Next note:
+
+- The committed `public/preview-evidence-global.js` bundle must stay in sync with `src/services/previewEvidence.ts` whenever Preview evidence serialization changes; the hidden Desktop capture sandbox executes the generated browser bundle, not the TypeScript source directly.

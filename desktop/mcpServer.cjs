@@ -9,6 +9,7 @@ const DESKTOP_MCP_TRANSPORT_LABEL = 'HTTP (MCP Streamable HTTP)'
 const DESKTOP_MCP_AUTH_DESCRIPTION = 'No token/header required.'
 const DESKTOP_MCP_PROTOCOL_VERSION = '2024-11-05'
 const MAX_MCP_BODY_BYTES = 1024 * 1024
+const DEFAULT_PREVIEW_CAPTURE_TTL_MS = 5 * 60 * 1000
 const VALID_VIEWPORT_SIZES = ['2XL', 'XL', 'LG', 'MD', 'SM', 'XS']
 const VALID_THEMES = ['light', 'dark']
 const VALID_PREVIEW_CAPTURE_LAYERS = ['screenshot', 'frame']
@@ -58,6 +59,8 @@ const CAPABILITY_V1_OMISSIONS = Object.freeze([
   'No Web Arcade MCP endpoint.',
 ])
 const PROJECT_SOURCE_PAGE_URI_PATTERN = /^arcade:\/\/project\/source\/pages\/(page\d+)\/(jsx|hooks)$/
+const PREVIEW_CAPTURE_RESOURCE_URI_PATTERN =
+  /^arcade:\/\/preview\/captures\/([a-z0-9-]+)\/(manifest|screenshot|frame)$/
 
 const MCP_TOOL_DEFINITIONS = Object.freeze([
   Object.freeze({
@@ -93,7 +96,35 @@ const MCP_TOOL_DEFINITIONS = Object.freeze([
         screenshotScope: Object.freeze({
           type: 'string',
           enum: VALID_PREVIEW_SCREENSHOT_SCOPES,
-          description: 'Optional screenshot scope for future capture implementations.',
+          description: 'Optional screenshot scope for the capture.',
+        }),
+        target: Object.freeze({
+          type: 'object',
+          additionalProperties: false,
+          properties: Object.freeze({
+            selector: Object.freeze({
+              type: 'string',
+              description: 'Preview-root-scoped CSS selector for region screenshots.',
+            }),
+            role: Object.freeze({
+              type: 'string',
+              description: 'Accessibility role filter for region screenshots.',
+            }),
+            name: Object.freeze({
+              type: 'string',
+              description: 'Accessible name filter for region screenshots.',
+            }),
+            text: Object.freeze({
+              type: 'string',
+              description: 'Visible text filter for region screenshots.',
+            }),
+            label: Object.freeze({
+              type: 'string',
+              description: 'Associated label filter for region screenshots.',
+            }),
+          }),
+          description:
+            'Optional preview-root selector or accessibility target for region screenshots.',
         }),
       }),
     }),
@@ -200,30 +231,33 @@ const MCP_STABLE_RESOURCE_DEFINITIONS = Object.freeze([
 ])
 
 const TOOL_EXECUTION_STATUS = Object.freeze({
-  capture_preview_evidence: 'not-yet-implemented',
+  capture_preview_evidence: 'available when an active preview capture bridge is connected',
   apply_changes: 'available when an active project writer is connected',
 })
 
-const PREVIEW_EVIDENCE_URI_TEMPLATE_STATUS = Object.freeze(
-  CAPABILITY_PREVIEW_EVIDENCE_URI_TEMPLATES.reduce((status, uriTemplate) => {
-    status[uriTemplate] = 'not-yet-implemented'
-    return status
-  }, {})
-)
+const PREVIEW_EVIDENCE_URI_TEMPLATE_STATUS = Object.freeze({
+  'arcade://preview/captures/{captureId}/manifest':
+    'available after a successful capture until the capture expires',
+  'arcade://preview/captures/{captureId}/screenshot':
+    'available after a successful capture until the capture expires',
+  'arcade://preview/captures/{captureId}/frame':
+    'available after a successful capture until the capture expires',
+  'arcade://preview/captures/{captureId}/accessibility': 'not-yet-implemented',
+  'arcade://preview/captures/{captureId}/dom-layout-style': 'not-yet-implemented',
+})
 
-const CAPTURE_LAYER_STATUS = Object.freeze(
-  CAPABILITY_PREVIEW_CAPTURE_LAYERS.reduce((status, layer) => {
-    status[layer] = 'not-yet-implemented'
-    return status
-  }, {})
-)
+const CAPTURE_LAYER_STATUS = Object.freeze({
+  screenshot: 'available',
+  accessibility: 'not-yet-implemented',
+  dom_layout_style: 'not-yet-implemented',
+  frame: 'available',
+})
 
-const SCREENSHOT_SCOPE_STATUS = Object.freeze(
-  VALID_PREVIEW_SCREENSHOT_SCOPES.reduce((status, scope) => {
-    status[scope] = 'not-yet-implemented'
-    return status
-  }, {})
-)
+const SCREENSHOT_SCOPE_STATUS = Object.freeze({
+  viewport: 'available',
+  full_page: 'available',
+  region: 'available',
+})
 
 const INTERACTION_ACTION_STATUS = Object.freeze(
   CAPABILITY_PREVIEW_INTERACTION_ACTIONS.reduce((status, action) => {
@@ -238,10 +272,13 @@ const createDesktopMcpServer = ({
   path = DESKTOP_MCP_PATH,
   readProjectResource = createProjectUnavailableResourceResult,
   applyChanges = createProjectUnavailableApplyChangesResult,
+  capturePreviewEvidence = createProjectUnavailableCapturePreviewResult,
+  previewCaptureTtlMs = DEFAULT_PREVIEW_CAPTURE_TTL_MS,
 } = {}) => {
   let activeServer = null
   let startOperation = null
   let lastActivity = null
+  const previewCaptureStore = createPreviewCaptureStore({ ttlMs: previewCaptureTtlMs })
   let availability = {
     status: 'unavailable',
     reason: 'Desktop Arcade MCP has not started yet.',
@@ -283,6 +320,7 @@ const createDesktopMcpServer = ({
         host,
         path,
         port: getPort(),
+        previewCaptureStore,
         readProjectResource,
         applyChanges: async (requestPayload) => {
           const applyChangesResult = await applyChanges(requestPayload)
@@ -290,6 +328,14 @@ const createDesktopMcpServer = ({
             lastActivity = applyChangesResult.safeActivity
           }
           return applyChangesResult
+        },
+        capturePreviewEvidence: async (requestPayload) => {
+          const captureResult = await capturePreviewEvidence(requestPayload)
+          if (isCapturePreviewResult(captureResult) && captureResult.ok) {
+            previewCaptureStore.store(captureResult)
+            lastActivity = captureResult.safeActivity
+          }
+          return captureResult
         },
       })
     })
@@ -353,7 +399,7 @@ const createDesktopMcpServer = ({
 const handleDesktopMcpRequest = (
   request,
   response,
-  { host, path, port, readProjectResource, applyChanges }
+  { host, path, port, previewCaptureStore, readProjectResource, applyChanges, capturePreviewEvidence }
 ) => {
   const requestUrl = new URL(request.url ?? '/', `http://${host}:${port}`)
   if (requestUrl.pathname !== path) {
@@ -379,7 +425,12 @@ const handleDesktopMcpRequest = (
     return
   }
 
-  void routeDesktopMcpRequest(request, response, { readProjectResource, applyChanges }).catch((error) => {
+  void routeDesktopMcpRequest(request, response, {
+    previewCaptureStore,
+    readProjectResource,
+    applyChanges,
+    capturePreviewEvidence,
+  }).catch((error) => {
     if (response.writableEnded) {
       return
     }
@@ -432,7 +483,11 @@ const sendNoContent = (response, statusCode = 204) => {
   response.end()
 }
 
-const routeDesktopMcpRequest = async (request, response, { readProjectResource, applyChanges }) => {
+const routeDesktopMcpRequest = async (
+  request,
+  response,
+  { previewCaptureStore, readProjectResource, applyChanges, capturePreviewEvidence }
+) => {
   let bodyText
   try {
     bodyText = await readRequestBody(request)
@@ -473,13 +528,18 @@ const routeDesktopMcpRequest = async (request, response, { readProjectResource, 
     return
   }
 
-  await routeDesktopMcpJsonRpcRequest(payload, response, { readProjectResource, applyChanges })
+  await routeDesktopMcpJsonRpcRequest(payload, response, {
+    previewCaptureStore,
+    readProjectResource,
+    applyChanges,
+    capturePreviewEvidence,
+  })
 }
 
 const routeDesktopMcpJsonRpcRequest = async (
   payload,
   response,
-  { readProjectResource, applyChanges }
+  { previewCaptureStore, readProjectResource, applyChanges, capturePreviewEvidence }
 ) => {
   switch (payload.method) {
     case 'initialize':
@@ -495,10 +555,13 @@ const routeDesktopMcpJsonRpcRequest = async (
       routeResourcesListRequest(payload, response)
       return
     case 'tools/call':
-      await routeToolsCallRequest(payload, response, applyChanges)
+      await routeToolsCallRequest(payload, response, { applyChanges, capturePreviewEvidence })
       return
     case 'resources/read':
-      await routeResourcesReadRequest(payload, response, readProjectResource)
+      await routeResourcesReadRequest(payload, response, {
+        previewCaptureStore,
+        readProjectResource,
+      })
       return
     default:
       sendJsonRpcError(response, {
@@ -611,7 +674,11 @@ const routeResourcesListRequest = (payload, response) => {
   })
 }
 
-const routeToolsCallRequest = async (payload, response, applyChanges) => {
+const routeToolsCallRequest = async (
+  payload,
+  response,
+  { applyChanges, capturePreviewEvidence }
+) => {
   if (!isJsonRpcResponseId(payload.id)) {
     sendJsonRpcError(response, {
       httpStatus: 400,
@@ -683,20 +750,44 @@ const routeToolsCallRequest = async (payload, response, applyChanges) => {
     return
   }
 
-  if (toolDefinition.name === 'capture_preview_evidence') {
-    sendJson(response, 200, {
-      jsonrpc: '2.0',
-      id: payload.id,
-      result: createToolExecutionErrorResult(
-        toolDefinition.name,
-        'not-yet-implemented',
-        `Desktop Arcade MCP tool "${toolDefinition.name}" is not implemented yet.`
-      ),
-    })
-    return
-  }
-
   try {
+    if (toolDefinition.name === 'capture_preview_evidence') {
+      const captureResult = await capturePreviewEvidence(argumentsPayload)
+      if (!isCapturePreviewResult(captureResult)) {
+        sendJson(response, 200, {
+          jsonrpc: '2.0',
+          id: payload.id,
+          result: createToolExecutionErrorResult(
+            toolDefinition.name,
+            'project-unavailable',
+            'Desktop Arcade MCP capture_preview_evidence returned an invalid renderer response.'
+          ),
+        })
+        return
+      }
+
+      sendJson(response, 200, {
+        jsonrpc: '2.0',
+        id: payload.id,
+        result: captureResult.ok
+          ? createToolExecutionSuccessResult(
+              `Captured Preview evidence: ${captureResult.summary}`,
+              toPublicCapturePreviewResult(captureResult)
+            )
+          : createToolExecutionErrorResult(
+              toolDefinition.name,
+              captureResult.code,
+              captureResult.message,
+              {
+                ...(captureResult.manifestResourceUri !== undefined
+                  ? { manifestResourceUri: captureResult.manifestResourceUri }
+                  : {}),
+              }
+            ),
+      })
+      return
+    }
+
     const applyChangesResult = await applyChanges(argumentsPayload)
     if (!isApplyChangesResult(applyChangesResult)) {
       sendJson(response, 200, {
@@ -754,7 +845,11 @@ const routeToolsCallRequest = async (payload, response, applyChanges) => {
   }
 }
 
-const routeResourcesReadRequest = async (payload, response, readProjectResource) => {
+const routeResourcesReadRequest = async (
+  payload,
+  response,
+  { previewCaptureStore, readProjectResource }
+) => {
   if (!isJsonRpcResponseId(payload.id)) {
     sendJsonRpcError(response, {
       httpStatus: 400,
@@ -782,6 +877,38 @@ const routeResourcesReadRequest = async (payload, response, readProjectResource)
       message: 'Desktop Arcade MCP resources/read params.uri must be a non-empty string.',
       data: {
         code: 'invalid-resource-uri',
+      },
+    })
+    return
+  }
+
+  if (isPreviewCaptureResourceUri(params.uri)) {
+    const resource = previewCaptureStore.read(params.uri)
+    if (!resource) {
+      sendJsonRpcError(response, {
+        id: payload.id,
+        code: -32002,
+        message:
+          `Desktop Arcade MCP resource "${params.uri}" is unavailable because the Preview capture does not exist or has expired.`,
+        data: {
+          code: 'resource-not-found',
+          resourceUri: params.uri,
+        },
+      })
+      return
+    }
+
+    sendJson(response, 200, {
+      jsonrpc: '2.0',
+      id: payload.id,
+      result: {
+        contents: [
+          {
+            uri: resource.uri,
+            mimeType: resource.mimeType,
+            text: resource.text,
+          },
+        ],
       },
     })
     return
@@ -903,6 +1030,8 @@ const isKnownProjectResourceUri = (uri) =>
   uri === 'arcade://project/source/global/hooks' ||
   PROJECT_SOURCE_PAGE_URI_PATTERN.test(uri)
 
+const isPreviewCaptureResourceUri = (uri) => PREVIEW_CAPTURE_RESOURCE_URI_PATTERN.test(uri)
+
 const readStrictParamsObject = (payload, { allowedKeys, id, method, response }) => {
   const params = payload.params === undefined ? {} : payload.params
   if (!isPlainObject(params)) {
@@ -945,6 +1074,7 @@ const validateCapturePreviewEvidenceArguments = (argumentsPayload) => {
     'theme',
     'layers',
     'screenshotScope',
+    'target',
   ])
   if (extraKeys.length > 0) {
     return `capture_preview_evidence arguments contain unsupported fields: ${extraKeys.join(
@@ -1002,6 +1132,48 @@ const validateCapturePreviewEvidenceArguments = (argumentsPayload) => {
     return `capture_preview_evidence screenshotScope must be one of ${VALID_PREVIEW_SCREENSHOT_SCOPES.join(
       ', '
     )}.`
+  }
+
+  if ('target' in argumentsPayload) {
+    if (!isPlainObject(argumentsPayload.target)) {
+      return 'capture_preview_evidence target must be an object when provided.'
+    }
+
+    const extraTargetKeys = getUnexpectedKeys(argumentsPayload.target, [
+      'selector',
+      'role',
+      'name',
+      'text',
+      'label',
+    ])
+    if (extraTargetKeys.length > 0) {
+      return `capture_preview_evidence target contains unsupported fields: ${extraTargetKeys.join(
+        ', '
+      )}.`
+    }
+
+    const targetFields = ['selector', 'role', 'name', 'text', 'label'].filter((key) => {
+      const value = argumentsPayload.target[key]
+      return value !== undefined
+    })
+    if (targetFields.length === 0) {
+      return 'capture_preview_evidence target must include at least one selector or accessibility field.'
+    }
+
+    for (const key of targetFields) {
+      const value = argumentsPayload.target[key]
+      if (typeof value !== 'string' || value.trim().length === 0) {
+        return `capture_preview_evidence target.${key} must be a non-empty string when provided.`
+      }
+    }
+  }
+
+  if (argumentsPayload.screenshotScope === 'region' && argumentsPayload.target === undefined) {
+    return 'capture_preview_evidence screenshotScope "region" requires a target.'
+  }
+
+  if (argumentsPayload.screenshotScope !== 'region' && argumentsPayload.target !== undefined) {
+    return 'capture_preview_evidence target may be provided only when screenshotScope is "region".'
   }
 
   return null
@@ -1164,7 +1336,7 @@ const createDesktopStableResourceText = (uri) => {
         '- `capture_preview_evidence({ pageId })` is the normal autonomous inspection path for pages and targeted visual states.',
         '- Saved Preview preferences live in `arcade://project/preview-context`; capture-only overrides must not mutate them.',
         '- If `apply_changes` returns `project-unavailable`, wait for an active Desktop Arcade window instead of falling back to repository or filesystem edits.',
-        '- If `capture_preview_evidence` still returns `not-yet-implemented`, continue with manifest/source/diagnostics reads and `apply_changes`; do not fall back to repository or filesystem edits for missing Preview evidence.',
+        '- Baseline Preview capture currently supports `screenshot` and `frame` layers, with `viewport`, `full_page`, and `region` screenshot scopes. Later semantic layers may still be unavailable.',
         '- When state is unclear, re-read the manifest before making another durable change.',
       ].join('\n')
     case 'arcade://desktop/authoring-guide':
@@ -1230,6 +1402,47 @@ const createProjectUnavailableApplyChangesResult = async () => ({
   message:
     'Desktop Arcade MCP apply_changes is unavailable because no active project writer is connected.',
 })
+
+const createProjectUnavailableCapturePreviewResult = async () => ({
+  ok: false,
+  code: 'project-unavailable',
+  message:
+    'Desktop Arcade MCP capture_preview_evidence is unavailable because no active preview capture bridge is connected.',
+})
+
+const createPreviewCaptureStore = ({ ttlMs }) => {
+  const captures = new Map()
+
+  const cleanupExpired = () => {
+    const now = Date.now()
+    for (const [captureId, capture] of captures) {
+      if (capture.expiresAt <= now) {
+        captures.delete(captureId)
+      }
+    }
+  }
+
+  return {
+    store(captureResult) {
+      cleanupExpired()
+      captures.set(captureResult.captureId, {
+        expiresAt: Date.now() + ttlMs,
+        resources: new Map(captureResult.resources.map((resource) => [resource.uri, resource])),
+      })
+    },
+    read(resourceUri) {
+      cleanupExpired()
+      const match = resourceUri.match(PREVIEW_CAPTURE_RESOURCE_URI_PATTERN)
+      if (!match) {
+        return null
+      }
+
+      const [, captureId] = match
+      const capture = captures.get(captureId)
+      return capture?.resources.get(resourceUri) ?? null
+    },
+  }
+}
 
 const formatServerErrorReason = (error, { host, port }) => {
   if (isPlainObject(error) && error.code === 'EADDRINUSE') {
@@ -1319,6 +1532,61 @@ const isProjectResourceReadResult = (value, expectedUri) =>
         value.code === 'invalid-resource-uri') &&
       typeof value.message === 'string' &&
       value.message.trim().length > 0)
+
+const isCapturePreviewResult = (value) => {
+  if (!isPlainObject(value) || typeof value.ok !== 'boolean') {
+    return false
+  }
+
+  if (value.ok) {
+    return (
+      typeof value.summary === 'string' &&
+      typeof value.captureId === 'string' &&
+      typeof value.manifestResourceUri === 'string' &&
+      Array.isArray(value.producedResources) &&
+      Array.isArray(value.requestedLayers) &&
+      Array.isArray(value.producedLayers) &&
+      isPlainObject(value.page) &&
+      typeof value.page.id === 'string' &&
+      typeof value.page.name === 'string' &&
+      isPlainObject(value.layerResources) &&
+      Array.isArray(value.resources) &&
+      value.resources.every(
+        (resource) =>
+          isPlainObject(resource) &&
+          typeof resource.uri === 'string' &&
+          typeof resource.mimeType === 'string' &&
+          typeof resource.text === 'string'
+      ) &&
+      isPlainObject(value.safeActivity) &&
+      value.safeActivity.toolName === 'capture_preview_evidence' &&
+      typeof value.safeActivity.timestamp === 'string'
+    )
+  }
+
+  return (
+    (value.code === 'project-unavailable' ||
+      value.code === 'invalid-page-id' ||
+      value.code === 'invalid-capture-target' ||
+      value.code === 'render-timeout' ||
+      value.code === 'render-failed') &&
+    typeof value.message === 'string' &&
+    (value.manifestResourceUri === undefined || typeof value.manifestResourceUri === 'string')
+  )
+}
+
+const toPublicCapturePreviewResult = (captureResult) => ({
+  ok: true,
+  summary: captureResult.summary,
+  captureId: captureResult.captureId,
+  manifestResourceUri: captureResult.manifestResourceUri,
+  producedResources: captureResult.producedResources,
+  page: captureResult.page,
+  requestedLayers: captureResult.requestedLayers,
+  producedLayers: captureResult.producedLayers,
+  layerResources: captureResult.layerResources,
+  safeActivity: captureResult.safeActivity,
+})
 
 const isApplyChangesResult = (value) =>
   isPlainObject(value) &&

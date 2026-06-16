@@ -32,7 +32,7 @@ export type DesktopMcpApplyChangesErrorCode =
 
 export interface DesktopMcpLastActivity {
   toolName: 'apply_changes' | 'capture_preview_evidence'
-  operationTypes?: Array<DesktopMcpApplyChangesOperation['type']>
+  operationTypes?: string[]
   timestamp: string
 }
 
