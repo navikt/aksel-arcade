@@ -945,7 +945,7 @@ const resolvePreviewCaptureTarget = (
     if (!element || isExcludedElement(element)) {
       throw createTaggedPreviewCaptureError(
         'invalid-capture-target',
-        `Preview region selector "${target.selector}" did not match a preview element.`
+        'Preview region selector target did not match a preview element.'
       )
     }
 
@@ -1068,7 +1068,7 @@ const executePreviewSelectInteraction = async (
     if (!option) {
       throw createTaggedPreviewCaptureError(
         'invalid-capture-target',
-        `Select interaction value "${step.value}" did not match an available option.`
+        'Select interaction value did not match an available option.'
       )
     }
     setFormControlValue(control, step.value)
@@ -1179,7 +1179,7 @@ const executePreviewWaitForInteraction = async (
     }
     throw createTaggedPreviewCaptureError(
       'render-timeout',
-      `Preview waitFor text "${step.text}" timed out before the state appeared.`
+      'Preview waitFor text matcher timed out before the state appeared.'
     )
   }
 
@@ -1199,10 +1199,9 @@ const executePreviewWaitForInteraction = async (
     await waitForPreviewInteractionTick(frameWindow)
   }
 
-  const targetDescription = describePreviewCaptureTarget(step.target)
   throw createTaggedPreviewCaptureError(
     'render-timeout',
-    `Preview waitFor target ${targetDescription} timed out before the state appeared.`
+    `Preview waitFor ${describePreviewCaptureTargetMatcher(step.target)} timed out before the state appeared.`
   )
 }
 
@@ -1215,7 +1214,7 @@ const resolvePreviewInteractionTarget = (
   if (!resolved) {
     throw createTaggedPreviewCaptureError(
       'invalid-capture-target',
-      `Preview interaction target ${describePreviewCaptureTarget(target)} did not match a Preview element.`
+      `Preview interaction ${describePreviewCaptureTargetMatcher(target)} did not match a Preview element.`
     )
   }
   return resolved
@@ -1330,7 +1329,7 @@ const queryPreviewTargetSelector = (root: Element, selector: string): Element | 
   } catch {
     throw createTaggedPreviewCaptureError(
       'invalid-capture-target',
-      `Preview selector "${selector}" is not a valid CSS selector.`
+      'Preview selector target is not a valid CSS selector.'
     )
   }
 }
@@ -1563,7 +1562,7 @@ const normalizePreviewInteractionKey = (key: string): string => {
 
   throw createTaggedPreviewCaptureError(
     'invalid-capture-target',
-    `Preview press key "${key}" is not supported for bounded Preview interactions.`
+    'Preview press key is not supported for bounded Preview interactions.'
   )
 }
 
@@ -1730,6 +1729,21 @@ const describePreviewCaptureTarget = (target: PreviewEvidenceCaptureTarget): str
   ]
     .filter(Boolean)
     .join(' ')
+
+const describePreviewCaptureTargetMatcher = (target: PreviewEvidenceCaptureTarget): string => {
+  if (target.selector) {
+    return 'selector target'
+  }
+
+  const parts = [
+    target.role ? 'role' : null,
+    target.name ? 'name' : null,
+    target.text ? 'text' : null,
+    target.label ? 'label' : null,
+  ].filter(Boolean)
+
+  return parts.length > 0 ? `${parts.join('+')} target` : 'target'
+}
 
 const getElementRole = (element: Element): string => {
   const explicitRole = element.getAttribute('role')

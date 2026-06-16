@@ -843,6 +843,99 @@ describe('desktopMcpServer', () => {
     expect(capturePreviewEvidence).not.toHaveBeenCalled()
   })
 
+  it('redacts raw interaction payload details from capture_preview_evidence failure responses', async () => {
+    const sentinel = 'TOPSECRET-PAYLOAD-CHECK-123'
+    const capturePreviewEvidence = vi.fn<
+      (request: Record<string, unknown>) => Promise<CapturePreviewFailure>
+    >().mockResolvedValue({
+      ok: false,
+      code: 'invalid-capture-target',
+      message: 'Preview interaction text target did not match a Preview element.',
+      currentPageId: 'page01',
+      interactions: {
+        requested: [
+          {
+            action: 'click',
+            target: {
+              text: sentinel,
+            },
+          },
+        ],
+        executed: [],
+        failedStep: {
+          index: 0,
+          step: {
+            action: 'click',
+            target: {
+              text: sentinel,
+            },
+          },
+          reason: 'Preview interaction text target did not match a Preview element.',
+        },
+      },
+    })
+    const server = createManagedServer({ port: 0, capturePreviewEvidence })
+    const state = await server.start()
+
+    const response = await postJson(state.url, {
+      jsonrpc: '2.0',
+      id: 69,
+      method: 'tools/call',
+      params: {
+        name: 'capture_preview_evidence',
+        arguments: {
+          pageId: 'page01',
+          interactions: [
+            {
+              action: 'click',
+              target: {
+                text: sentinel,
+              },
+            },
+          ],
+        },
+      },
+    })
+
+    expect(response.status).toBe(200)
+    const payload = await response.json()
+    expect(payload).toEqual({
+      jsonrpc: '2.0',
+      id: 69,
+      result: {
+        content: [
+          {
+            type: 'text',
+            text: 'Preview interaction text target did not match a Preview element.',
+          },
+        ],
+        isError: true,
+        structuredContent: {
+          code: 'invalid-capture-target',
+          toolName: 'capture_preview_evidence',
+          message: 'Preview interaction text target did not match a Preview element.',
+          interactions: {
+            requested: [
+              {
+                action: 'click',
+              },
+            ],
+            executed: [],
+            failedStep: {
+              index: 0,
+              step: {
+                action: 'click',
+              },
+              reason: 'Preview interaction text target did not match a Preview element.',
+            },
+          },
+          currentPageId: 'page01',
+        },
+      },
+    })
+    expect(JSON.stringify(payload)).not.toContain(sentinel)
+  })
+
   it('routes apply_changes through the injected project writer and preserves MCP tool-result semantics', async () => {
     const applyChanges = vi
       .fn<(request: Record<string, unknown>) => Promise<ApplyChangesResult>>()

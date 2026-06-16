@@ -1005,7 +1005,7 @@ const routeToolsCallRequest = async (
                   ? { manifestResourceUri: captureResult.manifestResourceUri }
                   : {}),
                 ...(captureResult.interactions !== undefined
-                  ? { interactions: captureResult.interactions }
+                    ? { interactions: redactCapturePreviewFailureInteractions(captureResult.interactions) }
                   : {}),
                 ...(captureResult.currentPageId !== undefined
                   ? { currentPageId: captureResult.currentPageId }
@@ -2103,6 +2103,29 @@ const toPublicCapturePreviewResult = (captureResult) => ({
   layerResources: captureResult.layerResources,
   ...(captureResult.interactions !== undefined ? { interactions: captureResult.interactions } : {}),
   safeActivity: captureResult.safeActivity,
+})
+
+const redactCapturePreviewFailureInteractions = (interactionState) => ({
+  requested: interactionState.requested.map((step) => ({
+    action: step.action,
+  })),
+  executed: interactionState.executed.map((entry) => ({
+    index: entry.index,
+    step: {
+      action: entry.step.action,
+    },
+  })),
+  ...(interactionState.failedStep !== undefined
+    ? {
+        failedStep: {
+          index: interactionState.failedStep.index,
+          step: {
+            action: interactionState.failedStep.step.action,
+          },
+          reason: interactionState.failedStep.reason,
+        },
+      }
+    : {}),
 })
 
 const isApplyChangesResult = (value) =>

@@ -328,6 +328,64 @@ describe('preview interactions', () => {
       },
     })
   })
+
+  it('redacts caller-supplied target and text payloads from failed interaction messages', async () => {
+    const sentinel = 'TOPSECRET-PAYLOAD-CHECK-123'
+    document.body.innerHTML = `
+      <div id="root">
+        <button>Only target</button>
+      </div>
+    `
+
+    const root = requireRoot()
+
+    const missingTargetResult = await runPreviewInteractionSequence(
+      root,
+      [{ action: 'click', target: { text: sentinel } }],
+      { currentPageId: 'page01' },
+      window
+    )
+
+    expect(missingTargetResult).toMatchObject({
+      ok: false,
+      error: {
+        code: 'invalid-capture-target',
+      },
+      captureMeta: {
+        interactions: {
+          failedStep: {
+            index: 0,
+          },
+        },
+      },
+    })
+    if (missingTargetResult.ok) {
+      throw new Error('Expected missing target result to fail.')
+    }
+    expect(missingTargetResult.error.message).not.toContain(sentinel)
+    expect(missingTargetResult.captureMeta?.interactions?.failedStep?.reason).not.toContain(sentinel)
+
+    const waitForTimeoutResult = await runPreviewInteractionSequence(
+      root,
+      [{ action: 'waitFor', text: sentinel, timeoutMs: 50 }],
+      { currentPageId: 'page01' },
+      window
+    )
+
+    expect(waitForTimeoutResult).toMatchObject({
+      ok: false,
+      error: {
+        code: 'render-timeout',
+      },
+    })
+    if (waitForTimeoutResult.ok) {
+      throw new Error('Expected waitFor timeout result to fail.')
+    }
+    expect(waitForTimeoutResult.error.message).not.toContain(sentinel)
+    expect(waitForTimeoutResult.captureMeta?.interactions?.failedStep?.reason).not.toContain(
+      sentinel
+    )
+  })
 })
 
 const requireRoot = (): HTMLElement => {
