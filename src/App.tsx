@@ -32,6 +32,7 @@ function App({
   const {
     project,
     updateProject,
+    replaceProjectState,
     replaceProject,
     resetToIntro,
     loadFormSummaryTemplate,
@@ -87,7 +88,7 @@ function App({
     theme,
     workingCopyPreferences,
     setTheme,
-    updateProject,
+    replaceProjectState,
     updatePreviewState,
     onDesktopMcpActivity: handleDesktopMcpActivity,
   })

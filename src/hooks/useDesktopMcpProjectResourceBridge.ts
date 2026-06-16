@@ -1,5 +1,5 @@
 import { useCallback, useLayoutEffect, useRef, type RefObject } from 'react'
-import type { ThemeMode, Project, ProjectSourceTarget } from '@/types/project'
+import type { ThemeMode, Project } from '@/types/project'
 import type { PreviewState } from '@/types/preview'
 import { getViewportWidth } from '@/types/viewports'
 import { collectPreviewDiagnostics } from '@/services/previewDiagnostics'
@@ -10,7 +10,6 @@ import {
 } from '@/services/storage'
 import {
   prepareDesktopMcpApplyChanges,
-  type PreparedDesktopMcpApplyChangesSuccess,
 } from '@/services/desktopMcpApplyChanges'
 import { registerDesktopPreloadMcpApplyChangesHandler } from '@/services/desktopMcpApplyChangesAdapter'
 import type {
@@ -39,15 +38,9 @@ interface UseDesktopMcpProjectResourceBridgeOptions {
   theme: ThemeMode
   workingCopyPreferences: WebArcadeWorkingCopyPreferences
   setTheme: (theme: ThemeMode) => void
-  updateProject: (updates: DesktopMcpProjectUpdates) => void
+  replaceProjectState: (project: Project) => void
   updatePreviewState: (updates: Partial<PreviewState>) => void
   onDesktopMcpActivity?: (activity: DesktopMcpLastActivity) => void
-}
-
-type DesktopMcpProjectUpdates = Partial<Pick<Project, 'name' | 'viewportSize'>> & {
-  jsxCode?: string
-  hooksCode?: string
-  sourceTarget?: ProjectSourceTarget
 }
 
 export const useDesktopMcpProjectResourceBridge = ({
@@ -57,7 +50,7 @@ export const useDesktopMcpProjectResourceBridge = ({
   theme,
   workingCopyPreferences,
   setTheme,
-  updateProject,
+  replaceProjectState,
   updatePreviewState,
   onDesktopMcpActivity,
 }: UseDesktopMcpProjectResourceBridgeOptions): void => {
@@ -119,20 +112,12 @@ export const useDesktopMcpProjectResourceBridge = ({
         project: preparedResult.nextProject,
         theme: preparedResult.nextTheme,
         diagnostics: preparedResult.nextDiagnostics,
-        transpiledCode: preparedResult.appliedOperations.some(
-          (operation) => operation.type === 'replace_source'
-        )
-          ? null
-          : currentContext.transpiledCode,
-        compileError: preparedResult.appliedOperations.some(
-          (operation) => operation.type === 'replace_source'
-        )
-          ? null
-          : currentContext.compileError,
+        transpiledCode: preparedResult.previewRefreshRequired ? null : currentContext.transpiledCode,
+        compileError: preparedResult.previewRefreshRequired ? null : currentContext.compileError,
       }
       workingCopyPreferencesRef.current = nextWorkingCopyPreferences
 
-      if (preparedResult.appliedOperations.some((operation) => operation.type === 'replace_source')) {
+      if (preparedResult.previewRefreshRequired) {
         updatePreviewState({
           status: 'transpiling',
           compileError: null,
@@ -141,17 +126,15 @@ export const useDesktopMcpProjectResourceBridge = ({
         })
       }
 
-      for (const operation of preparedResult.appliedOperations) {
-        applyPreparedOperation(operation, {
-          setTheme,
-          updateProject,
-        })
+      replaceProjectState(preparedResult.nextProject)
+      if (preparedResult.nextTheme !== currentContext.theme) {
+        setTheme(preparedResult.nextTheme)
       }
 
       onDesktopMcpActivity?.(preparedResult.result.safeActivity)
       return preparedResult.result
     },
-    [onDesktopMcpActivity, setTheme, updateProject, updatePreviewState]
+    [onDesktopMcpActivity, replaceProjectState, setTheme, updatePreviewState]
   )
 
   const handleCapturePreviewEvidence = useCallback(
@@ -225,38 +208,5 @@ const createApplyChangesPersistenceFailure = ({
     ok: false,
     code: detail && /exceeds 5MB limit/i.test(detail) ? 'payload-too-large' : 'persistence-failed',
     message,
-  }
-}
-
-const applyPreparedOperation = (
-  operation: PreparedDesktopMcpApplyChangesSuccess['appliedOperations'][number],
-  {
-    setTheme,
-    updateProject,
-  }: {
-    setTheme: (theme: ThemeMode) => void
-    updateProject: (updates: DesktopMcpProjectUpdates) => void
-  }
-) => {
-  switch (operation.type) {
-    case 'replace_source':
-      updateProject({
-        sourceTarget: operation.sourceTarget,
-        ...(operation.sourceKind === 'jsx'
-          ? { jsxCode: operation.content }
-          : { hooksCode: operation.content }),
-      })
-      return
-    case 'set_preview_context':
-      if (operation.viewportSize !== undefined) {
-        updateProject({ viewportSize: operation.viewportSize })
-      }
-      if (operation.theme !== undefined) {
-        setTheme(operation.theme)
-      }
-      return
-    case 'rename_project':
-      updateProject({ name: operation.name })
-      return
   }
 }

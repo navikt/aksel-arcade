@@ -76,6 +76,16 @@ interface ApplyChangesSuccess {
   changedResources: string[]
   nextRecommendedResources: string[]
   operationResults: Array<Record<string, unknown>>
+  tempPageRefMappings?: Record<
+    string,
+    {
+      pageId: string
+      sourceResources: {
+        jsxResourceUri: string
+        hooksResourceUri: string
+      }
+    }
+  >
   safeActivity: {
     toolName: 'apply_changes'
     operationTypes?: string[]
@@ -87,6 +97,7 @@ interface ApplyChangesFailure {
   ok: false
   code:
     | 'project-unavailable'
+    | 'invalid-operation'
     | 'stale-project-revision'
     | 'invalid-operation-target'
     | 'invalid-project-name'
@@ -616,23 +627,49 @@ describe('desktopMcpServer', () => {
       .fn<(request: Record<string, unknown>) => Promise<ApplyChangesResult>>()
       .mockResolvedValueOnce({
         ok: true,
-        summary: 'Rename the project',
+        summary: 'Create a landing page',
         projectRevision: 'rev-1234abcd',
-        changedResources: ['arcade://project/manifest'],
+        changedResources: [
+          'arcade://project/manifest',
+          'arcade://project/source/pages/page02/jsx',
+          'arcade://project/source/pages/page02/hooks',
+        ],
         nextRecommendedResources: [
           'arcade://project/manifest',
           'arcade://project/diagnostics',
+          'arcade://project/source/pages/page02/jsx',
+          'arcade://project/source/pages/page02/hooks',
         ],
         operationResults: [
           {
             index: 0,
-            type: 'rename_project',
-            name: 'Renamed project',
+            type: 'create_page',
+            pageId: 'page02',
+            name: 'Page 2',
+            newPageRef: 'landing',
+            sourceResources: {
+              jsxResourceUri: 'arcade://project/source/pages/page02/jsx',
+              hooksResourceUri: 'arcade://project/source/pages/page02/hooks',
+            },
+          },
+          {
+            index: 1,
+            type: 'select_active_page',
+            pageId: 'page02',
           },
         ],
+        tempPageRefMappings: {
+          landing: {
+            pageId: 'page02',
+            sourceResources: {
+              jsxResourceUri: 'arcade://project/source/pages/page02/jsx',
+              hooksResourceUri: 'arcade://project/source/pages/page02/hooks',
+            },
+          },
+        },
         safeActivity: {
           toolName: 'apply_changes',
-          operationTypes: ['rename_project'],
+          operationTypes: ['create_page', 'select_active_page'],
           timestamp: '2026-06-16T12:00:00.000Z',
         },
       })
@@ -652,11 +689,16 @@ describe('desktopMcpServer', () => {
       params: {
         name: 'apply_changes',
         arguments: {
-          summary: 'Rename the project',
+          summary: 'Create a landing page',
           operations: [
             {
-              type: 'rename_project',
-              name: 'Renamed project',
+              type: 'create_page',
+              newPageRef: 'landing',
+              jsxCode: 'export default function LandingPage() { return <div>Landing</div> }',
+            },
+            {
+              type: 'select_active_page',
+              tempPageRef: 'landing',
             },
           ],
         },
@@ -670,28 +712,54 @@ describe('desktopMcpServer', () => {
         content: [
           {
             type: 'text',
-            text: 'Applied changes: Rename the project',
+            text: 'Applied changes: Create a landing page',
           },
         ],
         structuredContent: {
           ok: true,
-          summary: 'Rename the project',
+          summary: 'Create a landing page',
           projectRevision: 'rev-1234abcd',
-          changedResources: ['arcade://project/manifest'],
+          changedResources: [
+            'arcade://project/manifest',
+            'arcade://project/source/pages/page02/jsx',
+            'arcade://project/source/pages/page02/hooks',
+          ],
           nextRecommendedResources: [
             'arcade://project/manifest',
             'arcade://project/diagnostics',
+            'arcade://project/source/pages/page02/jsx',
+            'arcade://project/source/pages/page02/hooks',
           ],
           operationResults: [
             {
               index: 0,
-              type: 'rename_project',
-              name: 'Renamed project',
+              type: 'create_page',
+              pageId: 'page02',
+              name: 'Page 2',
+              newPageRef: 'landing',
+              sourceResources: {
+                jsxResourceUri: 'arcade://project/source/pages/page02/jsx',
+                hooksResourceUri: 'arcade://project/source/pages/page02/hooks',
+              },
+            },
+            {
+              index: 1,
+              type: 'select_active_page',
+              pageId: 'page02',
             },
           ],
+          tempPageRefMappings: {
+            landing: {
+              pageId: 'page02',
+              sourceResources: {
+                jsxResourceUri: 'arcade://project/source/pages/page02/jsx',
+                hooksResourceUri: 'arcade://project/source/pages/page02/hooks',
+              },
+            },
+          },
           safeActivity: {
             toolName: 'apply_changes',
-            operationTypes: ['rename_project'],
+            operationTypes: ['create_page', 'select_active_page'],
             timestamp: '2026-06-16T12:00:00.000Z',
           },
         },
@@ -700,7 +768,7 @@ describe('desktopMcpServer', () => {
     expect(server.getState()).toMatchObject({
       lastActivity: {
         toolName: 'apply_changes',
-        operationTypes: ['rename_project'],
+        operationTypes: ['create_page', 'select_active_page'],
         timestamp: '2026-06-16T12:00:00.000Z',
       },
     })
@@ -744,11 +812,16 @@ describe('desktopMcpServer', () => {
     })
 
     expect(applyChanges).toHaveBeenNthCalledWith(1, {
-      summary: 'Rename the project',
+      summary: 'Create a landing page',
       operations: [
         {
-          type: 'rename_project',
-          name: 'Renamed project',
+          type: 'create_page',
+          newPageRef: 'landing',
+          jsxCode: 'export default function LandingPage() { return <div>Landing</div> }',
+        },
+        {
+          type: 'select_active_page',
+          tempPageRef: 'landing',
         },
       ],
     })
@@ -807,6 +880,9 @@ describe('desktopMcpServer', () => {
       'read `arcade://project/manifest`'
     )
     expect(operatingGuidePayload.result.contents[0].text).toContain(
+      '`create_page.newPageRef`, later `tempPageRef` targets, and `{{pageRef:name}}` placeholders'
+    )
+    expect(operatingGuidePayload.result.contents[0].text).toContain(
       '`capture_preview_evidence({ pageId })` is the normal autonomous inspection path'
     )
     expect(operatingGuidePayload.result.contents[0].text).toContain(
@@ -836,6 +912,9 @@ describe('desktopMcpServer', () => {
       'Arcade source is import-free JSX and Hooks'
     )
     expect(authoringGuidePayload.result.contents[0].text).toContain('`Global config`')
+    expect(authoringGuidePayload.result.contents[0].text).toContain(
+      '`{{pageRef:name}}` placeholders'
+    )
 
     const capabilitiesResponse = await postJson(state.url, {
       jsonrpc: '2.0',
@@ -862,6 +941,17 @@ describe('desktopMcpServer', () => {
       transport: 'HTTP (MCP Streamable HTTP)',
       requiresAuth: false,
       authDescription: 'No token/header required.',
+      applyChangesOperationTypes: [
+        'replace_source',
+        'create_page',
+        'rename_page',
+        'delete_page',
+        'set_start_page',
+        'select_active_page',
+        'set_preview_context',
+        'rename_project',
+      ],
+      pageRefPlaceholderSyntax: '{{pageRef:name}}',
       captureLayers: ['screenshot', 'accessibility', 'dom_layout_style', 'frame'],
       screenshotScopes: ['viewport', 'full_page', 'region'],
       interactionActions: ['click', 'fill', 'select', 'press', 'scroll', 'waitFor'],

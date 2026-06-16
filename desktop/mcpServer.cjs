@@ -14,6 +14,17 @@ const VALID_VIEWPORT_SIZES = ['2XL', 'XL', 'LG', 'MD', 'SM', 'XS']
 const VALID_THEMES = ['light', 'dark']
 const VALID_PREVIEW_CAPTURE_LAYERS = ['screenshot', 'frame']
 const VALID_PREVIEW_SCREENSHOT_SCOPES = ['viewport', 'full_page', 'region']
+const APPLY_CHANGES_OPERATION_TYPES = [
+  'replace_source',
+  'create_page',
+  'rename_page',
+  'delete_page',
+  'set_start_page',
+  'select_active_page',
+  'set_preview_context',
+  'rename_project',
+]
+const PAGE_REF_PLACEHOLDER_SYNTAX = '{{pageRef:name}}'
 const CAPABILITY_PREVIEW_CAPTURE_LAYERS = [
   'screenshot',
   'accessibility',
@@ -149,7 +160,7 @@ const MCP_TOOL_DEFINITIONS = Object.freeze([
         operations: Object.freeze({
           type: 'array',
           minItems: 1,
-          description: 'Ordered batch operations for source, preview, or project metadata.',
+          description: 'Ordered batch operations for source, page lifecycle, preview, or project metadata.',
           items: Object.freeze({
             type: 'object',
             additionalProperties: false,
@@ -157,11 +168,7 @@ const MCP_TOOL_DEFINITIONS = Object.freeze([
             properties: Object.freeze({
               type: Object.freeze({
                 type: 'string',
-                enum: Object.freeze([
-                  'replace_source',
-                  'set_preview_context',
-                  'rename_project',
-                ]),
+                enum: Object.freeze(APPLY_CHANGES_OPERATION_TYPES),
               }),
               resourceUri: Object.freeze({
                 type: 'string',
@@ -169,7 +176,32 @@ const MCP_TOOL_DEFINITIONS = Object.freeze([
               }),
               content: Object.freeze({
                 type: 'string',
-                description: 'Full source replacement content for replace_source operations.',
+                description:
+                  'Full source replacement content for replace_source operations. Supports {{pageRef:name}} placeholders when the batch declares matching create_page.newPageRef values earlier.',
+              }),
+              pageId: Object.freeze({
+                type: 'string',
+                description: 'Existing permanent Arcade page id for page lifecycle operations.',
+              }),
+              tempPageRef: Object.freeze({
+                type: 'string',
+                description:
+                  'Temporary page ref declared by create_page.newPageRef earlier in the same batch.',
+              }),
+              newPageRef: Object.freeze({
+                type: 'string',
+                description:
+                  'Optional temporary page ref that later operations and {{pageRef:name}} placeholders can use inside the same batch.',
+              }),
+              jsxCode: Object.freeze({
+                type: 'string',
+                description:
+                  'Optional initial JSX source for create_page operations. Supports {{pageRef:name}} placeholders.',
+              }),
+              hooksCode: Object.freeze({
+                type: 'string',
+                description:
+                  'Optional initial Hooks source for create_page operations. Supports {{pageRef:name}} placeholders.',
               }),
               viewportSize: Object.freeze({
                 type: 'string',
@@ -394,6 +426,42 @@ const createDesktopMcpServer = ({
     start,
     stop,
   }
+}
+
+const validateApplyChangesPageTarget = (operation, index, operationType, extraAllowedKeys = []) => {
+  const extraKeys = getUnexpectedKeys(operation, [
+    'type',
+    'pageId',
+    'tempPageRef',
+    ...extraAllowedKeys,
+  ])
+  if (extraKeys.length > 0) {
+    return `apply_changes ${operationType} operation ${index} contains unsupported fields: ${extraKeys.join(
+      ', '
+    )}.`
+  }
+
+  const hasPageId = operation.pageId !== undefined
+  const hasTempPageRef = operation.tempPageRef !== undefined
+  if ((hasPageId && hasTempPageRef) || (!hasPageId && !hasTempPageRef)) {
+    return `apply_changes ${operationType} operation ${index} must provide exactly one of pageId or tempPageRef.`
+  }
+
+  if (
+    hasPageId &&
+    (typeof operation.pageId !== 'string' || operation.pageId.trim().length === 0)
+  ) {
+    return `apply_changes ${operationType} operation ${index} pageId must be a non-empty string.`
+  }
+
+  if (
+    hasTempPageRef &&
+    (typeof operation.tempPageRef !== 'string' || operation.tempPageRef.trim().length === 0)
+  ) {
+    return `apply_changes ${operationType} operation ${index} tempPageRef must be a non-empty string.`
+  }
+
+  return null
 }
 
 const handleDesktopMcpRequest = (
@@ -1250,6 +1318,64 @@ const validateApplyChangesOperation = (operation, index) => {
 
       return null
     }
+    case 'create_page': {
+      const extraKeys = getUnexpectedKeys(operation, [
+        'type',
+        'name',
+        'newPageRef',
+        'jsxCode',
+        'hooksCode',
+      ])
+      if (extraKeys.length > 0) {
+        return `apply_changes create_page operation ${index} contains unsupported fields: ${extraKeys.join(
+          ', '
+        )}.`
+      }
+
+      if (
+        operation.name !== undefined &&
+        (typeof operation.name !== 'string' || operation.name.trim().length === 0)
+      ) {
+        return `apply_changes create_page operation ${index} name must be a non-empty string when provided.`
+      }
+
+      if (
+        operation.newPageRef !== undefined &&
+        (typeof operation.newPageRef !== 'string' || operation.newPageRef.trim().length === 0)
+      ) {
+        return `apply_changes create_page operation ${index} newPageRef must be a non-empty string when provided.`
+      }
+
+      if (operation.jsxCode !== undefined && typeof operation.jsxCode !== 'string') {
+        return `apply_changes create_page operation ${index} jsxCode must be a string when provided.`
+      }
+
+      if (operation.hooksCode !== undefined && typeof operation.hooksCode !== 'string') {
+        return `apply_changes create_page operation ${index} hooksCode must be a string when provided.`
+      }
+
+      return null
+    }
+    case 'rename_page': {
+      const extraKeys = getUnexpectedKeys(operation, ['type', 'name', 'pageId', 'tempPageRef'])
+      if (extraKeys.length > 0) {
+        return `apply_changes rename_page operation ${index} contains unsupported fields: ${extraKeys.join(
+          ', '
+        )}.`
+      }
+
+      if (typeof operation.name !== 'string' || operation.name.trim().length === 0) {
+        return `apply_changes rename_page operation ${index} name must be a non-empty string.`
+      }
+
+      return validateApplyChangesPageTarget(operation, index, 'rename_page', ['name'])
+    }
+    case 'delete_page':
+      return validateApplyChangesPageTarget(operation, index, 'delete_page')
+    case 'set_start_page':
+      return validateApplyChangesPageTarget(operation, index, 'set_start_page')
+    case 'select_active_page':
+      return validateApplyChangesPageTarget(operation, index, 'select_active_page')
     case 'set_preview_context': {
       const extraKeys = getUnexpectedKeys(operation, ['type', 'viewportSize', 'theme'])
       if (extraKeys.length > 0) {
@@ -1333,7 +1459,9 @@ const createDesktopStableResourceText = (uri) => {
         '- Work through `arcade://` resources and MCP tools only; do not edit repository files, package metadata, or the local filesystem.',
         '- Default loop: read this guide, read `arcade://project/manifest`, read the relevant source resources, use `apply_changes` for durable edits, read `arcade://project/diagnostics` unless the human asked for a different workflow, then capture Preview evidence when visual validation is needed.',
         '- Durable project edits happen through `apply_changes`, not by patching files outside the active Arcade project.',
+        '- Use `create_page.newPageRef`, later `tempPageRef` targets, and `{{pageRef:name}}` placeholders when one batch must create a page and link to it.',
         '- `capture_preview_evidence({ pageId })` is the normal autonomous inspection path for pages and targeted visual states.',
+        '- Use `select_active_page` only when you intentionally want the human-visible Active page to change; ordinary inspection should keep using `capture_preview_evidence({ pageId })`.',
         '- Saved Preview preferences live in `arcade://project/preview-context`; capture-only overrides must not mutate them.',
         '- If `apply_changes` returns `project-unavailable`, wait for an active Desktop Arcade window instead of falling back to repository or filesystem edits.',
         '- Baseline Preview capture currently supports `screenshot` and `frame` layers, with `viewport`, `full_page`, and `region` screenshot scopes. Later semantic layers may still be unavailable.',
@@ -1347,6 +1475,8 @@ const createDesktopStableResourceText = (uri) => {
         '- Prefer Aksel-valid Arcade JSX: current Aksel components, layout primitives, icons, and `--ax` design tokens before native HTML or custom CSS fallbacks.',
         '- `Global config` is shared code in scope for every Arcade page; it is not a renderable page.',
         '- Durable page navigation targets stable page ids, not page names.',
+        '- When a batch creates and links pages together, use `{{pageRef:name}}` placeholders in source and let Arcade rewrite them to the app-assigned page ids.',
+        '- Temporary page refs become valid only after the matching `create_page.newPageRef` is declared in the batch order.',
         '- Diagnostics plus Preview evidence are the feedback loop after source changes.',
         '- Keep the output context-light: no broad Aksel training, package edits, or repository/file edits.',
       ].join('\n')
@@ -1364,6 +1494,8 @@ const createDesktopStableResourceText = (uri) => {
         stableResourceUris: MCP_STABLE_RESOURCE_DEFINITIONS.map(
           (resourceDefinition) => resourceDefinition.uri
         ),
+        applyChangesOperationTypes: APPLY_CHANGES_OPERATION_TYPES,
+        pageRefPlaceholderSyntax: PAGE_REF_PLACEHOLDER_SYNTAX,
         dynamicSourceUriTemplates: CAPABILITY_SOURCE_URI_TEMPLATES,
         previewEvidenceUriTemplates: CAPABILITY_PREVIEW_EVIDENCE_URI_TEMPLATES,
         captureLayers: CAPABILITY_PREVIEW_CAPTURE_LAYERS,
@@ -1608,6 +1740,7 @@ const isApplyChangesResult = (value) =>
         (Array.isArray(value.safeActivity.operationTypes) &&
           value.safeActivity.operationTypes.every((operationType) => typeof operationType === 'string')))
     : (value.code === 'project-unavailable' ||
+        value.code === 'invalid-operation' ||
         value.code === 'stale-project-revision' ||
         value.code === 'invalid-operation-target' ||
         value.code === 'invalid-project-name' ||

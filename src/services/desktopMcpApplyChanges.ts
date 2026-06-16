@@ -1,27 +1,43 @@
-import type { Project, ProjectSourceTarget, ThemeMode } from '@/types/project'
+import type { ArcadePageId, Project, ProjectSourceTarget, ThemeMode } from '@/types/project'
 import type { PreviewDiagnostics } from '@/services/previewDiagnostics'
 import { clonePreviewDiagnostics } from '@/services/previewDiagnostics'
 import {
   DESKTOP_MCP_PROJECT_DIAGNOSTICS_URI,
   DESKTOP_MCP_PROJECT_MANIFEST_URI,
   DESKTOP_MCP_PROJECT_PREVIEW_CONTEXT_URI,
+  createDesktopMcpProjectPageSourceUri,
   createDesktopMcpProjectRevision,
 } from '@/services/desktopMcpProjectResources'
 import {
   parseDesktopMcpProjectSourceUri,
   type DesktopMcpProjectSourceKind,
 } from '@/services/desktopMcpProjectSourceUris'
-import { getPageById, normalizeProjectSelection, updateSourceForTarget } from '@/services/projectSource'
+import {
+  createArcadePage,
+  createArcadeSourceFile,
+  getPageById,
+  isArcadePageId,
+  nextPageId,
+  normalizeProjectSelection,
+  renamePage as renameProjectPage,
+  setActivePage,
+  setStartPage,
+  updateSourceForTarget,
+} from '@/services/projectSource'
 import { validateProjectSize } from '@/services/storage'
 import type {
   DesktopMcpApplyChangesFailure,
   DesktopMcpApplyChangesOperation,
   DesktopMcpApplyChangesOperationResult,
   DesktopMcpApplyChangesRequest,
+  DesktopMcpApplyChangesSourceResources,
   DesktopMcpApplyChangesSuccess,
+  DesktopMcpApplyChangesTempPageRefMapping,
 } from './desktopMcpApplyChangesProtocol'
 
 const MAX_PROJECT_NAME_LENGTH = 100
+const PAGE_REF_PLACEHOLDER_PATTERN = /\{\{pageRef:([^}]+)\}\}/g
+const TEMP_PAGE_REF_PATTERN = /^[^{}\s]+$/
 
 interface DesktopMcpApplyChangesContext {
   project: Project
@@ -29,33 +45,24 @@ interface DesktopMcpApplyChangesContext {
   diagnostics: PreviewDiagnostics
 }
 
-type PreparedDesktopMcpApplyChangesOperation =
-  | {
-      type: 'replace_source'
-      index: number
-      resourceUri: string
-      sourceTarget: ProjectSourceTarget
-      sourceKind: DesktopMcpProjectSourceKind
-      content: string
-    }
-  | {
-      type: 'set_preview_context'
-      index: number
-      viewportSize?: Project['viewportSize']
-      theme?: ThemeMode
-    }
-  | {
-      type: 'rename_project'
-      index: number
-      name: string
-    }
+interface PlannedCreatedPage {
+  index: number
+  pageId: ArcadePageId
+  sourceResources: DesktopMcpApplyChangesSourceResources
+  newPageRef?: string
+}
+
+interface PlannedCreatedPages {
+  byIndex: Map<number, PlannedCreatedPage>
+  tempPageRefs: Map<string, PlannedCreatedPage>
+}
 
 export interface PreparedDesktopMcpApplyChangesSuccess {
   ok: true
   nextProject: Project
   nextTheme: ThemeMode
   nextDiagnostics: PreviewDiagnostics
-  appliedOperations: PreparedDesktopMcpApplyChangesOperation[]
+  previewRefreshRequired: boolean
   result: DesktopMcpApplyChangesSuccess
 }
 
@@ -88,12 +95,16 @@ export const prepareDesktopMcpApplyChanges = (
     )
   }
 
-  const appliedOperations: PreparedDesktopMcpApplyChangesOperation[] = []
+  const plannedCreatedPages = planCreatedPages(request.operations, context.project.source.nextPageNumber)
+  if (!plannedCreatedPages.ok) {
+    return plannedCreatedPages.failure
+  }
+
   const operationResults: DesktopMcpApplyChangesOperationResult[] = []
   const changedResources = new Set<string>([DESKTOP_MCP_PROJECT_MANIFEST_URI])
   let nextProject = context.project
   let nextTheme = context.theme
-  let hasSourceChanges = false
+  let previewRefreshRequired = false
 
   for (const [index, operation] of request.operations.entries()) {
     switch (operation.type) {
@@ -103,23 +114,194 @@ export const prepareDesktopMcpApplyChanges = (
           return resolvedSource.failure
         }
 
-        nextProject = updateSourceForTarget(nextProject, resolvedSource.target, {
-          [resolvedSource.sourceKind]: operation.content,
-        })
-        hasSourceChanges = true
-        changedResources.add(operation.resourceUri)
-        appliedOperations.push({
-          type: 'replace_source',
-          index,
-          resourceUri: operation.resourceUri,
-          sourceTarget: resolvedSource.target,
-          sourceKind: resolvedSource.sourceKind,
+        const rewrittenContent = rewritePageRefPlaceholders({
           content: operation.content,
+          contextLabel: `apply_changes replace_source operation ${index} content`,
+          currentIndex: index,
+          plannedCreatedPages: plannedCreatedPages.value,
         })
+        if (!rewrittenContent.ok) {
+          return rewrittenContent.failure
+        }
+
+        nextProject = updateSourceForTarget(nextProject, resolvedSource.target, {
+          [resolvedSource.sourceKind]: rewrittenContent.content,
+        })
+        previewRefreshRequired = true
+        changedResources.add(operation.resourceUri)
         operationResults.push({
           index,
           type: 'replace_source',
           resourceUri: operation.resourceUri,
+        })
+        break
+      }
+      case 'create_page': {
+        const plannedPage = plannedCreatedPages.value.byIndex.get(index)
+        if (!plannedPage) {
+          return createApplyChangesFailure(
+            'invalid-operation',
+            `apply_changes create_page operation ${index} could not be planned.`
+          )
+        }
+
+        const pageName = normalizePageName({
+          operationType: 'create_page',
+          index,
+          name: operation.name,
+          fallback: createDefaultPageName(plannedPage.pageId),
+        })
+        if (!pageName.ok) {
+          return pageName.failure
+        }
+
+        const rewrittenJsx = rewritePageRefPlaceholders({
+          content: operation.jsxCode ?? '',
+          contextLabel: `apply_changes create_page operation ${index} jsxCode`,
+          currentIndex: index,
+          plannedCreatedPages: plannedCreatedPages.value,
+        })
+        if (!rewrittenJsx.ok) {
+          return rewrittenJsx.failure
+        }
+
+        const rewrittenHooks = rewritePageRefPlaceholders({
+          content: operation.hooksCode ?? '',
+          contextLabel: `apply_changes create_page operation ${index} hooksCode`,
+          currentIndex: index,
+          plannedCreatedPages: plannedCreatedPages.value,
+        })
+        if (!rewrittenHooks.ok) {
+          return rewrittenHooks.failure
+        }
+
+        nextProject = {
+          ...nextProject,
+          source: {
+            ...nextProject.source,
+            pages: [
+              ...nextProject.source.pages,
+              createArcadePage(
+                plannedPage.pageId,
+                pageName.value,
+                createArcadeSourceFile(rewrittenJsx.content, rewrittenHooks.content)
+              ),
+            ],
+            nextPageNumber: nextProject.source.nextPageNumber + 1,
+          },
+        }
+        previewRefreshRequired = true
+        changedResources.add(plannedPage.sourceResources.jsxResourceUri)
+        changedResources.add(plannedPage.sourceResources.hooksResourceUri)
+        operationResults.push({
+          index,
+          type: 'create_page',
+          pageId: plannedPage.pageId,
+          name: pageName.value,
+          ...(plannedPage.newPageRef ? { newPageRef: plannedPage.newPageRef } : {}),
+          sourceResources: plannedPage.sourceResources,
+        })
+        break
+      }
+      case 'rename_page': {
+        const resolvedPage = resolvePageOperationTarget({
+          operationType: 'rename_page',
+          index,
+          pageId: operation.pageId,
+          tempPageRef: operation.tempPageRef,
+          project: nextProject,
+          plannedCreatedPages: plannedCreatedPages.value,
+        })
+        if (!resolvedPage.ok) {
+          return resolvedPage.failure
+        }
+
+        const pageName = normalizePageName({
+          operationType: 'rename_page',
+          index,
+          name: operation.name,
+        })
+        if (!pageName.ok) {
+          return pageName.failure
+        }
+
+        nextProject = renameProjectPage(nextProject, resolvedPage.pageId, pageName.value)
+        operationResults.push({
+          index,
+          type: 'rename_page',
+          pageId: resolvedPage.pageId,
+          name: pageName.value,
+        })
+        break
+      }
+      case 'delete_page': {
+        const resolvedPage = resolvePageOperationTarget({
+          operationType: 'delete_page',
+          index,
+          pageId: operation.pageId,
+          tempPageRef: operation.tempPageRef,
+          project: nextProject,
+          plannedCreatedPages: plannedCreatedPages.value,
+        })
+        if (!resolvedPage.ok) {
+          return resolvedPage.failure
+        }
+
+        nextProject = {
+          ...nextProject,
+          source: {
+            ...nextProject.source,
+            pages: nextProject.source.pages.filter((page) => page.id !== resolvedPage.pageId),
+          },
+        }
+        previewRefreshRequired = true
+        operationResults.push({
+          index,
+          type: 'delete_page',
+          pageId: resolvedPage.pageId,
+        })
+        break
+      }
+      case 'set_start_page': {
+        const resolvedPage = resolvePageOperationTarget({
+          operationType: 'set_start_page',
+          index,
+          pageId: operation.pageId,
+          tempPageRef: operation.tempPageRef,
+          project: nextProject,
+          plannedCreatedPages: plannedCreatedPages.value,
+        })
+        if (!resolvedPage.ok) {
+          return resolvedPage.failure
+        }
+
+        nextProject = setStartPage(nextProject, resolvedPage.pageId)
+        previewRefreshRequired = true
+        operationResults.push({
+          index,
+          type: 'set_start_page',
+          pageId: resolvedPage.pageId,
+        })
+        break
+      }
+      case 'select_active_page': {
+        const resolvedPage = resolvePageOperationTarget({
+          operationType: 'select_active_page',
+          index,
+          pageId: operation.pageId,
+          tempPageRef: operation.tempPageRef,
+          project: nextProject,
+          plannedCreatedPages: plannedCreatedPages.value,
+        })
+        if (!resolvedPage.ok) {
+          return resolvedPage.failure
+        }
+
+        nextProject = setActivePage(nextProject, resolvedPage.pageId)
+        operationResults.push({
+          index,
+          type: 'select_active_page',
+          pageId: resolvedPage.pageId,
         })
         break
       }
@@ -134,14 +316,6 @@ export const prepareDesktopMcpApplyChanges = (
           nextTheme = operation.theme
         }
         changedResources.add(DESKTOP_MCP_PROJECT_PREVIEW_CONTEXT_URI)
-        appliedOperations.push({
-          type: 'set_preview_context',
-          index,
-          ...(operation.viewportSize !== undefined
-            ? { viewportSize: operation.viewportSize }
-            : {}),
-          ...(operation.theme !== undefined ? { theme: operation.theme } : {}),
-        })
         operationResults.push({
           index,
           type: 'set_preview_context',
@@ -165,11 +339,6 @@ export const prepareDesktopMcpApplyChanges = (
           ...nextProject,
           name: normalizedName,
         }
-        appliedOperations.push({
-          type: 'rename_project',
-          index,
-          name: normalizedName,
-        })
         operationResults.push({
           index,
           type: 'rename_project',
@@ -178,6 +347,27 @@ export const prepareDesktopMcpApplyChanges = (
         break
       }
     }
+  }
+
+  if (nextProject.source.pages.length === 0) {
+    return createApplyChangesFailure(
+      'invalid-operation',
+      'apply_changes would leave the Arcade project without any pages. Keep a remaining page or create a replacement before deleting the last page.'
+    )
+  }
+
+  if (!getPageById(nextProject.source, nextProject.source.startPageId)) {
+    return createApplyChangesFailure(
+      'invalid-operation',
+      'apply_changes deleted the current Start page without setting a replacement in the same batch. Add set_start_page targeting a remaining page or tempPageRef.'
+    )
+  }
+
+  if (!getPageById(nextProject.source, nextProject.activePageId)) {
+    return createApplyChangesFailure(
+      'invalid-operation',
+      'apply_changes deleted the current Active page without selecting a replacement in the same batch. Add select_active_page targeting a remaining page or tempPageRef.'
+    )
   }
 
   nextProject = normalizeProjectSelection({
@@ -197,21 +387,22 @@ export const prepareDesktopMcpApplyChanges = (
     project: nextProject,
     theme: nextTheme,
   })
-  const changedResourceList = [...changedResources]
+  const changedResourceList = getReadableChangedResources([...changedResources], nextProject)
   const nextRecommendedResources = dedupeResourceUris([
     DESKTOP_MCP_PROJECT_MANIFEST_URI,
     DESKTOP_MCP_PROJECT_DIAGNOSTICS_URI,
     ...changedResourceList,
   ])
+  const tempPageRefMappings = createTempPageRefMappings(plannedCreatedPages.value.tempPageRefs, nextProject)
 
   return {
     ok: true,
     nextProject,
     nextTheme,
-    nextDiagnostics: hasSourceChanges
+    nextDiagnostics: previewRefreshRequired
       ? createPendingSourceDiagnostics(context.diagnostics)
       : clonePreviewDiagnostics(context.diagnostics),
-    appliedOperations,
+    previewRefreshRequired,
     result: {
       ok: true,
       summary: request.summary.trim(),
@@ -219,11 +410,81 @@ export const prepareDesktopMcpApplyChanges = (
       changedResources: changedResourceList,
       nextRecommendedResources,
       operationResults,
+      ...(tempPageRefMappings ? { tempPageRefMappings } : {}),
       safeActivity: {
         toolName: 'apply_changes',
         operationTypes: getOrderedUniqueOperationTypes(request.operations),
         timestamp,
       },
+    },
+  }
+}
+
+const planCreatedPages = (
+  operations: DesktopMcpApplyChangesOperation[],
+  startingNextPageNumber: number
+):
+  | {
+      ok: true
+      value: PlannedCreatedPages
+    }
+  | {
+      ok: false
+      failure: DesktopMcpApplyChangesFailure
+    } => {
+  const byIndex = new Map<number, PlannedCreatedPage>()
+  const tempPageRefs = new Map<string, PlannedCreatedPage>()
+  let nextPageNumber = startingNextPageNumber
+
+  for (const [index, operation] of operations.entries()) {
+    if (operation.type !== 'create_page') {
+      continue
+    }
+
+    const pageId = nextPageId({ nextPageNumber })
+    const plannedPage: PlannedCreatedPage = {
+      index,
+      pageId,
+      sourceResources: createPageSourceResources(pageId),
+    }
+
+    if (operation.newPageRef !== undefined) {
+      const normalizedTempPageRef = normalizeTempPageRefField(operation.newPageRef, {
+        operationType: 'create_page',
+        index,
+        fieldName: 'newPageRef',
+      })
+      if (!normalizedTempPageRef.ok) {
+        return {
+          ok: false,
+          failure: normalizedTempPageRef.failure,
+        }
+      }
+
+      const existingPlan = tempPageRefs.get(normalizedTempPageRef.value)
+      if (existingPlan) {
+        return {
+          ok: false,
+          failure: createApplyChangesFailure(
+            'invalid-operation',
+            `apply_changes create_page operation ${index} newPageRef "${normalizedTempPageRef.value}" duplicates create_page operation ${existingPlan.index}.`
+          ),
+        }
+      }
+
+      plannedPage.newPageRef = normalizedTempPageRef.value
+      tempPageRefs.set(normalizedTempPageRef.value, plannedPage)
+    }
+
+    byIndex.set(index, plannedPage)
+    nextPageNumber += 1
+  }
+
+  return {
+    ok: true,
+    value: {
+      byIndex,
+      tempPageRefs,
     },
   }
 }
@@ -278,6 +539,373 @@ const resolveDesktopMcpApplyChangesSource = (
     target: parsedSourceUri.target,
     sourceKind: parsedSourceUri.sourceKind,
   }
+}
+
+const resolvePageOperationTarget = ({
+  operationType,
+  index,
+  pageId,
+  tempPageRef,
+  project,
+  plannedCreatedPages,
+}: {
+  operationType: 'rename_page' | 'delete_page' | 'set_start_page' | 'select_active_page'
+  index: number
+  pageId?: ArcadePageId
+  tempPageRef?: string
+  project: Project
+  plannedCreatedPages: PlannedCreatedPages
+}):
+  | {
+      ok: true
+      pageId: ArcadePageId
+    }
+  | {
+      ok: false
+      failure: DesktopMcpApplyChangesFailure
+    } => {
+  if ((pageId === undefined && tempPageRef === undefined) || (pageId !== undefined && tempPageRef !== undefined)) {
+    return {
+      ok: false,
+      failure: createApplyChangesFailure(
+        'invalid-operation',
+        `apply_changes ${operationType} operation ${index} must provide exactly one of pageId or tempPageRef.`
+      ),
+    }
+  }
+
+  if (pageId !== undefined) {
+    if (!isArcadePageId(pageId)) {
+      return {
+        ok: false,
+        failure: createApplyChangesFailure(
+          'invalid-operation',
+          `apply_changes ${operationType} operation ${index} pageId must be a valid Arcade page id.`
+        ),
+      }
+    }
+
+    if (!getPageById(project.source, pageId)) {
+      return {
+        ok: false,
+        failure: createApplyChangesFailure(
+          'invalid-operation-target',
+          `apply_changes ${operationType} operation ${index} could not find Arcade page "${pageId}". Re-read arcade://project/manifest before retrying.`,
+          {
+            manifestResourceUri: DESKTOP_MCP_PROJECT_MANIFEST_URI,
+          }
+        ),
+      }
+    }
+
+    return {
+      ok: true,
+      pageId,
+    }
+  }
+
+  const normalizedTempPageRef = normalizeTempPageRefField(tempPageRef, {
+    operationType,
+    index,
+    fieldName: 'tempPageRef',
+  })
+  if (!normalizedTempPageRef.ok) {
+    return {
+      ok: false,
+      failure: normalizedTempPageRef.failure,
+    }
+  }
+
+  const plannedPage = plannedCreatedPages.tempPageRefs.get(normalizedTempPageRef.value)
+  if (!plannedPage) {
+    return {
+      ok: false,
+      failure: createApplyChangesFailure(
+        'invalid-operation-target',
+        `apply_changes ${operationType} operation ${index} references unknown tempPageRef "${normalizedTempPageRef.value}". Declare create_page.newPageRef "${normalizedTempPageRef.value}" earlier in the same batch.`,
+        {
+          manifestResourceUri: DESKTOP_MCP_PROJECT_MANIFEST_URI,
+        }
+      ),
+    }
+  }
+
+  if (plannedPage.index > index) {
+    return {
+      ok: false,
+      failure: createApplyChangesFailure(
+        'invalid-operation-target',
+        `apply_changes ${operationType} operation ${index} references tempPageRef "${normalizedTempPageRef.value}" before create_page declares it. Move the create_page earlier in the batch.`,
+        {
+          manifestResourceUri: DESKTOP_MCP_PROJECT_MANIFEST_URI,
+        }
+      ),
+    }
+  }
+
+  if (!getPageById(project.source, plannedPage.pageId)) {
+    return {
+      ok: false,
+      failure: createApplyChangesFailure(
+        'invalid-operation-target',
+        `apply_changes ${operationType} operation ${index} references tempPageRef "${normalizedTempPageRef.value}", but Arcade page "${plannedPage.pageId}" is no longer available at that step.`,
+        {
+          manifestResourceUri: DESKTOP_MCP_PROJECT_MANIFEST_URI,
+        }
+      ),
+    }
+  }
+
+  return {
+    ok: true,
+    pageId: plannedPage.pageId,
+  }
+}
+
+const rewritePageRefPlaceholders = ({
+  content,
+  contextLabel,
+  currentIndex,
+  plannedCreatedPages,
+}: {
+  content: string
+  contextLabel: string
+  currentIndex: number
+  plannedCreatedPages: PlannedCreatedPages
+}):
+  | {
+      ok: true
+      content: string
+    }
+  | {
+      ok: false
+      failure: DesktopMcpApplyChangesFailure
+    } => {
+  let failure: DesktopMcpApplyChangesFailure | null = null
+
+  const rewrittenContent = content.replace(PAGE_REF_PLACEHOLDER_PATTERN, (fullMatch, rawTempPageRef) => {
+    if (failure) {
+      return fullMatch
+    }
+
+    const normalizedTempPageRef = normalizeTempPageRefValue(rawTempPageRef)
+    if (!normalizedTempPageRef.ok) {
+      failure = createApplyChangesFailure(
+        'invalid-operation',
+        `${contextLabel} contains invalid ${fullMatch} placeholder. pageRef names must be non-empty tokens without spaces or braces.`
+      )
+      return fullMatch
+    }
+
+    const plannedPage = plannedCreatedPages.tempPageRefs.get(normalizedTempPageRef.value)
+    if (!plannedPage) {
+      failure = createApplyChangesFailure(
+        'invalid-operation-target',
+        `${contextLabel} contains unresolved ${fullMatch} placeholder. Declare create_page.newPageRef "${normalizedTempPageRef.value}" earlier in the same apply_changes batch.`,
+        {
+          manifestResourceUri: DESKTOP_MCP_PROJECT_MANIFEST_URI,
+        }
+      )
+      return fullMatch
+    }
+
+    if (plannedPage.index > currentIndex) {
+      failure = createApplyChangesFailure(
+        'invalid-operation-target',
+        `${contextLabel} contains ${fullMatch} before create_page declares "${normalizedTempPageRef.value}". Move the create_page earlier in the batch.`,
+        {
+          manifestResourceUri: DESKTOP_MCP_PROJECT_MANIFEST_URI,
+        }
+      )
+      return fullMatch
+    }
+
+    return plannedPage.pageId
+  })
+
+  if (failure) {
+    return {
+      ok: false,
+      failure,
+    }
+  }
+
+  return {
+    ok: true,
+    content: rewrittenContent,
+  }
+}
+
+const normalizePageName = ({
+  operationType,
+  index,
+  name,
+  fallback,
+}: {
+  operationType: 'create_page' | 'rename_page'
+  index: number
+  name: string | undefined
+  fallback?: string
+}):
+  | {
+      ok: true
+      value: string
+    }
+  | {
+      ok: false
+      failure: DesktopMcpApplyChangesFailure
+    } => {
+  if (name === undefined) {
+    if (fallback !== undefined) {
+      return {
+        ok: true,
+        value: fallback,
+      }
+    }
+
+    return {
+      ok: false,
+      failure: createApplyChangesFailure(
+        'invalid-operation',
+        `apply_changes ${operationType} operation ${index} name must be a non-empty string.`
+      ),
+    }
+  }
+
+  const normalizedName = name.trim()
+  if (normalizedName.length === 0) {
+    return {
+      ok: false,
+      failure: createApplyChangesFailure(
+        'invalid-operation',
+        `apply_changes ${operationType} operation ${index} name must be a non-empty string${operationType === 'create_page' ? ' when provided' : ''}.`
+      ),
+    }
+  }
+
+  return {
+    ok: true,
+    value: normalizedName,
+  }
+}
+
+const normalizeTempPageRefField = (
+  tempPageRef: string,
+  {
+    operationType,
+    index,
+    fieldName,
+  }: {
+    operationType:
+      | 'create_page'
+      | 'rename_page'
+      | 'delete_page'
+      | 'set_start_page'
+      | 'select_active_page'
+    index: number
+    fieldName: 'newPageRef' | 'tempPageRef'
+  }
+):
+  | {
+      ok: true
+      value: string
+    }
+  | {
+      ok: false
+      failure: DesktopMcpApplyChangesFailure
+    } => {
+  const normalizedTempPageRef = normalizeTempPageRefValue(tempPageRef)
+  if (normalizedTempPageRef.ok) {
+    return normalizedTempPageRef
+  }
+
+  return {
+    ok: false,
+    failure: createApplyChangesFailure(
+      'invalid-operation',
+      `apply_changes ${operationType} operation ${index} ${fieldName} must be a non-empty token without spaces or braces.`
+    ),
+  }
+}
+
+const normalizeTempPageRefValue = (
+  tempPageRef: string
+):
+  | {
+      ok: true
+      value: string
+    }
+  | {
+      ok: false
+    } => {
+  const normalizedTempPageRef = tempPageRef.trim()
+  if (normalizedTempPageRef.length === 0 || !TEMP_PAGE_REF_PATTERN.test(normalizedTempPageRef)) {
+    return { ok: false }
+  }
+
+  return {
+    ok: true,
+    value: normalizedTempPageRef,
+  }
+}
+
+const createPageSourceResources = (
+  pageId: ArcadePageId
+): DesktopMcpApplyChangesSourceResources => ({
+  jsxResourceUri: createDesktopMcpProjectPageSourceUri(pageId, 'jsx'),
+  hooksResourceUri: createDesktopMcpProjectPageSourceUri(pageId, 'hooks'),
+})
+
+const createDefaultPageName = (pageId: ArcadePageId): string => {
+  const match = pageId.match(/^page(\d+)$/)
+  if (!match) {
+    return 'Page'
+  }
+
+  return `Page ${Number.parseInt(match[1], 10)}`
+}
+
+const getReadableChangedResources = (resourceUris: string[], project: Project): string[] =>
+  resourceUris.filter((resourceUri) => isReadableChangedResource(resourceUri, project))
+
+const isReadableChangedResource = (resourceUri: string, project: Project): boolean => {
+  if (
+    resourceUri === DESKTOP_MCP_PROJECT_MANIFEST_URI ||
+    resourceUri === DESKTOP_MCP_PROJECT_PREVIEW_CONTEXT_URI
+  ) {
+    return true
+  }
+
+  const parsedSourceUri = parseDesktopMcpProjectSourceUri(resourceUri)
+  if (!parsedSourceUri) {
+    return false
+  }
+
+  return (
+    parsedSourceUri.target.type === 'global-config' ||
+    getPageById(project.source, parsedSourceUri.target.pageId) !== undefined
+  )
+}
+
+const createTempPageRefMappings = (
+  tempPageRefs: Map<string, PlannedCreatedPage>,
+  project: Project
+): Record<string, DesktopMcpApplyChangesTempPageRefMapping> | undefined => {
+  const entries = [...tempPageRefs.entries()].flatMap(([tempPageRef, plannedPage]) =>
+    getPageById(project.source, plannedPage.pageId)
+      ? [
+          [
+            tempPageRef,
+            {
+              pageId: plannedPage.pageId,
+              sourceResources: plannedPage.sourceResources,
+            },
+          ] as const,
+        ]
+      : []
+  )
+
+  return entries.length > 0 ? Object.fromEntries(entries) : undefined
 }
 
 const createPendingSourceDiagnostics = (diagnostics: PreviewDiagnostics): PreviewDiagnostics => ({

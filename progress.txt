@@ -3393,3 +3393,26 @@ Verification:
 Next note:
 
 - The committed `public/preview-evidence-global.js` bundle must stay in sync with `src/services/previewEvidence.ts` whenever Preview evidence serialization changes; the hidden Desktop capture sandbox executes the generated browser bundle, not the TypeScript source directly.
+
+### 2026-06-16 - Issue #277: Extend apply_changes with page lifecycle batches and temp refs
+
+Implemented:
+
+- Selected `#277` as the single highest-priority `ready-for-agent` feature from `#276`-`#280` after checking issue `#269`, `CONTEXT.md`, and the existing `progress.txt` notes. `#275` and `#274` were already closed, `#276` and `#277` were the first unblocked slices, and `#277` won because it completes the multi-page mutation path and directly unlocks `#278` plus the later MCP hardening/smoke issues.
+- Extended the Desktop MCP `apply_changes` contract in `src/services/desktopMcpApplyChangesProtocol.ts` and `desktop/mcpServer.cjs` to support `create_page`, `rename_page`, `delete_page`, `set_start_page`, and `select_active_page`, along with `newPageRef`, `tempPageRef`, and `{{pageRef:name}}` placeholder documentation.
+- Reworked `src/services/desktopMcpApplyChanges.ts` to plan app-assigned page ids before mutation, rewrite temp page-ref placeholders into permanent ids, apply page lifecycle operations atomically on top of the existing `#275` path, and reject invalid batches for unresolved placeholders, out-of-order temp refs, zero-page final states, and missing Start/Active replacements.
+- Kept the MCP writer bridge narrow by reusing the existing main → preload → renderer `apply_changes` route; `desktop/main.cjs` and `desktop/mcpServer.cjs` now accept the new structured success/failure shape without introducing a second mutation channel.
+- Updated the renderer bridge in `src/hooks/useDesktopMcpProjectResourceBridge.ts`, `src/hooks/useProject.tsx`, and `src/App.tsx` so successful MCP batches replace the in-memory Arcade project state in one shot, keep immediate read-after-write consistency, and still drive the normal preview/diagnostics refresh path.
+- Added focused regression coverage in `tests/unit/services/desktopMcpApplyChanges.test.ts`, `tests/unit/services/desktopMcpServer.test.ts`, and `tests/unit/hooks/useDesktopMcpProjectResourceBridge.test.tsx`, plus a new end-to-end Electron regression at `tests/e2e/desktop-mcp-apply-changes.spec.ts` that exercises the real Desktop MCP endpoint through one create/link/select batch.
+
+Verification:
+
+- npm run typecheck
+- CI=1 npm run test -- --run
+- npm run lint
+- npm run test:e2e -- --project=chromium tests/e2e/desktop-mcp-apply-changes.spec.ts --reporter=line
+- Browser/console smoke check at `http://127.0.0.1:4176/aksel-arcade/` via `npm run dev -- --host 127.0.0.1 --port 4176 --strictPort`, confirming the app shell and preview render cleanly with no browser-console warnings/errors
+
+Next note:
+
+- `#278` should reuse the new `#277` temp-ref workflow exactly as-is: agents can now create/link pages durably through `apply_changes`, so Preview interaction work should keep page inspection on `capture_preview_evidence({ pageId })` and treat `select_active_page` as human-visible coordination only.

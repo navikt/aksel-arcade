@@ -98,6 +98,7 @@ interface AppState {
 
   // Actions
   updateProject: (updates: ProjectUpdate) => void
+  replaceProjectState: (project: Project) => void
   createPage: () => void
   renamePage: (pageId: ArcadePageId, name: string) => void
   deletePage: (pageId: ArcadePageId) => void
@@ -293,6 +294,10 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     })
   }
 
+  const replaceProjectState = (newProject: Project) => {
+    setProjectState(normalizeProjectSelection(newProject))
+  }
+
   const applyProjectTransform = (transform: (project: Project) => Project) => {
     setProjectState((prev) =>
       normalizeProjectSelection({
@@ -482,6 +487,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     isComponentPaletteOpen,
     isSettingsOpen,
     updateProject,
+    replaceProjectState,
     createPage,
     renamePage,
     deletePage,
