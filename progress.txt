@@ -3570,3 +3570,37 @@ Verification:
 Next note:
 
 - If the Desktop MCP preview-capture e2e unexpectedly talks to the wrong project state, first check for a stale local Electron process still listening on `127.0.0.1:3846`; that can make the test hit an old MCP server even when the newly launched window looks correct.
+
+### 2026-06-16 - Issue #279: Harden MCP bridge and remove superseded Agent pairing model
+
+Implemented:
+
+- Selected `#279` as the single highest-priority open `ready-for-agent` feature from `#279`-`#280` after checking parent PRD `#269`, `CONTEXT.md`, and the existing `progress.txt` notes. `#280` is explicitly blocked by `#279`, so the MCP hardening and superseded-pairing cleanup had to land first.
+- Disabled the old public Desktop Agent-session path in the normal Desktop capability set by switching `agentSessions.enabled` off in both the shared renderer capability map and the Electron main-process clone. Production Desktop Arcade now exposes the MCP setup path in Settings without showing the legacy Agent access/pairing button, while the legacy transport remains available only in explicitly opted-in compatibility tests.
+- Updated the public-surface regression coverage instead of deleting the old transport internals:
+  - `tests/integration/desktop-mcp-settings.test.tsx` now asserts the desktop MCP configuration appears without the old Agent-session button, and Web Arcade still shows neither MCP nor Agent UI.
+  - `tests/integration/project-controls-layout.test.tsx` now uses a test-only legacy capability fixture for compatibility-only bridge coverage while asserting the real Desktop capability set hides the public Agent-session UI and still shows the MCP settings surface.
+  - `tests/integration/share-popover.test.tsx` keeps the compatibility-only export-cleanliness path under the same test-only legacy fixture and broadens the forbidden artifact pattern to include MCP/instruction vocabulary as well as the older Agent-session terms.
+- Updated `tests/unit/services/shellCapabilities.test.ts` to lock the new Desktop default and revised `CONTEXT.md` so the old Agent session/access/transport/pairing vocabulary is clearly marked as legacy/superseded while the current `Agent bridge` / `Agent change` language reflects the local MCP model.
+
+Human-testable verification notes:
+
+- Directly smoke-checked in a browser against a built preview:
+  - Web Arcade still shows Share, shows no Agent button, and Settings shows no Desktop MCP section.
+  - A desktop-preload simulation (Electron user agent + preload bridge injected before load) shows no Share button, no Agent button, and Settings shows the MCP configuration (`desktop-arcade`, `HTTP (MCP Streamable HTTP)`, `http://127.0.0.1:3846/mcp`, no token/header) with no console errors.
+- Covered by automated Electron/MCP tests in this headless session because they are not directly human-testable from a plain browser smoke pass:
+  - `tests/unit/services/desktopMcpServer.test.ts` covers no-token operation, fixed endpoint behavior, browser-Origin rejection, GET/SSE rejection, and clear `project-unavailable` failures instead of auto-opening UI.
+  - `tests/integration/desktop-mcp-settings.test.tsx` covers safe last-activity metadata only.
+  - `tests/integration/share-popover.test.tsx` and `tests/integration/project-controls-layout.test.tsx` cover clean export/share payload boundaries so MCP/legacy activity, diagnostics, evidence, and instruction-shaped artifacts do not leak into portable project data.
+
+Verification:
+
+- npm run typecheck
+- npm run lint
+- CI=1 npm run test -- --run
+- npm run build
+- Browser smoke at `http://127.0.0.1:4173/aksel-arcade/` plus a desktop-preload simulation of the same build, confirming the MCP-only desktop chrome and the Web/Desktop UI boundary without runtime console errors
+
+Next note:
+
+- The old loopback transport files/tests now survive only as explicit compatibility coverage. If a follow-up fully removes that path instead of keeping it as a guarded internal fallback, the test-only legacy capability fixtures in `project-controls-layout.test.tsx` and `share-popover.test.tsx` are the first places to simplify or delete.

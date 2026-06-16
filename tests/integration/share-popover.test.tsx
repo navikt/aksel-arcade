@@ -29,7 +29,6 @@ import * as storage from '@/services/storage'
 import type { CompressionStrategy } from '@/services/compressionStrategies'
 import * as compressionStrategies from '@/services/compressionStrategies'
 import {
-  DESKTOP_ARCADE_CAPABILITIES,
   WEB_ARCADE_CAPABILITIES,
   type DesktopArcadePreloadApi,
   type ShellCapabilities,
@@ -192,7 +191,17 @@ const findAgentAccessButton = () =>
 const normalizeWhitespace = (value: string): string => value.replace(/\s+/g, ' ').trim()
 const AGENT_CHANGE_SUMMARY = 'Confidential Agent change summary'
 const AGENT_ARTIFACT_KEY_PATTERN =
-  /agent|session|permission|activity|bridge|checkpoint|rollback|evidence|diagnostic/i
+  /agent|session|permission|activity|bridge|checkpoint|rollback|evidence|diagnostic|mcp|instruction/i
+const LEGACY_AGENT_TEST_CAPABILITIES: ShellCapabilities = {
+  surface: 'desktop',
+  shareUrl: { enabled: false },
+  agentSessions: { enabled: true },
+  projectPackages: {
+    enabled: true,
+    defaultExtension: '.akselarcade',
+    legacyJsonImport: false,
+  },
+}
 const LEGACY_AGENT_BRIDGE_GLOBAL = '__AKSEL_ARCADE_AGENT_BRIDGE__'
 
 const callBridgeCommand = <TResult,>(command: () => TResult): TResult => {
@@ -242,7 +251,7 @@ function setupDesktopTransportPreload(
     stopAgentTransportSession: ReturnType<typeof vi.fn>
     setAgentTransportRequestHandler: ReturnType<typeof vi.fn>
   } = {
-    getShellCapabilities: vi.fn().mockResolvedValue(DESKTOP_ARCADE_CAPABILITIES),
+    getShellCapabilities: vi.fn().mockResolvedValue(LEGACY_AGENT_TEST_CAPABILITIES),
     startAgentTransportSession: vi.fn().mockResolvedValue(endpoint),
     stopAgentTransportSession: vi.fn().mockResolvedValue(true),
     setAgentTransportRequestHandler: vi.fn(
@@ -703,7 +712,7 @@ describe('Share popover integration', () => {
 
     try {
       setupDesktopTransportPreload()
-      renderHeader(undefined, DESKTOP_ARCADE_CAPABILITIES)
+      renderHeader(undefined, LEGACY_AGENT_TEST_CAPABILITIES)
       expect(screen.queryByLabelText(/share project/i)).toBeNull()
 
       const bridge = await startAgentAccess()

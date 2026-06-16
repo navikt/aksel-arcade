@@ -56,6 +56,16 @@ import {
 import { createShareToken, encodeSharePayload } from '@/utils/shareEncoding'
 
 const LEGACY_AGENT_BRIDGE_GLOBAL = '__AKSEL_ARCADE_AGENT_BRIDGE__'
+const LEGACY_AGENT_TEST_CAPABILITIES: ShellCapabilities = {
+  surface: 'desktop',
+  shareUrl: { enabled: false },
+  agentSessions: { enabled: true },
+  projectPackages: {
+    enabled: true,
+    defaultExtension: '.akselarcade',
+    legacyJsonImport: false,
+  },
+}
 
 const getLegacyAgentBridgeGlobal = () => Reflect.get(window, LEGACY_AGENT_BRIDGE_GLOBAL)
 
@@ -74,7 +84,7 @@ interface HarnessProps {
 
 const Harness = ({
   includePreview = false,
-  shellCapabilities = DESKTOP_ARCADE_CAPABILITIES,
+  shellCapabilities = LEGACY_AGENT_TEST_CAPABILITIES,
 }: HarnessProps) => {
   const {
     project,
@@ -147,7 +157,7 @@ const Harness = ({
 }
 
 const renderHeader = (options?: HarnessProps) => {
-  const shellCapabilities = options?.shellCapabilities ?? DESKTOP_ARCADE_CAPABILITIES
+  const shellCapabilities = options?.shellCapabilities ?? LEGACY_AGENT_TEST_CAPABILITIES
   if (shellCapabilities.agentSessions.enabled && !window.__AKSEL_ARCADE_DESKTOP__) {
     setupDesktopTransportPreload()
   }
@@ -187,7 +197,7 @@ const collectObjectKeys = (value: unknown): string[] => {
 }
 
 const AGENT_PACKAGE_ARTIFACT_KEY_PATTERN =
-  /agent|session|credential|endpoint|permission|checkpoint|diagnostic|evidence|transport|activity|bridge|rollback/i
+  /agent|session|credential|endpoint|permission|checkpoint|diagnostic|evidence|transport|activity|bridge|rollback|mcp|instruction/i
 
 const readBlobText = (blob: Blob): Promise<string> =>
   new Promise((resolve, reject) => {
@@ -541,7 +551,7 @@ function setupDesktopTransportPreload(
     stopAgentTransportSession: ReturnType<typeof vi.fn>
     setAgentTransportRequestHandler: ReturnType<typeof vi.fn>
   } = {
-    getShellCapabilities: vi.fn().mockResolvedValue(DESKTOP_ARCADE_CAPABILITIES),
+    getShellCapabilities: vi.fn().mockResolvedValue(LEGACY_AGENT_TEST_CAPABILITIES),
     startAgentTransportSession: vi.fn().mockResolvedValue(endpoint),
     stopAgentTransportSession: vi.fn().mockResolvedValue(true),
     setAgentTransportRequestHandler: vi.fn(
@@ -855,24 +865,23 @@ describe('ProjectControls layout', () => {
     expect(screen.getByTestId('settings-page-panel-open').textContent).toBe('false')
   })
 
-  it('keeps Desktop Arcade Agent access available and Share URL absent', async () => {
-    renderHeader()
+  it('keeps Desktop Arcade MCP available, Share URL absent, and the public Agent-session UI hidden', async () => {
+    renderHeader({ shellCapabilities: DESKTOP_ARCADE_CAPABILITIES })
 
     const importButton = screen.getByRole('button', { name: /^import$/i })
-    const agentButton = await findAgentAccessButton()
     const settingsButton = screen.getByRole('button', { name: /settings/i })
 
     expect(screen.queryByLabelText(/share project/i)).toBeNull()
     expect(
-      importButton.compareDocumentPosition(agentButton) & Node.DOCUMENT_POSITION_FOLLOWING
+      importButton.compareDocumentPosition(settingsButton) & Node.DOCUMENT_POSITION_FOLLOWING
     ).toBeTruthy()
-    expect(
-      agentButton.compareDocumentPosition(settingsButton) & Node.DOCUMENT_POSITION_FOLLOWING
-    ).toBeTruthy()
+    expect(screen.queryByTestId('agent-session-menu')).toBeNull()
 
     fireEvent.click(settingsButton)
+    expect(await screen.findByText('Desktop Arcade MCP')).toBeTruthy()
     expect(await screen.findByText(/Switch to light theme/i)).toBeTruthy()
     expect(screen.queryByText(/Switch to light mode/i)).toBeNull()
+    expect(screen.queryByRole('menuitemcheckbox', { name: AGENT_ACCESS_TOGGLE_NAME })).toBeNull()
   })
 
   it('does not restore Preview fullscreen when importing a clean package in Desktop Arcade', async () => {

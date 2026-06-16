@@ -100,36 +100,36 @@ _Avoid_: Build number, deployment ID, Web Arcade version
 A change that alters **Desktop Arcade** itself, its release path, or shared **Arcade project** behavior shipped by **Desktop Arcade**.
 _Avoid_: Desktop-only change, every repository change
 
-**Agent session**:
-A Desktop Arcade-only revocable, consent-gated pairing relationship where an authorized external agent can inspect and change one active **Arcade project** while the human can stop access.
+**Agent session** _(legacy, superseded)_:
+The pre-MCP Desktop Arcade pairing relationship model. It is obsolete for the local MCP bridge v1 and should appear only in historical notes or legacy compatibility tests.
 _Avoid_: Chat, bot session, automation session
 
-**Agent access**:
-A Desktop Arcade-only human-controlled on/off consent state that makes the current **Arcade project** available for explicit **Agent pairing** during an **Agent session**. It does not include ordinary project sharing, import/export, or normal human preview review.
+**Agent access** _(legacy, superseded)_:
+The pre-MCP in-app on/off consent toggle. Desktop Arcade MCP v1 does not use a separate Agent access switch; consent happens in the MCP client configuration instead.
 _Avoid_: Local server, transport, pairing token, Share URL
 
 **Agent bridge**:
-The Desktop Arcade user-authorized connection point between an external agent and an active **Agent session**; it lets agents read **Arcade-scoped state** and submit **Agent changes**.
+The Desktop Arcade local MCP server surface that lets an **External agent** read **Arcade-scoped state** and submit **Agent changes** for the active **Arcade project** through narrow resources and tools.
 _Avoid_: Provider integration, backend API, browser extension
 
-**Agent transport**:
-The Desktop Arcade-only same-device mechanism an **External agent** uses to reach the **Agent bridge** during an active **Agent session**.
+**Agent transport** _(legacy, superseded)_:
+The pre-MCP same-device pairing transport. Desktop Arcade MCP v1 uses the fixed local MCP endpoint instead of the old random loopback pairing transport.
 _Avoid_: Agent bridge, permission model, browser access
 
-**Agent pairing**:
-The deliberate user-approved link between one **External agent** and one active **Agent session** through an **Agent pairing credential**.
+**Agent pairing** _(legacy, superseded)_:
+The old user-approved link established through a short-lived credential. Desktop Arcade MCP v1 does not use a separate pairing step.
 _Avoid_: Installation, login, persistent trust, implicit local trust
 
-**Agent pairing handoff**:
-The human-mediated transfer that gives an **External agent** what it needs to complete **Agent pairing** for one active **Agent session**.
+**Agent pairing handoff** _(legacy, superseded)_:
+The copied bootstrap command used by the old loopback transport. Desktop Arcade MCP v1 replaces it with normal MCP client setup.
 _Avoid_: Agent discovery, provider push, persistent setup
 
-**Agent operating instructions**:
-Concise session-scoped guidance returned through the **Agent bridge** that tells an **External agent** how to work with Desktop Arcade during one active **Agent session**.
+**Agent operating instructions** _(legacy, superseded)_:
+The old session-scoped returned instructions. Desktop Arcade MCP v1 uses the `arcade://desktop/operating-guide` resource instead.
 _Avoid_: Agent pairing handoff, Aksel training, project content, repository documentation
 
-**Agent pairing credential**:
-A short-lived secret that authorizes one **External agent** to use the **Agent transport** for one active **Agent session**.
+**Agent pairing credential** _(legacy, superseded)_:
+The old short-lived pairing secret. Desktop Arcade MCP v1 requires no token or authorization header.
 _Avoid_: API key, installation token, persistent trust
 
 **External agent**:
@@ -140,8 +140,8 @@ _Avoid_: In-app chat, provider integration, browser automation
 A GitHub Copilot product surface that can act as an **External agent**, such as the GitHub Copilot app, Copilot CLI, or Copilot in VS Code.
 _Avoid_: Copilot provider, single Copilot integration
 
-**Agent permission**:
-A human-controlled capability that limits what an external agent may change or capture during an **Agent session**.
+**Agent permission** _(legacy, superseded)_:
+The old in-app capability toggle model. Desktop Arcade MCP v1 relies on the MCP host's approval UX plus the narrow Desktop Arcade MCP contract instead.
 _Avoid_: Role, scope, feature flag
 
 **Arcade-scoped state**:
@@ -185,22 +185,22 @@ A code autocomplete suggestion for a general renderable Aksel choice, including 
 _Avoid_: Compound subcomponent suggestion, prop suggestion
 
 **Agent change**:
-An agent-authored change applied to one or more parts of the active **Arcade project** during an **Agent session** — the **Global config** code, an individual **Arcade page**'s code, or the project's page set itself (adding, renaming, or removing an **Arcade page**, or changing the **Start page**). The app assigns page ids; an agent never chooses them.
+An agent-authored change applied to one or more parts of the active **Arcade project** through the Desktop Arcade local MCP bridge — the **Global config** code, an individual **Arcade page**'s code, or the project's page set itself (adding, renaming, or removing an **Arcade page**, or changing the **Start page**). The app assigns page ids; an agent never chooses them.
 _Avoid_: Proposed change, patch, command, cursor edit
 
 ## Example dialogue
 
-Developer: "The human started Agent access and copied an Agent pairing handoff to the external agent."
+Developer: "The human added Desktop Arcade as an MCP server in the external agent client."
 
-Domain expert: "Good. That pairs the agent with this active Arcade project only; it is not persistent trust."
+Domain expert: "Good. The local MCP bridge now targets this active Arcade project. Desktop Arcade v1 does not need a separate Agent access toggle or pairing handoff."
 
-Developer: "The agent session applied an agent change to the Arcade project."
+Developer: "The agent applied a batch change to the Arcade project through `apply_changes`."
 
-Domain expert: "Show it in the live preview. If the user does not want more agent changes, stop Agent access."
+Domain expert: "Show it in the live preview. If the user does not want more agent changes, remove or disable the MCP server in the client instead of looking for an in-app Agent access toggle."
 
 Developer: "The external agent needs help writing the source for a screenshot recreation."
 
-Domain expert: "Keep the Agent operating instructions focused on the active session and use Arcade authoring guidance to steer the agent toward Aksel-valid Arcade JSX."
+Domain expert: "Keep the operating guide focused on the MCP resources and tools, and use Arcade authoring guidance to steer the agent toward Aksel-valid Arcade JSX."
 
 Developer: "The user exported an Arcade project package to send a prototype to a colleague."
 
@@ -276,7 +276,7 @@ Domain expert: "The Web share URL should carry the full Arcade project source pl
 
 Developer: "An agent wants to add a page to a one-page Arcade project."
 
-Domain expert: "Agent sessions always work against the full pages-based Arcade project source, even when there is only one Arcade page. The agent can call the page lifecycle operations directly; the app still assigns the stable page id."
+Domain expert: "The local MCP bridge always works against the full pages-based Arcade project source, even when there is only one Arcade page. The agent can call the page lifecycle operations directly; the app still assigns the stable page id."
 
 Developer: "The agent needs to add a page and link to it."
 
