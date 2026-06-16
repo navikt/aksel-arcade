@@ -110,7 +110,7 @@ export const DesktopMcpSettingsGroup = ({
               void copyValue(mcpState.transportLabel, 'type')
             }}
           >
-            Copy type
+            Copy transport type
           </ActionMenu.Item>
           <ActionMenu.Item
             icon={<FilesIcon aria-hidden />}

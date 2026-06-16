@@ -122,9 +122,10 @@ test.describe('Issue #279 MCP hardening', () => {
         id: 11,
         method: 'tools/list',
       })
-      expect(toolsListPayload.result.tools.map((tool: { name: string }) => tool.name)).toEqual(
-        expect.arrayContaining(['read_resource', 'apply_changes', 'capture_preview_evidence'])
-      )
+      expect(toolsListPayload.result.tools.map((tool: { name: string }) => tool.name)).toEqual([
+        'capture_preview_evidence',
+        'apply_changes',
+      ])
 
       const resourcesListPayload = await postMcpRequest({
         jsonrpc: '2.0',

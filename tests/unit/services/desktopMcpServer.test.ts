@@ -272,12 +272,6 @@ describe('desktopMcpServer', () => {
       result: {
         tools: [
           {
-            name: 'read_resource',
-            inputSchema: {
-              additionalProperties: false,
-            },
-          },
-          {
             name: 'capture_preview_evidence',
             inputSchema: {
               additionalProperties: false,
@@ -636,34 +630,26 @@ describe('desktopMcpServer', () => {
       },
     })
 
-    const toolReadResponse = await postJson(state.url, {
+    const accessibilityResponse = await postJson(state.url, {
       jsonrpc: '2.0',
       id: 62,
-      method: 'tools/call',
+      method: 'resources/read',
       params: {
-        name: 'read_resource',
-        arguments: {
-          uri: 'arcade://preview/captures/capture-demo/accessibility',
-        },
+        uri: 'arcade://preview/captures/capture-demo/accessibility',
       },
     })
-    expect(toolReadResponse.status).toBe(200)
-    await expect(toolReadResponse.json()).resolves.toEqual({
+    expect(accessibilityResponse.status).toBe(200)
+    await expect(accessibilityResponse.json()).resolves.toEqual({
       jsonrpc: '2.0',
       id: 62,
       result: {
-        content: [
+        contents: [
           {
-            type: 'text',
-            text: 'Read Desktop Arcade MCP resource arcade://preview/captures/capture-demo/accessibility (application/json).',
+            uri: 'arcade://preview/captures/capture-demo/accessibility',
+            mimeType: 'application/json',
+            text: '{"rootSelector":"#root","nodeCount":2,"truncated":false,"nodes":[{"role":"heading","name":"Details","level":1}]}',
           },
         ],
-        structuredContent: {
-          ok: true,
-          uri: 'arcade://preview/captures/capture-demo/accessibility',
-          mimeType: 'application/json',
-          text: '{"rootSelector":"#root","nodeCount":2,"truncated":false,"nodes":[{"role":"heading","name":"Details","level":1}]}',
-        },
       },
     })
 
@@ -713,7 +699,7 @@ describe('desktopMcpServer', () => {
       },
     })
 
-    const accessibilityResponse = await postJson(state.url, {
+    const accessibilityRepeatResponse = await postJson(state.url, {
       jsonrpc: '2.0',
       id: 65,
       method: 'resources/read',
@@ -721,8 +707,8 @@ describe('desktopMcpServer', () => {
         uri: 'arcade://preview/captures/capture-demo/accessibility',
       },
     })
-    expect(accessibilityResponse.status).toBe(200)
-    await expect(accessibilityResponse.json()).resolves.toEqual({
+    expect(accessibilityRepeatResponse.status).toBe(200)
+    await expect(accessibilityRepeatResponse.json()).resolves.toEqual({
       jsonrpc: '2.0',
       id: 65,
       result: {
@@ -1200,10 +1186,10 @@ describe('desktopMcpServer', () => {
       '`capture_preview_evidence({ pageId })` is the normal autonomous inspection path'
     )
     expect(operatingGuidePayload.result.contents[0].text).toContain(
-      'use `read_resource({ uri })` as a compatibility bridge'
+      'Start with `tools/list`, `resources/list`, and `resources/read`'
     )
     expect(operatingGuidePayload.result.contents[0].text).toContain(
-      'start by reading `arcade://desktop/capabilities` through `read_resource({ uri: "arcade://desktop/capabilities" })`'
+      '`arcade://desktop/capabilities` is the shortest single place to inspect the published v1 contract'
     )
     expect(operatingGuidePayload.result.contents[0].text).toContain(
       'If `apply_changes` returns `project-unavailable`, wait for an active Desktop Arcade window'
@@ -1272,7 +1258,7 @@ describe('desktopMcpServer', () => {
       authDescription: 'No token/header required.',
       discoveryAdvice: {
         preferredFirstResourceUri: 'arcade://desktop/capabilities',
-        resourceReadFallbackTool: 'read_resource',
+        preferredDiscoveryMethods: ['tools/list', 'resources/list', 'resources/read'],
       },
       applyChangesOperationTypes: [
         'replace_source',
@@ -1327,7 +1313,6 @@ describe('desktopMcpServer', () => {
       stableDesktopResourceReads: 'available',
       projectResourceReads: 'available when an active project reader is connected',
       toolExecution: {
-        read_resource: 'available',
         capture_preview_evidence:
           'available when an active preview capture bridge is connected',
         apply_changes: 'available when an active project writer is connected',
@@ -1364,7 +1349,9 @@ describe('desktopMcpServer', () => {
       'arcade://preview/captures/{captureId}/dom-layout-style':
         'available after a successful capture until the capture expires',
     })
-    expect(capabilities.discoveryAdvice.note).toContain('read_resource({ uri: "arcade://desktop/capabilities" })')
+    expect(capabilities.discoveryAdvice.note).toContain(
+      'Use tools/list plus resources/list/resources/read to discover the published v1 surface.'
+    )
     expect(capabilities.verificationBoundaries).toMatchObject({
       mcpVerifiable: expect.arrayContaining([
         'No token/header is required for the desktop-arcade MCP endpoint.',

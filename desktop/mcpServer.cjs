@@ -96,22 +96,6 @@ const PREVIEW_CAPTURE_RESOURCE_URI_PATTERN =
 
 const MCP_TOOL_DEFINITIONS = Object.freeze([
   Object.freeze({
-    name: 'read_resource',
-    description:
-      'Read any available Desktop Arcade MCP arcade:// resource through a tool call. Use this when your MCP host does not expose raw resources/read.',
-    inputSchema: Object.freeze({
-      type: 'object',
-      additionalProperties: false,
-      properties: Object.freeze({
-        uri: Object.freeze({
-          type: 'string',
-          description: 'Required Desktop Arcade MCP resource URI to read.',
-        }),
-      }),
-      required: ['uri'],
-    }),
-  }),
-  Object.freeze({
     name: 'capture_preview_evidence',
     description:
       'Capture targeted Preview evidence for the active Arcade project across screenshot, accessibility, DOM/layout/style, and frame layers.',
@@ -378,7 +362,6 @@ const MCP_STABLE_RESOURCE_DEFINITIONS = Object.freeze([
 ])
 
 const TOOL_EXECUTION_STATUS = Object.freeze({
-  read_resource: 'available',
   capture_preview_evidence: 'available when an active preview capture bridge is connected',
   apply_changes: 'available when an active project writer is connected',
 })
@@ -942,37 +925,6 @@ const routeToolsCallRequest = async (
   }
 
   try {
-    if (toolDefinition.name === 'read_resource') {
-      const resourceResult = await readDesktopResource(argumentsPayload.uri, {
-        previewCaptureStore,
-        readProjectResource,
-      })
-
-      sendJson(response, 200, {
-        jsonrpc: '2.0',
-        id: payload.id,
-        result: resourceResult.ok
-          ? createToolExecutionSuccessResult(
-              `Read Desktop Arcade MCP resource ${resourceResult.uri} (${resourceResult.mimeType}).`,
-              {
-                ok: true,
-                uri: resourceResult.uri,
-                mimeType: resourceResult.mimeType,
-                text: resourceResult.text,
-              }
-            )
-          : createToolExecutionErrorResult(
-              toolDefinition.name,
-              resourceResult.code,
-              resourceResult.message,
-              {
-                resourceUri: resourceResult.resourceUri,
-              }
-            ),
-      })
-      return
-    }
-
     if (toolDefinition.name === 'capture_preview_evidence') {
       const captureResult = await capturePreviewEvidence(argumentsPayload)
       if (!isCapturePreviewResult(captureResult)) {
@@ -1062,9 +1014,7 @@ const routeToolsCallRequest = async (
     const unexpectedMessage =
       toolDefinition.name === 'capture_preview_evidence'
         ? 'Desktop Arcade MCP capture_preview_evidence failed unexpectedly.'
-        : toolDefinition.name === 'read_resource'
-          ? 'Desktop Arcade MCP read_resource failed unexpectedly.'
-          : 'Desktop Arcade MCP apply_changes failed unexpectedly.'
+        : 'Desktop Arcade MCP apply_changes failed unexpectedly.'
 
     sendJson(response, 200, {
       jsonrpc: '2.0',
@@ -1271,8 +1221,6 @@ const readStrictParamsObject = (payload, { allowedKeys, id, method, response }) 
 
 const validateToolArguments = (toolName, argumentsPayload) => {
   switch (toolName) {
-    case 'read_resource':
-      return validateReadResourceArguments(argumentsPayload)
     case 'capture_preview_evidence':
       return validateCapturePreviewEvidenceArguments(argumentsPayload)
     case 'apply_changes':
@@ -1280,19 +1228,6 @@ const validateToolArguments = (toolName, argumentsPayload) => {
     default:
       return `Unknown Desktop Arcade MCP tool "${toolName}".`
   }
-}
-
-const validateReadResourceArguments = (argumentsPayload) => {
-  const extraKeys = getUnexpectedKeys(argumentsPayload, ['uri'])
-  if (extraKeys.length > 0) {
-    return `read_resource arguments contain unsupported fields: ${extraKeys.join(', ')}.`
-  }
-
-  if (typeof argumentsPayload.uri !== 'string' || argumentsPayload.uri.trim().length === 0) {
-    return 'read_resource uri must be a non-empty string.'
-  }
-
-  return null
 }
 
 const validateCapturePreviewEvidenceArguments = (argumentsPayload) => {
@@ -1773,8 +1708,7 @@ const createDesktopStableResourceText = (uri) => {
         '',
         '- Work through `arcade://` resources and MCP tools only; do not edit repository files, package metadata, or the local filesystem.',
         '- Default loop: read this guide, read `arcade://project/manifest`, read the relevant source resources, use `apply_changes` for durable edits, read `arcade://project/diagnostics` unless the human asked for a different workflow, then capture Preview evidence when visual validation is needed.',
-        '- If your MCP host does not expose raw `resources/read`, use `read_resource({ uri })` as a compatibility bridge for any returned `arcade://...` resource URI.',
-        '- If your MCP host hides raw discovery UI, start by reading `arcade://desktop/capabilities` through `read_resource({ uri: "arcade://desktop/capabilities" })` so MCP itself can describe the published tools, resources, limits, and verification boundaries.',
+        '- Start with `tools/list`, `resources/list`, and `resources/read`; `arcade://desktop/capabilities` is the shortest single place to inspect the published v1 contract.',
         '- Durable project edits happen through `apply_changes`, not by patching files outside the active Arcade project.',
         '- Use `create_page.newPageRef`, later `tempPageRef` targets, and `{{pageRef:name}}` placeholders when one batch must create a page and link to it.',
         '- `capture_preview_evidence({ pageId })` is the normal autonomous inspection path for pages and targeted visual states.',
@@ -1811,11 +1745,11 @@ const createDesktopStableResourceText = (uri) => {
         requiresAuth: false,
         authDescription: DESKTOP_MCP_AUTH_DESCRIPTION,
         contractNote:
-          'This resource lists the stable v1 MCP contract and the current implementation status for each published tool and preview surface.',
+          'This resource lists the stable v1 MCP contract, omissions, and current implementation status for the published tools and resource families.',
         discoveryAdvice: {
           preferredFirstResourceUri: 'arcade://desktop/capabilities',
-          resourceReadFallbackTool: 'read_resource',
-          note: 'If your MCP host does not expose raw resources/read or discovery UI, call read_resource({ uri: "arcade://desktop/capabilities" }) first so MCP itself can describe the published v1 surface.',
+          preferredDiscoveryMethods: ['tools/list', 'resources/list', 'resources/read'],
+          note: 'Use tools/list plus resources/list/resources/read to discover the published v1 surface. Read arcade://desktop/capabilities first when you want the full contract in one place.',
         },
         toolNames: MCP_TOOL_DEFINITIONS.map((toolDefinition) => toolDefinition.name),
         stableResourceUris: MCP_STABLE_RESOURCE_DEFINITIONS.map(

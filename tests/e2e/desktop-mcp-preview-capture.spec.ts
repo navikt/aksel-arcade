@@ -38,18 +38,25 @@ const callTool = async (name: string, argumentsPayload: Record<string, unknown>)
   })
 
 const readMcpResource = async (uri: string) => {
-  const payload = await callTool('read_resource', { uri })
+  const payload = await postMcpRequest({
+    jsonrpc: '2.0',
+    id: 2,
+    method: 'resources/read',
+    params: {
+      uri,
+    },
+  })
   expect(payload).toMatchObject({
     result: {
-      structuredContent: {
-        ok: true,
-        uri,
-      },
+      contents: [
+        {
+          uri,
+        },
+      ],
     },
   })
 
-  return payload.result.structuredContent as {
-    ok: true
+  return payload.result.contents[0] as {
     uri: string
     mimeType: string
     text: string

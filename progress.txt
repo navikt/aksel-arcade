@@ -3679,3 +3679,36 @@ Verification:
 Next note:
 
 - The new `issue-279-mcp-hardening` e2e spec is the right first stop if a future change regresses Desktop Settings copy, auth-free MCP access, payload redaction, or the closed-window `project-unavailable` behavior. If it fails locally because port `127.0.0.1:3846` is already occupied, clear the stale local Electron instance before trusting any Desktop MCP result.
+
+### 2026-06-17 - Issue #280: Add human-verifiable MCP smoke flow and final documentation polish
+
+Implemented:
+
+- Selected `#280` as the single remaining MCP v1 feature after checking parent PRD `#269`, `CONTEXT.md`, and the existing `progress.txt` notes. This slice stayed on the agreed v1 surface only.
+- Removed the out-of-contract `read_resource` compatibility tool from `desktop/mcpServer.cjs`, so Desktop Arcade MCP again publishes exactly the two v1 tools from the PRD: `capture_preview_evidence` and `apply_changes`.
+- Tightened the Desktop MCP operating/capabilities resources around the real v1 contract:
+  - discovery now points clients at `tools/list`, `resources/list`, and `resources/read`;
+  - the default mutation loop keeps diagnostics/evidence checks as a fallback unless the human asked for a different workflow;
+  - `capture_preview_evidence({ pageId })` stays the normal inspection path while `select_active_page` stays human-facing coordination only;
+  - Arcade source is explicitly documented as `arcade://...` resources plus `apply_changes`, not repository/filesystem editing.
+- Added a user-facing Desktop MCP v1 setup + smoke checklist to `README.md` with the exact server name, type, URL, no-token/header requirement, the two-tool contract, the stable resources, the batch temp-ref workflow, the Preview evidence reads, and the Web/Desktop boundary checks.
+- Polished the Desktop Settings ActionMenu copy from **Copy type** to **Copy transport type** for clearer MCP setup wording.
+- Added the final end-to-end smoke coverage in `tests/e2e/desktop-mcp-smoke.spec.ts`, then updated the existing MCP tests (`desktop-mcp-preview-capture`, `issue-279-mcp-hardening`, `desktopMcpServer`, and `desktop-mcp-settings`) so the automated loop now matches the final two-tool contract.
+
+Human-testable verification notes:
+
+- The new Electron/Web smoke spec now covers the practical happy path the issue asked for: exact MCP config, two-tool listing, stable resource reads, manifest/source reads, one batch create/link change via temp refs, diagnostics after the change, targeted Preview capture for a specific page id, reading screenshot/accessibility/DOM-layout-style/frame resources, safe Settings activity metadata, and the Web no-MCP boundary.
+- Also did a live Web browser spot-check at `http://127.0.0.1:4173/aksel-arcade/`: Share was present, Settings had no Desktop MCP section, and the browser console stayed free of warnings/errors.
+
+Verification:
+
+- npm install
+- npm run typecheck
+- npm run lint
+- CI=1 npm test -- --run
+- npm run build
+- npm run test:e2e -- tests/e2e/desktop-mcp-smoke.spec.ts tests/e2e/desktop-mcp-preview-capture.spec.ts tests/e2e/issue-279-mcp-hardening.spec.ts --reporter=line
+
+Next note:
+
+- If a future MCP host cannot use `resources/list` / `resources/read`, treat that as a new product-capability discussion instead of reintroducing a third helper tool. Keep `README.md` and `arcade://desktop/capabilities` aligned with the exact published two-tool v1 surface.
