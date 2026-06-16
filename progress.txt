@@ -3604,3 +3604,31 @@ Verification:
 Next note:
 
 - The old loopback transport files/tests now survive only as explicit compatibility coverage. If a follow-up fully removes that path instead of keeping it as a guarded internal fallback, the test-only legacy capability fixtures in `project-controls-layout.test.tsx` and `share-popover.test.tsx` are the first places to simplify or delete.
+
+### 2026-06-16 - Issue #279 follow-up: MCP-only verification contract
+
+Implemented:
+
+- Followed up on a real post-PR verification gap reported by an MCP-only tester: the MCP bridge itself was working, but the Desktop MCP operating guide/capabilities resource did not clearly tell a host-limited agent how to discover the surface or which acceptance checks were intentionally outside MCP.
+- Updated `arcade://desktop/operating-guide` so MCP-only clients are explicitly told to start with `arcade://desktop/capabilities` and to use `read_resource({ uri })` when the host does not expose raw resource/discovery UI.
+- Expanded `arcade://desktop/capabilities` with two new contract sections:
+  - `discoveryAdvice`, which points agents at `arcade://desktop/capabilities` plus the `read_resource` fallback path.
+  - `verificationBoundaries`, which separates MCP-verifiable checks (auth-free access, structured/redacted failures, origin/transport rejection, safe activity metadata) from host/UI-only checks (Desktop Settings chrome, Web/Desktop UI boundaries, share/package payload cleanliness, host logs, and closed-window lifecycle).
+- Added regression coverage in `tests/unit/services/desktopMcpServer.test.ts` so the Desktop MCP self-description keeps documenting this boundary and MCP-only agents do not have to guess again.
+
+Human-testable verification notes:
+
+- The original tester report was valid: several issue-279 acceptance items are not directly observable from the MCP surface alone. The fix here is to make that boundary explicit and discoverable from MCP itself, not to expose Desktop/Web chrome or host logs through MCP.
+- After this follow-up, an MCP-only agent can determine up front which checks it can complete autonomously and which ones must remain app-side or human-driven.
+
+Verification:
+
+- CI=1 npm run test -- --run tests/unit/services/desktopMcpServer.test.ts
+- npm run typecheck
+- npm run lint
+- CI=1 npm run test -- --run
+- npm run build
+
+Next note:
+
+- If a future issue wants full autonomous verification of host/UI-only items, that is a new product capability discussion. The current contract remains intentional: MCP can describe those boundaries authoritatively, but it should not introspect Desktop chrome, host logs, or window lifecycle just to satisfy a test harness.

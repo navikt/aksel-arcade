@@ -1110,7 +1110,13 @@ describe('desktopMcpServer', () => {
       'use `read_resource({ uri })` as a compatibility bridge'
     )
     expect(operatingGuidePayload.result.contents[0].text).toContain(
+      'start by reading `arcade://desktop/capabilities` through `read_resource({ uri: "arcade://desktop/capabilities" })`'
+    )
+    expect(operatingGuidePayload.result.contents[0].text).toContain(
       'If `apply_changes` returns `project-unavailable`, wait for an active Desktop Arcade window'
+    )
+    expect(operatingGuidePayload.result.contents[0].text).toContain(
+      'Product-chrome checks such as Desktop Settings copy, Web/Desktop UI boundaries, portable share/package contents, host-process logs, and window-close lifecycle are intentionally outside the MCP surface'
     )
     expect(operatingGuidePayload.result.contents[0].text).toContain(
       'Preview capture supports `screenshot`, `accessibility`, `dom_layout_style`, and `frame` layers'
@@ -1171,6 +1177,10 @@ describe('desktopMcpServer', () => {
       transport: 'HTTP (MCP Streamable HTTP)',
       requiresAuth: false,
       authDescription: 'No token/header required.',
+      discoveryAdvice: {
+        preferredFirstResourceUri: 'arcade://desktop/capabilities',
+        resourceReadFallbackTool: 'read_resource',
+      },
       applyChangesOperationTypes: [
         'replace_source',
         'create_page',
@@ -1261,6 +1271,24 @@ describe('desktopMcpServer', () => {
       'arcade://preview/captures/{captureId}/dom-layout-style':
         'available after a successful capture until the capture expires',
     })
+    expect(capabilities.discoveryAdvice.note).toContain('read_resource({ uri: "arcade://desktop/capabilities" })')
+    expect(capabilities.verificationBoundaries).toMatchObject({
+      mcpVerifiable: expect.arrayContaining([
+        'No token/header is required for the desktop-arcade MCP endpoint.',
+        'Business failures stay structured and redacted in MCP tool/resource responses.',
+        'Unknown browser Origins are rejected and GET/SSE entrypoints stay unsupported.',
+      ]),
+      hostOnly: expect.arrayContaining([
+        'Desktop Settings shows MCP configuration instead of a pairing handoff.',
+        'Desktop Arcade shows no public Agent access toggle, pairing credential, or pairing handoff UI.',
+        'Web Arcade shows no MCP or Agent UI and exposes no Web MCP endpoint.',
+        'Portable Web share URLs and Arcade project packages exclude MCP resources, evidence, diagnostics, instructions, and activity data.',
+        'Closing Desktop Arcade windows leaves MCP project calls failing clearly without auto-opening or focusing UI.',
+      ]),
+    })
+    expect(capabilities.verificationBoundaries.note).toContain(
+      'hostOnly items are intentionally outside the MCP surface'
+    )
     expect(capabilities.v1Omissions).toContain('No prompts surface.')
     expect(capabilities.contractNote).toContain('current implementation status')
   })
