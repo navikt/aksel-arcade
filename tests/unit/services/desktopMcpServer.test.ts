@@ -310,6 +310,54 @@ describe('desktopMcpServer', () => {
     ])
   })
 
+  it('keeps the legacy read_resource alias callable without re-listing it in the v1 tool surface', async () => {
+    const server = createManagedServer({ port: 0 })
+    const state = await server.start()
+
+    const toolsResponse = await postJson(state.url, {
+      jsonrpc: '2.0',
+      id: 31,
+      method: 'tools/list',
+    })
+    expect(toolsResponse.status).toBe(200)
+    const toolsPayload = await toolsResponse.json()
+    expect(toolsPayload.result.tools.map((tool: { name: string }) => tool.name)).toEqual([
+      'capture_preview_evidence',
+      'apply_changes',
+    ])
+
+    const readResourceResponse = await postJson(state.url, {
+      jsonrpc: '2.0',
+      id: 32,
+      method: 'tools/call',
+      params: {
+        name: 'read_resource',
+        arguments: {
+          uri: 'arcade://desktop/authoring-guide',
+        },
+      },
+    })
+    expect(readResourceResponse.status).toBe(200)
+    await expect(readResourceResponse.json()).resolves.toEqual({
+      jsonrpc: '2.0',
+      id: 32,
+      result: {
+        content: [
+          {
+            type: 'text',
+            text: 'Read Desktop Arcade MCP resource arcade://desktop/authoring-guide (text/markdown).',
+          },
+        ],
+        structuredContent: {
+          ok: true,
+          uri: 'arcade://desktop/authoring-guide',
+          mimeType: 'text/markdown',
+          text: expect.stringContaining('# Desktop Arcade MCP authoring guide'),
+        },
+      },
+    })
+  })
+
   it('returns 202 for initialized notifications and keeps unsupported MCP surfaces undiscoverable', async () => {
     const server = createManagedServer({ port: 0 })
     const state = await server.start()
@@ -1189,7 +1237,7 @@ describe('desktopMcpServer', () => {
       'Start with `tools/list`, `resources/list`, and `resources/read`'
     )
     expect(operatingGuidePayload.result.contents[0].text).toContain(
-      'Tool-only hosts can exercise the two v1 tools but cannot complete the resource-read portions of the checklist from MCP alone'
+      'Tool-only hosts can exercise the two listed v1 tools, but the published discovery surface cannot complete the resource-read portions of the checklist without those resource methods'
     )
     expect(operatingGuidePayload.result.contents[0].text).toContain(
       '`arcade://desktop/capabilities` is the shortest single place to inspect the published v1 contract'
@@ -1359,7 +1407,7 @@ describe('desktopMcpServer', () => {
       'Use tools/list plus resources/list/resources/read to discover the published v1 surface.'
     )
     expect(capabilities.smokeChecklistRequirements.note).toContain(
-      'Tool-only hosts can call capture_preview_evidence and apply_changes but cannot complete the stable-resource, diagnostics, or evidence-resource read checks from MCP alone.'
+      'Tool-only hosts can call capture_preview_evidence and apply_changes, but the published v1 discovery surface cannot complete the stable-resource, diagnostics, or evidence-resource read checks without those resource methods.'
     )
     expect(capabilities.verificationBoundaries).toMatchObject({
       mcpVerifiable: expect.arrayContaining([

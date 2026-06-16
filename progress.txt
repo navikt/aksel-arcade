@@ -3761,3 +3761,23 @@ Verification:
 Next note:
 
 - If Desktop Settings reports the MCP endpoint as unavailable because port `127.0.0.1:3846` is already in use, clear the stale local Electron listener before trusting any Desktop MCP smoke result. The issue-280 smoke specs now tolerate an existing valid Arcade project, but they still require a single live Desktop MCP owner.
+
+### 2026-06-17 - PR #291 review follow-up: preserve Desktop MCP read compatibility
+
+Implemented:
+
+- Restored `read_resource` as an unlisted Desktop MCP compatibility alias so pre-#280 tool-only clients do not break on `tools/call`, while `tools/list` still publishes exactly the two v1 tools required by issue #280.
+- Added unit coverage that proves the alias remains callable without reappearing in the advertised v1 tool surface.
+- Tightened the Desktop MCP guide/capabilities wording and README smoke guidance so they describe the published two-tool discovery surface accurately without implying the hidden compatibility bridge is part of the new v1 contract.
+
+Verification:
+
+- npm run typecheck
+- npm run lint
+- CI=1 npm test -- --run
+- npm run test:e2e -- tests/e2e/desktop-mcp-smoke.spec.ts tests/e2e/desktop-mcp-preview-capture.spec.ts tests/e2e/desktop-mcp-apply-changes.spec.ts tests/e2e/issue-279-mcp-hardening.spec.ts --reporter=line
+- Direct Web browser spot-check at `http://127.0.0.1:4173/aksel-arcade/` for clean load and no browser-console errors
+
+Next note:
+
+- If we ever want to remove the hidden `read_resource` bridge, treat that as an explicit compatibility change with a migration plan instead of a silent contract break under the same Desktop MCP v1 surface.

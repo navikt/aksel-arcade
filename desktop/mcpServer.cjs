@@ -322,6 +322,17 @@ const MCP_TOOL_DEFINITIONS = Object.freeze([
   }),
 ])
 
+const MCP_COMPATIBILITY_TOOL_DEFINITIONS = Object.freeze([
+  Object.freeze({
+    name: 'read_resource',
+  }),
+])
+
+const findCallableToolDefinition = (toolName) =>
+  MCP_TOOL_DEFINITIONS.find((tool) => tool.name === toolName) ??
+  MCP_COMPATIBILITY_TOOL_DEFINITIONS.find((tool) => tool.name === toolName) ??
+  null
+
 const MCP_STABLE_RESOURCE_DEFINITIONS = Object.freeze([
   Object.freeze({
     uri: 'arcade://desktop/operating-guide',
@@ -882,7 +893,7 @@ const routeToolsCallRequest = async (
     return
   }
 
-  const toolDefinition = MCP_TOOL_DEFINITIONS.find((tool) => tool.name === params.name)
+  const toolDefinition = findCallableToolDefinition(params.name)
   if (!toolDefinition) {
     sendJsonRpcError(response, {
       id: payload.id,
@@ -925,6 +936,37 @@ const routeToolsCallRequest = async (
   }
 
   try {
+    if (toolDefinition.name === 'read_resource') {
+      const resourceResult = await readDesktopResource(argumentsPayload.uri, {
+        previewCaptureStore,
+        readProjectResource,
+      })
+
+      sendJson(response, 200, {
+        jsonrpc: '2.0',
+        id: payload.id,
+        result: resourceResult.ok
+          ? createToolExecutionSuccessResult(
+              `Read Desktop Arcade MCP resource ${resourceResult.uri} (${resourceResult.mimeType}).`,
+              {
+                ok: true,
+                uri: resourceResult.uri,
+                mimeType: resourceResult.mimeType,
+                text: resourceResult.text,
+              }
+            )
+          : createToolExecutionErrorResult(
+              toolDefinition.name,
+              resourceResult.code,
+              resourceResult.message,
+              {
+                resourceUri: resourceResult.resourceUri,
+              }
+            ),
+      })
+      return
+    }
+
     if (toolDefinition.name === 'capture_preview_evidence') {
       const captureResult = await capturePreviewEvidence(argumentsPayload)
       if (!isCapturePreviewResult(captureResult)) {
@@ -1221,6 +1263,8 @@ const readStrictParamsObject = (payload, { allowedKeys, id, method, response }) 
 
 const validateToolArguments = (toolName, argumentsPayload) => {
   switch (toolName) {
+    case 'read_resource':
+      return validateReadResourceArguments(argumentsPayload)
     case 'capture_preview_evidence':
       return validateCapturePreviewEvidenceArguments(argumentsPayload)
     case 'apply_changes':
@@ -1228,6 +1272,19 @@ const validateToolArguments = (toolName, argumentsPayload) => {
     default:
       return `Unknown Desktop Arcade MCP tool "${toolName}".`
   }
+}
+
+const validateReadResourceArguments = (argumentsPayload) => {
+  const extraKeys = getUnexpectedKeys(argumentsPayload, ['uri'])
+  if (extraKeys.length > 0) {
+    return `read_resource arguments contain unsupported fields: ${extraKeys.join(', ')}.`
+  }
+
+  if (typeof argumentsPayload.uri !== 'string' || argumentsPayload.uri.trim().length === 0) {
+    return 'read_resource uri must be a non-empty string.'
+  }
+
+  return null
 }
 
 const validateCapturePreviewEvidenceArguments = (argumentsPayload) => {
@@ -1709,7 +1766,7 @@ const createDesktopStableResourceText = (uri) => {
         '- Work through `arcade://` resources and MCP tools only; do not edit repository files, package metadata, or the local filesystem.',
         '- Default loop: read this guide, read `arcade://project/manifest`, read the relevant source resources, use `apply_changes` for durable edits, read `arcade://project/diagnostics` unless the human asked for a different workflow, then capture Preview evidence when visual validation is needed.',
         '- Start with `tools/list`, `resources/list`, and `resources/read`; `arcade://desktop/capabilities` is the shortest single place to inspect the published v1 contract.',
-        '- To complete the full smoke checklist from inside a client, the host must expose `resources/list` and `resources/read` (or an equivalent resource inspector). Tool-only hosts can exercise the two v1 tools but cannot complete the resource-read portions of the checklist from MCP alone.',
+        '- To complete the full smoke checklist from inside a client, the host must expose `resources/list` and `resources/read` (or an equivalent resource inspector). Tool-only hosts can exercise the two listed v1 tools, but the published discovery surface cannot complete the resource-read portions of the checklist without those resource methods.',
         '- Durable project edits happen through `apply_changes`, not by patching files outside the active Arcade project.',
         '- Use `create_page.newPageRef`, later `tempPageRef` targets, and `{{pageRef:name}}` placeholders when one batch must create a page and link to it.',
         '- `capture_preview_evidence({ pageId })` is the normal autonomous inspection path for pages and targeted visual states.',
@@ -1754,7 +1811,7 @@ const createDesktopStableResourceText = (uri) => {
         },
         smokeChecklistRequirements: {
           requiresClientResourceReads: true,
-          note: 'Use an MCP client that exposes resources/list and resources/read, or verify those resource steps manually in a resource inspector. Tool-only hosts can call capture_preview_evidence and apply_changes but cannot complete the stable-resource, diagnostics, or evidence-resource read checks from MCP alone.',
+          note: 'Use an MCP client that exposes resources/list and resources/read, or verify those resource steps manually in a resource inspector. Tool-only hosts can call capture_preview_evidence and apply_changes, but the published v1 discovery surface cannot complete the stable-resource, diagnostics, or evidence-resource read checks without those resource methods.',
         },
         toolNames: MCP_TOOL_DEFINITIONS.map((toolDefinition) => toolDefinition.name),
         stableResourceUris: MCP_STABLE_RESOURCE_DEFINITIONS.map(

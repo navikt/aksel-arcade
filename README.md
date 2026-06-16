@@ -224,7 +224,7 @@ Desktop Arcade exposes a local MCP server only in the desktop shell. Web Arcade 
 
 Desktop MCP v1 publishes exactly two tools — `capture_preview_evidence` and `apply_changes` — plus `arcade://desktop/*`, `arcade://project/*`, and capture-produced `arcade://preview/captures/*` resources. Read those resources through MCP `resources/list` and `resources/read`; Arcade source is virtual `arcade://...` content, not repository or filesystem files.
 
-For the full smoke checklist, use an MCP client that exposes `resources/list` and `resources/read` (or an equivalent resource inspector). Tool-only MCP hosts can still exercise the two v1 tools, but they cannot complete the stable-resource, diagnostics, or evidence-resource read steps from MCP alone.
+For the full smoke checklist, use an MCP client that exposes `resources/list` and `resources/read` (or an equivalent resource inspector). Tool-only MCP hosts can still exercise the two listed v1 tools, but the published discovery surface cannot complete the stable-resource, diagnostics, or evidence-resource read steps without those resource methods.
 
 1. Start Desktop Arcade with a multi-page Arcade project.
 2. Add the MCP server to your client with the exact settings above.
