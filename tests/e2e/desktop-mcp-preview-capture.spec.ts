@@ -22,15 +22,30 @@ const readMcpResource = async (uri: string) => {
     body: JSON.stringify({
       jsonrpc: '2.0',
       id: 2,
-      method: 'resources/read',
+      method: 'tools/call',
       params: {
-        uri,
+        name: 'read_resource',
+        arguments: {
+          uri,
+        },
       },
     }),
   })
 
   expect(response.status).toBe(200)
-  return response.json()
+  const payload = await response.json()
+  expect(payload).toMatchObject({
+    jsonrpc: '2.0',
+    id: 2,
+    result: {
+      structuredContent: {
+        ok: true,
+        uri,
+      },
+    },
+  })
+
+  return payload.result.structuredContent
 }
 
 const captureDefaultPreviewEvidence = async () => {
@@ -64,17 +79,29 @@ const captureDefaultPreviewEvidence = async () => {
 
   const capture = payload.result.structuredContent
   const frameResourceResponse = await readMcpResource(capture.layerResources.frame)
-  const frameResourceText = frameResourceResponse.result.contents[0].text
+  const frameResourceText = frameResourceResponse.text
   const frameResource = JSON.parse(frameResourceText)
   expect(frameResource.preview.viewport.width).toBeGreaterThan(0)
   expect(frameResource.preview.viewport.height).toBeGreaterThan(0)
 
   const screenshotResourceResponse = await readMcpResource(capture.layerResources.screenshot)
-  const screenshotSvg = screenshotResourceResponse.result.contents[0].text as string
+  const screenshotSvg = screenshotResourceResponse.text as string
   const screenshotMatch = screenshotSvg.match(/<svg[^>]*width="(\d+)" height="(\d+)"/)
   expect(screenshotMatch).not.toBeNull()
   expect(Number(screenshotMatch?.[1])).toBeGreaterThan(1)
   expect(Number(screenshotMatch?.[2])).toBeGreaterThan(1)
+
+  const accessibilityResourceResponse = await readMcpResource(capture.layerResources.accessibility)
+  const accessibilityResource = JSON.parse(accessibilityResourceResponse.text)
+  expect(accessibilityResource.rootSelector).toBe('#root')
+  expect(accessibilityResource.nodeCount).toBeGreaterThan(0)
+  expect(Array.isArray(accessibilityResource.nodes)).toBe(true)
+
+  const domLayoutStyleResponse = await readMcpResource(capture.layerResources.dom_layout_style)
+  const domLayoutStyleResource = JSON.parse(domLayoutStyleResponse.text)
+  expect(domLayoutStyleResource.rootSelector).toBe('#root')
+  expect(domLayoutStyleResource.capturedElementCount).toBeGreaterThan(0)
+  expect(domLayoutStyleResource.tree.tagName).toBe('div')
 }
 
 test.describe('Desktop MCP preview capture', () => {

@@ -12,7 +12,7 @@ const MAX_MCP_BODY_BYTES = 1024 * 1024
 const DEFAULT_PREVIEW_CAPTURE_TTL_MS = 5 * 60 * 1000
 const VALID_VIEWPORT_SIZES = ['2XL', 'XL', 'LG', 'MD', 'SM', 'XS']
 const VALID_THEMES = ['light', 'dark']
-const VALID_PREVIEW_CAPTURE_LAYERS = ['screenshot', 'frame']
+const VALID_PREVIEW_CAPTURE_LAYERS = ['screenshot', 'accessibility', 'dom_layout_style', 'frame']
 const VALID_PREVIEW_SCREENSHOT_SCOPES = ['viewport', 'full_page', 'region']
 const APPLY_CHANGES_OPERATION_TYPES = [
   'replace_source',
@@ -71,12 +71,29 @@ const CAPABILITY_V1_OMISSIONS = Object.freeze([
 ])
 const PROJECT_SOURCE_PAGE_URI_PATTERN = /^arcade:\/\/project\/source\/pages\/(page\d+)\/(jsx|hooks)$/
 const PREVIEW_CAPTURE_RESOURCE_URI_PATTERN =
-  /^arcade:\/\/preview\/captures\/([a-z0-9-]+)\/(manifest|screenshot|frame)$/
+  /^arcade:\/\/preview\/captures\/([a-z0-9-]+)\/(manifest|screenshot|frame|accessibility|dom-layout-style)$/
 
 const MCP_TOOL_DEFINITIONS = Object.freeze([
   Object.freeze({
+    name: 'read_resource',
+    description:
+      'Read any available Desktop Arcade MCP arcade:// resource through a tool call. Use this when your MCP host does not expose raw resources/read.',
+    inputSchema: Object.freeze({
+      type: 'object',
+      additionalProperties: false,
+      properties: Object.freeze({
+        uri: Object.freeze({
+          type: 'string',
+          description: 'Required Desktop Arcade MCP resource URI to read.',
+        }),
+      }),
+      required: ['uri'],
+    }),
+  }),
+  Object.freeze({
     name: 'capture_preview_evidence',
-    description: 'Capture targeted Preview evidence for the active Arcade project.',
+    description:
+      'Capture targeted Preview evidence for the active Arcade project across screenshot, accessibility, DOM/layout/style, and frame layers.',
     inputSchema: Object.freeze({
       type: 'object',
       additionalProperties: false,
@@ -102,7 +119,8 @@ const MCP_TOOL_DEFINITIONS = Object.freeze([
             type: 'string',
             enum: VALID_PREVIEW_CAPTURE_LAYERS,
           }),
-          description: 'Optional requested baseline evidence layers.',
+          description:
+            'Optional requested evidence layers. screenshot = visual appearance and spatial gestalt; accessibility = roles, names, landmarks, focusable controls, and semantic hierarchy; dom_layout_style = actionable hierarchy, bounds, styles, spacing, colors, typography, and overflow; frame = viewport, theme, page, scroll, diagnostics, truncation, and capture metadata. Omit to capture all available layers.',
         }),
         screenshotScope: Object.freeze({
           type: 'string',
@@ -263,6 +281,7 @@ const MCP_STABLE_RESOURCE_DEFINITIONS = Object.freeze([
 ])
 
 const TOOL_EXECUTION_STATUS = Object.freeze({
+  read_resource: 'available',
   capture_preview_evidence: 'available when an active preview capture bridge is connected',
   apply_changes: 'available when an active project writer is connected',
 })
@@ -274,14 +293,16 @@ const PREVIEW_EVIDENCE_URI_TEMPLATE_STATUS = Object.freeze({
     'available after a successful capture until the capture expires',
   'arcade://preview/captures/{captureId}/frame':
     'available after a successful capture until the capture expires',
-  'arcade://preview/captures/{captureId}/accessibility': 'not-yet-implemented',
-  'arcade://preview/captures/{captureId}/dom-layout-style': 'not-yet-implemented',
+  'arcade://preview/captures/{captureId}/accessibility':
+    'available after a successful capture until the capture expires',
+  'arcade://preview/captures/{captureId}/dom-layout-style':
+    'available after a successful capture until the capture expires',
 })
 
 const CAPTURE_LAYER_STATUS = Object.freeze({
   screenshot: 'available',
-  accessibility: 'not-yet-implemented',
-  dom_layout_style: 'not-yet-implemented',
+  accessibility: 'available',
+  dom_layout_style: 'available',
   frame: 'available',
 })
 
@@ -623,7 +644,12 @@ const routeDesktopMcpJsonRpcRequest = async (
       routeResourcesListRequest(payload, response)
       return
     case 'tools/call':
-      await routeToolsCallRequest(payload, response, { applyChanges, capturePreviewEvidence })
+      await routeToolsCallRequest(payload, response, {
+        applyChanges,
+        capturePreviewEvidence,
+        previewCaptureStore,
+        readProjectResource,
+      })
       return
     case 'resources/read':
       await routeResourcesReadRequest(payload, response, {
@@ -745,7 +771,7 @@ const routeResourcesListRequest = (payload, response) => {
 const routeToolsCallRequest = async (
   payload,
   response,
-  { applyChanges, capturePreviewEvidence }
+  { applyChanges, capturePreviewEvidence, previewCaptureStore, readProjectResource }
 ) => {
   if (!isJsonRpcResponseId(payload.id)) {
     sendJsonRpcError(response, {
@@ -819,6 +845,37 @@ const routeToolsCallRequest = async (
   }
 
   try {
+    if (toolDefinition.name === 'read_resource') {
+      const resourceResult = await readDesktopResource(argumentsPayload.uri, {
+        previewCaptureStore,
+        readProjectResource,
+      })
+
+      sendJson(response, 200, {
+        jsonrpc: '2.0',
+        id: payload.id,
+        result: resourceResult.ok
+          ? createToolExecutionSuccessResult(
+              `Read Desktop Arcade MCP resource ${resourceResult.uri} (${resourceResult.mimeType}).`,
+              {
+                ok: true,
+                uri: resourceResult.uri,
+                mimeType: resourceResult.mimeType,
+                text: resourceResult.text,
+              }
+            )
+          : createToolExecutionErrorResult(
+              toolDefinition.name,
+              resourceResult.code,
+              resourceResult.message,
+              {
+                resourceUri: resourceResult.resourceUri,
+              }
+            ),
+      })
+      return
+    }
+
     if (toolDefinition.name === 'capture_preview_evidence') {
       const captureResult = await capturePreviewEvidence(argumentsPayload)
       if (!isCapturePreviewResult(captureResult)) {
@@ -899,17 +956,110 @@ const routeToolsCallRequest = async (
           ),
     })
   } catch (error) {
+    const unexpectedMessage =
+      toolDefinition.name === 'capture_preview_evidence'
+        ? 'Desktop Arcade MCP capture_preview_evidence failed unexpectedly.'
+        : toolDefinition.name === 'read_resource'
+          ? 'Desktop Arcade MCP read_resource failed unexpectedly.'
+          : 'Desktop Arcade MCP apply_changes failed unexpectedly.'
+
     sendJson(response, 200, {
       jsonrpc: '2.0',
       id: payload.id,
       result: createToolExecutionErrorResult(
         toolDefinition.name,
         'project-unavailable',
-        error instanceof Error
-          ? error.message
-          : 'Desktop Arcade MCP apply_changes failed unexpectedly.'
+        error instanceof Error ? error.message : unexpectedMessage
       ),
     })
+  }
+}
+
+const readDesktopResource = async (uri, { previewCaptureStore, readProjectResource }) => {
+  if (isPreviewCaptureResourceUri(uri)) {
+    const resource = previewCaptureStore.read(uri)
+    if (!resource) {
+      return {
+        ok: false,
+        code: 'resource-not-found',
+        resourceUri: uri,
+        message: `Desktop Arcade MCP resource "${uri}" is unavailable because the Preview capture does not exist or has expired.`,
+      }
+    }
+
+    return {
+      ok: true,
+      uri: resource.uri,
+      mimeType: resource.mimeType,
+      text: resource.text,
+    }
+  }
+
+  if (isKnownProjectResourceUri(uri)) {
+    let resourceResult
+    try {
+      resourceResult = await readProjectResource({ uri })
+    } catch (error) {
+      return {
+        ok: false,
+        code: 'project-unavailable',
+        resourceUri: uri,
+        message:
+          error instanceof Error ? error.message : `Desktop Arcade MCP resource "${uri}" is unavailable.`,
+      }
+    }
+
+    if (!isProjectResourceReadResult(resourceResult, uri)) {
+      return {
+        ok: false,
+        code: 'project-unavailable',
+        resourceUri: uri,
+        message: `Desktop Arcade MCP resource "${uri}" returned an invalid project resource response.`,
+      }
+    }
+
+    if (!resourceResult.ok) {
+      return {
+        ok: false,
+        code: resourceResult.code,
+        resourceUri: resourceResult.resourceUri,
+        message: resourceResult.message,
+      }
+    }
+
+    return {
+      ok: true,
+      uri: resourceResult.uri,
+      mimeType: resourceResult.mimeType,
+      text: resourceResult.text,
+    }
+  }
+
+  const resourceDefinition = MCP_STABLE_RESOURCE_DEFINITIONS.find((resource) => resource.uri === uri)
+  if (!resourceDefinition) {
+    return {
+      ok: false,
+      code: 'resource-not-found',
+      resourceUri: uri,
+      message: `Unknown Desktop Arcade MCP resource "${uri}".`,
+    }
+  }
+
+  const desktopResourceText = createDesktopStableResourceText(resourceDefinition.uri)
+  if (desktopResourceText !== null) {
+    return {
+      ok: true,
+      uri: resourceDefinition.uri,
+      mimeType: resourceDefinition.mimeType,
+      text: desktopResourceText,
+    }
+  }
+
+  return {
+    ok: false,
+    code: 'not-yet-implemented',
+    resourceUri: resourceDefinition.uri,
+    message: `Desktop Arcade MCP resource "${resourceDefinition.uri}" is not implemented yet.`,
   }
 }
 
@@ -950,142 +1100,34 @@ const routeResourcesReadRequest = async (
     return
   }
 
-  if (isPreviewCaptureResourceUri(params.uri)) {
-    const resource = previewCaptureStore.read(params.uri)
-    if (!resource) {
-      sendJsonRpcError(response, {
-        id: payload.id,
-        code: -32002,
-        message:
-          `Desktop Arcade MCP resource "${params.uri}" is unavailable because the Preview capture does not exist or has expired.`,
-        data: {
-          code: 'resource-not-found',
-          resourceUri: params.uri,
-        },
-      })
-      return
-    }
-
-    sendJson(response, 200, {
-      jsonrpc: '2.0',
-      id: payload.id,
-      result: {
-        contents: [
-          {
-            uri: resource.uri,
-            mimeType: resource.mimeType,
-            text: resource.text,
-          },
-        ],
-      },
-    })
-    return
-  }
-
-  if (isKnownProjectResourceUri(params.uri)) {
-    let resourceResult
-    try {
-      resourceResult = await readProjectResource({ uri: params.uri })
-    } catch (error) {
-      sendJsonRpcError(response, {
-        id: payload.id,
-        code: -32002,
-        message:
-          error instanceof Error
-            ? error.message
-            : `Desktop Arcade MCP resource "${params.uri}" is unavailable.`,
-        data: {
-          code: 'project-unavailable',
-          resourceUri: params.uri,
-        },
-      })
-      return
-    }
-
-    if (!isProjectResourceReadResult(resourceResult, params.uri)) {
-      sendJsonRpcError(response, {
-        id: payload.id,
-        code: -32002,
-        message:
-          `Desktop Arcade MCP resource "${params.uri}" returned an invalid project resource response.`,
-        data: {
-          code: 'project-unavailable',
-          resourceUri: params.uri,
-        },
-      })
-      return
-    }
-
-    if (!resourceResult.ok) {
-      sendJsonRpcError(response, {
-        id: payload.id,
-        code: -32002,
-        message: resourceResult.message,
-        data: {
-          code: resourceResult.code,
-          resourceUri: resourceResult.resourceUri,
-        },
-      })
-      return
-    }
-
-    sendJson(response, 200, {
-      jsonrpc: '2.0',
-      id: payload.id,
-      result: {
-        contents: [
-          {
-            uri: resourceResult.uri,
-            mimeType: resourceResult.mimeType,
-            text: resourceResult.text,
-          },
-        ],
-      },
-    })
-    return
-  }
-
-  const resourceDefinition = MCP_STABLE_RESOURCE_DEFINITIONS.find(
-    (resource) => resource.uri === params.uri
-  )
-  if (!resourceDefinition) {
+  const resourceResult = await readDesktopResource(params.uri, {
+    previewCaptureStore,
+    readProjectResource,
+  })
+  if (!resourceResult.ok) {
     sendJsonRpcError(response, {
       id: payload.id,
       code: -32002,
-      message: `Unknown Desktop Arcade MCP resource "${params.uri}".`,
+      message: resourceResult.message,
       data: {
-        code: 'resource-not-found',
-        resourceUri: params.uri,
+        code: resourceResult.code,
+        resourceUri: resourceResult.resourceUri,
       },
     })
     return
   }
 
-  const desktopResourceText = createDesktopStableResourceText(resourceDefinition.uri)
-  if (desktopResourceText !== null) {
-    sendJson(response, 200, {
-      jsonrpc: '2.0',
-      id: payload.id,
-      result: {
-        contents: [
-          {
-            uri: resourceDefinition.uri,
-            mimeType: resourceDefinition.mimeType,
-            text: desktopResourceText,
-          },
-        ],
-      },
-    })
-    return
-  }
-
-  sendJsonRpcError(response, {
+  sendJson(response, 200, {
+    jsonrpc: '2.0',
     id: payload.id,
-    code: -32002,
-    message: `Desktop Arcade MCP resource "${resourceDefinition.uri}" is not implemented yet.`,
-    data: {
-      code: 'not-yet-implemented',
-      resourceUri: resourceDefinition.uri,
+    result: {
+      contents: [
+        {
+          uri: resourceResult.uri,
+          mimeType: resourceResult.mimeType,
+          text: resourceResult.text,
+        },
+      ],
     },
   })
 }
@@ -1126,6 +1168,8 @@ const readStrictParamsObject = (payload, { allowedKeys, id, method, response }) 
 
 const validateToolArguments = (toolName, argumentsPayload) => {
   switch (toolName) {
+    case 'read_resource':
+      return validateReadResourceArguments(argumentsPayload)
     case 'capture_preview_evidence':
       return validateCapturePreviewEvidenceArguments(argumentsPayload)
     case 'apply_changes':
@@ -1133,6 +1177,19 @@ const validateToolArguments = (toolName, argumentsPayload) => {
     default:
       return `Unknown Desktop Arcade MCP tool "${toolName}".`
   }
+}
+
+const validateReadResourceArguments = (argumentsPayload) => {
+  const extraKeys = getUnexpectedKeys(argumentsPayload, ['uri'])
+  if (extraKeys.length > 0) {
+    return `read_resource arguments contain unsupported fields: ${extraKeys.join(', ')}.`
+  }
+
+  if (typeof argumentsPayload.uri !== 'string' || argumentsPayload.uri.trim().length === 0) {
+    return 'read_resource uri must be a non-empty string.'
+  }
+
+  return null
 }
 
 const validateCapturePreviewEvidenceArguments = (argumentsPayload) => {
@@ -1458,13 +1515,14 @@ const createDesktopStableResourceText = (uri) => {
         '',
         '- Work through `arcade://` resources and MCP tools only; do not edit repository files, package metadata, or the local filesystem.',
         '- Default loop: read this guide, read `arcade://project/manifest`, read the relevant source resources, use `apply_changes` for durable edits, read `arcade://project/diagnostics` unless the human asked for a different workflow, then capture Preview evidence when visual validation is needed.',
+        '- If your MCP host does not expose raw `resources/read`, use `read_resource({ uri })` as a compatibility bridge for any returned `arcade://...` resource URI.',
         '- Durable project edits happen through `apply_changes`, not by patching files outside the active Arcade project.',
         '- Use `create_page.newPageRef`, later `tempPageRef` targets, and `{{pageRef:name}}` placeholders when one batch must create a page and link to it.',
         '- `capture_preview_evidence({ pageId })` is the normal autonomous inspection path for pages and targeted visual states.',
         '- Use `select_active_page` only when you intentionally want the human-visible Active page to change; ordinary inspection should keep using `capture_preview_evidence({ pageId })`.',
         '- Saved Preview preferences live in `arcade://project/preview-context`; capture-only overrides must not mutate them.',
         '- If `apply_changes` returns `project-unavailable`, wait for an active Desktop Arcade window instead of falling back to repository or filesystem edits.',
-        '- Baseline Preview capture currently supports `screenshot` and `frame` layers, with `viewport`, `full_page`, and `region` screenshot scopes. Later semantic layers may still be unavailable.',
+        '- Preview capture supports `screenshot`, `accessibility`, `dom_layout_style`, and `frame` layers, with `viewport`, `full_page`, and `region` screenshot scopes. Omit `layers` to capture all available layers.',
         '- When state is unclear, re-read the manifest before making another durable change.',
       ].join('\n')
     case 'arcade://desktop/authoring-guide':
@@ -1682,6 +1740,13 @@ const isCapturePreviewResult = (value) => {
       typeof value.page.id === 'string' &&
       typeof value.page.name === 'string' &&
       isPlainObject(value.layerResources) &&
+      (value.layerResources.accessibility === undefined ||
+        typeof value.layerResources.accessibility === 'string') &&
+      (value.layerResources.dom_layout_style === undefined ||
+        typeof value.layerResources.dom_layout_style === 'string') &&
+      (value.layerResources.frame === undefined || typeof value.layerResources.frame === 'string') &&
+      (value.layerResources.screenshot === undefined ||
+        typeof value.layerResources.screenshot === 'string') &&
       Array.isArray(value.resources) &&
       value.resources.every(
         (resource) =>

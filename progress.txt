@@ -3429,3 +3429,94 @@ Verification:
 - npm run typecheck
 - npm run lint
 - CI=1 npm run test -- --run
+
+### 2026-06-16 - Issue #276: Add accessibility and DOM/layout/style Preview evidence layers
+
+Implemented:
+
+- Selected `#276` as the single highest-priority `ready-for-agent` feature from `#276`-`#280` after checking issue `#269`, `CONTEXT.md`, and the existing `progress.txt` notes. `#279` and `#280` are still blocked, `#277` was already complete, and `#276` beat `#278` because it finishes the core Preview evidence contract that later interaction workflows depend on.
+- Extended `src/services/previewEvidence.ts` so Preview capture now produces a bounded `accessibility` layer with roles, accessible names, heading levels, focusability, and selected/expanded/checked/current/pressed/disabled states alongside the existing DOM/layout/style evidence, including overflow styles and deterministic truncation metadata.
+- Extended `src/services/desktopMcpPreviewCapture.ts`, `src/services/desktopMcpPreviewCaptureProtocol.ts`, `src/services/desktopMcpPreviewCaptureSandbox.ts`, `desktop/main.cjs`, and `desktop/mcpServer.cjs` so `capture_preview_evidence` defaults omitted `layers` to all available layers, publishes short-lived `accessibility` and `dom_layout_style` resources plus the manifest/frame/screenshot set, validates the expanded contract end-to-end, and updates the MCP capability/guide text to mark both new layers as available.
+- Regenerated `public/preview-evidence-global.js` via `npm run build:sandbox` so the hidden Desktop Preview capture sandbox stays in sync with the TypeScript evidence serializer.
+- Added focused regression coverage in `tests/unit/services/previewEvidence.test.ts`, new `tests/unit/services/desktopMcpPreviewCapture.test.ts`, updated `tests/unit/services/desktopMcpServer.test.ts`, and extended `tests/e2e/desktop-mcp-preview-capture.spec.ts` so the new layers, default-all-layer behavior, manifest/resource payloads, and live Desktop MCP preview-capture flow are all covered.
+
+Verification:
+
+- npm run build:sandbox
+- npm run typecheck
+- npm run lint
+- CI=1 npm run test -- --run
+- npm run test:e2e -- tests/e2e/desktop-mcp-preview-capture.spec.ts --reporter=line
+- Browser/console smoke check at `http://127.0.0.1:5173/aksel-arcade/` via `npm run dev -- --host 127.0.0.1 --port 5173 --strictPort`, confirming the app shell and live preview render cleanly with no browser-console warnings/errors
+
+Next note:
+
+- `#278` can now treat `capture_preview_evidence` as a full four-layer inspection primitive. Reuse the new `accessibility` and `dom_layout_style` resources instead of inventing parallel interaction-inspection payloads, and keep `public/preview-evidence-global.js` regenerated whenever `src/services/previewEvidence.ts` changes.
+
+### 2026-06-16 - PR #288 follow-up: add tool-level MCP resource reads
+
+Fixed after manual MCP verification:
+
+- Reproduced a host-compatibility gap after `#276`: `capture_preview_evidence` succeeded and returned `arcade://preview/captures/...` URIs, but some agent-facing MCP hosts expose only `tools/call` and not raw `resources/read`, so the returned evidence resources could not actually be inspected from that environment.
+- Added a new Desktop Arcade MCP tool, `read_resource({ uri })`, in `desktop/mcpServer.cjs`. It reuses the same underlying resource-read path as raw `resources/read`, so tool-only hosts can now fetch Preview capture resources, project resources, and stable desktop resources without widening the surface beyond existing `arcade://...` contracts.
+- Kept the existing raw `resources/read` behavior unchanged while centralizing the shared read logic, updated capability/operating-guide output to advertise the compatibility bridge, and added unit coverage that exercises the new tool against Preview capture resources.
+- Updated `tests/e2e/desktop-mcp-preview-capture.spec.ts` to verify the real Electron/Desktop MCP flow through `capture_preview_evidence` plus `read_resource`, which matches the failing agent-facing usage more closely than direct `resources/read`.
+
+Verification:
+
+- CI=1 npm run test -- --run tests/unit/services/desktopMcpServer.test.ts
+- npm run test:e2e -- tests/e2e/desktop-mcp-preview-capture.spec.ts --reporter=line
+- npm run typecheck
+- npm run lint
+- CI=1 npm run test -- --run
+
+Next note:
+
+- Keep `read_resource` as the compatibility path for MCP hosts that cannot issue raw `resources/read` requests. If a later issue changes Preview capture manifests or adds new `arcade://preview/captures/{captureId}/*` resources, make sure both the raw resource path and the tool-only bridge stay in sync.
+
+### 2026-06-16 - PR #288 follow-up: sanitize accessibility fallback names
+
+Fixed after external retest:
+
+- Reproduced the remaining `#276` gap with a focused unit regression: Preview accessibility serialization was deriving fallback names from raw subtree `textContent`, so a `<main>` landmark could pick up text from excluded descendants like `<script>`, `<style>`, and `<template>`.
+- Tightened `src/services/previewEvidence.ts` so fallback accessibility names now use sanitized subtree text and only apply to roles/elements that actually take names from their contents. Landmark/container nodes such as `main` no longer inherit noisy descendant text, while headings, buttons, links, and similar content-named controls still keep their expected names.
+- Reused the sanitized text helper for `aria-labelledby`, associated `<label>` text, and other accessibility-name text paths so excluded nodes do not leak back in through referenced labels.
+- Regenerated `public/preview-evidence-global.js` so the hidden Desktop Preview capture sandbox uses the same sanitization logic as the TypeScript source, and added a regression in `tests/unit/services/previewEvidence.test.ts` that proves script/style/template text is absent from accessibility output.
+
+Verification:
+
+- CI=1 npm run test -- --run tests/unit/services/previewEvidence.test.ts tests/unit/services/desktopMcpPreviewCapture.test.ts tests/unit/services/desktopMcpServer.test.ts
+- npm run build:sandbox
+- npm run test:e2e -- tests/e2e/desktop-mcp-preview-capture.spec.ts --reporter=line
+- npm run typecheck
+- npm run lint
+- CI=1 npm run test -- --run
+- Browser/console smoke check at `http://127.0.0.1:5173/aksel-arcade/` via `npm run dev -- --host 127.0.0.1 --port 5173 --strictPort`, confirming the app shell and live preview render cleanly with no browser-console warnings/errors
+
+Next note:
+
+- If later Preview evidence work expands accessible-name heuristics, keep the current distinction between explicit names and content-derived names. Excluded descendant text must stay out of both the DOM/layout/style layer and the accessibility layer, and `public/preview-evidence-global.js` must be regenerated whenever `src/services/previewEvidence.ts` changes.
+
+### 2026-06-16 - PR #288 review follow-up: align accessible names with browser behavior
+
+Fixed during merge review:
+
+- Confirmed a remaining PR-scoped accuracy gap in the new accessibility layer: fallback name extraction still diverged from browser behavior for three common cases — `<img alt>`, text-like `<input value>`, and content names polluted by `aria-hidden` descendants.
+- Tightened `src/services/previewEvidence.ts` so image/image-input `alt` text is used as the accessible name, text-like inputs no longer use their current `value` as a fake name, button-like inputs still keep value-backed names where appropriate, and sanitized subtree text now skips `aria-hidden` / `hidden` descendants as well as excluded nodes.
+- Reused the same helper path for label text, `aria-labelledby`, and content-derived names, so the accessibility layer and `target.name` capture matching stay aligned with each other instead of drifting across separate heuristics.
+- Added focused regression coverage in `tests/unit/services/previewEvidence.test.ts` proving `<img alt="Hero art">` is named, `<input type="text" value="xyz">` stays unnamed, and `<button>Run<span aria-hidden="true">hidden</span></button>` captures as `Run` instead of `Run hidden`.
+- Regenerated `public/preview-evidence-global.js` so the checked-in hidden Preview sandbox bundle matches the updated serializer logic.
+
+Verification:
+
+- CI=1 npm run test -- --run tests/unit/services/previewEvidence.test.ts
+- npm run build:sandbox
+- npm run test:e2e -- tests/e2e/desktop-mcp-preview-capture.spec.ts --reporter=line
+- npm run typecheck
+- npm run lint
+- CI=1 npm run test -- --run
+- Browser/console smoke check at `http://127.0.0.1:5173/aksel-arcade/` via `npm run dev -- --host 127.0.0.1 --port 5173 --strictPort`, confirming the app shell and live preview render cleanly with no browser-console warnings/errors
+
+Next note:
+
+- Keep accessibility-name extraction grounded in browser/AT semantics rather than raw DOM text. If future work expands roles or target matching, preserve the current split between explicit names (`aria-*`, `alt`, labels, titles), content-derived names for the roles that support them, and sanitized descendant text that excludes hidden/unsafe nodes.

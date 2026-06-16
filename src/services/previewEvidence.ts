@@ -23,6 +23,8 @@ export interface PreviewEvidenceComputedStyle {
   boxSizing?: string
   width?: string
   height?: string
+  overflowX?: string
+  overflowY?: string
   marginTop?: string
   marginRight?: string
   marginBottom?: string
@@ -88,7 +90,36 @@ export interface PreviewEvidence {
   tree: PreviewEvidenceElement
 }
 
-export type PreviewEvidenceLayer = 'screenshot' | 'frame'
+export interface PreviewEvidenceAccessibilityState {
+  disabled?: boolean
+  selected?: boolean
+  expanded?: boolean
+  checked?: boolean | 'mixed'
+  current?: string | true
+  pressed?: boolean | 'mixed'
+}
+
+export interface PreviewEvidenceAccessibilityNode {
+  role: string
+  name?: string
+  level?: number
+  focusable?: true
+  states?: PreviewEvidenceAccessibilityState
+  children?: PreviewEvidenceAccessibilityNode[]
+}
+
+export interface PreviewEvidenceAccessibility {
+  rootSelector: typeof PREVIEW_EVIDENCE_ROOT_SELECTOR
+  nodeCount: number
+  truncated: boolean
+  nodes: PreviewEvidenceAccessibilityNode[]
+}
+
+export type PreviewEvidenceLayer =
+  | 'screenshot'
+  | 'accessibility'
+  | 'dom_layout_style'
+  | 'frame'
 export type PreviewEvidenceScreenshotScope = 'viewport' | 'full_page' | 'region'
 export type PreviewEvidenceCaptureErrorCode =
   | 'preview-unavailable'
@@ -141,6 +172,7 @@ export interface PreviewEvidenceCaptureFailure {
 export interface PreviewEvidenceCaptureSuccess {
   ok: true
   evidence: PreviewEvidence
+  accessibility?: PreviewEvidenceAccessibility
   screenshot?: PreviewEvidenceScreenshot
   captureMeta?: PreviewEvidenceCaptureMetadata
 }
@@ -151,6 +183,11 @@ export type PreviewEvidenceCaptureResult =
 
 interface SerializationState {
   capturedElementCount: number
+  truncated: boolean
+}
+
+interface AccessibilitySerializationState {
+  nodeCount: number
   truncated: boolean
 }
 
@@ -261,6 +298,24 @@ export const serializePreviewEvidence = (
   }
 }
 
+const serializePreviewAccessibility = (
+  root: Element,
+  frameWindow: Window = root.ownerDocument.defaultView ?? window
+): PreviewEvidenceAccessibility => {
+  const state: AccessibilitySerializationState = {
+    nodeCount: 0,
+    truncated: false,
+  }
+  const nodes = serializeAccessibilityNodes(root, frameWindow, state)
+
+  return {
+    rootSelector: PREVIEW_EVIDENCE_ROOT_SELECTOR,
+    nodeCount: state.nodeCount,
+    truncated: state.truncated,
+    nodes,
+  }
+}
+
 export const capturePreviewEvidenceSnapshot = (
   root: Element,
   {
@@ -282,8 +337,12 @@ export const capturePreviewEvidenceSnapshot = (
     const evidence = serializePreviewEvidence(root, frameWindow, viewportFallback)
     const normalizedLayers = layers ? [...layers] : []
     const screenshotRequested = normalizedLayers.includes('screenshot')
+    const accessibilityRequested = normalizedLayers.includes('accessibility')
     const screenshot = screenshotRequested
       ? createPreviewScreenshot(root, { screenshotScope, target, viewportFallback }, frameWindow)
+      : null
+    const accessibility = accessibilityRequested
+      ? serializePreviewAccessibility(root, frameWindow)
       : null
 
     if (screenshotRequested && !screenshot) {
@@ -296,10 +355,11 @@ export const capturePreviewEvidenceSnapshot = (
     return {
       ok: true,
       evidence,
+      ...(accessibility ? { accessibility } : {}),
       ...(screenshot ? { screenshot } : {}),
       captureMeta: {
         currentPageId,
-        screenshotScope,
+        ...(screenshotRequested ? { screenshotScope } : {}),
         ...(screenshot?.targetDescription ? { targetDescription: screenshot.targetDescription } : {}),
       },
     }
@@ -349,6 +409,69 @@ const serializeElement = (
     boundingBox: getBoundingBox(element),
     computedStyle: getSelectedComputedStyle(frameWindow.getComputedStyle(element)),
     ...(children.length > 0 ? { children } : {}),
+  }
+}
+
+const serializeAccessibilityNodes = (
+  element: Element,
+  frameWindow: Window,
+  state: AccessibilitySerializationState
+): PreviewEvidenceAccessibilityNode[] => {
+  if (isExcludedElement(element) || isAccessibilityHidden(element, frameWindow) || state.truncated) {
+    return []
+  }
+
+  const node = createAccessibilityNode(element)
+  if (node) {
+    if (state.nodeCount >= MAX_PREVIEW_EVIDENCE_ELEMENTS) {
+      state.truncated = true
+      return []
+    }
+
+    state.nodeCount += 1
+  }
+
+  const children: PreviewEvidenceAccessibilityNode[] = []
+  for (const child of Array.from(element.children)) {
+    if (state.truncated) {
+      break
+    }
+
+    children.push(...serializeAccessibilityNodes(child, frameWindow, state))
+  }
+
+  if (!node) {
+    return children
+  }
+
+  return [
+    {
+      ...node,
+      ...(children.length > 0 ? { children } : {}),
+    },
+  ]
+}
+
+const createAccessibilityNode = (
+  element: Element
+): PreviewEvidenceAccessibilityNode | null => {
+  const explicitlyNamed = hasExplicitAccessibleName(element)
+  const name = getElementAccessibleName(element)
+  const role = getElementAccessibilityRole(element, explicitlyNamed)
+  const focusable = isElementFocusable(element)
+  const level = getElementHeadingLevel(element)
+  const states = getElementAccessibilityStates(element)
+
+  if (!role && !focusable && level === undefined && states === undefined && !explicitlyNamed) {
+    return null
+  }
+
+  return {
+    role: role ?? 'generic',
+    ...(name ? { name } : {}),
+    ...(level !== undefined ? { level } : {}),
+    ...(focusable ? { focusable: true } : {}),
+    ...(states ? { states } : {}),
   }
 }
 
@@ -700,15 +823,24 @@ const matchesPreviewCaptureTargetCandidate = (
     return false
   }
 
-  if (normalizedName && !getElementAccessibleName(candidate).includes(normalizedName)) {
+  if (
+    normalizedName &&
+    !normalizeComparableText(getElementAccessibleName(candidate)).includes(normalizedName)
+  ) {
     return false
   }
 
-  if (normalizedText && !getElementVisibleText(candidate).includes(normalizedText)) {
+  if (
+    normalizedText &&
+    !normalizeComparableText(getElementVisibleText(candidate)).includes(normalizedText)
+  ) {
     return false
   }
 
-  if (normalizedLabel && !getElementLabelText(candidate).includes(normalizedLabel)) {
+  if (
+    normalizedLabel &&
+    !normalizeComparableText(getElementLabelText(candidate)).includes(normalizedLabel)
+  ) {
     return false
   }
 
@@ -761,18 +893,26 @@ const getElementRole = (element: Element): string => {
 const getElementAccessibleName = (element: Element): string => {
   const ariaLabel = element.getAttribute('aria-label')
   if (ariaLabel) {
-    return normalizeComparableText(ariaLabel)
+    return normalizeWhitespace(ariaLabel)
   }
 
   const labelledBy = element.getAttribute('aria-labelledby')
   if (labelledBy) {
     const text = labelledBy
       .split(/\s+/)
-      .map((id) => element.ownerDocument.getElementById(id)?.textContent ?? '')
+      .map((id) => {
+        const referencedElement = element.ownerDocument.getElementById(id)
+        return referencedElement ? getElementVisibleText(referencedElement) : ''
+      })
       .join(' ')
     if (text.trim()) {
-      return normalizeComparableText(text)
+      return normalizeWhitespace(text)
     }
+  }
+
+  const altText = getElementAltText(element)
+  if (altText) {
+    return altText
   }
 
   const labelText = getElementLabelText(element)
@@ -782,24 +922,38 @@ const getElementAccessibleName = (element: Element): string => {
 
   const title = element.getAttribute('title')
   if (title) {
-    return normalizeComparableText(title)
+    return normalizeWhitespace(title)
   }
 
-  if (element instanceof HTMLInputElement && element.value) {
-    return normalizeComparableText(element.value)
+  if (element instanceof HTMLInputElement && inputUsesValueAsAccessibleName(element) && element.value) {
+    return normalizeWhitespace(element.value)
   }
 
-  return getElementVisibleText(element)
+  return elementUsesContentAsAccessibleName(element) ? getElementVisibleText(element) : ''
 }
+
+const hasExplicitAccessibleName = (element: Element): boolean =>
+  element.hasAttribute('aria-label') ||
+  element.hasAttribute('aria-labelledby') ||
+  getElementAltText(element).length > 0 ||
+  element.hasAttribute('title') ||
+  getElementLabelText(element).length > 0 ||
+  (element instanceof HTMLInputElement &&
+    inputUsesValueAsAccessibleName(element) &&
+    normalizeWhitespace(element.value).length > 0)
 
 const getElementLabelText = (element: Element): string => {
   if (!(element instanceof HTMLElement)) {
     return ''
   }
 
-  const labels = isLabelableElement(element) ? Array.from(element.labels ?? []) : []
+  if (!isLabelableElement(element)) {
+    return ''
+  }
+
+  const labels = Array.from(element.labels ?? [])
   if (labels.length > 0) {
-    return normalizeComparableText(labels.map((label) => label.textContent ?? '').join(' '))
+    return normalizeWhitespace(labels.map((label) => getElementVisibleText(label)).join(' '))
   }
 
   if (element.id) {
@@ -807,28 +961,308 @@ const getElementLabelText = (element: Element): string => {
       (candidate) => candidate.getAttribute('for') === element.id
     )
     if (label) {
-      return normalizeComparableText(label.textContent ?? '')
+      return getElementVisibleText(label)
     }
   }
 
   const wrappingLabel = element.closest('label')
-  return wrappingLabel ? normalizeComparableText(wrappingLabel.textContent ?? '') : ''
+  return wrappingLabel ? getElementVisibleText(wrappingLabel) : ''
 }
 
 const getElementVisibleText = (element: Element): string =>
-  normalizeComparableText((element.textContent ?? '').replace(/\s+/g, ' '))
+  normalizeWhitespace(getSanitizedSubtreeText(element))
+
+const getSanitizedSubtreeText = (node: Node): string => {
+  if (node.nodeType === Node.TEXT_NODE) {
+    return node.textContent ?? ''
+  }
+
+  if (node.nodeType === Node.ELEMENT_NODE) {
+    const element = node as Element
+    if (
+      isExcludedElement(element) ||
+      element.getAttribute('aria-hidden') === 'true' ||
+      element.hasAttribute('hidden')
+    ) {
+      return ''
+    }
+  }
+
+  return Array.from(node.childNodes)
+    .map((child) => getSanitizedSubtreeText(child))
+    .join(' ')
+}
+
+const getElementAltText = (element: Element): string => {
+  if (element instanceof HTMLImageElement) {
+    return normalizeWhitespace(element.getAttribute('alt') ?? '')
+  }
+
+  if (element instanceof HTMLInputElement && element.type === 'image') {
+    return normalizeWhitespace(element.getAttribute('alt') ?? '')
+  }
+
+  return ''
+}
+
+const inputUsesValueAsAccessibleName = (input: HTMLInputElement): boolean =>
+  input.type === 'button' || input.type === 'submit' || input.type === 'reset'
+
+const elementUsesContentAsAccessibleName = (element: Element): boolean => {
+  const explicitRole = element.getAttribute('role')?.trim().toLowerCase()
+  if (explicitRole) {
+    return (
+      explicitRole === 'button' ||
+      explicitRole === 'cell' ||
+      explicitRole === 'checkbox' ||
+      explicitRole === 'columnheader' ||
+      explicitRole === 'gridcell' ||
+      explicitRole === 'heading' ||
+      explicitRole === 'link' ||
+      explicitRole === 'menuitem' ||
+      explicitRole === 'menuitemcheckbox' ||
+      explicitRole === 'menuitemradio' ||
+      explicitRole === 'option' ||
+      explicitRole === 'radio' ||
+      explicitRole === 'rowheader' ||
+      explicitRole === 'switch' ||
+      explicitRole === 'tab' ||
+      explicitRole === 'tooltip' ||
+      explicitRole === 'treeitem'
+    )
+  }
+
+  const tagName = element.tagName.toLowerCase()
+  if (/^h[1-6]$/.test(tagName)) {
+    return true
+  }
+
+  if (tagName === 'button' || tagName === 'option' || tagName === 'summary') {
+    return true
+  }
+
+  return tagName === 'a' && element.hasAttribute('href')
+}
 
 const normalizeComparableText = (value: string | undefined): string =>
   normalizeWhitespace(value ?? '').toLowerCase()
 
-const isLabelableElement = (element: HTMLElement): element is LabelableElement =>
-  element instanceof HTMLButtonElement ||
-  element instanceof HTMLInputElement ||
-  element instanceof HTMLMeterElement ||
-  element instanceof HTMLOutputElement ||
-  element instanceof HTMLProgressElement ||
-  element instanceof HTMLSelectElement ||
-  element instanceof HTMLTextAreaElement
+const getElementAccessibilityRole = (
+  element: Element,
+  explicitlyNamed: boolean
+): string | undefined => {
+  const explicitRole = element.getAttribute('role')?.trim().toLowerCase()
+  if (explicitRole) {
+    return explicitRole === 'none' || explicitRole === 'presentation' ? undefined : explicitRole
+  }
+
+  const tagName = element.tagName.toLowerCase()
+  switch (tagName) {
+    case 'a':
+      return element.hasAttribute('href') ? 'link' : undefined
+    case 'article':
+      return 'article'
+    case 'aside':
+      return 'complementary'
+    case 'button':
+      return 'button'
+    case 'dialog':
+      return 'dialog'
+    case 'footer':
+      return 'contentinfo'
+    case 'form':
+      return explicitlyNamed ? 'form' : undefined
+    case 'header':
+      return 'banner'
+    case 'img':
+      return 'img'
+    case 'li':
+      return 'listitem'
+    case 'main':
+      return 'main'
+    case 'meter':
+      return 'meter'
+    case 'nav':
+      return 'navigation'
+    case 'ol':
+    case 'ul':
+      return 'list'
+    case 'option':
+      return 'option'
+    case 'progress':
+      return 'progressbar'
+    case 'section':
+      return explicitlyNamed ? 'region' : undefined
+    case 'select':
+      return element instanceof HTMLSelectElement && (element.multiple || element.size > 1)
+        ? 'listbox'
+        : 'combobox'
+    case 'summary':
+      return 'button'
+    case 'table':
+      return 'table'
+    case 'textarea':
+      return 'textbox'
+    case 'tr':
+      return 'row'
+  }
+
+  if (/^h[1-6]$/.test(tagName)) {
+    return 'heading'
+  }
+
+  if (tagName !== 'input') {
+    return undefined
+  }
+
+  const input = element as HTMLInputElement
+  switch (input.type) {
+    case 'button':
+    case 'submit':
+    case 'reset':
+      return 'button'
+    case 'checkbox':
+      return 'checkbox'
+    case 'hidden':
+      return undefined
+    case 'number':
+      return 'spinbutton'
+    case 'radio':
+      return 'radio'
+    case 'range':
+      return 'slider'
+    case 'search':
+      return 'searchbox'
+    default:
+      return 'textbox'
+  }
+}
+
+const getElementHeadingLevel = (element: Element): number | undefined => {
+  const tagName = element.tagName.toLowerCase()
+  if (/^h[1-6]$/.test(tagName)) {
+    return Number(tagName.slice(1))
+  }
+
+  const role = element.getAttribute('role')?.trim().toLowerCase()
+  if (role !== 'heading') {
+    return undefined
+  }
+
+  const ariaLevel = Number(element.getAttribute('aria-level'))
+  return Number.isInteger(ariaLevel) && ariaLevel > 0 ? ariaLevel : undefined
+}
+
+const getElementAccessibilityStates = (
+  element: Element
+): PreviewEvidenceAccessibilityState | undefined => {
+  const states = removeUndefinedAccessibilityStates({
+    disabled: getElementDisabledState(element),
+    selected: getElementSelectedState(element),
+    expanded: getElementExpandedState(element),
+    checked: getElementCheckedState(element),
+    current: getElementCurrentState(element),
+    pressed: getElementPressedState(element),
+  })
+
+  return Object.keys(states).length > 0 ? states : undefined
+}
+
+const getElementDisabledState = (element: Element): boolean | undefined => {
+  const ariaDisabled = element.getAttribute('aria-disabled')
+  if (ariaDisabled === 'true') {
+    return true
+  }
+
+  return isElementDisabled(element) ? true : undefined
+}
+
+const getElementSelectedState = (element: Element): boolean | undefined => {
+  const ariaSelected = element.getAttribute('aria-selected')
+  if (ariaSelected === 'true' || ariaSelected === 'false') {
+    return ariaSelected === 'true'
+  }
+
+  return element.tagName.toLowerCase() === 'option'
+    ? (element as HTMLOptionElement).selected
+    : undefined
+}
+
+const getElementExpandedState = (element: Element): boolean | undefined => {
+  const ariaExpanded = element.getAttribute('aria-expanded')
+  if (ariaExpanded === 'true' || ariaExpanded === 'false') {
+    return ariaExpanded === 'true'
+  }
+
+  return element.tagName.toLowerCase() === 'details'
+    ? (element as HTMLDetailsElement).open
+    : undefined
+}
+
+const getElementCheckedState = (
+  element: Element
+): PreviewEvidenceAccessibilityState['checked'] | undefined => {
+  const ariaChecked = element.getAttribute('aria-checked')
+  if (ariaChecked === 'mixed') {
+    return 'mixed'
+  }
+
+  if (ariaChecked === 'true' || ariaChecked === 'false') {
+    return ariaChecked === 'true'
+  }
+
+  if (element instanceof HTMLInputElement && (element.type === 'checkbox' || element.type === 'radio')) {
+    return element.indeterminate ? 'mixed' : element.checked
+  }
+
+  return undefined
+}
+
+const getElementCurrentState = (
+  element: Element
+): PreviewEvidenceAccessibilityState['current'] | undefined => {
+  const ariaCurrent = element.getAttribute('aria-current')?.trim().toLowerCase()
+  if (!ariaCurrent || ariaCurrent === 'false') {
+    return undefined
+  }
+
+  return ariaCurrent === 'true' ? true : ariaCurrent
+}
+
+const getElementPressedState = (
+  element: Element
+): PreviewEvidenceAccessibilityState['pressed'] | undefined => {
+  const ariaPressed = element.getAttribute('aria-pressed')
+  if (ariaPressed === 'mixed') {
+    return 'mixed'
+  }
+
+  if (ariaPressed === 'true' || ariaPressed === 'false') {
+    return ariaPressed === 'true'
+  }
+
+  return undefined
+}
+
+const removeUndefinedAccessibilityStates = (
+  states: PreviewEvidenceAccessibilityState
+): PreviewEvidenceAccessibilityState =>
+  Object.fromEntries(
+    Object.entries(states).filter(([, value]) => value !== undefined)
+  ) as PreviewEvidenceAccessibilityState
+
+const isLabelableElement = (element: HTMLElement): element is LabelableElement => {
+  const tagName = element.tagName.toLowerCase()
+  return (
+    tagName === 'button' ||
+    tagName === 'input' ||
+    tagName === 'meter' ||
+    tagName === 'output' ||
+    tagName === 'progress' ||
+    tagName === 'select' ||
+    tagName === 'textarea'
+  )
+}
 
 const getAllowedAttributes = (element: Element): Record<string, string> | undefined => {
   const attributes = Array.from(element.attributes)
@@ -913,6 +1347,8 @@ const getSelectedComputedStyle = (style: CSSStyleDeclaration): PreviewEvidenceCo
     boxSizing: style.boxSizing,
     width: style.width,
     height: style.height,
+    overflowX: style.overflowX,
+    overflowY: style.overflowY,
     marginTop: style.marginTop,
     marginRight: style.marginRight,
     marginBottom: style.marginBottom,
@@ -956,6 +1392,79 @@ const removeEmptyStyleValues = (
   ) as PreviewEvidenceComputedStyle
 
 const normalizeWhitespace = (value: string): string => value.replace(/\s+/g, ' ').trim()
+
+const isAccessibilityHidden = (element: Element, frameWindow: Window): boolean => {
+  if (element.getAttribute('aria-hidden') === 'true' || element.hasAttribute('hidden')) {
+    return true
+  }
+
+  if (!(element instanceof HTMLElement) && !(element instanceof SVGElement)) {
+    return false
+  }
+
+  const computedStyle = frameWindow.getComputedStyle(element)
+  return computedStyle.display === 'none' || computedStyle.visibility === 'hidden'
+}
+
+const isElementFocusable = (element: Element): boolean => {
+  if (isElementDisabled(element)) {
+    return false
+  }
+
+  if (element instanceof HTMLAnchorElement) {
+    return element.hasAttribute('href')
+  }
+
+  if (element instanceof HTMLButtonElement) {
+    return true
+  }
+
+  if (element instanceof HTMLInputElement) {
+    return element.type !== 'hidden'
+  }
+
+  if (element instanceof HTMLSelectElement || element instanceof HTMLTextAreaElement) {
+    return true
+  }
+
+  if (element.tagName.toLowerCase() === 'summary') {
+    return true
+  }
+
+  if (element instanceof HTMLElement || element instanceof SVGElement) {
+    if (element.tabIndex >= 0) {
+      return true
+    }
+
+    const contentEditable = element.getAttribute('contenteditable')
+    return Boolean(contentEditable && contentEditable.toLowerCase() !== 'false')
+  }
+
+  return false
+}
+
+const isElementDisabled = (element: Element): boolean => {
+  const tagName = element.tagName.toLowerCase()
+  switch (tagName) {
+    case 'button':
+    case 'fieldset':
+    case 'input':
+    case 'optgroup':
+    case 'option':
+    case 'select':
+    case 'textarea':
+      return (element as
+        | HTMLButtonElement
+        | HTMLFieldSetElement
+        | HTMLInputElement
+        | HTMLOptGroupElement
+        | HTMLOptionElement
+        | HTMLSelectElement
+        | HTMLTextAreaElement).disabled
+    default:
+      return false
+  }
+}
 
 const isTransparentColor = (value: string | undefined): boolean => {
   const normalized = normalizeComparableText(value)

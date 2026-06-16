@@ -126,6 +126,8 @@ interface CapturePreviewSuccess {
   producedLayers: string[]
   layerResources: {
     screenshot?: string
+    accessibility?: string
+    dom_layout_style?: string
     frame?: string
   }
   resources: Array<{
@@ -258,6 +260,12 @@ describe('desktopMcpServer', () => {
       id: 2,
       result: {
         tools: [
+          {
+            name: 'read_resource',
+            inputSchema: {
+              additionalProperties: false,
+            },
+          },
           {
             name: 'capture_preview_evidence',
             inputSchema: {
@@ -426,22 +434,27 @@ describe('desktopMcpServer', () => {
       .fn<(request: Record<string, unknown>) => Promise<CapturePreviewResult>>()
       .mockResolvedValue({
         ok: true,
-        summary: 'Captured Details (page02) in dark MD preview with screenshot and frame evidence (region).',
+        summary:
+          'Captured Details (page02) in dark MD preview with screenshot, accessibility, DOM/layout/style and frame evidence (region).',
         captureId: 'capture-demo',
         manifestResourceUri: 'arcade://preview/captures/capture-demo/manifest',
         producedResources: [
           'arcade://preview/captures/capture-demo/manifest',
-          'arcade://preview/captures/capture-demo/frame',
           'arcade://preview/captures/capture-demo/screenshot',
+          'arcade://preview/captures/capture-demo/accessibility',
+          'arcade://preview/captures/capture-demo/dom-layout-style',
+          'arcade://preview/captures/capture-demo/frame',
         ],
         page: {
           id: 'page02',
           name: 'Details',
         },
-        requestedLayers: ['screenshot', 'frame'],
-        producedLayers: ['screenshot', 'frame'],
+        requestedLayers: ['screenshot', 'accessibility', 'dom_layout_style', 'frame'],
+        producedLayers: ['screenshot', 'accessibility', 'dom_layout_style', 'frame'],
         layerResources: {
           screenshot: 'arcade://preview/captures/capture-demo/screenshot',
+          accessibility: 'arcade://preview/captures/capture-demo/accessibility',
+          dom_layout_style: 'arcade://preview/captures/capture-demo/dom-layout-style',
           frame: 'arcade://preview/captures/capture-demo/frame',
         },
         resources: [
@@ -451,19 +464,29 @@ describe('desktopMcpServer', () => {
             text: '{"captureId":"capture-demo"}',
           },
           {
-            uri: 'arcade://preview/captures/capture-demo/frame',
-            mimeType: 'application/json',
-            text: '{"page":{"id":"page02"}}',
-          },
-          {
             uri: 'arcade://preview/captures/capture-demo/screenshot',
             mimeType: 'image/svg+xml',
             text: '<svg xmlns="http://www.w3.org/2000/svg"></svg>',
           },
+          {
+            uri: 'arcade://preview/captures/capture-demo/accessibility',
+            mimeType: 'application/json',
+            text: '{"rootSelector":"#root","nodeCount":2,"truncated":false,"nodes":[{"role":"heading","name":"Details","level":1}]}',
+          },
+          {
+            uri: 'arcade://preview/captures/capture-demo/dom-layout-style',
+            mimeType: 'application/json',
+            text: '{"rootSelector":"#root","capturedElementCount":4,"truncated":false,"tree":{"tagName":"div"}}',
+          },
+          {
+            uri: 'arcade://preview/captures/capture-demo/frame',
+            mimeType: 'application/json',
+            text: '{"page":{"id":"page02"}}',
+          },
         ],
         safeActivity: {
           toolName: 'capture_preview_evidence',
-          operationTypes: ['screenshot', 'frame'],
+          operationTypes: ['screenshot', 'accessibility', 'dom_layout_style', 'frame'],
           timestamp: '2026-06-16T12:30:00.000Z',
         },
       })
@@ -484,7 +507,7 @@ describe('desktopMcpServer', () => {
         arguments: {
           pageId: 'page02',
           viewportSize: 'MD',
-          layers: ['screenshot', 'frame'],
+          layers: ['screenshot', 'accessibility', 'dom_layout_style', 'frame'],
           screenshotScope: 'region',
           target: {
             role: 'button',
@@ -501,33 +524,37 @@ describe('desktopMcpServer', () => {
         content: [
           {
             type: 'text',
-            text: 'Captured Preview evidence: Captured Details (page02) in dark MD preview with screenshot and frame evidence (region).',
+            text: 'Captured Preview evidence: Captured Details (page02) in dark MD preview with screenshot, accessibility, DOM/layout/style and frame evidence (region).',
           },
         ],
         structuredContent: {
           ok: true,
           summary:
-            'Captured Details (page02) in dark MD preview with screenshot and frame evidence (region).',
+            'Captured Details (page02) in dark MD preview with screenshot, accessibility, DOM/layout/style and frame evidence (region).',
           captureId: 'capture-demo',
           manifestResourceUri: 'arcade://preview/captures/capture-demo/manifest',
           producedResources: [
             'arcade://preview/captures/capture-demo/manifest',
-            'arcade://preview/captures/capture-demo/frame',
             'arcade://preview/captures/capture-demo/screenshot',
+            'arcade://preview/captures/capture-demo/accessibility',
+            'arcade://preview/captures/capture-demo/dom-layout-style',
+            'arcade://preview/captures/capture-demo/frame',
           ],
           page: {
             id: 'page02',
             name: 'Details',
           },
-          requestedLayers: ['screenshot', 'frame'],
-          producedLayers: ['screenshot', 'frame'],
+          requestedLayers: ['screenshot', 'accessibility', 'dom_layout_style', 'frame'],
+          producedLayers: ['screenshot', 'accessibility', 'dom_layout_style', 'frame'],
           layerResources: {
             screenshot: 'arcade://preview/captures/capture-demo/screenshot',
+            accessibility: 'arcade://preview/captures/capture-demo/accessibility',
+            dom_layout_style: 'arcade://preview/captures/capture-demo/dom-layout-style',
             frame: 'arcade://preview/captures/capture-demo/frame',
           },
           safeActivity: {
             toolName: 'capture_preview_evidence',
-            operationTypes: ['screenshot', 'frame'],
+            operationTypes: ['screenshot', 'accessibility', 'dom_layout_style', 'frame'],
             timestamp: '2026-06-16T12:30:00.000Z',
           },
         },
@@ -536,14 +563,45 @@ describe('desktopMcpServer', () => {
     expect(server.getState()).toMatchObject({
       lastActivity: {
         toolName: 'capture_preview_evidence',
-        operationTypes: ['screenshot', 'frame'],
+        operationTypes: ['screenshot', 'accessibility', 'dom_layout_style', 'frame'],
         timestamp: '2026-06-16T12:30:00.000Z',
+      },
+    })
+
+    const toolReadResponse = await postJson(state.url, {
+      jsonrpc: '2.0',
+      id: 62,
+      method: 'tools/call',
+      params: {
+        name: 'read_resource',
+        arguments: {
+          uri: 'arcade://preview/captures/capture-demo/accessibility',
+        },
+      },
+    })
+    expect(toolReadResponse.status).toBe(200)
+    await expect(toolReadResponse.json()).resolves.toEqual({
+      jsonrpc: '2.0',
+      id: 62,
+      result: {
+        content: [
+          {
+            type: 'text',
+            text: 'Read Desktop Arcade MCP resource arcade://preview/captures/capture-demo/accessibility (application/json).',
+          },
+        ],
+        structuredContent: {
+          ok: true,
+          uri: 'arcade://preview/captures/capture-demo/accessibility',
+          mimeType: 'application/json',
+          text: '{"rootSelector":"#root","nodeCount":2,"truncated":false,"nodes":[{"role":"heading","name":"Details","level":1}]}',
+        },
       },
     })
 
     const manifestResponse = await postJson(state.url, {
       jsonrpc: '2.0',
-      id: 62,
+      id: 63,
       method: 'resources/read',
       params: {
         uri: 'arcade://preview/captures/capture-demo/manifest',
@@ -552,7 +610,7 @@ describe('desktopMcpServer', () => {
     expect(manifestResponse.status).toBe(200)
     await expect(manifestResponse.json()).resolves.toEqual({
       jsonrpc: '2.0',
-      id: 62,
+      id: 63,
       result: {
         contents: [
           {
@@ -566,7 +624,7 @@ describe('desktopMcpServer', () => {
 
     const screenshotResponse = await postJson(state.url, {
       jsonrpc: '2.0',
-      id: 63,
+      id: 64,
       method: 'resources/read',
       params: {
         uri: 'arcade://preview/captures/capture-demo/screenshot',
@@ -575,7 +633,7 @@ describe('desktopMcpServer', () => {
     expect(screenshotResponse.status).toBe(200)
     await expect(screenshotResponse.json()).resolves.toEqual({
       jsonrpc: '2.0',
-      id: 63,
+      id: 64,
       result: {
         contents: [
           {
@@ -587,10 +645,56 @@ describe('desktopMcpServer', () => {
       },
     })
 
+    const accessibilityResponse = await postJson(state.url, {
+      jsonrpc: '2.0',
+      id: 65,
+      method: 'resources/read',
+      params: {
+        uri: 'arcade://preview/captures/capture-demo/accessibility',
+      },
+    })
+    expect(accessibilityResponse.status).toBe(200)
+    await expect(accessibilityResponse.json()).resolves.toEqual({
+      jsonrpc: '2.0',
+      id: 65,
+      result: {
+        contents: [
+          {
+            uri: 'arcade://preview/captures/capture-demo/accessibility',
+            mimeType: 'application/json',
+            text: '{"rootSelector":"#root","nodeCount":2,"truncated":false,"nodes":[{"role":"heading","name":"Details","level":1}]}',
+          },
+        ],
+      },
+    })
+
+    const domLayoutStyleResponse = await postJson(state.url, {
+      jsonrpc: '2.0',
+      id: 66,
+      method: 'resources/read',
+      params: {
+        uri: 'arcade://preview/captures/capture-demo/dom-layout-style',
+      },
+    })
+    expect(domLayoutStyleResponse.status).toBe(200)
+    await expect(domLayoutStyleResponse.json()).resolves.toEqual({
+      jsonrpc: '2.0',
+      id: 66,
+      result: {
+        contents: [
+          {
+            uri: 'arcade://preview/captures/capture-demo/dom-layout-style',
+            mimeType: 'application/json',
+            text: '{"rootSelector":"#root","capturedElementCount":4,"truncated":false,"tree":{"tagName":"div"}}',
+          },
+        ],
+      },
+    })
+
     await new Promise((resolve) => setTimeout(resolve, 75))
     const expiredResponse = await postJson(state.url, {
       jsonrpc: '2.0',
-      id: 64,
+      id: 67,
       method: 'resources/read',
       params: {
         uri: 'arcade://preview/captures/capture-demo/screenshot',
@@ -599,7 +703,7 @@ describe('desktopMcpServer', () => {
     expect(expiredResponse.status).toBe(200)
     await expect(expiredResponse.json()).resolves.toEqual({
       jsonrpc: '2.0',
-      id: 64,
+      id: 67,
       error: {
         code: -32002,
         message:
@@ -613,7 +717,7 @@ describe('desktopMcpServer', () => {
     expect(capturePreviewEvidence).toHaveBeenCalledWith({
       pageId: 'page02',
       viewportSize: 'MD',
-      layers: ['screenshot', 'frame'],
+      layers: ['screenshot', 'accessibility', 'dom_layout_style', 'frame'],
       screenshotScope: 'region',
       target: {
         role: 'button',
@@ -886,10 +990,13 @@ describe('desktopMcpServer', () => {
       '`capture_preview_evidence({ pageId })` is the normal autonomous inspection path'
     )
     expect(operatingGuidePayload.result.contents[0].text).toContain(
+      'use `read_resource({ uri })` as a compatibility bridge'
+    )
+    expect(operatingGuidePayload.result.contents[0].text).toContain(
       'If `apply_changes` returns `project-unavailable`, wait for an active Desktop Arcade window'
     )
     expect(operatingGuidePayload.result.contents[0].text).toContain(
-      'Baseline Preview capture currently supports `screenshot` and `frame` layers'
+      'Preview capture supports `screenshot`, `accessibility`, `dom_layout_style`, and `frame` layers'
     )
 
     const authoringGuideResponse = await postJson(state.url, {
@@ -990,14 +1097,15 @@ describe('desktopMcpServer', () => {
       stableDesktopResourceReads: 'available',
       projectResourceReads: 'available when an active project reader is connected',
       toolExecution: {
+        read_resource: 'available',
         capture_preview_evidence:
           'available when an active preview capture bridge is connected',
         apply_changes: 'available when an active project writer is connected',
       },
       captureLayers: {
         screenshot: 'available',
-        accessibility: 'not-yet-implemented',
-        dom_layout_style: 'not-yet-implemented',
+        accessibility: 'available',
+        dom_layout_style: 'available',
         frame: 'available',
       },
       screenshotScopes: {
@@ -1021,8 +1129,10 @@ describe('desktopMcpServer', () => {
         'available after a successful capture until the capture expires',
       'arcade://preview/captures/{captureId}/frame':
         'available after a successful capture until the capture expires',
-      'arcade://preview/captures/{captureId}/accessibility': 'not-yet-implemented',
-      'arcade://preview/captures/{captureId}/dom-layout-style': 'not-yet-implemented',
+      'arcade://preview/captures/{captureId}/accessibility':
+        'available after a successful capture until the capture expires',
+      'arcade://preview/captures/{captureId}/dom-layout-style':
+        'available after a successful capture until the capture expires',
     })
     expect(capabilities.v1Omissions).toContain('No prompts surface.')
     expect(capabilities.contractNote).toContain('current implementation status')

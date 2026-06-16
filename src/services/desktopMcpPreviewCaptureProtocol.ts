@@ -5,7 +5,11 @@ import type {
   PreviewEvidenceScreenshotScope,
 } from './previewEvidence'
 
-export type DesktopMcpPreviewCaptureLayer = 'screenshot' | 'frame'
+export type DesktopMcpPreviewCaptureLayer =
+  | 'screenshot'
+  | 'accessibility'
+  | 'dom_layout_style'
+  | 'frame'
 
 export interface DesktopMcpPreviewCaptureRequest {
   pageId?: ArcadePageId
@@ -25,6 +29,8 @@ export type DesktopMcpPreviewCaptureErrorCode =
 
 export interface DesktopMcpPreviewCaptureLayerResources {
   screenshot?: string
+  accessibility?: string
+  dom_layout_style?: string
   frame?: string
 }
 
