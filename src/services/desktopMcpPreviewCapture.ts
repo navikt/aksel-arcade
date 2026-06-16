@@ -15,15 +15,26 @@ import type {
   DesktopMcpPreviewCaptureSuccess,
 } from './desktopMcpPreviewCaptureProtocol'
 import {
+  MAX_PREVIEW_INTERACTION_STEPS,
+  MAX_PREVIEW_INTERACTION_TOTAL_TIME_MS,
+  MAX_PREVIEW_INTERACTION_WAIT_TIMEOUT_MS,
   MAX_PREVIEW_EVIDENCE_ELEMENTS,
   type PreviewEvidence,
   type PreviewEvidenceAccessibility,
+  type PreviewEvidenceCaptureMetadata,
   type PreviewEvidenceCaptureTarget,
+  type PreviewInteractionState,
+  type PreviewInteractionStep,
   type PreviewEvidenceScreenshot,
   type PreviewEvidenceScreenshotScope,
 } from './previewEvidence'
 
 export const DESKTOP_MCP_PREVIEW_CAPTURE_TIMEOUT_MS = 20_000
+export const DESKTOP_MCP_PREVIEW_CAPTURE_MAX_INTERACTION_STEPS = MAX_PREVIEW_INTERACTION_STEPS
+export const DESKTOP_MCP_PREVIEW_CAPTURE_MAX_INTERACTION_TOTAL_TIME_MS =
+  MAX_PREVIEW_INTERACTION_TOTAL_TIME_MS
+export const DESKTOP_MCP_PREVIEW_CAPTURE_MAX_WAIT_TIMEOUT_MS =
+  MAX_PREVIEW_INTERACTION_WAIT_TIMEOUT_MS
 
 export const DESKTOP_MCP_PREVIEW_CAPTURE_LAYER_PURPOSES = Object.freeze({
   screenshot: 'visual appearance and spatial gestalt',
@@ -54,6 +65,7 @@ export interface PreparedDesktopMcpPreviewCapture {
   viewportSize: ViewportSize
   theme: ThemeMode
   requestedLayers: DesktopMcpPreviewCaptureLayer[]
+  requestedInteractions: PreviewInteractionStep[]
   screenshotScope: PreviewEvidenceScreenshotScope
   target?: PreviewEvidenceCaptureTarget
   projectRevision: string
@@ -64,7 +76,7 @@ export interface DesktopMcpSandboxCaptureSuccess {
   evidence: PreviewEvidence
   accessibility?: PreviewEvidenceAccessibility
   screenshot?: PreviewEvidenceScreenshot
-  targetDescription?: string | null
+  captureMeta?: PreviewEvidenceCaptureMetadata
 }
 
 export type DesktopMcpSandboxCaptureResult =
@@ -115,6 +127,7 @@ export const prepareDesktopMcpPreviewCapture = (
 
   const target = normalizePreviewCaptureTarget(request.target)
   const screenshotScope = request.screenshotScope ?? 'viewport'
+  const requestedInteractions = normalizePreviewInteractions(request.interactions)
   if (screenshotScope === 'region' && !target) {
     return createPreviewCaptureFailure(
       'invalid-capture-target',
@@ -126,6 +139,13 @@ export const prepareDesktopMcpPreviewCapture = (
     return createPreviewCaptureFailure(
       'invalid-capture-target',
       'capture_preview_evidence target may be provided only when screenshotScope is "region".'
+    )
+  }
+
+  if (requestedInteractions.length > DESKTOP_MCP_PREVIEW_CAPTURE_MAX_INTERACTION_STEPS) {
+    return createPreviewCaptureFailure(
+      'invalid-capture-target',
+      `capture_preview_evidence supports at most ${DESKTOP_MCP_PREVIEW_CAPTURE_MAX_INTERACTION_STEPS} bounded Preview interactions per capture.`
     )
   }
 
@@ -141,6 +161,7 @@ export const prepareDesktopMcpPreviewCapture = (
     viewportSize: request.viewportSize ?? context.project.viewportSize,
     theme: request.theme ?? context.theme,
     requestedLayers,
+    requestedInteractions,
     screenshotScope,
     ...(target ? { target } : {}),
     projectRevision: createDesktopMcpProjectRevision({
@@ -189,8 +210,14 @@ export const finalizeDesktopMcpPreviewCapture = (
   const producedResources = [manifestResourceUri]
   const producedLayers: DesktopMcpPreviewCaptureLayer[] = []
   const layerResources: DesktopMcpPreviewCaptureSuccess['layerResources'] = {}
+  const interactionState = capture.captureMeta?.interactions
+  const targetDescription = capture.captureMeta?.targetDescription
 
   const frame = capture.evidence.frame
+  const screenshotMetadata = {
+    scope: prepared.screenshotScope,
+    ...(targetDescription ? { targetDescription } : {}),
+  }
 
   const frameResource = {
     captureId,
@@ -215,7 +242,7 @@ export const finalizeDesktopMcpPreviewCapture = (
       requestedLayers: prepared.requestedLayers,
       producedLayers,
       screenshotScope: prepared.screenshotScope,
-      ...(capture.targetDescription ? { targetDescription: capture.targetDescription } : {}),
+      ...(targetDescription ? { targetDescription } : {}),
       capturedElementCount: frame.capturedElementCount,
       truncated: frame.truncated,
       limits: {
@@ -223,11 +250,28 @@ export const finalizeDesktopMcpPreviewCapture = (
         maxAccessibilityNodes: MAX_PREVIEW_EVIDENCE_ELEMENTS,
       },
       timeoutMs: DESKTOP_MCP_PREVIEW_CAPTURE_TIMEOUT_MS,
+      interactionLimits: {
+        maxSteps: DESKTOP_MCP_PREVIEW_CAPTURE_MAX_INTERACTION_STEPS,
+        maxTotalTimeMs: DESKTOP_MCP_PREVIEW_CAPTURE_MAX_INTERACTION_TOTAL_TIME_MS,
+        maxWaitTimeoutMs: DESKTOP_MCP_PREVIEW_CAPTURE_MAX_WAIT_TIMEOUT_MS,
+      },
       capturedAt: timestamp,
     },
   }
 
-  const manifest = {
+  const manifest: Record<string, unknown> & {
+    summary: string
+    producedLayers: DesktopMcpPreviewCaptureLayer[]
+    layerPurposes: Record<string, string>
+    layerResources: DesktopMcpPreviewCaptureSuccess['layerResources']
+    screenshot?: typeof screenshotMetadata
+    interactions?: PreviewInteractionState & {
+      finalState: {
+        pageId: Project['source']['pages'][number]['id']
+        scroll: PreviewEvidence['frame']['scroll']
+      }
+    }
+  } = {
     captureId,
     summary: createPreviewCaptureSummary(prepared, capture, producedLayers),
     projectRevision: prepared.projectRevision,
@@ -247,10 +291,7 @@ export const finalizeDesktopMcpPreviewCapture = (
     layerResources,
     ...(producedLayers.includes('screenshot')
       ? {
-          screenshot: {
-            scope: prepared.screenshotScope,
-            ...(capture.targetDescription ? { targetDescription: capture.targetDescription } : {}),
-          },
+          screenshot: screenshotMetadata,
         }
       : {}),
     diagnostics: {
@@ -267,8 +308,25 @@ export const finalizeDesktopMcpPreviewCapture = (
         maxAccessibilityNodes: MAX_PREVIEW_EVIDENCE_ELEMENTS,
       },
       timeoutMs: DESKTOP_MCP_PREVIEW_CAPTURE_TIMEOUT_MS,
+      interactionLimits: {
+        maxSteps: DESKTOP_MCP_PREVIEW_CAPTURE_MAX_INTERACTION_STEPS,
+        maxTotalTimeMs: DESKTOP_MCP_PREVIEW_CAPTURE_MAX_INTERACTION_TOTAL_TIME_MS,
+        maxWaitTimeoutMs: DESKTOP_MCP_PREVIEW_CAPTURE_MAX_WAIT_TIMEOUT_MS,
+      },
       capturedAt: timestamp,
     },
+  }
+
+  if (prepared.requestedInteractions.length > 0 || interactionState) {
+   manifest.interactions = {
+     requested: prepared.requestedInteractions,
+     executed: interactionState?.executed ?? [],
+     finalState: {
+       pageId: capture.captureMeta?.currentPageId ?? prepared.pageId,
+       scroll: frame.scroll,
+     },
+     ...(interactionState?.failedStep ? { failedStep: interactionState.failedStep } : {}),
+   }
   }
 
   const addLayerResource = (
@@ -353,10 +411,7 @@ export const finalizeDesktopMcpPreviewCapture = (
   )
   manifest.layerResources = layerResources
   if (producedLayers.includes('screenshot')) {
-    manifest.screenshot = {
-      scope: prepared.screenshotScope,
-      ...(capture.targetDescription ? { targetDescription: capture.targetDescription } : {}),
-    }
+    manifest.screenshot = screenshotMetadata
   }
 
   resources.unshift({
@@ -378,6 +433,15 @@ export const finalizeDesktopMcpPreviewCapture = (
     requestedLayers: prepared.requestedLayers,
     producedLayers,
     layerResources,
+    ...(interactionState || prepared.requestedInteractions.length > 0
+      ? {
+          interactions: {
+            requested: prepared.requestedInteractions,
+            executed: interactionState?.executed ?? [],
+            ...(interactionState?.failedStep ? { failedStep: interactionState.failedStep } : {}),
+          } satisfies PreviewInteractionState,
+        }
+      : {}),
     resources,
     safeActivity: {
       toolName: 'capture_preview_evidence',
@@ -410,6 +474,34 @@ const normalizePreviewCaptureTarget = (
   return Object.keys(normalized).length > 0 ? normalized : undefined
 }
 
+const normalizePreviewInteractions = (
+  interactions: PreviewInteractionStep[] | undefined
+): PreviewInteractionStep[] => {
+  if (!interactions || interactions.length === 0) {
+    return []
+  }
+
+  return interactions.map((interaction) => {
+    const target =
+      'target' in interaction && interaction.target
+        ? normalizePreviewCaptureTarget(interaction.target)
+        : undefined
+
+    if (interaction.action === 'waitFor') {
+      return {
+        ...interaction,
+        ...(typeof interaction.text === 'string' ? { text: interaction.text.trim() } : {}),
+        ...(target ? { target } : {}),
+      }
+    }
+
+    return {
+      ...interaction,
+      ...(target ? { target } : {}),
+    }
+  })
+}
+
 const summarizePreviewDiagnostics = (
   context: DesktopMcpPreviewCaptureContext
 ): PreviewDiagnosticsSummary => {
@@ -439,13 +531,17 @@ const createPreviewCaptureSummary = (
       : `${formattedLayers.slice(0, -1).join(', ')} and ${lastProducedLayer}`
   const scopeSummary = producedLayers.includes('screenshot')
     ? prepared.screenshotScope === 'region'
-      ? capture.targetDescription
-        ? ` (region (${capture.targetDescription}))`
+      ? capture.captureMeta?.targetDescription
+        ? ` (region (${capture.captureMeta.targetDescription}))`
         : ' (region)'
       : ` (${prepared.screenshotScope.replace('_', '-')})`
     : ''
+  const interactionSummary =
+    prepared.requestedInteractions.length > 0
+      ? ` after ${prepared.requestedInteractions.length} interaction${prepared.requestedInteractions.length === 1 ? '' : 's'}`
+      : ''
 
-  return `Captured ${prepared.pageName} (${prepared.pageId}) in ${prepared.theme} ${prepared.viewportSize} preview with ${layerSummary} evidence${scopeSummary}.`
+  return `Captured ${prepared.pageName} (${prepared.pageId}) in ${prepared.theme} ${prepared.viewportSize} preview with ${layerSummary} evidence${interactionSummary}${scopeSummary}.`
 }
 
 const formatPreviewCaptureLayerLabel = (layer: DesktopMcpPreviewCaptureLayer): string => {

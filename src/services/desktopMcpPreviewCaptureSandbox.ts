@@ -9,9 +9,11 @@ import type {
   DesktopMcpPreviewCaptureFailure,
 } from './desktopMcpPreviewCaptureProtocol'
 import type {
+  PreviewEvidenceCaptureMetadata,
   PreviewEvidenceCaptureTarget,
   PreviewEvidenceCaptureErrorCode,
   PreviewEvidenceCaptureResult,
+  PreviewInteractionStep,
   PreviewEvidenceScreenshotScope,
 } from './previewEvidence'
 
@@ -26,6 +28,7 @@ interface CapturePreviewInSandboxOptions {
   viewportHeight: number
   theme: ThemeMode
   layers: DesktopMcpPreviewCaptureLayer[]
+  interactions: PreviewInteractionStep[]
   screenshotScope: PreviewEvidenceScreenshotScope
   target?: PreviewEvidenceCaptureTarget
   timeoutMs?: number
@@ -41,6 +44,7 @@ export const capturePreviewInIsolatedSandbox = async ({
   viewportHeight,
   theme,
   layers,
+  interactions,
   screenshotScope,
   target,
   timeoutMs = DESKTOP_MCP_PREVIEW_CAPTURE_TIMEOUT_MS,
@@ -114,6 +118,7 @@ export const capturePreviewInIsolatedSandbox = async ({
         payload: {
           requestId: PREVIEW_CAPTURE_REQUEST_ID,
           layers,
+          interactions,
           screenshotScope,
           viewportWidth,
           viewportHeight,
@@ -126,7 +131,9 @@ export const capturePreviewInIsolatedSandbox = async ({
 
     const handleCaptureResult = (result: PreviewEvidenceCaptureResult) => {
       if (!result.ok) {
-        finish(mapPreviewEvidenceFailure(result.error.code, result.error.message))
+        finish(
+          mapPreviewEvidenceFailure(result.error.code, result.error.message, result.captureMeta)
+        )
         return
       }
 
@@ -135,9 +142,7 @@ export const capturePreviewInIsolatedSandbox = async ({
         evidence: result.evidence,
         ...(result.accessibility ? { accessibility: result.accessibility } : {}),
         ...(result.screenshot ? { screenshot: result.screenshot } : {}),
-        ...(result.captureMeta?.targetDescription
-          ? { targetDescription: result.captureMeta.targetDescription }
-          : {}),
+        ...(result.captureMeta ? { captureMeta: result.captureMeta } : {}),
       })
     }
 
@@ -228,23 +233,29 @@ export const capturePreviewInIsolatedSandbox = async ({
 
 const mapPreviewEvidenceFailure = (
   code: PreviewEvidenceCaptureErrorCode,
-  message: string
+  message: string,
+  captureMeta?: PreviewEvidenceCaptureMetadata
 ): DesktopMcpPreviewCaptureFailure => {
   switch (code) {
     case 'invalid-capture-target':
-      return createSandboxCaptureFailure('invalid-capture-target', message)
+      return createSandboxCaptureFailure('invalid-capture-target', message, captureMeta)
     case 'render-timeout':
-      return createSandboxCaptureFailure('render-timeout', message)
+      return createSandboxCaptureFailure('render-timeout', message, captureMeta)
     default:
-      return createSandboxCaptureFailure('render-failed', message)
+      return createSandboxCaptureFailure('render-failed', message, captureMeta)
   }
 }
 
 const createSandboxCaptureFailure = (
   code: DesktopMcpPreviewCaptureFailure['code'],
-  message: string
+  message: string,
+  captureMeta?: PreviewEvidenceCaptureMetadata
 ): DesktopMcpPreviewCaptureFailure => ({
   ok: false,
   code,
   message,
+  ...(captureMeta?.interactions ? { interactions: captureMeta.interactions } : {}),
+  ...(captureMeta?.currentPageId !== undefined
+    ? { currentPageId: captureMeta.currentPageId }
+    : {}),
 })

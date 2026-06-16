@@ -607,7 +607,7 @@ const resolvePageOperationTarget = ({
     }
   }
 
-  const normalizedTempPageRef = normalizeTempPageRefField(tempPageRef, {
+  const normalizedTempPageRef = normalizeTempPageRefField(tempPageRef!, {
     operationType,
     index,
     fieldName: 'tempPageRef',

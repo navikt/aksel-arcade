@@ -354,6 +354,10 @@ const parseDesktopMcpPreviewCaptureRequest = (payload) => {
   if (payload.target !== undefined && target === null) {
     return null
   }
+  const interactions = parseDesktopMcpPreviewCaptureInteractions(payload.interactions)
+  if (payload.interactions !== undefined && interactions === null) {
+    return null
+  }
 
   if (
     (payload.pageId !== undefined &&
@@ -377,7 +381,78 @@ const parseDesktopMcpPreviewCaptureRequest = (payload) => {
       ? { screenshotScope: payload.screenshotScope }
       : {}),
     ...(target ? { target } : {}),
+    ...(interactions ? { interactions } : {}),
   }
+}
+
+const parseDesktopMcpPreviewCaptureInteractions = (value) => {
+  if (value === undefined) {
+    return undefined
+  }
+
+  if (!Array.isArray(value)) {
+    return null
+  }
+
+  const interactions = []
+  for (const step of value) {
+    if (!isRecord(step) || typeof step.action !== 'string') {
+      return null
+    }
+
+    const target = parseDesktopMcpPreviewCaptureTarget(step.target)
+    if (step.target !== undefined && target === null) {
+      return null
+    }
+
+    const parsedStep = {
+      action: step.action,
+    }
+
+    if (target) {
+      parsedStep.target = target
+    }
+
+    for (const key of ['value', 'key', 'text']) {
+      if (step[key] === undefined) {
+        continue
+      }
+
+      if (typeof step[key] !== 'string') {
+        return null
+      }
+
+      parsedStep[key] = step[key]
+    }
+
+    for (const key of ['checked', 'renderIdle']) {
+      if (step[key] === undefined) {
+        continue
+      }
+
+      if (typeof step[key] !== 'boolean') {
+        return null
+      }
+
+      parsedStep[key] = step[key]
+    }
+
+    for (const key of ['x', 'y', 'timeoutMs']) {
+      if (step[key] === undefined) {
+        continue
+      }
+
+      if (typeof step[key] !== 'number') {
+        return null
+      }
+
+      parsedStep[key] = step[key]
+    }
+
+    interactions.push(parsedStep)
+  }
+
+  return interactions
 }
 
 const parseDesktopMcpPreviewCaptureTarget = (value) => {

@@ -1,6 +1,8 @@
 import type { ArcadePageId, ThemeMode, ViewportSize } from '@/types/project'
 import type { DesktopMcpLastActivity } from './desktopMcpApplyChangesProtocol'
 import type {
+  PreviewInteractionState,
+  PreviewInteractionStep,
   PreviewEvidenceCaptureTarget,
   PreviewEvidenceScreenshotScope,
 } from './previewEvidence'
@@ -18,6 +20,7 @@ export interface DesktopMcpPreviewCaptureRequest {
   layers?: DesktopMcpPreviewCaptureLayer[]
   screenshotScope?: PreviewEvidenceScreenshotScope
   target?: PreviewEvidenceCaptureTarget
+  interactions?: PreviewInteractionStep[]
 }
 
 export type DesktopMcpPreviewCaptureErrorCode =
@@ -53,6 +56,7 @@ export interface DesktopMcpPreviewCaptureSuccess {
   requestedLayers: DesktopMcpPreviewCaptureLayer[]
   producedLayers: DesktopMcpPreviewCaptureLayer[]
   layerResources: DesktopMcpPreviewCaptureLayerResources
+  interactions?: PreviewInteractionState
   resources: DesktopMcpPreviewCaptureResource[]
   safeActivity: DesktopMcpLastActivity
 }
@@ -62,6 +66,8 @@ export interface DesktopMcpPreviewCaptureFailure {
   code: DesktopMcpPreviewCaptureErrorCode
   message: string
   manifestResourceUri?: string
+  interactions?: PreviewInteractionState
+  currentPageId?: ArcadePageId | null
 }
 
 export type DesktopMcpPreviewCaptureResult =

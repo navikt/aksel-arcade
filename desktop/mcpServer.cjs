@@ -14,6 +14,27 @@ const VALID_VIEWPORT_SIZES = ['2XL', 'XL', 'LG', 'MD', 'SM', 'XS']
 const VALID_THEMES = ['light', 'dark']
 const VALID_PREVIEW_CAPTURE_LAYERS = ['screenshot', 'accessibility', 'dom_layout_style', 'frame']
 const VALID_PREVIEW_SCREENSHOT_SCOPES = ['viewport', 'full_page', 'region']
+const VALID_PREVIEW_INTERACTION_ACTIONS = ['click', 'fill', 'select', 'press', 'scroll', 'waitFor']
+const MAX_PREVIEW_INTERACTION_STEPS = 10
+const MAX_PREVIEW_INTERACTION_TOTAL_TIME_MS = 10_000
+const MAX_PREVIEW_INTERACTION_WAIT_TIMEOUT_MS = 5_000
+const VALID_PREVIEW_PRESS_KEYS = [
+  'Enter',
+  'Escape',
+  'Tab',
+  'ArrowUp',
+  'ArrowDown',
+  'ArrowLeft',
+  'ArrowRight',
+  'Backspace',
+  'Delete',
+  'Home',
+  'End',
+  'PageUp',
+  'PageDown',
+  'Space',
+  ' ',
+]
 const APPLY_CHANGES_OPERATION_TYPES = [
   'replace_source',
   'create_page',
@@ -154,6 +175,82 @@ const MCP_TOOL_DEFINITIONS = Object.freeze([
           }),
           description:
             'Optional preview-root selector or accessibility target for region screenshots.',
+        }),
+        interactions: Object.freeze({
+          type: 'array',
+          maxItems: MAX_PREVIEW_INTERACTION_STEPS,
+          description:
+            'Optional bounded, capture-only Preview interaction sequence. Each step must use one of click, fill, select, press, scroll, or waitFor. Accessibility targets are preferred; selector fallback is scoped to the Preview root only. Interactions are ephemeral and do not mutate durable project or host UI state.',
+          items: Object.freeze({
+            type: 'object',
+            additionalProperties: false,
+            required: ['action'],
+            properties: Object.freeze({
+              action: Object.freeze({
+                type: 'string',
+                enum: VALID_PREVIEW_INTERACTION_ACTIONS,
+              }),
+              target: Object.freeze({
+                type: 'object',
+                additionalProperties: false,
+                properties: Object.freeze({
+                  selector: Object.freeze({
+                    type: 'string',
+                    description: 'Preview-root-scoped CSS selector fallback.',
+                  }),
+                  role: Object.freeze({
+                    type: 'string',
+                    description: 'Accessibility role filter.',
+                  }),
+                  name: Object.freeze({
+                    type: 'string',
+                    description: 'Accessible name filter.',
+                  }),
+                  text: Object.freeze({
+                    type: 'string',
+                    description: 'Visible text filter.',
+                  }),
+                  label: Object.freeze({
+                    type: 'string',
+                    description: 'Associated label filter.',
+                  }),
+                }),
+              }),
+              value: Object.freeze({
+                type: 'string',
+                description: 'Fill/select value when the action requires a string value.',
+              }),
+              checked: Object.freeze({
+                type: 'boolean',
+                description: 'Checkbox/radio state for select interactions.',
+              }),
+              key: Object.freeze({
+                type: 'string',
+                description:
+                  'Bounded press key such as Enter, Escape, Tab, Arrow keys, Backspace, Delete, Home, End, PageUp, PageDown, Space, or a single printable character.',
+              }),
+              x: Object.freeze({
+                type: 'number',
+                description: 'Horizontal scroll delta for scroll interactions.',
+              }),
+              y: Object.freeze({
+                type: 'number',
+                description: 'Vertical scroll delta for scroll interactions.',
+              }),
+              text: Object.freeze({
+                type: 'string',
+                description: 'Visible Preview text to wait for during waitFor interactions.',
+              }),
+              renderIdle: Object.freeze({
+                type: 'boolean',
+                description: 'Wait for the Preview render to settle.',
+              }),
+              timeoutMs: Object.freeze({
+                type: 'number',
+                description: `Optional bounded waitFor timeout in milliseconds (max ${MAX_PREVIEW_INTERACTION_WAIT_TIMEOUT_MS}).`,
+              }),
+            }),
+          }),
         }),
       }),
     }),
@@ -314,7 +411,7 @@ const SCREENSHOT_SCOPE_STATUS = Object.freeze({
 
 const INTERACTION_ACTION_STATUS = Object.freeze(
   CAPABILITY_PREVIEW_INTERACTION_ACTIONS.reduce((status, action) => {
-    status[action] = 'not-yet-implemented'
+    status[action] = 'available'
     return status
   }, {})
 )
@@ -907,6 +1004,12 @@ const routeToolsCallRequest = async (
                 ...(captureResult.manifestResourceUri !== undefined
                   ? { manifestResourceUri: captureResult.manifestResourceUri }
                   : {}),
+                ...(captureResult.interactions !== undefined
+                  ? { interactions: captureResult.interactions }
+                  : {}),
+                ...(captureResult.currentPageId !== undefined
+                  ? { currentPageId: captureResult.currentPageId }
+                  : {}),
               }
             ),
       })
@@ -1200,6 +1303,7 @@ const validateCapturePreviewEvidenceArguments = (argumentsPayload) => {
     'layers',
     'screenshotScope',
     'target',
+    'interactions',
   ])
   if (extraKeys.length > 0) {
     return `capture_preview_evidence arguments contain unsupported fields: ${extraKeys.join(
@@ -1260,36 +1364,11 @@ const validateCapturePreviewEvidenceArguments = (argumentsPayload) => {
   }
 
   if ('target' in argumentsPayload) {
-    if (!isPlainObject(argumentsPayload.target)) {
-      return 'capture_preview_evidence target must be an object when provided.'
-    }
-
-    const extraTargetKeys = getUnexpectedKeys(argumentsPayload.target, [
-      'selector',
-      'role',
-      'name',
-      'text',
-      'label',
-    ])
-    if (extraTargetKeys.length > 0) {
-      return `capture_preview_evidence target contains unsupported fields: ${extraTargetKeys.join(
-        ', '
-      )}.`
-    }
-
-    const targetFields = ['selector', 'role', 'name', 'text', 'label'].filter((key) => {
-      const value = argumentsPayload.target[key]
-      return value !== undefined
+    const targetValidationError = validatePreviewCaptureTarget(argumentsPayload.target, {
+      context: 'capture_preview_evidence target',
     })
-    if (targetFields.length === 0) {
-      return 'capture_preview_evidence target must include at least one selector or accessibility field.'
-    }
-
-    for (const key of targetFields) {
-      const value = argumentsPayload.target[key]
-      if (typeof value !== 'string' || value.trim().length === 0) {
-        return `capture_preview_evidence target.${key} must be a non-empty string when provided.`
-      }
+    if (targetValidationError) {
+      return targetValidationError
     }
   }
 
@@ -1301,7 +1380,186 @@ const validateCapturePreviewEvidenceArguments = (argumentsPayload) => {
     return 'capture_preview_evidence target may be provided only when screenshotScope is "region".'
   }
 
+  if ('interactions' in argumentsPayload) {
+    if (!Array.isArray(argumentsPayload.interactions)) {
+      return 'capture_preview_evidence interactions must be an array when provided.'
+    }
+
+    if (argumentsPayload.interactions.length === 0) {
+      return 'capture_preview_evidence interactions must include at least one step when provided.'
+    }
+
+    if (argumentsPayload.interactions.length > MAX_PREVIEW_INTERACTION_STEPS) {
+      return `capture_preview_evidence interactions must not exceed ${MAX_PREVIEW_INTERACTION_STEPS} steps.`
+    }
+
+    for (const [index, interaction] of argumentsPayload.interactions.entries()) {
+      const interactionError = validatePreviewInteractionStep(interaction, index)
+      if (interactionError) {
+        return interactionError
+      }
+    }
+  }
+
   return null
+}
+
+const validatePreviewCaptureTarget = (value, { context }) => {
+  if (!isPlainObject(value)) {
+    return `${context} must be an object when provided.`
+  }
+
+  const extraTargetKeys = getUnexpectedKeys(value, ['selector', 'role', 'name', 'text', 'label'])
+  if (extraTargetKeys.length > 0) {
+    return `${context} contains unsupported fields: ${extraTargetKeys.join(', ')}.`
+  }
+
+  const targetFields = ['selector', 'role', 'name', 'text', 'label'].filter((key) => {
+    const targetValue = value[key]
+    return targetValue !== undefined
+  })
+  if (targetFields.length === 0) {
+    return `${context} must include at least one selector or accessibility field.`
+  }
+
+  for (const key of targetFields) {
+    const targetValue = value[key]
+    if (typeof targetValue !== 'string' || targetValue.trim().length === 0) {
+      return `${context}.${key} must be a non-empty string when provided.`
+    }
+  }
+
+  return null
+}
+
+const validatePreviewInteractionStep = (value, index) => {
+  if (!isPlainObject(value)) {
+    return `capture_preview_evidence interactions[${index}] must be an object.`
+  }
+
+  const extraKeys = getUnexpectedKeys(value, [
+    'action',
+    'target',
+    'value',
+    'checked',
+    'key',
+    'x',
+    'y',
+    'text',
+    'renderIdle',
+    'timeoutMs',
+  ])
+  if (extraKeys.length > 0) {
+    return `capture_preview_evidence interactions[${index}] contain unsupported fields: ${extraKeys.join(', ')}.`
+  }
+
+  if (
+    typeof value.action !== 'string' ||
+    !VALID_PREVIEW_INTERACTION_ACTIONS.includes(value.action)
+  ) {
+    return `capture_preview_evidence interactions[${index}].action must be one of ${VALID_PREVIEW_INTERACTION_ACTIONS.join(', ')}.`
+  }
+
+  if (value.target !== undefined) {
+    const targetError = validatePreviewCaptureTarget(value.target, {
+      context: `capture_preview_evidence interactions[${index}].target`,
+    })
+    if (targetError) {
+      return targetError
+    }
+  }
+
+  if ('value' in value && typeof value.value !== 'string') {
+    return `capture_preview_evidence interactions[${index}].value must be a string when provided.`
+  }
+
+  if ('checked' in value && typeof value.checked !== 'boolean') {
+    return `capture_preview_evidence interactions[${index}].checked must be a boolean when provided.`
+  }
+
+  if ('key' in value && typeof value.key !== 'string') {
+    return `capture_preview_evidence interactions[${index}].key must be a string when provided.`
+  }
+
+  if (
+    typeof value.key === 'string' &&
+    !VALID_PREVIEW_PRESS_KEYS.includes(value.key.trim()) &&
+    !/^[^\s]$/.test(value.key.trim())
+  ) {
+    return `capture_preview_evidence interactions[${index}].key must be a supported bounded key or a single printable character.`
+  }
+
+  if ('text' in value && (typeof value.text !== 'string' || value.text.trim().length === 0)) {
+    return `capture_preview_evidence interactions[${index}].text must be a non-empty string when provided.`
+  }
+
+  if ('renderIdle' in value && value.renderIdle !== true) {
+    return `capture_preview_evidence interactions[${index}].renderIdle must be true when provided.`
+  }
+
+  for (const key of ['x', 'y']) {
+    if (key in value && (typeof value[key] !== 'number' || !Number.isFinite(value[key]))) {
+      return `capture_preview_evidence interactions[${index}].${key} must be a finite number when provided.`
+    }
+  }
+
+  if (
+    'timeoutMs' in value &&
+    (typeof value.timeoutMs !== 'number' ||
+      !Number.isFinite(value.timeoutMs) ||
+      value.timeoutMs <= 0 ||
+      value.timeoutMs > MAX_PREVIEW_INTERACTION_WAIT_TIMEOUT_MS)
+  ) {
+    return `capture_preview_evidence interactions[${index}].timeoutMs must be a positive number no greater than ${MAX_PREVIEW_INTERACTION_WAIT_TIMEOUT_MS}.`
+  }
+
+  switch (value.action) {
+    case 'click':
+      if (value.target === undefined) {
+        return `capture_preview_evidence interactions[${index}] click steps require a target.`
+      }
+      return null
+    case 'fill':
+      if (value.target === undefined) {
+        return `capture_preview_evidence interactions[${index}] fill steps require a target.`
+      }
+      if (typeof value.value !== 'string') {
+        return `capture_preview_evidence interactions[${index}] fill steps require a string value.`
+      }
+      return null
+    case 'select':
+      if (value.target === undefined) {
+        return `capture_preview_evidence interactions[${index}] select steps require a target.`
+      }
+      if ((typeof value.value === 'string') === (typeof value.checked === 'boolean')) {
+        return `capture_preview_evidence interactions[${index}] select steps require exactly one of value or checked.`
+      }
+      return null
+    case 'press':
+      if (typeof value.key !== 'string' || value.key.trim().length === 0) {
+        return `capture_preview_evidence interactions[${index}] press steps require a key.`
+      }
+      return null
+    case 'scroll':
+      if (
+        (typeof value.x !== 'number' || !Number.isFinite(value.x)) &&
+        (typeof value.y !== 'number' || !Number.isFinite(value.y))
+      ) {
+        return `capture_preview_evidence interactions[${index}] scroll steps require an x or y delta.`
+      }
+      return null
+    case 'waitFor': {
+      const waitConditions = Number(typeof value.text === 'string') +
+        Number(value.target !== undefined) +
+        Number(value.renderIdle === true)
+      if (waitConditions !== 1) {
+        return `capture_preview_evidence interactions[${index}] waitFor steps require exactly one of text, target, or renderIdle.`
+      }
+      return null
+    }
+    default:
+      return `capture_preview_evidence interactions[${index}].action is not supported.`
+  }
 }
 
 const validateApplyChangesArguments = (argumentsPayload) => {
@@ -1523,6 +1781,10 @@ const createDesktopStableResourceText = (uri) => {
         '- Saved Preview preferences live in `arcade://project/preview-context`; capture-only overrides must not mutate them.',
         '- If `apply_changes` returns `project-unavailable`, wait for an active Desktop Arcade window instead of falling back to repository or filesystem edits.',
         '- Preview capture supports `screenshot`, `accessibility`, `dom_layout_style`, and `frame` layers, with `viewport`, `full_page`, and `region` screenshot scopes. Omit `layers` to capture all available layers.',
+        `- Preview capture interactions support ${VALID_PREVIEW_INTERACTION_ACTIONS.join(', ')} with at most ${MAX_PREVIEW_INTERACTION_STEPS} steps and ${MAX_PREVIEW_INTERACTION_TOTAL_TIME_MS} ms total interaction time per capture.`,
+        '- Interaction targets prefer accessibility fields (`role`, `name`, `text`, `label`) and allow Preview-root-scoped CSS selector fallback only.',
+        '- Preview interactions are isolated to the hidden Preview render: they must not touch Desktop Arcade host UI, durable source, saved Preview preferences, or the human-visible Active page.',
+        '- Preview interactions block browser/external navigation targets; only in-prototype Arcade page references are allowed.',
         '- When state is unclear, re-read the manifest before making another durable change.',
       ].join('\n')
     case 'arcade://desktop/authoring-guide':
@@ -1560,8 +1822,12 @@ const createDesktopStableResourceText = (uri) => {
         captureLayerPurposes: CAPABILITY_PREVIEW_CAPTURE_LAYER_PURPOSES,
         screenshotScopes: VALID_PREVIEW_SCREENSHOT_SCOPES,
         interactionActions: CAPABILITY_PREVIEW_INTERACTION_ACTIONS,
+        interactionWaitModes: ['text', 'target', 'renderIdle'],
         limits: {
           requestBodyBytes: MAX_MCP_BODY_BYTES,
+          previewInteractionSteps: MAX_PREVIEW_INTERACTION_STEPS,
+          previewInteractionTotalTimeMs: MAX_PREVIEW_INTERACTION_TOTAL_TIME_MS,
+          previewInteractionWaitTimeoutMs: MAX_PREVIEW_INTERACTION_WAIT_TIMEOUT_MS,
         },
         implementationStatus: {
           stableDesktopResourceReads: 'available',
@@ -1723,6 +1989,28 @@ const isProjectResourceReadResult = (value, expectedUri) =>
       typeof value.message === 'string' &&
       value.message.trim().length > 0)
 
+const isPreviewInteractionState = (value) =>
+  isPlainObject(value) &&
+  Array.isArray(value.requested) &&
+  Array.isArray(value.executed) &&
+  value.requested.every((step) => isPlainObject(step) && typeof step.action === 'string') &&
+  value.executed.every(
+    (entry) =>
+      isPlainObject(entry) &&
+      typeof entry.index === 'number' &&
+      isPlainObject(entry.step) &&
+      typeof entry.step.action === 'string' &&
+      (entry.targetDescription === undefined || typeof entry.targetDescription === 'string')
+  ) &&
+  (value.failedStep === undefined ||
+    (isPlainObject(value.failedStep) &&
+      typeof value.failedStep.index === 'number' &&
+      typeof value.failedStep.reason === 'string' &&
+      isPlainObject(value.failedStep.step) &&
+      typeof value.failedStep.step.action === 'string' &&
+      (value.failedStep.targetDescription === undefined ||
+        typeof value.failedStep.targetDescription === 'string')))
+
 const isCapturePreviewResult = (value) => {
   if (!isPlainObject(value) || typeof value.ok !== 'boolean') {
     return false
@@ -1747,6 +2035,7 @@ const isCapturePreviewResult = (value) => {
       (value.layerResources.frame === undefined || typeof value.layerResources.frame === 'string') &&
       (value.layerResources.screenshot === undefined ||
         typeof value.layerResources.screenshot === 'string') &&
+      (value.interactions === undefined || isPreviewInteractionState(value.interactions)) &&
       Array.isArray(value.resources) &&
       value.resources.every(
         (resource) =>
@@ -1768,7 +2057,11 @@ const isCapturePreviewResult = (value) => {
       value.code === 'render-timeout' ||
       value.code === 'render-failed') &&
     typeof value.message === 'string' &&
-    (value.manifestResourceUri === undefined || typeof value.manifestResourceUri === 'string')
+    (value.manifestResourceUri === undefined || typeof value.manifestResourceUri === 'string') &&
+    (value.interactions === undefined || isPreviewInteractionState(value.interactions)) &&
+    (value.currentPageId === undefined ||
+      value.currentPageId === null ||
+      typeof value.currentPageId === 'string')
   )
 }
 
@@ -1782,6 +2075,7 @@ const toPublicCapturePreviewResult = (captureResult) => ({
   requestedLayers: captureResult.requestedLayers,
   producedLayers: captureResult.producedLayers,
   layerResources: captureResult.layerResources,
+  ...(captureResult.interactions !== undefined ? { interactions: captureResult.interactions } : {}),
   safeActivity: captureResult.safeActivity,
 })
 

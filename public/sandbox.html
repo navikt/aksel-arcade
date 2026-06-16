@@ -157,6 +157,7 @@
     const {
       capturePreviewEvidenceSnapshot,
       PREVIEW_EVIDENCE_ROOT_SELECTOR,
+      runPreviewInteractionSequence,
     } = window.previewEvidenceUtils;
 
     // React and Aksel are loaded from the pre-bundled sandbox runtime.
@@ -508,7 +509,7 @@
       }
     }
 
-    function capturePreviewEvidence(payload) {
+    async function capturePreviewEvidence(payload) {
       const requestId = payload?.requestId;
       if (typeof requestId !== 'string' || requestId.length === 0) {
         console.warn('Invalid Preview evidence request payload:', payload);
@@ -520,6 +521,7 @@
           ? payload.expectedPageId
           : null;
       const layers = Array.isArray(payload?.layers) ? payload.layers : undefined;
+      const interactions = Array.isArray(payload?.interactions) ? payload.interactions : [];
       const screenshotScope =
         typeof payload?.screenshotScope === 'string' ? payload.screenshotScope : undefined;
       const viewportWidth =
@@ -530,7 +532,7 @@
         payload?.target && typeof payload.target === 'object' ? payload.target : undefined;
       const maxFrames = 30;
 
-      const captureWhenReady = (remainingFrames = maxFrames) => {
+      const captureWhenReady = async (remainingFrames = maxFrames) => {
         if (expectedPageId && getCurrentPreviewPageId() !== expectedPageId) {
           if (remainingFrames <= 0) {
             sendPreviewEvidenceResult(requestId, {
@@ -543,7 +545,9 @@
             return;
           }
 
-          window.setTimeout(() => captureWhenReady(remainingFrames - 1), 16);
+          window.setTimeout(() => {
+            void captureWhenReady(remainingFrames - 1);
+          }, 16);
           return;
         }
 
@@ -560,6 +564,22 @@
             return;
           }
 
+          await new Promise((resolve) => window.setTimeout(resolve, 32));
+
+          const interactionResult = await runPreviewInteractionSequence(
+            root,
+            interactions,
+            {
+              currentPageId: getCurrentPreviewPageId(),
+              getCurrentPageId: getCurrentPreviewPageId,
+            },
+            window
+          );
+          if (!interactionResult.ok) {
+            sendPreviewEvidenceResult(requestId, interactionResult);
+            return;
+          }
+
           sendPreviewEvidenceResult(
             requestId,
             capturePreviewEvidenceSnapshot(
@@ -573,6 +593,7 @@
                     : undefined,
                 target,
                 currentPageId: getCurrentPreviewPageId(),
+                interactionState: interactionResult.interactionState,
               },
               window
             )
@@ -588,7 +609,7 @@
         }
       };
 
-      captureWhenReady();
+      await captureWhenReady();
     }
 
     function sendPreviewEvidenceResult(requestId, result) {

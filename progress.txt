@@ -3520,3 +3520,33 @@ Verification:
 Next note:
 
 - Keep accessibility-name extraction grounded in browser/AT semantics rather than raw DOM text. If future work expands roles or target matching, preserve the current split between explicit names (`aria-*`, `alt`, labels, titles), content-derived names for the roles that support them, and sanitized descendant text that excludes hidden/unsafe nodes.
+
+### 2026-06-16 - Issue #278: Add bounded preview interaction sequences to evidence capture
+
+Implemented:
+
+- Selected `#278` as the single highest-priority `ready-for-agent` feature from `#278`-`#280` after checking issue `#269`, `CONTEXT.md`, and the existing `progress.txt` notes. `#279` depends on `#278`, and `#280` depends on both `#278` and `#279`, so `#278` was the earliest unblocked dependency slice.
+- Extended `capture_preview_evidence` end to end so Desktop MCP now accepts bounded Preview interaction sequences for `click`, `fill`, `select`, `press`, `scroll`, and `waitFor`, with step/time caps published through `desktop/mcpServer.cjs` and the Preview-capture contract types.
+- Implemented interaction execution inside the fresh hidden Preview sandbox only, keeping interactions scoped to preview-root targets, blocking host-UI selectors and browser/external navigation, and preserving durable Arcade project/workspace state outside the capture.
+- Recorded requested/executed interactions, failed-step details, and final transient state in the capture manifest/result path. Successful captures now surface interaction metadata without changing the human-visible active page or saved Preview preferences.
+- Fixed two runtime bugs found while running the live human-testable flow: the hidden offscreen iframe could stall capture while waiting on `requestAnimationFrame`, and interactions could start before React effect-driven page-link handlers were attached after render.
+- Added focused regression coverage in `tests/unit/services/previewInteractions.test.ts`, extended the Preview-capture/server unit suites, and expanded `tests/e2e/desktop-mcp-preview-capture.spec.ts` to cover click-opened UI state, filled form state, select/press/scroll/wait flows, in-prototype navigation, missing-target failures, host-UI rejection, external-navigation blocking, and non-persistence of human-visible state.
+- While closing the slice, also fixed build-only typing drift surfaced by `npm run build` in the Preview-capture manifest typing, `desktopMcpApplyChanges`, and the AppContext test stubs so repo-wide validation stays green.
+
+Verification:
+
+- npm run typecheck
+- npm run lint
+- CI=1 npm test -- --run
+- npm run build
+- npm run test:e2e -- tests/e2e/desktop-mcp-preview-capture.spec.ts --reporter=line
+- Browser/console smoke check at `http://127.0.0.1:4173/aksel-arcade/`, confirming the app shell and live preview render cleanly and the browser console stays free of errors/warnings
+
+Human-testable verification notes:
+
+- All issue `#278` verification steps are testable with the seeded multi-page interaction demo project and now pass in the live Desktop MCP Electron flow.
+- The live verification covers click-opened menu state across screenshot/accessibility/DOM evidence, filled-form capture, `waitFor` settling, fail-fast missing-target behavior without a misleading manifest, preserved human-visible active page and saved Preview preferences, host-UI selector rejection, and external-navigation blocking while still allowing in-prototype Arcade page navigation.
+
+Next note:
+
+- `#279` should build on the new interaction manifest/result metadata instead of inventing a parallel post-capture format. Keep all transient UI mutation inside the hidden isolated Preview sandbox, and regenerate `public/preview-evidence-global.js` whenever `src/services/previewEvidence.ts` changes.
