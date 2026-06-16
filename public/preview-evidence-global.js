@@ -545,7 +545,10 @@ var previewEvidenceUtils = (() => {
     }
     const labelledBy = element.getAttribute("aria-labelledby");
     if (labelledBy) {
-      const text = labelledBy.split(/\s+/).map((id) => element.ownerDocument.getElementById(id)?.textContent ?? "").join(" ");
+      const text = labelledBy.split(/\s+/).map((id) => {
+        const referencedElement = element.ownerDocument.getElementById(id);
+        return referencedElement ? getElementVisibleText(referencedElement) : "";
+      }).join(" ");
       if (text.trim()) {
         return normalizeWhitespace(text);
       }
@@ -561,7 +564,7 @@ var previewEvidenceUtils = (() => {
     if (element instanceof HTMLInputElement && element.value) {
       return normalizeWhitespace(element.value);
     }
-    return getElementVisibleText(element);
+    return elementUsesContentAsAccessibleName(element) ? getElementVisibleText(element) : "";
   };
   var hasExplicitAccessibleName = (element) => element.hasAttribute("aria-label") || element.hasAttribute("aria-labelledby") || element.hasAttribute("title") || getElementLabelText(element).length > 0 || element instanceof HTMLInputElement && normalizeWhitespace(element.value).length > 0;
   var getElementLabelText = (element) => {
@@ -573,20 +576,46 @@ var previewEvidenceUtils = (() => {
     }
     const labels = Array.from(element.labels ?? []);
     if (labels.length > 0) {
-      return normalizeWhitespace(labels.map((label) => label.textContent ?? "").join(" "));
+      return normalizeWhitespace(labels.map((label) => getElementVisibleText(label)).join(" "));
     }
     if (element.id) {
       const label = Array.from(element.ownerDocument.querySelectorAll("label[for]")).find(
         (candidate) => candidate.getAttribute("for") === element.id
       );
       if (label) {
-        return normalizeWhitespace(label.textContent ?? "");
+        return getElementVisibleText(label);
       }
     }
     const wrappingLabel = element.closest("label");
-    return wrappingLabel ? normalizeWhitespace(wrappingLabel.textContent ?? "") : "";
+    return wrappingLabel ? getElementVisibleText(wrappingLabel) : "";
   };
-  var getElementVisibleText = (element) => normalizeWhitespace((element.textContent ?? "").replace(/\s+/g, " "));
+  var getElementVisibleText = (element) => normalizeWhitespace(getSanitizedSubtreeText(element));
+  var getSanitizedSubtreeText = (node) => {
+    if (node.nodeType === Node.TEXT_NODE) {
+      return node.textContent ?? "";
+    }
+    if (node.nodeType === Node.ELEMENT_NODE) {
+      const element = node;
+      if (isExcludedElement(element)) {
+        return "";
+      }
+    }
+    return Array.from(node.childNodes).map((child) => getSanitizedSubtreeText(child)).join(" ");
+  };
+  var elementUsesContentAsAccessibleName = (element) => {
+    const explicitRole = element.getAttribute("role")?.trim().toLowerCase();
+    if (explicitRole) {
+      return explicitRole === "button" || explicitRole === "cell" || explicitRole === "checkbox" || explicitRole === "columnheader" || explicitRole === "gridcell" || explicitRole === "heading" || explicitRole === "link" || explicitRole === "menuitem" || explicitRole === "menuitemcheckbox" || explicitRole === "menuitemradio" || explicitRole === "option" || explicitRole === "radio" || explicitRole === "rowheader" || explicitRole === "switch" || explicitRole === "tab" || explicitRole === "tooltip" || explicitRole === "treeitem";
+    }
+    const tagName = element.tagName.toLowerCase();
+    if (/^h[1-6]$/.test(tagName)) {
+      return true;
+    }
+    if (tagName === "button" || tagName === "option" || tagName === "summary") {
+      return true;
+    }
+    return tagName === "a" && element.hasAttribute("href");
+  };
   var normalizeComparableText = (value) => normalizeWhitespace(value ?? "").toLowerCase();
   var getElementAccessibilityRole = (element, explicitlyNamed) => {
     const explicitRole = element.getAttribute("role")?.trim().toLowerCase();

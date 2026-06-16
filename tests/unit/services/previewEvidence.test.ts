@@ -306,6 +306,53 @@ describe('preview evidence', () => {
     expect(result.accessibility.nodeCount).toBe(MAX_PREVIEW_EVIDENCE_ELEMENTS)
     expect(result.accessibility.truncated).toBe(true)
   })
+
+  it('excludes script, style, and template text from accessibility names', () => {
+    document.body.innerHTML = `
+      <div id="root">
+        <main>
+          <h1>Unsafe root</h1>
+          <button>Injected action</button>
+          <script>window.__x = 1</script>
+          <style>#unsafe-root { background: hotpink; }</style>
+          <template><span>Hidden template text</span></template>
+        </main>
+      </div>
+    `
+
+    const root = document.getElementById('root')
+    if (!root) {
+      throw new Error('Expected preview root to exist.')
+    }
+
+    const result = capturePreviewEvidenceSnapshot(root, { layers: ['accessibility'] }, window)
+    if (!result.ok || !result.accessibility) {
+      throw new Error('Expected accessibility capture to succeed.')
+    }
+
+    expect(result.accessibility.nodes).toEqual([
+      {
+        role: 'main',
+        children: [
+          {
+            role: 'heading',
+            name: 'Unsafe root',
+            level: 1,
+          },
+          {
+            role: 'button',
+            name: 'Injected action',
+            focusable: true,
+          },
+        ],
+      },
+    ])
+
+    const serializedAccessibility = JSON.stringify(result.accessibility)
+    expect(serializedAccessibility).not.toContain('window.__x = 1')
+    expect(serializedAccessibility).not.toContain('hotpink')
+    expect(serializedAccessibility).not.toContain('Hidden template text')
+  })
 })
 
 const renderPreviewFixture = () => {

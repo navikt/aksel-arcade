@@ -3473,3 +3473,26 @@ Verification:
 Next note:
 
 - Keep `read_resource` as the compatibility path for MCP hosts that cannot issue raw `resources/read` requests. If a later issue changes Preview capture manifests or adds new `arcade://preview/captures/{captureId}/*` resources, make sure both the raw resource path and the tool-only bridge stay in sync.
+
+### 2026-06-16 - PR #288 follow-up: sanitize accessibility fallback names
+
+Fixed after external retest:
+
+- Reproduced the remaining `#276` gap with a focused unit regression: Preview accessibility serialization was deriving fallback names from raw subtree `textContent`, so a `<main>` landmark could pick up text from excluded descendants like `<script>`, `<style>`, and `<template>`.
+- Tightened `src/services/previewEvidence.ts` so fallback accessibility names now use sanitized subtree text and only apply to roles/elements that actually take names from their contents. Landmark/container nodes such as `main` no longer inherit noisy descendant text, while headings, buttons, links, and similar content-named controls still keep their expected names.
+- Reused the sanitized text helper for `aria-labelledby`, associated `<label>` text, and other accessibility-name text paths so excluded nodes do not leak back in through referenced labels.
+- Regenerated `public/preview-evidence-global.js` so the hidden Desktop Preview capture sandbox uses the same sanitization logic as the TypeScript source, and added a regression in `tests/unit/services/previewEvidence.test.ts` that proves script/style/template text is absent from accessibility output.
+
+Verification:
+
+- CI=1 npm run test -- --run tests/unit/services/previewEvidence.test.ts tests/unit/services/desktopMcpPreviewCapture.test.ts tests/unit/services/desktopMcpServer.test.ts
+- npm run build:sandbox
+- npm run test:e2e -- tests/e2e/desktop-mcp-preview-capture.spec.ts --reporter=line
+- npm run typecheck
+- npm run lint
+- CI=1 npm run test -- --run
+- Browser/console smoke check at `http://127.0.0.1:5173/aksel-arcade/` via `npm run dev -- --host 127.0.0.1 --port 5173 --strictPort`, confirming the app shell and live preview render cleanly with no browser-console warnings/errors
+
+Next note:
+
+- If later Preview evidence work expands accessible-name heuristics, keep the current distinction between explicit names and content-derived names. Excluded descendant text must stay out of both the DOM/layout/style layer and the accessibility layer, and `public/preview-evidence-global.js` must be regenerated whenever `src/services/previewEvidence.ts` changes.
