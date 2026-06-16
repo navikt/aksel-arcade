@@ -15,6 +15,8 @@ const originalWindowMetricDescriptors = {
 
 afterEach(() => {
   document.body.innerHTML = ''
+  document.body.removeAttribute('style')
+  document.documentElement.removeAttribute('style')
   restoreWindowMetric('innerWidth')
   restoreWindowMetric('innerHeight')
   restoreWindowMetric('devicePixelRatio')
@@ -171,6 +173,53 @@ describe('preview evidence', () => {
       screenshot: {
         width: 640,
         height: 480,
+      },
+    })
+  })
+
+  it('uses the preview canvas background when the body is transparent', () => {
+    const { root } = renderPreviewFixture()
+
+    document.body.style.backgroundColor = 'transparent'
+    document.documentElement.style.backgroundColor = 'rgb(250, 251, 252)'
+
+    const result = capturePreviewEvidenceSnapshot(root, { layers: ['screenshot'] }, window)
+
+    expect(result).toMatchObject({
+      ok: true,
+      screenshot: {
+        width: 1024,
+        height: 768,
+      },
+    })
+    if (!result.ok || !result.screenshot) {
+      throw new Error('Expected screenshot capture to succeed.')
+    }
+
+    expect(result.screenshot.text).toMatch(/background-color:\s*rgb\(250,\s*251,\s*252\)/)
+  })
+
+  it('prefers the most specific matching element for region text targets', () => {
+    const { root } = renderPreviewFixture()
+
+    const result = capturePreviewEvidenceSnapshot(
+      root,
+      {
+        layers: ['screenshot'],
+        screenshotScope: 'region',
+        target: { text: 'Continue' },
+      },
+      window
+    )
+
+    expect(result).toMatchObject({
+      ok: true,
+      screenshot: {
+        width: 96,
+        height: 32,
+      },
+      captureMeta: {
+        targetDescription: 'text="Continue"',
       },
     })
   })

@@ -403,8 +403,7 @@ const createPreviewScreenshot = (
   stage.style.height = `${documentHeight}px`
   stage.style.overflow = 'hidden'
   stage.style.boxSizing = 'border-box'
-  stage.style.backgroundColor =
-    frameWindow.getComputedStyle(frameDocument.body).backgroundColor || 'transparent'
+  stage.style.backgroundColor = resolvePreviewCanvasBackgroundColor(frameDocument, frameWindow)
   stage.style.transform = `translate(${-captureRegion.rect.x}px, ${-captureRegion.rect.y}px)`
   stage.style.transformOrigin = 'top left'
 
@@ -525,6 +524,25 @@ const getCaptureDocumentHeight = (
   )
 }
 
+const resolvePreviewCanvasBackgroundColor = (
+  frameDocument: Document,
+  frameWindow: Window
+): string => {
+  const bodyColor = frameDocument.body
+    ? frameWindow.getComputedStyle(frameDocument.body).backgroundColor
+    : ''
+  if (!isTransparentColor(bodyColor)) {
+    return bodyColor
+  }
+
+  const documentElementColor = frameWindow.getComputedStyle(frameDocument.documentElement).backgroundColor
+  if (!isTransparentColor(documentElementColor)) {
+    return documentElementColor
+  }
+
+  return bodyColor || documentElementColor || 'transparent'
+}
+
 const cloneStyledElementTree = (element: Element, frameWindow: Window): Element | null => {
   if (isExcludedElement(element)) {
     return null
@@ -631,29 +649,21 @@ const resolvePreviewCaptureTarget = (
   const normalizedText = normalizeComparableText(target.text)
   const normalizedLabel = normalizeComparableText(target.label)
 
-  const matchingElement = candidates.find((candidate) => {
-    if (isExcludedElement(candidate)) {
-      return false
-    }
-
-    if (normalizedRole && getElementRole(candidate) !== normalizedRole) {
-      return false
-    }
-
-    if (normalizedName && !getElementAccessibleName(candidate).includes(normalizedName)) {
-      return false
-    }
-
-    if (normalizedText && !getElementVisibleText(candidate).includes(normalizedText)) {
-      return false
-    }
-
-    if (normalizedLabel && !getElementLabelText(candidate).includes(normalizedLabel)) {
-      return false
-    }
-
-    return true
-  })
+  const matchingCandidates = candidates.filter((candidate) =>
+    matchesPreviewCaptureTargetCandidate(candidate, {
+      normalizedRole,
+      normalizedName,
+      normalizedText,
+      normalizedLabel,
+    })
+  )
+  const matchingElement =
+    matchingCandidates.find(
+      (candidate) =>
+        !matchingCandidates.some(
+          (otherCandidate) => otherCandidate !== candidate && candidate.contains(otherCandidate)
+        )
+    ) ?? null
 
   if (!matchingElement) {
     throw createTaggedPreviewCaptureError(
@@ -666,6 +676,43 @@ const resolvePreviewCaptureTarget = (
     element: matchingElement,
     targetDescription: describePreviewCaptureTarget(target),
   }
+}
+
+const matchesPreviewCaptureTargetCandidate = (
+  candidate: Element,
+  {
+    normalizedRole,
+    normalizedName,
+    normalizedText,
+    normalizedLabel,
+  }: {
+    normalizedRole?: string
+    normalizedName?: string
+    normalizedText?: string
+    normalizedLabel?: string
+  }
+): boolean => {
+  if (isExcludedElement(candidate)) {
+    return false
+  }
+
+  if (normalizedRole && getElementRole(candidate) !== normalizedRole) {
+    return false
+  }
+
+  if (normalizedName && !getElementAccessibleName(candidate).includes(normalizedName)) {
+    return false
+  }
+
+  if (normalizedText && !getElementVisibleText(candidate).includes(normalizedText)) {
+    return false
+  }
+
+  if (normalizedLabel && !getElementLabelText(candidate).includes(normalizedLabel)) {
+    return false
+  }
+
+  return true
 }
 
 const describePreviewCaptureTarget = (target: PreviewEvidenceCaptureTarget): string =>
@@ -909,6 +956,15 @@ const removeEmptyStyleValues = (
   ) as PreviewEvidenceComputedStyle
 
 const normalizeWhitespace = (value: string): string => value.replace(/\s+/g, ' ').trim()
+
+const isTransparentColor = (value: string | undefined): boolean => {
+  const normalized = normalizeComparableText(value)
+  return (
+    normalized.length === 0 ||
+    normalized === 'transparent' ||
+    /^rgba\(\s*\d+\s*,\s*\d+\s*,\s*\d+\s*,\s*0(?:\.0+)?\s*\)$/.test(normalized)
+  )
+}
 
 const truncateEvidenceValue = (value: string, maxLength: number): string =>
   value.length > maxLength ? `${value.slice(0, maxLength)}...` : value

@@ -204,7 +204,7 @@ var previewEvidenceUtils = (() => {
     stage.style.height = `${documentHeight}px`;
     stage.style.overflow = "hidden";
     stage.style.boxSizing = "border-box";
-    stage.style.backgroundColor = frameWindow.getComputedStyle(frameDocument.body).backgroundColor || "transparent";
+    stage.style.backgroundColor = resolvePreviewCanvasBackgroundColor(frameDocument, frameWindow);
     stage.style.transform = `translate(${-captureRegion.rect.x}px, ${-captureRegion.rect.y}px)`;
     stage.style.transformOrigin = "top left";
     const clonedRoot = cloneStyledElementTree(root, frameWindow);
@@ -297,6 +297,17 @@ var previewEvidenceUtils = (() => {
       roundNumber(rootRect.bottom + frameWindow.scrollY)
     );
   };
+  var resolvePreviewCanvasBackgroundColor = (frameDocument, frameWindow) => {
+    const bodyColor = frameDocument.body ? frameWindow.getComputedStyle(frameDocument.body).backgroundColor : "";
+    if (!isTransparentColor(bodyColor)) {
+      return bodyColor;
+    }
+    const documentElementColor = frameWindow.getComputedStyle(frameDocument.documentElement).backgroundColor;
+    if (!isTransparentColor(documentElementColor)) {
+      return documentElementColor;
+    }
+    return bodyColor || documentElementColor || "transparent";
+  };
   var cloneStyledElementTree = (element, frameWindow) => {
     if (isExcludedElement(element)) {
       return null;
@@ -381,24 +392,19 @@ var previewEvidenceUtils = (() => {
     const normalizedName = normalizeComparableText(target.name);
     const normalizedText = normalizeComparableText(target.text);
     const normalizedLabel = normalizeComparableText(target.label);
-    const matchingElement = candidates.find((candidate) => {
-      if (isExcludedElement(candidate)) {
-        return false;
-      }
-      if (normalizedRole && getElementRole(candidate) !== normalizedRole) {
-        return false;
-      }
-      if (normalizedName && !getElementAccessibleName(candidate).includes(normalizedName)) {
-        return false;
-      }
-      if (normalizedText && !getElementVisibleText(candidate).includes(normalizedText)) {
-        return false;
-      }
-      if (normalizedLabel && !getElementLabelText(candidate).includes(normalizedLabel)) {
-        return false;
-      }
-      return true;
-    });
+    const matchingCandidates = candidates.filter(
+      (candidate) => matchesPreviewCaptureTargetCandidate(candidate, {
+        normalizedRole,
+        normalizedName,
+        normalizedText,
+        normalizedLabel
+      })
+    );
+    const matchingElement = matchingCandidates.find(
+      (candidate) => !matchingCandidates.some(
+        (otherCandidate) => otherCandidate !== candidate && candidate.contains(otherCandidate)
+      )
+    ) ?? null;
     if (!matchingElement) {
       throw createTaggedPreviewCaptureError(
         "invalid-capture-target",
@@ -409,6 +415,29 @@ var previewEvidenceUtils = (() => {
       element: matchingElement,
       targetDescription: describePreviewCaptureTarget(target)
     };
+  };
+  var matchesPreviewCaptureTargetCandidate = (candidate, {
+    normalizedRole,
+    normalizedName,
+    normalizedText,
+    normalizedLabel
+  }) => {
+    if (isExcludedElement(candidate)) {
+      return false;
+    }
+    if (normalizedRole && getElementRole(candidate) !== normalizedRole) {
+      return false;
+    }
+    if (normalizedName && !getElementAccessibleName(candidate).includes(normalizedName)) {
+      return false;
+    }
+    if (normalizedText && !getElementVisibleText(candidate).includes(normalizedText)) {
+      return false;
+    }
+    if (normalizedLabel && !getElementLabelText(candidate).includes(normalizedLabel)) {
+      return false;
+    }
+    return true;
   };
   var describePreviewCaptureTarget = (target) => [
     target.role ? `role=${target.role}` : null,
@@ -579,6 +608,10 @@ var previewEvidenceUtils = (() => {
     Object.entries(style).filter(([, value]) => Boolean(value))
   );
   var normalizeWhitespace = (value) => value.replace(/\s+/g, " ").trim();
+  var isTransparentColor = (value) => {
+    const normalized = normalizeComparableText(value);
+    return normalized.length === 0 || normalized === "transparent" || /^rgba\(\s*\d+\s*,\s*\d+\s*,\s*\d+\s*,\s*0(?:\.0+)?\s*\)$/.test(normalized);
+  };
   var truncateEvidenceValue = (value, maxLength) => value.length > maxLength ? `${value.slice(0, maxLength)}...` : value;
   var roundNumber = (value) => {
     if (!Number.isFinite(value)) {

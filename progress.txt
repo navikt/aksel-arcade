@@ -3373,3 +3373,23 @@ Verification:
 Next note:
 
 - The current default project still exposes only `page01`, so the exact "capture a non-active page without changing the visible active page" verifier step remains non-executable until a multi-page default fixture exists; keep treating that as fixture coverage, not a regression in the capture pipeline.
+
+### 2026-06-16 - PR #286 review follow-up for issue #274
+
+Fixed after review:
+
+- Screenshot evidence now preserves the actual Preview canvas backdrop instead of inheriting the transparent sandbox body. `src/services/previewEvidence.ts` resolves the capture background from the real document canvas (`body`, then `documentElement`) so Desktop MCP screenshots match the themed Preview surface.
+- Region capture targets that rely on `text`, `name`, or `label` now choose the most specific matching element instead of stopping at an ancestor like `#root` whose descendant text happens to match. This keeps targeted region crops aligned with the intended control.
+- Added focused unit coverage for both review fixes in `tests/unit/services/previewEvidence.test.ts`, including the transparent-body/html-background capture path and text-based region targeting resolving to the button-sized crop.
+
+Verification:
+
+- npm run type-check
+- CI=1 npm test -- --run
+- npm run lint
+- npm run build
+- npx playwright test tests/e2e/desktop-mcp-preview-capture.spec.ts --reporter=line
+
+Next note:
+
+- The committed `public/preview-evidence-global.js` bundle must stay in sync with `src/services/previewEvidence.ts` whenever Preview evidence serialization changes; the hidden Desktop capture sandbox executes the generated browser bundle, not the TypeScript source directly.
