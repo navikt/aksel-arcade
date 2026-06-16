@@ -10,15 +10,23 @@ const ROUTE_DESKTOP_MCP_PROJECT_RESOURCE_REQUEST_CHANNEL =
   'aksel-arcade:route-desktop-mcp-project-resource-request'
 const ROUTE_DESKTOP_MCP_PROJECT_RESOURCE_RESPONSE_CHANNEL =
   'aksel-arcade:route-desktop-mcp-project-resource-response'
+const ROUTE_DESKTOP_MCP_APPLY_CHANGES_REQUEST_CHANNEL =
+  'aksel-arcade:route-desktop-mcp-apply-changes-request'
+const ROUTE_DESKTOP_MCP_APPLY_CHANGES_RESPONSE_CHANNEL =
+  'aksel-arcade:route-desktop-mcp-apply-changes-response'
 
 let agentTransportRequestHandler = null
 let desktopMcpProjectResourceReadHandler = null
+let desktopMcpApplyChangesHandler = null
 
 ipcRenderer.on(ROUTE_AGENT_TRANSPORT_REQUEST_CHANNEL, (_event, payload) => {
   void routeAgentTransportRequest(payload)
 })
 ipcRenderer.on(ROUTE_DESKTOP_MCP_PROJECT_RESOURCE_REQUEST_CHANNEL, (_event, payload) => {
   void routeDesktopMcpProjectResourceRequest(payload)
+})
+ipcRenderer.on(ROUTE_DESKTOP_MCP_APPLY_CHANGES_REQUEST_CHANNEL, (_event, payload) => {
+  void routeDesktopMcpApplyChangesRequest(payload)
 })
 
 const routeAgentTransportRequest = async (payload) => {
@@ -130,6 +138,56 @@ const routeDesktopMcpProjectResourceRequest = async (payload) => {
   }
 }
 
+const routeDesktopMcpApplyChangesRequest = async (payload) => {
+  const requestId =
+    isRecord(payload) && typeof payload.requestId === 'string' ? payload.requestId : null
+  if (!requestId) {
+    return
+  }
+
+  const request = parseDesktopMcpApplyChangesRequest(payload)
+  if (!request) {
+    ipcRenderer.send(ROUTE_DESKTOP_MCP_APPLY_CHANGES_RESPONSE_CHANNEL, {
+      requestId,
+      response: createDesktopMcpApplyChangesFailure(
+        'project-unavailable',
+        'Desktop MCP apply_changes route request from the main process was invalid.'
+      ),
+    })
+    return
+  }
+
+  if (!desktopMcpApplyChangesHandler) {
+    ipcRenderer.send(ROUTE_DESKTOP_MCP_APPLY_CHANGES_RESPONSE_CHANNEL, {
+      requestId,
+      response: createDesktopMcpApplyChangesFailure(
+        'project-unavailable',
+        'Desktop MCP apply_changes is not available in the renderer yet.'
+      ),
+    })
+    return
+  }
+
+  try {
+    const response = await desktopMcpApplyChangesHandler(request)
+    ipcRenderer.send(ROUTE_DESKTOP_MCP_APPLY_CHANGES_RESPONSE_CHANNEL, {
+      requestId,
+      response,
+    })
+  } catch (error) {
+    ipcRenderer.send(ROUTE_DESKTOP_MCP_APPLY_CHANGES_RESPONSE_CHANNEL, {
+      requestId,
+      response: createDesktopMcpApplyChangesFailure(
+        'project-unavailable',
+        getRedactedAgentErrorMessage(
+          error,
+          'Desktop MCP apply_changes failed unexpectedly in the renderer.'
+        )
+      ),
+    })
+  }
+}
+
 contextBridge.exposeInMainWorld(
   '__AKSEL_ARCADE_DESKTOP__',
   Object.freeze({
@@ -152,6 +210,12 @@ contextBridge.exposeInMainWorld(
         )
       }
       desktopMcpProjectResourceReadHandler = handler
+    },
+    setDesktopMcpApplyChangesHandler: (handler) => {
+      if (handler !== null && typeof handler !== 'function') {
+        throw new Error('Desktop MCP apply_changes handler must be a function or null.')
+      }
+      desktopMcpApplyChangesHandler = handler
     },
   })
 )
@@ -196,6 +260,25 @@ const parseDesktopMcpProjectResourceRequest = (payload) => {
 const getPayloadResourceUri = (payload) =>
   isRecord(payload) && typeof payload.uri === 'string' ? payload.uri : ''
 
+const parseDesktopMcpApplyChangesRequest = (payload) => {
+  if (
+    !isRecord(payload) ||
+    typeof payload.summary !== 'string' ||
+    payload.summary.trim().length === 0 ||
+    !Array.isArray(payload.operations)
+  ) {
+    return null
+  }
+
+  return {
+    summary: payload.summary,
+    ...(typeof payload.expectedProjectRevision === 'string'
+      ? { expectedProjectRevision: payload.expectedProjectRevision }
+      : {}),
+    operations: payload.operations,
+  }
+}
+
 const createRouteErrorResponse = (id, jsonRpcCode, code, message) => ({
   jsonrpc: '2.0',
   id,
@@ -212,6 +295,12 @@ const createDesktopMcpProjectResourceFailure = (code, resourceUri, message) => (
   ok: false,
   code,
   resourceUri,
+  message,
+})
+
+const createDesktopMcpApplyChangesFailure = (code, message) => ({
+  ok: false,
+  code,
   message,
 })
 

@@ -17,7 +17,15 @@ const {
   DESKTOP_MCP_SERVER_VERSION: string
   DESKTOP_MCP_TRANSPORT_LABEL: string
   createDesktopMcpServer: (
-    options?: Partial<{ host: string; port: number; path: string }>
+    options?: Partial<{
+      host: string
+      port: number
+      path: string
+      readProjectResource: (request: { uri: string }) => ProjectResourceReadResult | Promise<ProjectResourceReadResult>
+      applyChanges: (
+        request: Record<string, unknown>
+      ) => ApplyChangesResult | Promise<ApplyChangesResult>
+    }>
   ) => DesktopMcpServer
 } = require('../../../desktop/mcpServer.cjs')
 
@@ -52,6 +60,37 @@ interface ProjectResourceReadFailure {
 
 type ProjectResourceReadResult = ProjectResourceReadSuccess | ProjectResourceReadFailure
 
+interface ApplyChangesSuccess {
+  ok: true
+  summary: string
+  projectRevision: string
+  changedResources: string[]
+  nextRecommendedResources: string[]
+  operationResults: Array<Record<string, unknown>>
+  safeActivity: {
+    toolName: 'apply_changes'
+    operationTypes?: string[]
+    timestamp: string
+  }
+}
+
+interface ApplyChangesFailure {
+  ok: false
+  code:
+    | 'project-unavailable'
+    | 'stale-project-revision'
+    | 'invalid-operation-target'
+    | 'invalid-project-name'
+    | 'payload-too-large'
+  message: string
+  manifestResourceUri?: string
+  resourceUri?: string
+  expectedProjectRevision?: string
+  currentProjectRevision?: string
+}
+
+type ApplyChangesResult = ApplyChangesSuccess | ApplyChangesFailure
+
 const activeServers: DesktopMcpServer[] = []
 const occupiedServers: Server[] = []
 
@@ -61,6 +100,7 @@ const createManagedServer = (
     port: number
     path: string
     readProjectResource: (request: { uri: string }) => ProjectResourceReadResult | Promise<ProjectResourceReadResult>
+    applyChanges: (request: Record<string, unknown>) => ApplyChangesResult | Promise<ApplyChangesResult>
   }>
 ): DesktopMcpServer => {
   const server = createDesktopMcpServer(options)
@@ -225,7 +265,7 @@ describe('desktopMcpServer', () => {
     })
   })
 
-  it('returns structured placeholder failures for known tools and rejects unknown tools or unsupported fields', async () => {
+  it('returns structured placeholder failures for capture_preview_evidence and rejects unknown tools or unsupported fields', async () => {
     const server = createManagedServer({ port: 0 })
     const state = await server.start()
 
@@ -261,43 +301,6 @@ describe('desktopMcpServer', () => {
           toolName: 'capture_preview_evidence',
           message:
             'Desktop Arcade MCP tool "capture_preview_evidence" is not implemented yet.',
-        },
-      },
-    })
-
-    const applyChangesResponse = await postJson(state.url, {
-      jsonrpc: '2.0',
-      id: 51,
-      method: 'tools/call',
-      params: {
-        name: 'apply_changes',
-        arguments: {
-          summary: 'Rename the project',
-          operations: [
-            {
-              type: 'rename_project',
-              name: 'Renamed project',
-            },
-          ],
-        },
-      },
-    })
-    expect(applyChangesResponse.status).toBe(200)
-    await expect(applyChangesResponse.json()).resolves.toEqual({
-      jsonrpc: '2.0',
-      id: 51,
-      result: {
-        content: [
-          {
-            type: 'text',
-            text: 'Desktop Arcade MCP tool "apply_changes" is not implemented yet.',
-          },
-        ],
-        isError: true,
-        structuredContent: {
-          code: 'not-yet-implemented',
-          toolName: 'apply_changes',
-          message: 'Desktop Arcade MCP tool "apply_changes" is not implemented yet.',
         },
       },
     })
@@ -350,6 +353,158 @@ describe('desktopMcpServer', () => {
     })
   })
 
+  it('routes apply_changes through the injected project writer and preserves MCP tool-result semantics', async () => {
+    const applyChanges = vi
+      .fn<(request: Record<string, unknown>) => Promise<ApplyChangesResult>>()
+      .mockResolvedValueOnce({
+        ok: true,
+        summary: 'Rename the project',
+        projectRevision: 'rev-1234abcd',
+        changedResources: ['arcade://project/manifest'],
+        nextRecommendedResources: [
+          'arcade://project/manifest',
+          'arcade://project/diagnostics',
+        ],
+        operationResults: [
+          {
+            index: 0,
+            type: 'rename_project',
+            name: 'Renamed project',
+          },
+        ],
+        safeActivity: {
+          toolName: 'apply_changes',
+          operationTypes: ['rename_project'],
+          timestamp: '2026-06-16T12:00:00.000Z',
+        },
+      })
+      .mockResolvedValueOnce({
+        ok: false,
+        code: 'stale-project-revision',
+        message: 'Revision mismatch.',
+        manifestResourceUri: 'arcade://project/manifest',
+        expectedProjectRevision: 'rev-old',
+        currentProjectRevision: 'rev-new',
+      })
+
+    const server = createManagedServer({ port: 0, applyChanges })
+    const state = await server.start()
+
+    const successResponse = await postJson(state.url, {
+      jsonrpc: '2.0',
+      id: 51,
+      method: 'tools/call',
+      params: {
+        name: 'apply_changes',
+        arguments: {
+          summary: 'Rename the project',
+          operations: [
+            {
+              type: 'rename_project',
+              name: 'Renamed project',
+            },
+          ],
+        },
+      },
+    })
+    expect(successResponse.status).toBe(200)
+    await expect(successResponse.json()).resolves.toEqual({
+      jsonrpc: '2.0',
+      id: 51,
+      result: {
+        content: [
+          {
+            type: 'text',
+            text: 'Applied changes: Rename the project',
+          },
+        ],
+        structuredContent: {
+          ok: true,
+          summary: 'Rename the project',
+          projectRevision: 'rev-1234abcd',
+          changedResources: ['arcade://project/manifest'],
+          nextRecommendedResources: [
+            'arcade://project/manifest',
+            'arcade://project/diagnostics',
+          ],
+          operationResults: [
+            {
+              index: 0,
+              type: 'rename_project',
+              name: 'Renamed project',
+            },
+          ],
+          safeActivity: {
+            toolName: 'apply_changes',
+            operationTypes: ['rename_project'],
+            timestamp: '2026-06-16T12:00:00.000Z',
+          },
+        },
+      },
+    })
+
+    const staleResponse = await postJson(state.url, {
+      jsonrpc: '2.0',
+      id: 52,
+      method: 'tools/call',
+      params: {
+        name: 'apply_changes',
+        arguments: {
+          summary: 'Retry with stale revision',
+          expectedProjectRevision: 'rev-old',
+          operations: [
+            {
+              type: 'rename_project',
+              name: 'Renamed project',
+            },
+          ],
+        },
+      },
+    })
+    expect(staleResponse.status).toBe(200)
+    await expect(staleResponse.json()).resolves.toEqual({
+      jsonrpc: '2.0',
+      id: 52,
+      result: {
+        content: [
+          {
+            type: 'text',
+            text: 'Revision mismatch.',
+          },
+        ],
+        isError: true,
+        structuredContent: {
+          code: 'stale-project-revision',
+          toolName: 'apply_changes',
+          message: 'Revision mismatch.',
+          manifestResourceUri: 'arcade://project/manifest',
+          expectedProjectRevision: 'rev-old',
+          currentProjectRevision: 'rev-new',
+        },
+      },
+    })
+
+    expect(applyChanges).toHaveBeenNthCalledWith(1, {
+      summary: 'Rename the project',
+      operations: [
+        {
+          type: 'rename_project',
+          name: 'Renamed project',
+        },
+      ],
+    })
+    expect(applyChanges).toHaveBeenNthCalledWith(2, {
+      summary: 'Retry with stale revision',
+      expectedProjectRevision: 'rev-old',
+      operations: [
+        {
+          type: 'rename_project',
+          name: 'Renamed project',
+        },
+      ],
+    })
+  })
+
   it('reads the Desktop MCP guide and capabilities resources', async () => {
     const server = createManagedServer({ port: 0 })
     const state = await server.start()
@@ -399,7 +554,10 @@ describe('desktopMcpServer', () => {
       '`select_active_page` is for human-facing coordination'
     )
     expect(operatingGuidePayload.result.contents[0].text).toContain(
-      'still returns `not-yet-implemented`, treat the current build as read-only'
+      'If `apply_changes` returns `project-unavailable`, wait for an active Desktop Arcade window'
+    )
+    expect(operatingGuidePayload.result.contents[0].text).toContain(
+      '`capture_preview_evidence` still returns `not-yet-implemented`'
     )
 
     const authoringGuideResponse = await postJson(state.url, {
@@ -488,7 +646,7 @@ describe('desktopMcpServer', () => {
       projectResourceReads: 'available when an active project reader is connected',
       toolExecution: {
         capture_preview_evidence: 'not-yet-implemented',
-        apply_changes: 'not-yet-implemented',
+        apply_changes: 'available when an active project writer is connected',
       },
       captureLayers: {
         screenshot: 'not-yet-implemented',

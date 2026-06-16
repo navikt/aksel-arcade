@@ -1,4 +1,5 @@
 import { getDesktopPreloadApi, type DesktopArcadePreloadApi } from './shellCapabilities'
+import type { DesktopMcpLastActivity } from './desktopMcpApplyChangesProtocol'
 
 export type DesktopMcpServerAvailability =
   | { status: 'available' }
@@ -11,6 +12,7 @@ export interface DesktopMcpServerState {
   requiresAuth: false
   authDescription: string
   availability: DesktopMcpServerAvailability
+  lastActivity?: DesktopMcpLastActivity | null
 }
 
 export const DESKTOP_MCP_LAST_ACTIVITY_PLACEHOLDER = 'Last activity: No MCP activity yet.'
@@ -36,6 +38,21 @@ export const formatDesktopMcpAvailability = (
   availability.status === 'available'
     ? 'Status: Available'
     : `Status: Unavailable: ${availability.reason}`
+
+export const formatDesktopMcpLastActivity = (
+  activity: DesktopMcpLastActivity | null | undefined
+): string => {
+  if (!activity) {
+    return DESKTOP_MCP_LAST_ACTIVITY_PLACEHOLDER
+  }
+
+  const operationSuffix =
+    activity.operationTypes && activity.operationTypes.length > 0
+      ? ` (${activity.operationTypes.join(', ')})`
+      : ''
+
+  return `Last activity: ${activity.toolName}${operationSuffix} at ${activity.timestamp}`
+}
 
 const isDesktopMcpServerState = (value: unknown): value is DesktopMcpServerState => {
   if (!isRecord(value)) {
@@ -64,7 +81,12 @@ const isDesktopMcpServerState = (value: unknown): value is DesktopMcpServerState
     return false
   }
 
-  return isDesktopMcpServerAvailability(value.availability)
+  return (
+    isDesktopMcpServerAvailability(value.availability) &&
+    (value.lastActivity === undefined ||
+      value.lastActivity === null ||
+      isDesktopMcpLastActivity(value.lastActivity))
+  )
 }
 
 const isDesktopMcpServerAvailability = (
@@ -87,3 +109,23 @@ const isDesktopMcpServerAvailability = (
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null
+
+const isDesktopMcpLastActivity = (value: unknown): value is DesktopMcpLastActivity => {
+  if (!isRecord(value)) {
+    return false
+  }
+
+  if (
+    (value.toolName !== 'apply_changes' && value.toolName !== 'capture_preview_evidence') ||
+    typeof value.timestamp !== 'string' ||
+    value.timestamp.trim().length === 0
+  ) {
+    return false
+  }
+
+  return (
+    value.operationTypes === undefined ||
+    (Array.isArray(value.operationTypes) &&
+      value.operationTypes.every((operationType) => typeof operationType === 'string'))
+  )
+}

@@ -8,6 +8,7 @@ import {
   DESKTOP_MCP_PROJECT_SOURCE_GLOBAL_HOOKS_URI,
   DESKTOP_MCP_PROJECT_SOURCE_GLOBAL_JSX_URI,
   createDesktopMcpProjectPageSourceUri,
+  parseDesktopMcpProjectSourceUri,
   type DesktopMcpProjectSourceKind,
 } from '@/services/desktopMcpProjectSourceUris'
 import {
@@ -16,7 +17,12 @@ import {
   type PageReferenceKind,
   getStalePageReferenceMessage,
 } from '@/services/pageReferences'
-import { getActivePage, getPageById, getStartPage, isArcadePageId } from '@/services/projectSource'
+import {
+  getActivePage,
+  getPageById,
+  getStartPage,
+  isArcadePageId,
+} from '@/services/projectSource'
 import type {
   DesktopMcpProjectResourceReadFailure,
   DesktopMcpProjectResourceReadRequest,
@@ -34,7 +40,6 @@ export {
   type DesktopMcpProjectSourceKind,
 } from '@/services/desktopMcpProjectSourceUris'
 
-const PROJECT_SOURCE_PAGE_URI_PATTERN = /^arcade:\/\/project\/source\/pages\/(page\d+)\/(jsx|hooks)$/
 const COMPILE_ERROR_SOURCE_LABEL_PATTERN = /^(global config|page\d+)\s+(JSX|Hooks):/i
 const SOURCE_FILE_MIME_TYPE = 'text/plain'
 const JSON_MIME_TYPE = 'application/json'
@@ -311,16 +316,16 @@ const parseDesktopMcpProjectResourceUri = (
     return { kind: 'global-source', uri, sourceKind: 'hooks' }
   }
 
-  const pageSourceMatch = uri.match(PROJECT_SOURCE_PAGE_URI_PATTERN)
-  if (!pageSourceMatch || !isArcadePageId(pageSourceMatch[1])) {
+  const parsedSourceUri = parseDesktopMcpProjectSourceUri(uri)
+  if (!parsedSourceUri || parsedSourceUri.target.type !== 'page') {
     return null
   }
 
   return {
     kind: 'page-source',
     uri,
-    pageId: pageSourceMatch[1],
-    sourceKind: pageSourceMatch[2] as DesktopMcpProjectSourceKind,
+    pageId: parsedSourceUri.target.pageId,
+    sourceKind: parsedSourceUri.sourceKind,
   }
 }
 

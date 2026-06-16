@@ -14,6 +14,10 @@ const ROUTE_DESKTOP_MCP_PROJECT_RESOURCE_REQUEST_CHANNEL =
   'aksel-arcade:route-desktop-mcp-project-resource-request'
 const ROUTE_DESKTOP_MCP_PROJECT_RESOURCE_RESPONSE_CHANNEL =
   'aksel-arcade:route-desktop-mcp-project-resource-response'
+const ROUTE_DESKTOP_MCP_APPLY_CHANGES_REQUEST_CHANNEL =
+  'aksel-arcade:route-desktop-mcp-apply-changes-request'
+const ROUTE_DESKTOP_MCP_APPLY_CHANGES_RESPONSE_CHANNEL =
+  'aksel-arcade:route-desktop-mcp-apply-changes-response'
 const DEFAULT_RENDERER_URL = 'http://127.0.0.1:5173/aksel-arcade/'
 const DIST_DIR = path.resolve(__dirname, '..', 'dist-desktop')
 const DESKTOP_RENDERER_PROTOCOL = 'aksel-arcade'
@@ -22,17 +26,21 @@ const DESKTOP_RENDERER_ORIGIN = `${DESKTOP_RENDERER_PROTOCOL}://${DESKTOP_RENDER
 const DESKTOP_RENDERER_URL = `${DESKTOP_RENDERER_ORIGIN}/index.html`
 const AGENT_TRANSPORT_ROUTE_TIMEOUT_MS = 5000
 const DESKTOP_MCP_PROJECT_RESOURCE_ROUTE_TIMEOUT_MS = 5000
+const DESKTOP_MCP_APPLY_CHANGES_ROUTE_TIMEOUT_MS = 5000
 const agentLoopbackTransport = createAgentLoopbackJsonRpcTransport({
   routeRequest: routeAgentTransportRequest,
 })
 const desktopMcpServer = createDesktopMcpServer({
   readProjectResource: routeDesktopMcpProjectResourceRead,
+  applyChanges: routeDesktopMcpApplyChanges,
 })
 let activeMainWindow = null
 let nextAgentTransportRouteRequestId = 0
 const pendingAgentTransportRouteRequests = new Map()
 let nextDesktopMcpProjectResourceRequestId = 0
 const pendingDesktopMcpProjectResourceRequests = new Map()
+let nextDesktopMcpApplyChangesRequestId = 0
+const pendingDesktopMcpApplyChangesRequests = new Map()
 let desktopRendererProtocolRegistered = false
 const DESKTOP_ARCADE_CAPABILITIES = Object.freeze({
   surface: 'desktop',
@@ -85,6 +93,10 @@ const registerDesktopIpc = () => {
     ROUTE_DESKTOP_MCP_PROJECT_RESOURCE_RESPONSE_CHANNEL,
     handleDesktopMcpProjectResourceResponse
   )
+  ipcMain.on(
+    ROUTE_DESKTOP_MCP_APPLY_CHANGES_RESPONSE_CHANNEL,
+    handleDesktopMcpApplyChangesResponse
+  )
 }
 
 const removeDesktopIpc = () => {
@@ -97,6 +109,7 @@ const removeDesktopIpc = () => {
     ROUTE_DESKTOP_MCP_PROJECT_RESOURCE_RESPONSE_CHANNEL,
     handleDesktopMcpProjectResourceResponse
   )
+  ipcMain.off(ROUTE_DESKTOP_MCP_APPLY_CHANGES_RESPONSE_CHANNEL, handleDesktopMcpApplyChangesResponse)
 }
 
 const registerDesktopRendererProtocol = () => {
@@ -229,6 +242,54 @@ function routeDesktopMcpProjectResourceRead({ uri }) {
   })
 }
 
+function routeDesktopMcpApplyChanges(request) {
+  const targetWindow = getDesktopMcpProjectResourceWindow()
+  if (!targetWindow) {
+    return Promise.resolve(
+      createDesktopMcpApplyChangesFailure(
+        'project-unavailable',
+        'Desktop Arcade MCP apply_changes is unavailable because no renderer window is available.'
+      )
+    )
+  }
+
+  const requestId = `desktop-mcp-apply-changes-${++nextDesktopMcpApplyChangesRequestId}`
+
+  return new Promise((resolve) => {
+    const timeout = setTimeout(() => {
+      pendingDesktopMcpApplyChangesRequests.delete(requestId)
+      resolve(
+        createDesktopMcpApplyChangesFailure(
+          'project-unavailable',
+          'Desktop Arcade MCP apply_changes timed out before the renderer responded.'
+        )
+      )
+    }, DESKTOP_MCP_APPLY_CHANGES_ROUTE_TIMEOUT_MS)
+
+    pendingDesktopMcpApplyChangesRequests.set(requestId, {
+      resolve,
+      timeout,
+      webContentsId: targetWindow.webContents.id,
+    })
+
+    try {
+      targetWindow.webContents.send(ROUTE_DESKTOP_MCP_APPLY_CHANGES_REQUEST_CHANNEL, {
+        requestId,
+        ...request,
+      })
+    } catch {
+      pendingDesktopMcpApplyChangesRequests.delete(requestId)
+      clearTimeout(timeout)
+      resolve(
+        createDesktopMcpApplyChangesFailure(
+          'project-unavailable',
+          'Desktop Arcade MCP apply_changes is unavailable because the renderer window is no longer reachable.'
+        )
+      )
+    }
+  })
+}
+
 function handleAgentTransportRouteResponse(event, payload) {
   if (!isRecord(payload) || typeof payload.requestId !== 'string') {
     return
@@ -284,6 +345,32 @@ function handleDesktopMcpProjectResourceResponse(event, payload) {
   pendingRequest.resolve(payload.response)
 }
 
+function handleDesktopMcpApplyChangesResponse(event, payload) {
+  if (!isRecord(payload) || typeof payload.requestId !== 'string') {
+    return
+  }
+
+  const pendingRequest = pendingDesktopMcpApplyChangesRequests.get(payload.requestId)
+  if (!pendingRequest || pendingRequest.webContentsId !== event.sender.id) {
+    return
+  }
+
+  pendingDesktopMcpApplyChangesRequests.delete(payload.requestId)
+  clearTimeout(pendingRequest.timeout)
+
+  if (!isDesktopMcpApplyChangesResult(payload.response)) {
+    pendingRequest.resolve(
+      createDesktopMcpApplyChangesFailure(
+        'project-unavailable',
+        'Desktop Arcade MCP apply_changes is unavailable because the renderer returned an invalid response.'
+      )
+    )
+    return
+  }
+
+  pendingRequest.resolve(payload.response)
+}
+
 const getAgentTransportWindow = () => {
   if (activeMainWindow && !activeMainWindow.isDestroyed()) {
     return activeMainWindow
@@ -316,6 +403,14 @@ const resolvePendingDesktopMcpProjectResourceRequests = (responseFactory) => {
   }
 }
 
+const resolvePendingDesktopMcpApplyChangesRequests = (responseFactory) => {
+  for (const [requestId, pendingRequest] of pendingDesktopMcpApplyChangesRequests) {
+    pendingDesktopMcpApplyChangesRequests.delete(requestId)
+    clearTimeout(pendingRequest.timeout)
+    pendingRequest.resolve(responseFactory(pendingRequest))
+  }
+}
+
 const createAgentTransportRouteErrorResponse = (id, jsonRpcCode, code, message) => ({
   jsonrpc: '2.0',
   id: isJsonRpcId(id) ? id : null,
@@ -333,6 +428,13 @@ const createDesktopMcpProjectResourceFailure = (code, resourceUri, message) => (
   code,
   resourceUri,
   message,
+})
+
+const createDesktopMcpApplyChangesFailure = (code, message, extras = {}) => ({
+  ok: false,
+  code,
+  message,
+  ...extras,
 })
 
 const parseTransportSessionPayload = (payload) => {
@@ -465,6 +567,12 @@ const createWindow = async () => {
         'Desktop Arcade project resources are unavailable because the renderer window closed.'
       )
     )
+    resolvePendingDesktopMcpApplyChangesRequests(() =>
+      createDesktopMcpApplyChangesFailure(
+        'project-unavailable',
+        'Desktop Arcade MCP apply_changes is unavailable because the renderer window closed.'
+      )
+    )
   })
 
   mainWindow.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
@@ -525,6 +633,12 @@ app.on('will-quit', () => {
       'Desktop Arcade project resources are unavailable because the renderer is shutting down.'
     )
   )
+  resolvePendingDesktopMcpApplyChangesRequests(() =>
+    createDesktopMcpApplyChangesFailure(
+      'project-unavailable',
+      'Desktop Arcade MCP apply_changes is unavailable because the renderer is shutting down.'
+    )
+  )
   removeDesktopIpc()
 })
 
@@ -571,5 +685,47 @@ const isDesktopMcpProjectResourceReadResult = (value, expectedUri) => {
       value.code === 'invalid-resource-uri') &&
     typeof value.message === 'string' &&
     value.message.trim().length > 0
+  )
+}
+
+const isDesktopMcpApplyChangesResult = (value) => {
+  if (!isRecord(value) || typeof value.ok !== 'boolean') {
+    return false
+  }
+
+  if (value.ok) {
+    return (
+    typeof value.summary === 'string' &&
+    value.summary.trim().length > 0 &&
+    typeof value.projectRevision === 'string' &&
+    value.projectRevision.trim().length > 0 &&
+    Array.isArray(value.changedResources) &&
+    value.changedResources.every((resourceUri) => typeof resourceUri === 'string') &&
+    Array.isArray(value.nextRecommendedResources) &&
+    value.nextRecommendedResources.every((resourceUri) => typeof resourceUri === 'string') &&
+    Array.isArray(value.operationResults) &&
+    isRecord(value.safeActivity) &&
+    typeof value.safeActivity.toolName === 'string' &&
+    typeof value.safeActivity.timestamp === 'string' &&
+    (value.safeActivity.operationTypes === undefined ||
+      (Array.isArray(value.safeActivity.operationTypes) &&
+        value.safeActivity.operationTypes.every((operationType) => typeof operationType === 'string')))
+    )
+  }
+
+  return (
+    (value.code === 'project-unavailable' ||
+    value.code === 'stale-project-revision' ||
+    value.code === 'invalid-operation-target' ||
+    value.code === 'invalid-project-name' ||
+    value.code === 'payload-too-large') &&
+    typeof value.message === 'string' &&
+    value.message.trim().length > 0 &&
+    (value.manifestResourceUri === undefined || typeof value.manifestResourceUri === 'string') &&
+    (value.resourceUri === undefined || typeof value.resourceUri === 'string') &&
+    (value.expectedProjectRevision === undefined ||
+    typeof value.expectedProjectRevision === 'string') &&
+    (value.currentProjectRevision === undefined ||
+    typeof value.currentProjectRevision === 'string')
   )
 }

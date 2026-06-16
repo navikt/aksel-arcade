@@ -3260,3 +3260,31 @@ Verification:
 - Direct MCP probe against a local ephemeral `createDesktopMcpServer({ port: 0 })` instance confirmed:
   - the capabilities resource returns `implementationStatus.toolExecution.apply_changes = "not-yet-implemented"` and the matching layer/template statuses
   - the operating guide now tells clients to treat the build as read-only while those tools are still placeholders
+
+### 2026-06-16 - Issue #275: Desktop MCP apply_changes for existing-project edits
+
+Implemented:
+
+- Selected `#275` as the single highest-priority `ready-for-agent` feature from `#274`-`#280` after checking issue `#269`, `CONTEXT.md`, and the existing `progress.txt` notes. `#273` had already finished the read-resource slice, and `#275` was the next unblocked mutation path that later page-lifecycle work depends on.
+- Added `src/services/desktopMcpApplyChanges.ts` plus the shared protocol/adapter helpers so Desktop MCP now supports the existing-project `apply_changes` subset for `replace_source`, `set_preview_context`, and `rename_project`.
+- Kept the mutation flow on the same narrow main -> preload -> renderer bridge as project-resource reads: `desktop/main.cjs`, `desktop/preload.cjs`, `desktop/mcpServer.cjs`, `src/services/shellCapabilities.ts`, and `src/hooks/useDesktopMcpProjectResourceBridge.ts` now route validated apply requests, surface business failures as MCP tool errors, and keep immediate read-after-write consistency for follow-up `resources/read` calls.
+- Prevalidated the whole operation batch before mutating React state, including stale `expectedProjectRevision` checks, source-target URI validation, project-name validation, and the existing 5 MB project-size guard.
+- Reused shared `arcade://project/source/...` URI parsing from `src/services/desktopMcpProjectSourceUris.ts` so `replace_source` only accepts real manifest-backed source resources.
+- Updated Desktop MCP capabilities/guide text to report `apply_changes` as available when an active project writer is connected while leaving `capture_preview_evidence` on the explicit `not-yet-implemented` path.
+- Added regression coverage in `tests/unit/services/desktopMcpApplyChanges.test.ts`, `tests/unit/services/desktopMcpApplyChangesAdapter.test.ts`, `tests/unit/services/desktopMcpServer.test.ts`, and `tests/integration/desktop-mcp-settings.test.tsx` for success/failure semantics, adapter registration, server routing, and safe last-activity rendering.
+- Fixed two build-only follow-ups before handoff: imported `isArcadePageId` into `src/services/desktopMcpProjectResources.ts` after the shared URI-parser refactor, and updated the typed Vitest mock signature in `tests/unit/services/desktopMcpServer.test.ts` so `tsc -b` passes.
+
+Verification:
+
+- npm install
+- npm run typecheck
+- npm run lint
+- CI=1 npm run test -- --run
+- npm run build
+- Browser/console smoke check at `http://127.0.0.1:4173/aksel-arcade/` via `npm run dev -- --host 127.0.0.1 --port 4173`, confirming the app shell and live preview render and the console stays free of warnings/errors in the clean flow
+
+Next note:
+
+- `#277` should build on this `apply_changes` path for page-lifecycle mutations instead of introducing a second writer bridge; the current existing-project mutation surface already has revision checks, source-resource targeting, and immediate read-after-write behavior.
+- `capture_preview_evidence` is still intentionally unimplemented. Keep the next MCP slices on the manifest/source/diagnostics/apply loop unless that issue is the one being worked.
+- Desktop MCP Settings last-activity is currently renderer-managed UI state. If a later issue needs persistence or parity from the main-process server state, that should be a separate follow-up rather than folded into `#275`.

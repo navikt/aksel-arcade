@@ -199,12 +199,10 @@ const MCP_STABLE_RESOURCE_DEFINITIONS = Object.freeze([
   }),
 ])
 
-const TOOL_EXECUTION_STATUS = Object.freeze(
-  MCP_TOOL_DEFINITIONS.reduce((status, toolDefinition) => {
-    status[toolDefinition.name] = 'not-yet-implemented'
-    return status
-  }, {})
-)
+const TOOL_EXECUTION_STATUS = Object.freeze({
+  capture_preview_evidence: 'not-yet-implemented',
+  apply_changes: 'available when an active project writer is connected',
+})
 
 const PREVIEW_EVIDENCE_URI_TEMPLATE_STATUS = Object.freeze(
   CAPABILITY_PREVIEW_EVIDENCE_URI_TEMPLATES.reduce((status, uriTemplate) => {
@@ -239,6 +237,7 @@ const createDesktopMcpServer = ({
   port = DESKTOP_MCP_PORT,
   path = DESKTOP_MCP_PATH,
   readProjectResource = createProjectUnavailableResourceResult,
+  applyChanges = createProjectUnavailableApplyChangesResult,
 } = {}) => {
   let activeServer = null
   let startOperation = null
@@ -283,6 +282,7 @@ const createDesktopMcpServer = ({
         path,
         port: getPort(),
         readProjectResource,
+        applyChanges,
       })
     })
 
@@ -342,7 +342,11 @@ const createDesktopMcpServer = ({
   }
 }
 
-const handleDesktopMcpRequest = (request, response, { host, path, port, readProjectResource }) => {
+const handleDesktopMcpRequest = (
+  request,
+  response,
+  { host, path, port, readProjectResource, applyChanges }
+) => {
   const requestUrl = new URL(request.url ?? '/', `http://${host}:${port}`)
   if (requestUrl.pathname !== path) {
     sendText(response, 404, 'Desktop Arcade MCP endpoint not found.')
@@ -367,7 +371,7 @@ const handleDesktopMcpRequest = (request, response, { host, path, port, readProj
     return
   }
 
-  void routeDesktopMcpRequest(request, response, { readProjectResource }).catch((error) => {
+  void routeDesktopMcpRequest(request, response, { readProjectResource, applyChanges }).catch((error) => {
     if (response.writableEnded) {
       return
     }
@@ -420,7 +424,7 @@ const sendNoContent = (response, statusCode = 204) => {
   response.end()
 }
 
-const routeDesktopMcpRequest = async (request, response, { readProjectResource }) => {
+const routeDesktopMcpRequest = async (request, response, { readProjectResource, applyChanges }) => {
   let bodyText
   try {
     bodyText = await readRequestBody(request)
@@ -461,10 +465,14 @@ const routeDesktopMcpRequest = async (request, response, { readProjectResource }
     return
   }
 
-  await routeDesktopMcpJsonRpcRequest(payload, response, { readProjectResource })
+  await routeDesktopMcpJsonRpcRequest(payload, response, { readProjectResource, applyChanges })
 }
 
-const routeDesktopMcpJsonRpcRequest = async (payload, response, { readProjectResource }) => {
+const routeDesktopMcpJsonRpcRequest = async (
+  payload,
+  response,
+  { readProjectResource, applyChanges }
+) => {
   switch (payload.method) {
     case 'initialize':
       routeInitializeRequest(payload, response)
@@ -479,7 +487,7 @@ const routeDesktopMcpJsonRpcRequest = async (payload, response, { readProjectRes
       routeResourcesListRequest(payload, response)
       return
     case 'tools/call':
-      routeToolsCallRequest(payload, response)
+      await routeToolsCallRequest(payload, response, applyChanges)
       return
     case 'resources/read':
       await routeResourcesReadRequest(payload, response, readProjectResource)
@@ -595,7 +603,7 @@ const routeResourcesListRequest = (payload, response) => {
   })
 }
 
-const routeToolsCallRequest = (payload, response) => {
+const routeToolsCallRequest = async (payload, response, applyChanges) => {
   if (!isJsonRpcResponseId(payload.id)) {
     sendJsonRpcError(response, {
       httpStatus: 400,
@@ -667,15 +675,75 @@ const routeToolsCallRequest = (payload, response) => {
     return
   }
 
-  sendJson(response, 200, {
-    jsonrpc: '2.0',
-    id: payload.id,
-    result: createToolExecutionErrorResult(
-      toolDefinition.name,
-      'not-yet-implemented',
-      `Desktop Arcade MCP tool "${toolDefinition.name}" is not implemented yet.`
-    ),
-  })
+  if (toolDefinition.name === 'capture_preview_evidence') {
+    sendJson(response, 200, {
+      jsonrpc: '2.0',
+      id: payload.id,
+      result: createToolExecutionErrorResult(
+        toolDefinition.name,
+        'not-yet-implemented',
+        `Desktop Arcade MCP tool "${toolDefinition.name}" is not implemented yet.`
+      ),
+    })
+    return
+  }
+
+  try {
+    const applyChangesResult = await applyChanges(argumentsPayload)
+    if (!isApplyChangesResult(applyChangesResult)) {
+      sendJson(response, 200, {
+        jsonrpc: '2.0',
+        id: payload.id,
+        result: createToolExecutionErrorResult(
+          toolDefinition.name,
+          'project-unavailable',
+          'Desktop Arcade MCP apply_changes returned an invalid renderer response.'
+        ),
+      })
+      return
+    }
+
+    sendJson(response, 200, {
+      jsonrpc: '2.0',
+      id: payload.id,
+      result: applyChangesResult.ok
+        ? createToolExecutionSuccessResult(
+            `Applied changes: ${applyChangesResult.summary}`,
+            applyChangesResult
+          )
+        : createToolExecutionErrorResult(
+            toolDefinition.name,
+            applyChangesResult.code,
+            applyChangesResult.message,
+            {
+              ...(applyChangesResult.manifestResourceUri !== undefined
+                ? { manifestResourceUri: applyChangesResult.manifestResourceUri }
+                : {}),
+              ...(applyChangesResult.resourceUri !== undefined
+                ? { resourceUri: applyChangesResult.resourceUri }
+                : {}),
+              ...(applyChangesResult.expectedProjectRevision !== undefined
+                ? { expectedProjectRevision: applyChangesResult.expectedProjectRevision }
+                : {}),
+              ...(applyChangesResult.currentProjectRevision !== undefined
+                ? { currentProjectRevision: applyChangesResult.currentProjectRevision }
+                : {}),
+            }
+          ),
+    })
+  } catch (error) {
+    sendJson(response, 200, {
+      jsonrpc: '2.0',
+      id: payload.id,
+      result: createToolExecutionErrorResult(
+        toolDefinition.name,
+        'project-unavailable',
+        error instanceof Error
+          ? error.message
+          : 'Desktop Arcade MCP apply_changes failed unexpectedly.'
+      ),
+    })
+  }
 }
 
 const routeResourcesReadRequest = async (payload, response, readProjectResource) => {
@@ -1050,7 +1118,17 @@ const validateApplyChangesOperation = (operation, index) => {
   }
 }
 
-const createToolExecutionErrorResult = (toolName, code, message) => ({
+const createToolExecutionSuccessResult = (message, structuredContent) => ({
+  content: [
+    {
+      type: 'text',
+      text: message,
+    },
+  ],
+  structuredContent,
+})
+
+const createToolExecutionErrorResult = (toolName, code, message, extras = {}) => ({
   content: [
     {
       type: 'text',
@@ -1062,6 +1140,7 @@ const createToolExecutionErrorResult = (toolName, code, message) => ({
     code,
     toolName,
     message,
+    ...extras,
   },
 })
 
@@ -1077,7 +1156,8 @@ const createDesktopStableResourceText = (uri) => {
         '- `capture_preview_evidence({ pageId })` is the normal autonomous inspection path for pages and targeted visual states.',
         '- `select_active_page` is for human-facing coordination; it is not the routine inspection path.',
         '- Saved Preview preferences live in `arcade://project/preview-context`; capture-only overrides must not mutate them.',
-        '- If `apply_changes` or `capture_preview_evidence` still returns `not-yet-implemented`, treat the current build as read-only and stop after discovery instead of falling back to repository or filesystem edits.',
+        '- If `apply_changes` returns `project-unavailable`, wait for an active Desktop Arcade window instead of falling back to repository or filesystem edits.',
+        '- If `capture_preview_evidence` still returns `not-yet-implemented`, continue with manifest/source/diagnostics reads and `apply_changes`; do not fall back to repository or filesystem edits for missing Preview evidence.',
         '- When state is unclear, re-read the manifest before making another durable change.',
       ].join('\n')
     case 'arcade://desktop/authoring-guide':
@@ -1136,6 +1216,13 @@ const createProjectUnavailableResourceResult = async ({ uri }) => ({
   code: 'project-unavailable',
   resourceUri: uri,
   message: `Desktop Arcade MCP resource "${uri}" is unavailable because no project reader is connected.`,
+})
+
+const createProjectUnavailableApplyChangesResult = async () => ({
+  ok: false,
+  code: 'project-unavailable',
+  message:
+    'Desktop Arcade MCP apply_changes is unavailable because no active project writer is connected.',
 })
 
 const formatServerErrorReason = (error, { host, port }) => {
@@ -1226,6 +1313,40 @@ const isProjectResourceReadResult = (value, expectedUri) =>
         value.code === 'invalid-resource-uri') &&
       typeof value.message === 'string' &&
       value.message.trim().length > 0)
+
+const isApplyChangesResult = (value) =>
+  isPlainObject(value) &&
+  typeof value.ok === 'boolean' &&
+  (value.ok
+    ? typeof value.summary === 'string' &&
+      value.summary.trim().length > 0 &&
+      typeof value.projectRevision === 'string' &&
+      value.projectRevision.trim().length > 0 &&
+      Array.isArray(value.changedResources) &&
+      value.changedResources.every((resourceUri) => typeof resourceUri === 'string') &&
+      Array.isArray(value.nextRecommendedResources) &&
+      value.nextRecommendedResources.every((resourceUri) => typeof resourceUri === 'string') &&
+      Array.isArray(value.operationResults) &&
+      isPlainObject(value.safeActivity) &&
+      typeof value.safeActivity.toolName === 'string' &&
+      typeof value.safeActivity.timestamp === 'string' &&
+      (value.safeActivity.operationTypes === undefined ||
+        (Array.isArray(value.safeActivity.operationTypes) &&
+          value.safeActivity.operationTypes.every((operationType) => typeof operationType === 'string')))
+    : (value.code === 'project-unavailable' ||
+        value.code === 'stale-project-revision' ||
+        value.code === 'invalid-operation-target' ||
+        value.code === 'invalid-project-name' ||
+        value.code === 'payload-too-large') &&
+      typeof value.message === 'string' &&
+      value.message.trim().length > 0 &&
+      (value.manifestResourceUri === undefined ||
+        typeof value.manifestResourceUri === 'string') &&
+      (value.resourceUri === undefined || typeof value.resourceUri === 'string') &&
+      (value.expectedProjectRevision === undefined ||
+        typeof value.expectedProjectRevision === 'string') &&
+      (value.currentProjectRevision === undefined ||
+        typeof value.currentProjectRevision === 'string'))
 
 const isPlainObject = (value) =>
   typeof value === 'object' && value !== null && !Array.isArray(value)

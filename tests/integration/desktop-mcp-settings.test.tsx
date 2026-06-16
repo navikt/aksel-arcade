@@ -98,6 +98,29 @@ describe('Desktop Arcade MCP settings', () => {
     expect(await screen.findByRole('menuitem', { name: /copy mcp url/i })).toBeTruthy()
   })
 
+  it('shows only safe Desktop MCP last-activity metadata in settings', async () => {
+    const user = userEvent.setup()
+    renderHeader({
+      shellCapabilities: DESKTOP_ARCADE_CAPABILITIES,
+      desktopMcpServerState: {
+        ...AVAILABLE_MCP_STATE,
+        lastActivity: {
+          toolName: 'apply_changes',
+          operationTypes: ['replace_source', 'rename_project'],
+          timestamp: '2026-06-16T12:00:00.000Z',
+        },
+      },
+    })
+
+    await user.click(screen.getByRole('button', { name: /settings/i }))
+
+    expect(
+      await screen.findByText(
+        'Last activity: apply_changes (replace_source, rename_project) at 2026-06-16T12:00:00.000Z'
+      )
+    ).toBeTruthy()
+  })
+
   it('shows the unavailable reason when Desktop Arcade cannot bind the fixed MCP port', async () => {
     const user = userEvent.setup()
     renderHeader({
