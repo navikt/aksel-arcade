@@ -832,6 +832,7 @@ const isDesktopMcpApplyChangesResult = (value) => {
 
   return (
     (value.code === 'project-unavailable' ||
+    value.code === 'invalid-operation' ||
     value.code === 'stale-project-revision' ||
     value.code === 'invalid-operation-target' ||
     value.code === 'invalid-project-name' ||

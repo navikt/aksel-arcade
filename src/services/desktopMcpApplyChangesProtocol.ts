@@ -1,4 +1,19 @@
-import type { ThemeMode, ViewportSize } from '@/types/project'
+import type { ArcadePageId, ThemeMode, ViewportSize } from '@/types/project'
+
+export interface DesktopMcpApplyChangesSourceResources {
+  jsxResourceUri: string
+  hooksResourceUri: string
+}
+
+export interface DesktopMcpApplyChangesTempPageRefMapping {
+  pageId: ArcadePageId
+  sourceResources: DesktopMcpApplyChangesSourceResources
+}
+
+interface DesktopMcpApplyChangesPageTarget {
+  pageId?: ArcadePageId
+  tempPageRef?: string
+}
 
 export type DesktopMcpApplyChangesOperation =
   | {
@@ -6,6 +21,26 @@ export type DesktopMcpApplyChangesOperation =
       resourceUri: string
       content: string
     }
+  | ({
+      type: 'create_page'
+      name?: string
+      newPageRef?: string
+      jsxCode?: string
+      hooksCode?: string
+    })
+  | ({
+      type: 'rename_page'
+      name: string
+    } & DesktopMcpApplyChangesPageTarget)
+  | ({
+      type: 'delete_page'
+    } & DesktopMcpApplyChangesPageTarget)
+  | ({
+      type: 'set_start_page'
+    } & DesktopMcpApplyChangesPageTarget)
+  | ({
+      type: 'select_active_page'
+    } & DesktopMcpApplyChangesPageTarget)
   | {
       type: 'set_preview_context'
       viewportSize?: ViewportSize
@@ -25,6 +60,7 @@ export interface DesktopMcpApplyChangesRequest {
 export type DesktopMcpApplyChangesErrorCode =
   | 'project-unavailable'
   | 'stale-project-revision'
+  | 'invalid-operation'
   | 'invalid-operation-target'
   | 'invalid-project-name'
   | 'payload-too-large'
@@ -41,6 +77,35 @@ export type DesktopMcpApplyChangesOperationResult =
       index: number
       type: 'replace_source'
       resourceUri: string
+    }
+  | {
+      index: number
+      type: 'create_page'
+      pageId: ArcadePageId
+      name: string
+      newPageRef?: string
+      sourceResources: DesktopMcpApplyChangesSourceResources
+    }
+  | {
+      index: number
+      type: 'rename_page'
+      pageId: ArcadePageId
+      name: string
+    }
+  | {
+      index: number
+      type: 'delete_page'
+      pageId: ArcadePageId
+    }
+  | {
+      index: number
+      type: 'set_start_page'
+      pageId: ArcadePageId
+    }
+  | {
+      index: number
+      type: 'select_active_page'
+      pageId: ArcadePageId
     }
   | {
       index: number
@@ -61,6 +126,7 @@ export interface DesktopMcpApplyChangesSuccess {
   changedResources: string[]
   nextRecommendedResources: string[]
   operationResults: DesktopMcpApplyChangesOperationResult[]
+  tempPageRefMappings?: Record<string, DesktopMcpApplyChangesTempPageRefMapping>
   safeActivity: DesktopMcpLastActivity
 }
 
