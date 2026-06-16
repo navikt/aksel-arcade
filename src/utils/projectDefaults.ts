@@ -505,6 +505,7 @@ export const createDefaultPreviewState = (viewportSize: ViewportSize = 'MD'): Pr
   status: 'idle',
   transpiledCode: null,
   compileError: null,
+  pendingCompileError: null,
   runtimeError: null,
   sandboxConsoleMessages: [],
   inspectEnabled: false,

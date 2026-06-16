@@ -6,6 +6,7 @@ import { SettingsProvider, useSettings } from '@/contexts/SettingsContext'
 import { AppProvider, useProject } from '@/hooks/useProject'
 import { EditorPane } from '@/components/Editor/EditorPane'
 import { PreviewPane } from '@/components/Preview/PreviewPane'
+import { collectPreviewDiagnostics } from '@/services/previewDiagnostics'
 import {
   DEFAULT_WEB_ARCADE_WORKING_COPY_PREFERENCES,
   saveProject,
@@ -62,13 +63,17 @@ vi.mock('@/components/Editor/CodeEditor', () => ({
 }))
 
 const PreviewHarness = () => {
-  const { project } = useProject()
+  const { project, previewState } = useProject()
   const { selectedEditTarget } = useSettings()
+  const diagnostics = collectPreviewDiagnostics(previewState)
 
   return (
     <>
       <div data-testid="selected-edit-target">{selectedEditTarget}</div>
       <div data-testid="active-page-id">{project.activePageId}</div>
+      <div data-testid="diagnostics-status">{diagnostics.status}</div>
+      <div data-testid="diagnostics-compile-error">{diagnostics.compileError?.message ?? ''}</div>
+      <div data-testid="diagnostics-runtime-error">{diagnostics.runtimeError?.message ?? ''}</div>
       <EditorPane />
       <PreviewPane />
     </>
@@ -418,5 +423,110 @@ describe('Multi-page preview sync', () => {
     })
 
     expect(screen.queryByText('Compile Error')).toBeNull()
+    expect(screen.getByTestId('diagnostics-status').textContent).toBe('error')
+    expect(screen.getByTestId('diagnostics-compile-error').textContent).toMatch(
+      /Unexpected token/i
+    )
+  })
+
+  it('drops a pending compile error when a newer runtime error arrives first', async () => {
+    const project = createStoredMultiPageProject()
+    saveProject(project, {
+      preferences: {
+        ...DEFAULT_WEB_ARCADE_WORKING_COPY_PREFERENCES,
+        multiPageEnabled: true,
+        pagePanelOpen: true,
+        selectedEditTarget: 'page',
+      },
+    })
+    renderHarness()
+
+    await screen.findByTestId('preview-iframe')
+    dispatchSandboxMessage({ type: 'SANDBOX_CONNECTED' })
+    dispatchSandboxMessage({ type: 'RENDER_SUCCESS' })
+
+    await act(async () => {
+      await new Promise((resolve) => window.setTimeout(resolve, 600))
+    })
+
+    const editors = screen.getAllByRole('textbox', { name: 'Code editor' })
+    const editor = editors[editors.length - 1]
+    if (!editor) {
+      throw new Error('Expected a code editor to be rendered.')
+    }
+
+    fireEvent.focus(editor)
+    fireEvent.change(editor, { target: { value: '<' } })
+
+    await act(async () => {
+      await new Promise((resolve) => window.setTimeout(resolve, 1_000))
+    })
+
+    dispatchSandboxMessage({
+      type: 'RUNTIME_ERROR',
+      payload: {
+        message: 'Existing preview exploded',
+        componentStack: '\n    at StartPage',
+        stack: 'Error: Existing preview exploded',
+        pageId: 'page01',
+      },
+    })
+
+    fireEvent.blur(editor)
+
+    await waitFor(() => {
+      expect(screen.getByText('Runtime Error')).toBeTruthy()
+      expect(screen.queryByText('Compile Error')).toBeNull()
+      expect(screen.getByTestId('diagnostics-compile-error').textContent).toBe('')
+      expect(screen.getByTestId('diagnostics-runtime-error').textContent).toBe(
+        'Existing preview exploded'
+      )
+    })
+  })
+
+  it('clears a stale runtime overlay when a newer compile error is queued while focused', async () => {
+    const project = createStoredMultiPageProject()
+    saveProject(project, {
+      preferences: {
+        ...DEFAULT_WEB_ARCADE_WORKING_COPY_PREFERENCES,
+        multiPageEnabled: true,
+        pagePanelOpen: true,
+        selectedEditTarget: 'page',
+      },
+    })
+    renderHarness()
+
+    await screen.findByTestId('preview-iframe')
+    dispatchSandboxMessage({ type: 'SANDBOX_CONNECTED' })
+    dispatchSandboxMessage({ type: 'RENDER_SUCCESS' })
+    dispatchSandboxMessage({
+      type: 'RUNTIME_ERROR',
+      payload: {
+        message: 'Existing preview exploded',
+        componentStack: '\n    at StartPage',
+        stack: 'Error: Existing preview exploded',
+        pageId: 'page01',
+      },
+    })
+
+    await screen.findByText('Runtime Error')
+
+    const editors = screen.getAllByRole('textbox', { name: 'Code editor' })
+    const editor = editors[editors.length - 1]
+    if (!editor) {
+      throw new Error('Expected a code editor to be rendered.')
+    }
+
+    fireEvent.focus(editor)
+    fireEvent.change(editor, { target: { value: '<' } })
+
+    await act(async () => {
+      await new Promise((resolve) => window.setTimeout(resolve, 1_000))
+    })
+
+    expect(screen.queryByText('Runtime Error')).toBeNull()
+    expect(screen.queryByText('Compile Error')).toBeNull()
+    expect(screen.getByTestId('diagnostics-compile-error').textContent).toMatch(/Unexpected token/i)
+    expect(screen.getByTestId('diagnostics-runtime-error').textContent).toBe('')
   })
 })

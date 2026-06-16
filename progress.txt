@@ -1657,6 +1657,7 @@ Verified:
 - Checked `CONTEXT.md` Desktop language and `docs/desktop-release.md` local unsigned packaging contract before touching the feature.
 - Confirmed the current branch already contains the #143 local packaging path: `npm run desktop:build` emits `dist-desktop` with relative asset URLs, Electron Builder targets Windows x64 NSIS plus macOS arm64/x64 DMGs without publishing, artifact names include product/version/OS/architecture, installed metadata uses `Aksel Arcade` and `no.nav.aksel.arcade`, and desktop icons are generated from `public/aksel-favicon.svg`.
 - Confirmed `tests/unit/desktopPackagingConfig.test.ts` covers the Desktop build profile, app metadata, target matrix, artifact naming, icon wiring, version injection, and local unsigned packaging commands.
+
 - No acceptance gap required a code change in this pass; kept the work scoped to the single #143 feature.
 
 Verification:
@@ -3201,3 +3202,21 @@ Verification:
 
 - npm run typecheck
 - CI=1 npm run test -- --run
+
+### 2026-06-16 - PR #283 review follow-up for Issue #272
+
+Fixed before merge:
+
+- Kept the delayed visible compile-error UX in `PreviewPane`, but stopped Desktop MCP/agent diagnostics from missing active compile failures while the code editor stays focused by carrying a separate `pendingCompileError` through preview state and teaching `collectPreviewDiagnostics()` to surface it as an error immediately.
+- Cleared stale error state in both directions: a newer runtime error now drops any queued compile error before blur, and a newer focused compile error now clears any stale runtime overlay from the last successful preview.
+- Added regression coverage for that focused-editing path in `tests/integration/multi-page-preview-sync.test.tsx` plus a unit guard in `tests/unit/services/previewDiagnostics.test.ts`, so diagnostics stay accurate even when the visible overlay is still intentionally suppressed.
+- Replaced compile-error source inference-by-message with explicit source metadata: `CompileError` now carries `resourceUri`, project transpilation attaches that URI for global config, page JSX/Hooks, unsupported imports, and mapped Babel errors, and Desktop MCP diagnostics prefer the explicit URI before falling back to the old label parser.
+- Extracted shared Desktop MCP project source URI helpers into `src/services/desktopMcpProjectSourceUris.ts`, reused them from both the transpiler and MCP resource builder, and added regression assertions in `tests/integration/multi-page-preview-runtime.test.tsx` plus `tests/unit/services/desktopMcpProjectResources.test.ts` so page/global compile diagnostics keep stable source links even when error messages are unlabeled.
+
+Verification:
+
+- npm run type-check
+- npm run lint
+- CI=1 npm run test
+- npm run build
+- Browser/console smoke check at `http://127.0.0.1:4173/aksel-arcade/` using `npm run preview -- --host 127.0.0.1 --port 4173`, confirming the app shell and preview render and the console stays free of errors/warnings

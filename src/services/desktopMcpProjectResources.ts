@@ -2,6 +2,15 @@ import type { ThemeMode, ArcadePageId, ArcadeSourceFile, Project } from '@/types
 import type { CompileError, PreviewStatus, RuntimeError } from '@/types/preview'
 import type { PreviewDiagnostics } from '@/services/previewDiagnostics'
 import {
+  DESKTOP_MCP_PROJECT_DIAGNOSTICS_URI,
+  DESKTOP_MCP_PROJECT_MANIFEST_URI,
+  DESKTOP_MCP_PROJECT_PREVIEW_CONTEXT_URI,
+  DESKTOP_MCP_PROJECT_SOURCE_GLOBAL_HOOKS_URI,
+  DESKTOP_MCP_PROJECT_SOURCE_GLOBAL_JSX_URI,
+  createDesktopMcpProjectPageSourceUri,
+  type DesktopMcpProjectSourceKind,
+} from '@/services/desktopMcpProjectSourceUris'
+import {
   findPageReferences,
   type PageReference,
   type PageReferenceKind,
@@ -15,11 +24,15 @@ import type {
   DesktopMcpProjectResourceReadSuccess,
 } from '@/services/desktopMcpProjectResourceProtocol'
 
-export const DESKTOP_MCP_PROJECT_MANIFEST_URI = 'arcade://project/manifest' as const
-export const DESKTOP_MCP_PROJECT_PREVIEW_CONTEXT_URI = 'arcade://project/preview-context' as const
-export const DESKTOP_MCP_PROJECT_DIAGNOSTICS_URI = 'arcade://project/diagnostics' as const
-export const DESKTOP_MCP_PROJECT_SOURCE_GLOBAL_JSX_URI = 'arcade://project/source/global/jsx' as const
-export const DESKTOP_MCP_PROJECT_SOURCE_GLOBAL_HOOKS_URI = 'arcade://project/source/global/hooks' as const
+export {
+  DESKTOP_MCP_PROJECT_DIAGNOSTICS_URI,
+  DESKTOP_MCP_PROJECT_MANIFEST_URI,
+  DESKTOP_MCP_PROJECT_PREVIEW_CONTEXT_URI,
+  DESKTOP_MCP_PROJECT_SOURCE_GLOBAL_HOOKS_URI,
+  DESKTOP_MCP_PROJECT_SOURCE_GLOBAL_JSX_URI,
+  createDesktopMcpProjectPageSourceUri,
+  type DesktopMcpProjectSourceKind,
+} from '@/services/desktopMcpProjectSourceUris'
 
 const PROJECT_SOURCE_PAGE_URI_PATTERN = /^arcade:\/\/project\/source\/pages\/(page\d+)\/(jsx|hooks)$/
 const COMPILE_ERROR_SOURCE_LABEL_PATTERN = /^(global config|page\d+)\s+(JSX|Hooks):/i
@@ -28,7 +41,6 @@ const JSON_MIME_TYPE = 'application/json'
 const MAX_DIAGNOSTIC_DETAILS_LENGTH = 1_000
 const MAX_DIAGNOSTIC_SNIPPET_LENGTH = 200
 
-type DesktopMcpProjectSourceKind = 'jsx' | 'hooks'
 type DesktopMcpProjectResourceKind =
   | 'manifest'
   | 'preview-context'
@@ -179,15 +191,18 @@ export const createDesktopMcpProjectManifest = ({
     id: page.id,
     name: page.name,
     source: {
-      jsx: createSourceResourceSummary(page.source.jsx, getProjectPageSourceUri(page.id, 'jsx')),
+      jsx: createSourceResourceSummary(
+        page.source.jsx,
+        createDesktopMcpProjectPageSourceUri(page.id, 'jsx')
+      ),
       hooks: createSourceResourceSummary(
         page.source.hooks,
-        getProjectPageSourceUri(page.id, 'hooks')
+        createDesktopMcpProjectPageSourceUri(page.id, 'hooks')
       ),
     },
     ...createReferenceSet(page.source, validPageIds, {
-      jsx: getProjectPageSourceUri(page.id, 'jsx'),
-      hooks: getProjectPageSourceUri(page.id, 'hooks'),
+      jsx: createDesktopMcpProjectPageSourceUri(page.id, 'jsx'),
+      hooks: createDesktopMcpProjectPageSourceUri(page.id, 'hooks'),
     }),
   }))
 
@@ -371,7 +386,7 @@ const createCompileErrorIssue = (
   error: CompileError,
   pageNameById: ReadonlyMap<ArcadePageId, string>
 ): DesktopMcpProjectDiagnosticIssue => {
-  const resourceUri = inferCompileErrorResourceUri(error.message)
+  const resourceUri = error.resourceUri ?? inferCompileErrorResourceUri(error.message)
   const sourceText = resourceUri ? readSourceTextFromUri(project, resourceUri) : null
 
   return {
@@ -464,8 +479,8 @@ const createStalePageReferenceIssues = (
     pushStaleIssues(
       page.source,
       {
-        jsx: getProjectPageSourceUri(page.id, 'jsx'),
-        hooks: getProjectPageSourceUri(page.id, 'hooks'),
+        jsx: createDesktopMcpProjectPageSourceUri(page.id, 'jsx'),
+        hooks: createDesktopMcpProjectPageSourceUri(page.id, 'hooks'),
       },
       {
         pageId: page.id,
@@ -500,7 +515,9 @@ const inferCompileErrorResourceUri = (message: string): string | null => {
       : DESKTOP_MCP_PROJECT_SOURCE_GLOBAL_HOOKS_URI
   }
 
-  return isArcadePageId(match[1]) ? getProjectPageSourceUri(match[1], sourceKind) : null
+  return isArcadePageId(match[1])
+    ? createDesktopMcpProjectPageSourceUri(match[1], sourceKind)
+    : null
 }
 
 const createResourceSuccess = (
@@ -534,11 +551,6 @@ const createResourceFailure = (
   message,
   resourceUri,
 })
-
-const getProjectPageSourceUri = (
-  pageId: ArcadePageId,
-  sourceKind: DesktopMcpProjectSourceKind
-): string => `arcade://project/source/pages/${pageId}/${sourceKind}`
 
 const readGlobalSourceText = (
   project: Project,

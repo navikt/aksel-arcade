@@ -63,11 +63,12 @@ const createProject = (): Project => ({
 const createDiagnostics = (): PreviewDiagnostics => ({
   status: 'error',
   compileError: {
-    message: 'page02 JSX: Unexpected token (3:10)',
+    message: 'Unexpected token (3:10)',
     line: 2,
     column: 10,
     stack: 'SyntaxError: Unexpected token',
     pageId: 'page02',
+    resourceUri: 'arcade://project/source/pages/page02/jsx',
   },
   runtimeError: {
     message: 'Boom',
