@@ -3220,3 +3220,26 @@ Verification:
 - CI=1 npm run test
 - npm run build
 - Browser/console smoke check at `http://127.0.0.1:4173/aksel-arcade/` using `npm run preview -- --host 127.0.0.1 --port 4173`, confirming the app shell and preview render and the console stays free of errors/warnings
+
+### 2026-06-16 - Issue #273: Serve compact Desktop MCP guide and capabilities resources
+
+Implemented:
+
+- Selected `#273` as the single highest-priority actionable `ready-for-agent` feature from `#273`-`#280` after checking parent PRD `#269`, `CONTEXT.md`, and the existing `progress.txt` notes. `#275` is explicitly blocked by `#273`, while `#279` and `#280` depend on later MCP slices, so the Desktop guidance-resource contract was the next unblocked foundation.
+- Replaced the `not-yet-implemented` Desktop-resource path in `desktop/mcpServer.cjs` for `arcade://desktop/operating-guide`, `arcade://desktop/authoring-guide`, and `arcade://desktop/capabilities`; `resources/read` now returns real Markdown/JSON contents while keeping the existing unknown-resource and invalid-param error paths unchanged.
+- Added a concise operating guide that tells external agents to work through `arcade://` resources plus `apply_changes`, follow the default manifest/source/diagnostics/evidence loop, avoid repository/package/filesystem edits, and treat `select_active_page` as human-facing coordination rather than the normal inspection path.
+- Added a separate authoring guide that keeps the authoring contract short and durable: import-free Arcade JSX/Hooks, Aksel-valid Arcade JSX first, `Global config` as shared non-page code, stable page-id navigation, `{{pageRef:name}}` placeholders only inside `apply_changes` batches, and diagnostics/Preview evidence as the feedback loop after source changes.
+- Added a compact machine-readable capabilities resource generated from the MCP server constants so the published contract stays in sync with the real endpoint/tool/resource surface. It now exposes the fixed Desktop endpoint, auth model, tool names, stable resource URIs, source/capture URI templates, capture-layer purpose summaries, screenshot scopes, interaction actions, request-size limit, and the v1 omission list.
+- Extended `tests/unit/services/desktopMcpServer.test.ts` to cover successful reads for all three Desktop resources, Markdown/JSON MIME types, guide-content expectations, capabilities JSON parsing/shape, and drift guards that compare the capabilities tool/resource lists against the live `tools/list` and `resources/list` surfaces.
+
+Verification:
+
+- `npm run typecheck`
+- `npm run lint` (passes with the existing `.eslintignore` deprecation notice)
+- `CI=1 npm run test`
+- `npm run build`
+- Browser/console smoke check at `http://127.0.0.1:4173/aksel-arcade/` using `npm run preview -- --host 127.0.0.1 --port 4173` plus a headless Playwright check confirmed the app title/body render and the browser console stays free of errors/warnings
+
+Next note:
+
+- `#275` can now build on the real Desktop guidance/capabilities resources instead of placeholder Desktop reads, but it still needs to implement the actual `apply_changes` execution path. Keep the capabilities JSON generated from the MCP server constants so later tool/resource additions do not drift from the published contract.
