@@ -4,6 +4,7 @@ import type { InspectionData } from './inspection'
 import type {
   PreviewEvidenceCaptureResult,
   PreviewEvidenceCaptureTarget,
+  PreviewInteractionStep,
   PreviewEvidenceLayer,
   PreviewEvidenceScreenshotScope,
 } from '@/services/previewEvidence'
@@ -22,6 +23,7 @@ export type MainToSandboxMessage =
       payload: {
         requestId: string
         layers?: PreviewEvidenceLayer[]
+        interactions?: PreviewInteractionStep[]
         screenshotScope?: PreviewEvidenceScreenshotScope
         viewportWidth?: number
         viewportHeight?: number

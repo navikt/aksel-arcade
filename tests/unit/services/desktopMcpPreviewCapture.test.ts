@@ -144,6 +144,106 @@ describe('desktopMcpPreviewCapture', () => {
     })
     expect(manifest.screenshot).toBeUndefined()
   })
+
+  it('records requested and executed interaction state in the finalized manifest', () => {
+    const context = createCaptureContext()
+    const prepared = prepareDesktopMcpPreviewCapture(
+      {
+        interactions: [
+          {
+            action: 'click',
+            target: { role: 'button', name: 'Open details' },
+          },
+          {
+            action: 'waitFor',
+            text: 'Expanded details',
+            timeoutMs: 300,
+          },
+        ],
+      },
+      context
+    )
+    if (!prepared.ok) {
+      throw new Error('Expected preview capture preparation to succeed.')
+    }
+
+    const result = finalizeDesktopMcpPreviewCapture(
+      prepared,
+      {
+        ...createSandboxCapture(),
+        captureMeta: {
+          currentPageId: 'page02',
+          interactions: {
+            requested: prepared.requestedInteractions,
+            executed: [
+              {
+                index: 0,
+                step: prepared.requestedInteractions[0],
+                targetDescription: 'role=button name="Open details"',
+              },
+              {
+                index: 1,
+                step: prepared.requestedInteractions[1],
+              },
+            ],
+          },
+        },
+      },
+      context,
+      {
+        captureId: 'capture-interactions',
+        timestamp: '2026-06-16T12:00:00.000Z',
+      }
+    )
+
+    expect(result).toMatchObject({
+      ok: true,
+      summary:
+        'Captured Page 1 (page01) in dark MD preview with screenshot, accessibility, DOM/layout/style and frame evidence after 2 interactions (viewport).',
+      interactions: {
+        executed: [
+          {
+            index: 0,
+            targetDescription: 'role=button name="Open details"',
+          },
+          {
+            index: 1,
+          },
+        ],
+      },
+    })
+    if (!result.ok) {
+      throw new Error('Expected finalized preview capture to succeed.')
+    }
+
+    const manifest = JSON.parse(findResourceText(result.resources, result.manifestResourceUri))
+    expect(manifest.interactions).toEqual({
+      requested: prepared.requestedInteractions,
+      executed: [
+        {
+          index: 0,
+          step: prepared.requestedInteractions[0],
+          targetDescription: 'role=button name="Open details"',
+        },
+        {
+          index: 1,
+          step: prepared.requestedInteractions[1],
+        },
+      ],
+      finalState: {
+        pageId: 'page02',
+        scroll: {
+          x: 0,
+          y: 0,
+        },
+      },
+    })
+    expect(manifest.capture.interactionLimits).toEqual({
+      maxSteps: 10,
+      maxTotalTimeMs: 10000,
+      maxWaitTimeoutMs: 5000,
+    })
+  })
 })
 
 const createCaptureContext = () => ({
@@ -211,7 +311,9 @@ const createSandboxCapture = (): DesktopMcpSandboxCaptureSuccess => ({
     width: 320,
     height: 200,
   },
-  targetDescription: 'role=button name="Continue"',
+  captureMeta: {
+    targetDescription: 'role=button name="Continue"',
+  },
 })
 
 const createRect = (width: number, height: number) => ({

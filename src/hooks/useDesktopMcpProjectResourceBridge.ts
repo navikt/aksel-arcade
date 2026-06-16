@@ -165,6 +165,7 @@ export const useDesktopMcpProjectResourceBridge = ({
         viewportHeight: Math.max(1, previewIframeRef.current?.clientHeight ?? 900),
         theme: prepared.theme,
         layers: prepared.requestedLayers,
+        interactions: prepared.requestedInteractions,
         screenshotScope: prepared.screenshotScope,
         ...(prepared.target ? { target: prepared.target } : {}),
       })

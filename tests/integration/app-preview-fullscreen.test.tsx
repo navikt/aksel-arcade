@@ -109,6 +109,7 @@ describe('App preview fullscreen layout', () => {
               renamePage: vi.fn(),
               deletePage: vi.fn(),
               setStartPage: vi.fn(),
+              replaceProjectState: vi.fn(),
               replaceProject: vi.fn(),
               updateEditorState: vi.fn(),
               updatePreviewState: vi.fn(),

@@ -2,9 +2,34 @@ import type { ArcadePageId } from '@/types/project'
 
 export const PREVIEW_EVIDENCE_ROOT_SELECTOR = '#root'
 export const MAX_PREVIEW_EVIDENCE_ELEMENTS = 200
+export const MAX_PREVIEW_INTERACTION_STEPS = 10
+export const MAX_PREVIEW_INTERACTION_TOTAL_TIME_MS = 10_000
+export const MAX_PREVIEW_INTERACTION_WAIT_TIMEOUT_MS = 5_000
 const MAX_PREVIEW_EVIDENCE_TEXT_LENGTH = 200
 const MAX_PREVIEW_EVIDENCE_ATTRIBUTE_LENGTH = 200
 const MAX_PREVIEW_EVIDENCE_CLASS_NAMES = 30
+const DEFAULT_PREVIEW_INTERACTION_WAIT_TIMEOUT_MS = 1_500
+const PREVIEW_INTERACTION_POLL_INTERVAL_MS = 16
+const PREVIEW_INTERACTION_SETTLE_FRAMES = 2
+const PREVIEW_INTERACTION_RENDER_IDLE_MS = 100
+const PREVIEW_INTERACTION_PRINTABLE_KEY_PATTERN = /^[^\s]$/
+const PREVIEW_INTERACTION_SUPPORTED_KEYS = new Set([
+  'Enter',
+  'Escape',
+  'Tab',
+  'ArrowUp',
+  'ArrowDown',
+  'ArrowLeft',
+  'ArrowRight',
+  'Backspace',
+  'Delete',
+  'Home',
+  'End',
+  'PageUp',
+  'PageDown',
+  'Space',
+  ' ',
+])
 
 export interface PreviewEvidenceRect {
   x: number
@@ -120,6 +145,13 @@ export type PreviewEvidenceLayer =
   | 'accessibility'
   | 'dom_layout_style'
   | 'frame'
+export type PreviewInteractionAction =
+  | 'click'
+  | 'fill'
+  | 'select'
+  | 'press'
+  | 'scroll'
+  | 'waitFor'
 export type PreviewEvidenceScreenshotScope = 'viewport' | 'full_page' | 'region'
 export type PreviewEvidenceCaptureErrorCode =
   | 'preview-unavailable'
@@ -132,6 +164,72 @@ export interface PreviewEvidenceCaptureTarget {
   name?: string
   text?: string
   label?: string
+}
+
+export interface PreviewClickInteraction {
+  action: 'click'
+  target: PreviewEvidenceCaptureTarget
+}
+
+export interface PreviewFillInteraction {
+  action: 'fill'
+  target: PreviewEvidenceCaptureTarget
+  value: string
+}
+
+export interface PreviewSelectInteraction {
+  action: 'select'
+  target: PreviewEvidenceCaptureTarget
+  value?: string
+  checked?: boolean
+}
+
+export interface PreviewPressInteraction {
+  action: 'press'
+  key: string
+  target?: PreviewEvidenceCaptureTarget
+}
+
+export interface PreviewScrollInteraction {
+  action: 'scroll'
+  target?: PreviewEvidenceCaptureTarget
+  x?: number
+  y?: number
+}
+
+export interface PreviewWaitForInteraction {
+  action: 'waitFor'
+  text?: string
+  target?: PreviewEvidenceCaptureTarget
+  renderIdle?: boolean
+  timeoutMs?: number
+}
+
+export type PreviewInteractionStep =
+  | PreviewClickInteraction
+  | PreviewFillInteraction
+  | PreviewSelectInteraction
+  | PreviewPressInteraction
+  | PreviewScrollInteraction
+  | PreviewWaitForInteraction
+
+export interface PreviewInteractionExecutionRecord {
+  index: number
+  step: PreviewInteractionStep
+  targetDescription?: string
+}
+
+export interface PreviewInteractionFailureDetails {
+  index: number
+  step: PreviewInteractionStep
+  reason: string
+  targetDescription?: string
+}
+
+export interface PreviewInteractionState {
+  requested: PreviewInteractionStep[]
+  executed: PreviewInteractionExecutionRecord[]
+  failedStep?: PreviewInteractionFailureDetails
 }
 
 export interface PreviewEvidenceScreenshot {
@@ -154,6 +252,7 @@ export interface PreviewEvidenceCaptureMetadata {
   currentPageId?: ArcadePageId | null
   screenshotScope?: PreviewEvidenceScreenshotScope
   targetDescription?: string
+  interactions?: PreviewInteractionState
 }
 
 interface PreviewEvidenceViewportFallback {
@@ -167,6 +266,7 @@ export interface PreviewEvidenceCaptureFailure {
     code: PreviewEvidenceCaptureErrorCode
     message: string
   }
+  captureMeta?: PreviewEvidenceCaptureMetadata
 }
 
 export interface PreviewEvidenceCaptureSuccess {
@@ -180,6 +280,15 @@ export interface PreviewEvidenceCaptureSuccess {
 export type PreviewEvidenceCaptureResult =
   | PreviewEvidenceCaptureFailure
   | PreviewEvidenceCaptureSuccess
+
+interface PreviewInteractionSequenceSuccess {
+  ok: true
+  interactionState: PreviewInteractionState
+}
+
+type PreviewInteractionSequenceResult =
+  | PreviewInteractionSequenceSuccess
+  | PreviewEvidenceCaptureFailure
 
 interface SerializationState {
   capturedElementCount: number
@@ -323,12 +432,14 @@ export const capturePreviewEvidenceSnapshot = (
     screenshotScope = 'viewport',
     target,
     currentPageId = null,
+    interactionState,
     viewportFallback,
   }: {
     layers?: PreviewEvidenceLayer[]
     screenshotScope?: PreviewEvidenceScreenshotScope
     target?: PreviewEvidenceCaptureTarget
     currentPageId?: ArcadePageId | null
+    interactionState?: PreviewInteractionState
     viewportFallback?: PreviewEvidenceViewportFallback
   } = {},
   frameWindow: Window = root.ownerDocument.defaultView ?? window
@@ -361,6 +472,7 @@ export const capturePreviewEvidenceSnapshot = (
         currentPageId,
         ...(screenshotRequested ? { screenshotScope } : {}),
         ...(screenshot?.targetDescription ? { targetDescription: screenshot.targetDescription } : {}),
+        ...(interactionState ? { interactions: interactionState } : {}),
       },
     }
   } catch (error) {
@@ -368,8 +480,85 @@ export const capturePreviewEvidenceSnapshot = (
     const message = getErrorMessage(error)
     return createPreviewCaptureFailure(
       code,
-      code === 'preview-unavailable' ? `Preview evidence could not be captured: ${message}` : message
+      code === 'preview-unavailable' ? `Preview evidence could not be captured: ${message}` : message,
+      {
+        ...(currentPageId !== null || interactionState
+          ? {
+              captureMeta: {
+                ...(currentPageId !== null ? { currentPageId } : {}),
+                ...(interactionState ? { interactions: interactionState } : {}),
+              },
+            }
+          : {}),
+      }
     )
+  }
+}
+
+export const runPreviewInteractionSequence = async (
+  root: Element,
+  interactions: PreviewInteractionStep[],
+  {
+    currentPageId = null,
+    getCurrentPageId,
+    maxTotalTimeMs = MAX_PREVIEW_INTERACTION_TOTAL_TIME_MS,
+  }: {
+    currentPageId?: ArcadePageId | null
+    getCurrentPageId?: () => ArcadePageId | null
+    maxTotalTimeMs?: number
+  } = {},
+  frameWindow: Window = root.ownerDocument.defaultView ?? window
+): Promise<PreviewInteractionSequenceResult> => {
+  const requested = interactions.map(clonePreviewInteractionStep)
+  const interactionState: PreviewInteractionState = {
+    requested,
+    executed: [],
+  }
+
+  if (requested.length === 0) {
+    return {
+      ok: true,
+      interactionState,
+    }
+  }
+
+  const deadline = Date.now() + Math.max(1, maxTotalTimeMs)
+
+  for (const [index, step] of requested.entries()) {
+    try {
+      const targetDescription = await executePreviewInteractionStep(root, step, {
+        deadline,
+        frameWindow,
+      })
+      interactionState.executed.push({
+        index,
+        step,
+        ...(targetDescription ? { targetDescription } : {}),
+      })
+    } catch (error) {
+      const code = isTaggedPreviewCaptureError(error) ? error.code : 'invalid-capture-target'
+      const reason = getErrorMessage(error)
+      interactionState.failedStep = {
+        index,
+        step,
+        reason,
+      }
+      return createPreviewCaptureFailure(code, reason, {
+        captureMeta: {
+          currentPageId: readCurrentPreviewInteractionPageId(currentPageId, getCurrentPageId),
+          interactions: interactionState,
+        },
+      })
+    }
+  }
+
+  return {
+    ok: true,
+    interactionState: {
+      ...interactionState,
+      requested,
+      executed: [...interactionState.executed],
+    },
   }
 }
 
@@ -752,7 +941,7 @@ const resolvePreviewCaptureTarget = (
   }
 
   if (target.selector) {
-    const element = root.querySelector(target.selector)
+    const element = queryPreviewTargetSelector(root, target.selector)
     if (!element || isExcludedElement(element)) {
       throw createTaggedPreviewCaptureError(
         'invalid-capture-target',
@@ -799,6 +988,691 @@ const resolvePreviewCaptureTarget = (
     element: matchingElement,
     targetDescription: describePreviewCaptureTarget(target),
   }
+}
+
+interface PreviewInteractionExecutionOptions {
+  deadline: number
+  frameWindow: Window
+}
+
+interface PreviewResolvedInteractionTarget {
+  element: Element
+  targetDescription: string
+}
+
+const executePreviewInteractionStep = async (
+  root: Element,
+  step: PreviewInteractionStep,
+  { deadline, frameWindow }: PreviewInteractionExecutionOptions
+): Promise<string | undefined> => {
+  switch (step.action) {
+    case 'click':
+      return executePreviewClickInteraction(root, step, frameWindow)
+    case 'fill':
+      return executePreviewFillInteraction(root, step, frameWindow)
+    case 'select':
+      return executePreviewSelectInteraction(root, step, frameWindow)
+    case 'press':
+      return executePreviewPressInteraction(root, step, frameWindow)
+    case 'scroll':
+      return executePreviewScrollInteraction(root, step, frameWindow)
+    case 'waitFor':
+      return executePreviewWaitForInteraction(root, step, deadline, frameWindow)
+  }
+}
+
+const executePreviewClickInteraction = async (
+  root: Element,
+  step: PreviewClickInteraction,
+  frameWindow: Window
+): Promise<string> => {
+  const target = resolvePreviewInteractionTarget(root, step.target, 'click')
+  assertPreviewInteractionNavigationAllowed(target.element)
+  focusPreviewInteractionElement(target.element)
+  triggerPreviewClick(target.element)
+  await settleAfterPreviewInteraction(frameWindow)
+  return target.targetDescription
+}
+
+const executePreviewFillInteraction = async (
+  root: Element,
+  step: PreviewFillInteraction,
+  frameWindow: Window
+): Promise<string> => {
+  const target = resolvePreviewInteractionTarget(root, step.target, 'fill')
+  const input = resolveFillInteractionElement(target.element)
+  focusPreviewInteractionElement(input)
+  setFormControlValue(input, step.value)
+  dispatchInputEvents(input)
+  await settleAfterPreviewInteraction(frameWindow)
+  return target.targetDescription
+}
+
+const executePreviewSelectInteraction = async (
+  root: Element,
+  step: PreviewSelectInteraction,
+  frameWindow: Window
+): Promise<string> => {
+  const target = resolvePreviewInteractionTarget(root, step.target, 'select')
+  const control = resolveSelectableInteractionElement(target.element)
+
+  if (control instanceof HTMLSelectElement) {
+    if (typeof step.value !== 'string') {
+      throw createTaggedPreviewCaptureError(
+        'invalid-capture-target',
+        'Select interactions targeting a combobox/select control require a string value.'
+      )
+    }
+
+    const option = Array.from(control.options).find((candidate) => candidate.value === step.value)
+    if (!option) {
+      throw createTaggedPreviewCaptureError(
+        'invalid-capture-target',
+        `Select interaction value "${step.value}" did not match an available option.`
+      )
+    }
+    setFormControlValue(control, step.value)
+    Array.from(control.options).forEach((candidate) => {
+      candidate.selected = candidate.value === step.value
+    })
+    dispatchInputEvents(control)
+    await settleAfterPreviewInteraction(frameWindow)
+    return target.targetDescription
+  }
+
+  if (typeof step.checked !== 'boolean') {
+    throw createTaggedPreviewCaptureError(
+      'invalid-capture-target',
+      'Select interactions targeting checkbox/radio controls require a checked boolean.'
+    )
+  }
+
+  if (control instanceof HTMLInputElement && control.type === 'radio' && !step.checked) {
+    throw createTaggedPreviewCaptureError(
+      'invalid-capture-target',
+      'Radio controls may only be selected with checked=true during Preview interactions.'
+    )
+  }
+
+  setFormControlChecked(control, step.checked)
+  dispatchInputEvents(control)
+  await settleAfterPreviewInteraction(frameWindow)
+  return target.targetDescription
+}
+
+const executePreviewPressInteraction = async (
+  root: Element,
+  step: PreviewPressInteraction,
+  frameWindow: Window
+): Promise<string | undefined> => {
+  const normalizedKey = normalizePreviewInteractionKey(step.key)
+  const target = step.target
+    ? resolvePreviewInteractionTarget(root, step.target, 'press')
+    : undefined
+  const element = resolvePressInteractionElement(root, target?.element)
+
+  if (!element) {
+    throw createTaggedPreviewCaptureError(
+      'invalid-capture-target',
+      'Press interactions require a focusable Preview element target or an existing focused Preview element.'
+    )
+  }
+
+  focusPreviewInteractionElement(element)
+  dispatchKeyboardInteraction(element, normalizedKey, root, frameWindow)
+  await settleAfterPreviewInteraction(frameWindow)
+  return target?.targetDescription
+}
+
+const executePreviewScrollInteraction = async (
+  root: Element,
+  step: PreviewScrollInteraction,
+  frameWindow: Window
+): Promise<string | undefined> => {
+  const deltaX = normalizePreviewInteractionNumber(step.x)
+  const deltaY = normalizePreviewInteractionNumber(step.y)
+
+  if (deltaX === 0 && deltaY === 0) {
+    throw createTaggedPreviewCaptureError(
+      'invalid-capture-target',
+      'Scroll interactions require a non-zero x or y delta.'
+    )
+  }
+
+  const target = step.target
+    ? resolvePreviewInteractionTarget(root, step.target, 'scroll')
+    : undefined
+
+  if (target?.element instanceof HTMLElement) {
+    target.element.scrollLeft += deltaX
+    target.element.scrollTop += deltaY
+    target.element.dispatchEvent(new Event('scroll', { bubbles: true }))
+  } else if (typeof frameWindow.scrollTo === 'function') {
+    frameWindow.scrollTo(frameWindow.scrollX + deltaX, frameWindow.scrollY + deltaY)
+  }
+
+  await settleAfterPreviewInteraction(frameWindow)
+  return target?.targetDescription
+}
+
+const executePreviewWaitForInteraction = async (
+  root: Element,
+  step: PreviewWaitForInteraction,
+  deadline: number,
+  frameWindow: Window
+): Promise<string | undefined> => {
+  const timeoutMs = getPreviewInteractionWaitTimeout(step.timeoutMs, deadline)
+
+  if (step.renderIdle) {
+    await waitForPreviewRenderIdle(root, timeoutMs, frameWindow)
+    return 'renderIdle'
+  }
+
+  if (typeof step.text === 'string') {
+    const normalizedText = normalizeComparableText(step.text)
+    const startedAt = Date.now()
+    while (Date.now() - startedAt < timeoutMs) {
+      if (normalizeComparableText(getElementVisibleText(root)).includes(normalizedText)) {
+        return `text="${step.text}"`
+      }
+      await waitForPreviewInteractionTick(frameWindow)
+    }
+    throw createTaggedPreviewCaptureError(
+      'render-timeout',
+      `Preview waitFor text "${step.text}" timed out before the state appeared.`
+    )
+  }
+
+  if (!step.target) {
+    throw createTaggedPreviewCaptureError(
+      'invalid-capture-target',
+      'waitFor interactions require text, target, or renderIdle.'
+    )
+  }
+
+  const startedAt = Date.now()
+  while (Date.now() - startedAt < timeoutMs) {
+    const resolvedTarget = tryResolvePreviewInteractionTarget(root, step.target, 'waitFor')
+    if (resolvedTarget) {
+      return resolvedTarget.targetDescription
+    }
+    await waitForPreviewInteractionTick(frameWindow)
+  }
+
+  const targetDescription = describePreviewCaptureTarget(step.target)
+  throw createTaggedPreviewCaptureError(
+    'render-timeout',
+    `Preview waitFor target ${targetDescription} timed out before the state appeared.`
+  )
+}
+
+const resolvePreviewInteractionTarget = (
+  root: Element,
+  target: PreviewEvidenceCaptureTarget,
+  kind: 'click' | 'fill' | 'select' | 'press' | 'scroll' | 'waitFor'
+): PreviewResolvedInteractionTarget => {
+  const resolved = tryResolvePreviewInteractionTarget(root, target, kind)
+  if (!resolved) {
+    throw createTaggedPreviewCaptureError(
+      'invalid-capture-target',
+      `Preview interaction target ${describePreviewCaptureTarget(target)} did not match a Preview element.`
+    )
+  }
+  return resolved
+}
+
+const tryResolvePreviewInteractionTarget = (
+  root: Element,
+  target: PreviewEvidenceCaptureTarget,
+  kind: 'click' | 'fill' | 'select' | 'press' | 'scroll' | 'waitFor'
+): PreviewResolvedInteractionTarget | null => {
+  if (target.selector) {
+    const element = queryPreviewTargetSelector(root, target.selector)
+    if (!element || isExcludedElement(element)) {
+      return null
+    }
+    return {
+      element,
+      targetDescription: `selector "${target.selector}"`,
+    }
+  }
+
+  const candidates = [root, ...Array.from(root.querySelectorAll('*'))]
+  const normalizedRole = target.role?.toLowerCase()
+  const normalizedName = normalizeComparableText(target.name)
+  const normalizedText = normalizeComparableText(target.text)
+  const normalizedLabel = normalizeComparableText(target.label)
+
+  const matchingCandidates = candidates
+    .filter((candidate) =>
+      matchesPreviewCaptureTargetCandidate(candidate, {
+        normalizedRole,
+        normalizedName,
+        normalizedText,
+        normalizedLabel,
+      })
+    )
+    .sort((left, right) => {
+      const scoreDifference =
+        getPreviewInteractionTargetScore(right, kind) - getPreviewInteractionTargetScore(left, kind)
+      if (scoreDifference !== 0) {
+        return scoreDifference
+      }
+      return getPreviewTargetDepth(right) - getPreviewTargetDepth(left)
+    })
+
+  const matchingElement = matchingCandidates[0] ?? null
+  if (!matchingElement) {
+    return null
+  }
+
+  return {
+    element: matchingElement,
+    targetDescription: describePreviewCaptureTarget(target),
+  }
+}
+
+const getPreviewInteractionTargetScore = (
+  element: Element,
+  kind: 'click' | 'fill' | 'select' | 'press' | 'scroll' | 'waitFor'
+): number => {
+  let score = getPreviewTargetDepth(element)
+  if (element instanceof HTMLLabelElement) {
+    score -= 20
+  }
+
+  const role = getElementRole(element)
+  if (role !== 'generic') {
+    score += 10
+  }
+
+  if (isElementFocusable(element)) {
+    score += 25
+  }
+
+  switch (kind) {
+    case 'click':
+      if (isElementClickable(element)) score += 80
+      break
+    case 'fill':
+      if (isFillableInteractionElement(element)) score += 120
+      break
+    case 'select':
+      if (isSelectableInteractionElement(element)) score += 120
+      break
+    case 'press':
+      if (isElementFocusable(element)) score += 80
+      break
+    case 'scroll':
+      if (element instanceof HTMLElement) score += 20
+      break
+    case 'waitFor':
+      if (role !== 'generic' || isElementFocusable(element)) score += 20
+      break
+  }
+
+  return score
+}
+
+const getPreviewTargetDepth = (element: Element): number => {
+  let depth = 0
+  let current: Element | null = element
+  while (current) {
+    depth += 1
+    current = current.parentElement
+  }
+  return depth
+}
+
+const queryPreviewTargetSelector = (root: Element, selector: string): Element | null => {
+  try {
+    return root.matches(selector) ? root : root.querySelector(selector)
+  } catch {
+    throw createTaggedPreviewCaptureError(
+      'invalid-capture-target',
+      `Preview selector "${selector}" is not a valid CSS selector.`
+    )
+  }
+}
+
+const resolveFillInteractionElement = (element: Element): HTMLInputElement | HTMLTextAreaElement => {
+  const control = resolveAssociatedInteractionControl(element)
+  if (control && isFillableInteractionElement(control)) {
+    return control
+  }
+
+  throw createTaggedPreviewCaptureError(
+    'invalid-capture-target',
+    'Fill interactions require a text input or textarea inside the Preview.'
+  )
+}
+
+const resolveSelectableInteractionElement = (
+  element: Element
+): HTMLInputElement | HTMLSelectElement => {
+  const control = resolveAssociatedInteractionControl(element)
+  if (control && isSelectableInteractionElement(control)) {
+    return control
+  }
+
+  throw createTaggedPreviewCaptureError(
+    'invalid-capture-target',
+    'Select interactions require a select, radio, or checkbox control inside the Preview.'
+  )
+}
+
+const resolvePressInteractionElement = (
+  root: Element,
+  element?: Element
+): HTMLElement | null => {
+  const candidate =
+    element ??
+    (root.ownerDocument.activeElement instanceof HTMLElement &&
+    root.contains(root.ownerDocument.activeElement)
+      ? root.ownerDocument.activeElement
+      : getFocusablePreviewElements(root)[0] ?? null)
+
+  if (!candidate) {
+    return null
+  }
+
+  const control = resolveAssociatedInteractionControl(candidate)
+  return control instanceof HTMLElement ? control : candidate instanceof HTMLElement ? candidate : null
+}
+
+const resolveAssociatedInteractionControl = (
+  element: Element
+): Element | null => {
+  if (element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement) {
+    return element
+  }
+
+  if (element instanceof HTMLSelectElement) {
+    return element
+  }
+
+  if (element instanceof HTMLOptionElement) {
+    return element.parentElement instanceof HTMLSelectElement ? element.parentElement : null
+  }
+
+  if (element instanceof HTMLLabelElement) {
+    const labelControl = element.control
+    if (labelControl) {
+      return labelControl
+    }
+  }
+
+  return (
+    element.querySelector('input, textarea, select, [contenteditable="true"]') ??
+    (element.closest('label') instanceof HTMLLabelElement ? element.closest('label')?.control : null) ??
+    element
+  )
+}
+
+const isFillableInteractionElement = (
+  element: Element
+): element is HTMLInputElement | HTMLTextAreaElement => {
+  if (element instanceof HTMLTextAreaElement) {
+    return !element.disabled && !element.readOnly
+  }
+
+  if (!(element instanceof HTMLInputElement)) {
+    return false
+  }
+
+  return (
+    !element.disabled &&
+    !element.readOnly &&
+    ['text', 'search', 'email', 'url', 'tel', 'password', 'number', ''].includes(element.type)
+  )
+}
+
+const isSelectableInteractionElement = (
+  element: Element
+): element is HTMLInputElement | HTMLSelectElement => {
+  if (element instanceof HTMLSelectElement) {
+    return !element.disabled
+  }
+
+  return (
+    element instanceof HTMLInputElement &&
+    !element.disabled &&
+    (element.type === 'checkbox' || element.type === 'radio')
+  )
+}
+
+const isElementClickable = (element: Element): boolean =>
+  element instanceof HTMLElement &&
+  (typeof element.onclick === 'function' ||
+    ['button', 'a', 'summary', 'label'].includes(element.tagName.toLowerCase()) ||
+    element.getAttribute('role') === 'button')
+
+const focusPreviewInteractionElement = (element: Element) => {
+  if (element instanceof HTMLElement || element instanceof SVGElement) {
+    element.focus()
+  }
+}
+
+const triggerPreviewClick = (element: Element) => {
+  if (element instanceof HTMLElement) {
+    element.click()
+    return
+  }
+
+  element.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, button: 0 }))
+}
+
+const dispatchKeyboardInteraction = (
+  element: HTMLElement,
+  key: string,
+  root: Element,
+  frameWindow: Window
+) => {
+  const keydownEvent = new KeyboardEvent('keydown', {
+    key,
+    bubbles: true,
+    cancelable: true,
+  })
+  const keydownAccepted = element.dispatchEvent(keydownEvent)
+
+  if (keydownAccepted) {
+    if (key === 'Tab') {
+      movePreviewFocus(root, element)
+    } else if (key === 'Enter' || key === ' ' || key === 'Space') {
+      if (isElementClickable(element)) {
+        assertPreviewInteractionNavigationAllowed(element)
+        triggerPreviewClick(element)
+      }
+    } else if (PREVIEW_INTERACTION_PRINTABLE_KEY_PATTERN.test(key)) {
+      if (isFillableInteractionElement(element)) {
+        setFormControlValue(element, `${element.value}${key}`)
+        dispatchInputEvents(element)
+      }
+    } else if (key === 'Backspace' && isFillableInteractionElement(element)) {
+      setFormControlValue(element, element.value.slice(0, -1))
+      dispatchInputEvents(element)
+    }
+  }
+
+  element.dispatchEvent(
+    new KeyboardEvent('keyup', {
+      key,
+      bubbles: true,
+      cancelable: true,
+    })
+  )
+
+  if (key === 'PageDown' || key === 'ArrowDown') {
+    frameWindow.dispatchEvent(new Event('scroll'))
+  }
+}
+
+const movePreviewFocus = (root: Element, currentElement: HTMLElement) => {
+  const focusableElements = getFocusablePreviewElements(root)
+  if (focusableElements.length === 0) {
+    return
+  }
+
+  const currentIndex = focusableElements.indexOf(currentElement)
+  const nextElement = focusableElements[(currentIndex + 1 + focusableElements.length) % focusableElements.length]
+  nextElement.focus()
+}
+
+const getFocusablePreviewElements = (root: Element): HTMLElement[] =>
+  [root, ...Array.from(root.querySelectorAll('*'))].filter(
+    (candidate): candidate is HTMLElement =>
+      candidate instanceof HTMLElement && isElementFocusable(candidate) && !isElementDisabled(candidate)
+  )
+
+const setFormControlValue = (
+  element: HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement,
+  value: string
+) => {
+  const prototype = Object.getPrototypeOf(element) as Record<string, unknown>
+  const descriptor = Object.getOwnPropertyDescriptor(prototype, 'value')
+  if (descriptor?.set) {
+    descriptor.set.call(element, value)
+  } else {
+    element.value = value
+  }
+}
+
+const setFormControlChecked = (element: HTMLInputElement, checked: boolean) => {
+  const prototype = Object.getPrototypeOf(element) as Record<string, unknown>
+  const descriptor = Object.getOwnPropertyDescriptor(prototype, 'checked')
+  if (descriptor?.set) {
+    descriptor.set.call(element, checked)
+  } else {
+    element.checked = checked
+  }
+}
+
+const dispatchInputEvents = (element: HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement) => {
+  element.dispatchEvent(new Event('input', { bubbles: true, cancelable: true }))
+  element.dispatchEvent(new Event('change', { bubbles: true, cancelable: true }))
+}
+
+const normalizePreviewInteractionKey = (key: string): string => {
+  const normalizedKey = key.trim()
+  if (
+    PREVIEW_INTERACTION_SUPPORTED_KEYS.has(normalizedKey) ||
+    PREVIEW_INTERACTION_PRINTABLE_KEY_PATTERN.test(normalizedKey)
+  ) {
+    return normalizedKey
+  }
+
+  throw createTaggedPreviewCaptureError(
+    'invalid-capture-target',
+    `Preview press key "${key}" is not supported for bounded Preview interactions.`
+  )
+}
+
+const normalizePreviewInteractionNumber = (value: number | undefined): number =>
+  typeof value === 'number' && Number.isFinite(value) ? value : 0
+
+const assertPreviewInteractionNavigationAllowed = (element: Element) => {
+  const anchor = element.closest('a')
+  if (!anchor) {
+    return
+  }
+
+  const href = anchor.getAttribute('href')
+  const to = anchor.getAttribute('to')
+  const targetPageId = href ?? to
+  if (targetPageId && /^page\d+$/.test(targetPageId)) {
+    return
+  }
+
+  throw createTaggedPreviewCaptureError(
+    'invalid-capture-target',
+    'Preview interactions block browser/external navigation targets. Only in-prototype Arcade page references are allowed.'
+  )
+}
+
+const waitForPreviewRenderIdle = async (
+  root: Element,
+  timeoutMs: number,
+  frameWindow: Window
+) => {
+  const startedAt = Date.now()
+  let lastMutationAt = startedAt
+  const observer = new MutationObserver(() => {
+    lastMutationAt = Date.now()
+  })
+
+  observer.observe(root, {
+    subtree: true,
+    childList: true,
+    attributes: true,
+    characterData: true,
+  })
+
+  try {
+    while (Date.now() - startedAt < timeoutMs) {
+      if (Date.now() - lastMutationAt >= PREVIEW_INTERACTION_RENDER_IDLE_MS) {
+        return
+      }
+      await waitForPreviewInteractionTick(frameWindow)
+    }
+  } finally {
+    observer.disconnect()
+  }
+
+  throw createTaggedPreviewCaptureError(
+    'render-timeout',
+    'Preview waitFor renderIdle timed out before the render settled.'
+  )
+}
+
+const settleAfterPreviewInteraction = async (frameWindow: Window) => {
+  for (let index = 0; index < PREVIEW_INTERACTION_SETTLE_FRAMES; index += 1) {
+    await waitForPreviewInteractionTick(frameWindow)
+  }
+}
+
+const waitForPreviewInteractionTick = (frameWindow: Window): Promise<void> =>
+  new Promise((resolve) => {
+    frameWindow.setTimeout(resolve, PREVIEW_INTERACTION_POLL_INTERVAL_MS)
+  })
+
+const getPreviewInteractionWaitTimeout = (
+  timeoutMs: number | undefined,
+  deadline: number
+): number => {
+  const remainingBudget = Math.max(1, deadline - Date.now())
+  const requestedTimeout =
+    typeof timeoutMs === 'number' && Number.isFinite(timeoutMs)
+      ? Math.max(1, Math.min(timeoutMs, MAX_PREVIEW_INTERACTION_WAIT_TIMEOUT_MS))
+      : DEFAULT_PREVIEW_INTERACTION_WAIT_TIMEOUT_MS
+
+  return Math.max(1, Math.min(requestedTimeout, remainingBudget))
+}
+
+const readCurrentPreviewInteractionPageId = (
+  currentPageId: ArcadePageId | null,
+  getCurrentPageId?: () => ArcadePageId | null
+): ArcadePageId | null => {
+  if (!getCurrentPageId) {
+    return currentPageId
+  }
+
+  try {
+    return getCurrentPageId()
+  } catch {
+    return currentPageId
+  }
+}
+
+const clonePreviewInteractionStep = (step: PreviewInteractionStep): PreviewInteractionStep => {
+  const base = {
+    ...step,
+  } as PreviewInteractionStep
+
+  if ('target' in step && step.target) {
+    base.target = { ...step.target }
+  }
+
+  return base
 }
 
 const matchesPreviewCaptureTargetCandidate = (
@@ -1530,13 +2404,15 @@ const createPreviewUnavailableFailure = (message: string): PreviewEvidenceCaptur
 
 const createPreviewCaptureFailure = (
   code: PreviewEvidenceCaptureErrorCode,
-  message: string
+  message: string,
+  extras: Omit<PreviewEvidenceCaptureFailure, 'ok' | 'error'> = {}
 ): PreviewEvidenceCaptureFailure => ({
   ok: false,
   error: {
     code,
     message,
   },
+  ...extras,
 })
 
 const createTaggedPreviewCaptureError = (

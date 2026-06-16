@@ -130,6 +130,11 @@ interface CapturePreviewSuccess {
     dom_layout_style?: string
     frame?: string
   }
+  interactions?: {
+    requested: Array<Record<string, unknown>>
+    executed: Array<Record<string, unknown>>
+    failedStep?: Record<string, unknown>
+  }
   resources: Array<{
     uri: string
     mimeType: string
@@ -152,6 +157,12 @@ interface CapturePreviewFailure {
     | 'render-failed'
   message: string
   manifestResourceUri?: string
+  interactions?: {
+    requested: Array<Record<string, unknown>>
+    executed: Array<Record<string, unknown>>
+    failedStep?: Record<string, unknown>
+  }
+  currentPageId?: string | null
 }
 
 type CapturePreviewResult = CapturePreviewSuccess | CapturePreviewFailure
@@ -457,6 +468,30 @@ describe('desktopMcpServer', () => {
           dom_layout_style: 'arcade://preview/captures/capture-demo/dom-layout-style',
           frame: 'arcade://preview/captures/capture-demo/frame',
         },
+        interactions: {
+          requested: [
+            {
+              action: 'click',
+              target: {
+                role: 'button',
+                name: 'Continue',
+              },
+            },
+          ],
+          executed: [
+            {
+              index: 0,
+              step: {
+                action: 'click',
+                target: {
+                  role: 'button',
+                  name: 'Continue',
+                },
+              },
+              targetDescription: 'role=button name="Continue"',
+            },
+          ],
+        },
         resources: [
           {
             uri: 'arcade://preview/captures/capture-demo/manifest',
@@ -513,6 +548,15 @@ describe('desktopMcpServer', () => {
             role: 'button',
             name: 'Continue',
           },
+          interactions: [
+            {
+              action: 'click',
+              target: {
+                role: 'button',
+                name: 'Continue',
+              },
+            },
+          ],
         },
       },
     })
@@ -551,6 +595,30 @@ describe('desktopMcpServer', () => {
             accessibility: 'arcade://preview/captures/capture-demo/accessibility',
             dom_layout_style: 'arcade://preview/captures/capture-demo/dom-layout-style',
             frame: 'arcade://preview/captures/capture-demo/frame',
+          },
+          interactions: {
+            requested: [
+              {
+                action: 'click',
+                target: {
+                  role: 'button',
+                  name: 'Continue',
+                },
+              },
+            ],
+            executed: [
+              {
+                index: 0,
+                step: {
+                  action: 'click',
+                  target: {
+                    role: 'button',
+                    name: 'Continue',
+                  },
+                },
+                targetDescription: 'role=button name="Continue"',
+              },
+            ],
           },
           safeActivity: {
             toolName: 'capture_preview_evidence',
@@ -723,7 +791,56 @@ describe('desktopMcpServer', () => {
         role: 'button',
         name: 'Continue',
       },
+      interactions: [
+        {
+          action: 'click',
+          target: {
+            role: 'button',
+            name: 'Continue',
+          },
+        },
+      ],
     })
+  })
+
+  it('rejects invalid bounded interaction arguments before routing capture_preview_evidence', async () => {
+    const capturePreviewEvidence = vi.fn()
+    const server = createManagedServer({ port: 0, capturePreviewEvidence })
+    const state = await server.start()
+
+    const invalidWaitForResponse = await postJson(state.url, {
+      jsonrpc: '2.0',
+      id: 68,
+      method: 'tools/call',
+      params: {
+        name: 'capture_preview_evidence',
+        arguments: {
+          interactions: [
+            {
+              action: 'waitFor',
+              text: 'Loaded',
+              renderIdle: true,
+            },
+          ],
+        },
+      },
+    })
+
+    expect(invalidWaitForResponse.status).toBe(200)
+    await expect(invalidWaitForResponse.json()).resolves.toEqual({
+      jsonrpc: '2.0',
+      id: 68,
+      error: {
+        code: -32602,
+        message:
+          'capture_preview_evidence interactions[0] waitFor steps require exactly one of text, target, or renderIdle.',
+        data: {
+          code: 'invalid-tool-arguments',
+          toolName: 'capture_preview_evidence',
+        },
+      },
+    })
+    expect(capturePreviewEvidence).not.toHaveBeenCalled()
   })
 
   it('routes apply_changes through the injected project writer and preserves MCP tool-result semantics', async () => {
@@ -998,6 +1115,12 @@ describe('desktopMcpServer', () => {
     expect(operatingGuidePayload.result.contents[0].text).toContain(
       'Preview capture supports `screenshot`, `accessibility`, `dom_layout_style`, and `frame` layers'
     )
+    expect(operatingGuidePayload.result.contents[0].text).toContain(
+      'Preview capture interactions support click, fill, select, press, scroll, waitFor'
+    )
+    expect(operatingGuidePayload.result.contents[0].text).toContain(
+      'Preview interactions block browser/external navigation targets'
+    )
 
     const authoringGuideResponse = await postJson(state.url, {
       jsonrpc: '2.0',
@@ -1062,8 +1185,12 @@ describe('desktopMcpServer', () => {
       captureLayers: ['screenshot', 'accessibility', 'dom_layout_style', 'frame'],
       screenshotScopes: ['viewport', 'full_page', 'region'],
       interactionActions: ['click', 'fill', 'select', 'press', 'scroll', 'waitFor'],
+      interactionWaitModes: ['text', 'target', 'renderIdle'],
       limits: {
         requestBodyBytes: 1024 * 1024,
+        previewInteractionSteps: 10,
+        previewInteractionTotalTimeMs: 10000,
+        previewInteractionWaitTimeoutMs: 5000,
       },
     })
     expect(capabilities.toolNames).toEqual(
@@ -1114,12 +1241,12 @@ describe('desktopMcpServer', () => {
         region: 'available',
       },
       interactionActions: {
-        click: 'not-yet-implemented',
-        fill: 'not-yet-implemented',
-        select: 'not-yet-implemented',
-        press: 'not-yet-implemented',
-        scroll: 'not-yet-implemented',
-        waitFor: 'not-yet-implemented',
+        click: 'available',
+        fill: 'available',
+        select: 'available',
+        press: 'available',
+        scroll: 'available',
+        waitFor: 'available',
       },
     })
     expect(capabilities.implementationStatus.previewEvidenceUriTemplates).toMatchObject({

@@ -21,18 +21,47 @@ var previewEvidenceUtils = (() => {
   var previewEvidence_exports = {};
   __export(previewEvidence_exports, {
     MAX_PREVIEW_EVIDENCE_ELEMENTS: () => MAX_PREVIEW_EVIDENCE_ELEMENTS,
+    MAX_PREVIEW_INTERACTION_STEPS: () => MAX_PREVIEW_INTERACTION_STEPS,
+    MAX_PREVIEW_INTERACTION_TOTAL_TIME_MS: () => MAX_PREVIEW_INTERACTION_TOTAL_TIME_MS,
+    MAX_PREVIEW_INTERACTION_WAIT_TIMEOUT_MS: () => MAX_PREVIEW_INTERACTION_WAIT_TIMEOUT_MS,
     PREVIEW_EVIDENCE_ROOT_SELECTOR: () => PREVIEW_EVIDENCE_ROOT_SELECTOR,
     capturePreviewEvidenceSnapshot: () => capturePreviewEvidenceSnapshot,
     collectPreviewEvidenceFromFrame: () => collectPreviewEvidenceFromFrame,
     registerPreviewEvidenceRequestHandler: () => registerPreviewEvidenceRequestHandler,
     requestPreviewEvidenceFromFrame: () => requestPreviewEvidenceFromFrame,
+    runPreviewInteractionSequence: () => runPreviewInteractionSequence,
     serializePreviewEvidence: () => serializePreviewEvidence
   });
   var PREVIEW_EVIDENCE_ROOT_SELECTOR = "#root";
   var MAX_PREVIEW_EVIDENCE_ELEMENTS = 200;
+  var MAX_PREVIEW_INTERACTION_STEPS = 10;
+  var MAX_PREVIEW_INTERACTION_TOTAL_TIME_MS = 1e4;
+  var MAX_PREVIEW_INTERACTION_WAIT_TIMEOUT_MS = 5e3;
   var MAX_PREVIEW_EVIDENCE_TEXT_LENGTH = 200;
   var MAX_PREVIEW_EVIDENCE_ATTRIBUTE_LENGTH = 200;
   var MAX_PREVIEW_EVIDENCE_CLASS_NAMES = 30;
+  var DEFAULT_PREVIEW_INTERACTION_WAIT_TIMEOUT_MS = 1500;
+  var PREVIEW_INTERACTION_POLL_INTERVAL_MS = 16;
+  var PREVIEW_INTERACTION_SETTLE_FRAMES = 2;
+  var PREVIEW_INTERACTION_RENDER_IDLE_MS = 100;
+  var PREVIEW_INTERACTION_PRINTABLE_KEY_PATTERN = /^[^\s]$/;
+  var PREVIEW_INTERACTION_SUPPORTED_KEYS = /* @__PURE__ */ new Set([
+    "Enter",
+    "Escape",
+    "Tab",
+    "ArrowUp",
+    "ArrowDown",
+    "ArrowLeft",
+    "ArrowRight",
+    "Backspace",
+    "Delete",
+    "Home",
+    "End",
+    "PageUp",
+    "PageDown",
+    "Space",
+    " "
+  ]);
   var collectPreviewEvidenceFromFrame = (iframe) => {
     if (!iframe) {
       return createPreviewUnavailableFailure("Preview iframe is not mounted yet.");
@@ -128,6 +157,7 @@ var previewEvidenceUtils = (() => {
     screenshotScope = "viewport",
     target,
     currentPageId = null,
+    interactionState,
     viewportFallback
   } = {}, frameWindow = root.ownerDocument.defaultView ?? window) => {
     try {
@@ -151,7 +181,8 @@ var previewEvidenceUtils = (() => {
         captureMeta: {
           currentPageId,
           ...screenshotRequested ? { screenshotScope } : {},
-          ...screenshot?.targetDescription ? { targetDescription: screenshot.targetDescription } : {}
+          ...screenshot?.targetDescription ? { targetDescription: screenshot.targetDescription } : {},
+          ...interactionState ? { interactions: interactionState } : {}
         }
       };
     } catch (error) {
@@ -159,9 +190,70 @@ var previewEvidenceUtils = (() => {
       const message = getErrorMessage(error);
       return createPreviewCaptureFailure(
         code,
-        code === "preview-unavailable" ? `Preview evidence could not be captured: ${message}` : message
+        code === "preview-unavailable" ? `Preview evidence could not be captured: ${message}` : message,
+        {
+          ...currentPageId !== null || interactionState ? {
+            captureMeta: {
+              ...currentPageId !== null ? { currentPageId } : {},
+              ...interactionState ? { interactions: interactionState } : {}
+            }
+          } : {}
+        }
       );
     }
+  };
+  var runPreviewInteractionSequence = async (root, interactions, {
+    currentPageId = null,
+    getCurrentPageId,
+    maxTotalTimeMs = MAX_PREVIEW_INTERACTION_TOTAL_TIME_MS
+  } = {}, frameWindow = root.ownerDocument.defaultView ?? window) => {
+    const requested = interactions.map(clonePreviewInteractionStep);
+    const interactionState = {
+      requested,
+      executed: []
+    };
+    if (requested.length === 0) {
+      return {
+        ok: true,
+        interactionState
+      };
+    }
+    const deadline = Date.now() + Math.max(1, maxTotalTimeMs);
+    for (const [index, step] of requested.entries()) {
+      try {
+        const targetDescription = await executePreviewInteractionStep(root, step, {
+          deadline,
+          frameWindow
+        });
+        interactionState.executed.push({
+          index,
+          step,
+          ...targetDescription ? { targetDescription } : {}
+        });
+      } catch (error) {
+        const code = isTaggedPreviewCaptureError(error) ? error.code : "invalid-capture-target";
+        const reason = getErrorMessage(error);
+        interactionState.failedStep = {
+          index,
+          step,
+          reason
+        };
+        return createPreviewCaptureFailure(code, reason, {
+          captureMeta: {
+            currentPageId: readCurrentPreviewInteractionPageId(currentPageId, getCurrentPageId),
+            interactions: interactionState
+          }
+        });
+      }
+    }
+    return {
+      ok: true,
+      interactionState: {
+        ...interactionState,
+        requested,
+        executed: [...interactionState.executed]
+      }
+    };
   };
   var serializeElement = (element, frameWindow, state) => {
     if (isExcludedElement(element)) {
@@ -438,7 +530,7 @@ var previewEvidenceUtils = (() => {
       return null;
     }
     if (target.selector) {
-      const element = root.querySelector(target.selector);
+      const element = queryPreviewTargetSelector(root, target.selector);
       if (!element || isExcludedElement(element)) {
         throw createTaggedPreviewCaptureError(
           "invalid-capture-target",
@@ -478,6 +570,488 @@ var previewEvidenceUtils = (() => {
       element: matchingElement,
       targetDescription: describePreviewCaptureTarget(target)
     };
+  };
+  var executePreviewInteractionStep = async (root, step, { deadline, frameWindow }) => {
+    switch (step.action) {
+      case "click":
+        return executePreviewClickInteraction(root, step, frameWindow);
+      case "fill":
+        return executePreviewFillInteraction(root, step, frameWindow);
+      case "select":
+        return executePreviewSelectInteraction(root, step, frameWindow);
+      case "press":
+        return executePreviewPressInteraction(root, step, frameWindow);
+      case "scroll":
+        return executePreviewScrollInteraction(root, step, frameWindow);
+      case "waitFor":
+        return executePreviewWaitForInteraction(root, step, deadline, frameWindow);
+    }
+  };
+  var executePreviewClickInteraction = async (root, step, frameWindow) => {
+    const target = resolvePreviewInteractionTarget(root, step.target, "click");
+    assertPreviewInteractionNavigationAllowed(target.element);
+    focusPreviewInteractionElement(target.element);
+    triggerPreviewClick(target.element);
+    await settleAfterPreviewInteraction(frameWindow);
+    return target.targetDescription;
+  };
+  var executePreviewFillInteraction = async (root, step, frameWindow) => {
+    const target = resolvePreviewInteractionTarget(root, step.target, "fill");
+    const input = resolveFillInteractionElement(target.element);
+    focusPreviewInteractionElement(input);
+    setFormControlValue(input, step.value);
+    dispatchInputEvents(input);
+    await settleAfterPreviewInteraction(frameWindow);
+    return target.targetDescription;
+  };
+  var executePreviewSelectInteraction = async (root, step, frameWindow) => {
+    const target = resolvePreviewInteractionTarget(root, step.target, "select");
+    const control = resolveSelectableInteractionElement(target.element);
+    if (control instanceof HTMLSelectElement) {
+      if (typeof step.value !== "string") {
+        throw createTaggedPreviewCaptureError(
+          "invalid-capture-target",
+          "Select interactions targeting a combobox/select control require a string value."
+        );
+      }
+      const option = Array.from(control.options).find((candidate) => candidate.value === step.value);
+      if (!option) {
+        throw createTaggedPreviewCaptureError(
+          "invalid-capture-target",
+          `Select interaction value "${step.value}" did not match an available option.`
+        );
+      }
+      setFormControlValue(control, step.value);
+      Array.from(control.options).forEach((candidate) => {
+        candidate.selected = candidate.value === step.value;
+      });
+      dispatchInputEvents(control);
+      await settleAfterPreviewInteraction(frameWindow);
+      return target.targetDescription;
+    }
+    if (typeof step.checked !== "boolean") {
+      throw createTaggedPreviewCaptureError(
+        "invalid-capture-target",
+        "Select interactions targeting checkbox/radio controls require a checked boolean."
+      );
+    }
+    if (control instanceof HTMLInputElement && control.type === "radio" && !step.checked) {
+      throw createTaggedPreviewCaptureError(
+        "invalid-capture-target",
+        "Radio controls may only be selected with checked=true during Preview interactions."
+      );
+    }
+    setFormControlChecked(control, step.checked);
+    dispatchInputEvents(control);
+    await settleAfterPreviewInteraction(frameWindow);
+    return target.targetDescription;
+  };
+  var executePreviewPressInteraction = async (root, step, frameWindow) => {
+    const normalizedKey = normalizePreviewInteractionKey(step.key);
+    const target = step.target ? resolvePreviewInteractionTarget(root, step.target, "press") : void 0;
+    const element = resolvePressInteractionElement(root, target?.element);
+    if (!element) {
+      throw createTaggedPreviewCaptureError(
+        "invalid-capture-target",
+        "Press interactions require a focusable Preview element target or an existing focused Preview element."
+      );
+    }
+    focusPreviewInteractionElement(element);
+    dispatchKeyboardInteraction(element, normalizedKey, root, frameWindow);
+    await settleAfterPreviewInteraction(frameWindow);
+    return target?.targetDescription;
+  };
+  var executePreviewScrollInteraction = async (root, step, frameWindow) => {
+    const deltaX = normalizePreviewInteractionNumber(step.x);
+    const deltaY = normalizePreviewInteractionNumber(step.y);
+    if (deltaX === 0 && deltaY === 0) {
+      throw createTaggedPreviewCaptureError(
+        "invalid-capture-target",
+        "Scroll interactions require a non-zero x or y delta."
+      );
+    }
+    const target = step.target ? resolvePreviewInteractionTarget(root, step.target, "scroll") : void 0;
+    if (target?.element instanceof HTMLElement) {
+      target.element.scrollLeft += deltaX;
+      target.element.scrollTop += deltaY;
+      target.element.dispatchEvent(new Event("scroll", { bubbles: true }));
+    } else if (typeof frameWindow.scrollTo === "function") {
+      frameWindow.scrollTo(frameWindow.scrollX + deltaX, frameWindow.scrollY + deltaY);
+    }
+    await settleAfterPreviewInteraction(frameWindow);
+    return target?.targetDescription;
+  };
+  var executePreviewWaitForInteraction = async (root, step, deadline, frameWindow) => {
+    const timeoutMs = getPreviewInteractionWaitTimeout(step.timeoutMs, deadline);
+    if (step.renderIdle) {
+      await waitForPreviewRenderIdle(root, timeoutMs, frameWindow);
+      return "renderIdle";
+    }
+    if (typeof step.text === "string") {
+      const normalizedText = normalizeComparableText(step.text);
+      const startedAt2 = Date.now();
+      while (Date.now() - startedAt2 < timeoutMs) {
+        if (normalizeComparableText(getElementVisibleText(root)).includes(normalizedText)) {
+          return `text="${step.text}"`;
+        }
+        await waitForPreviewInteractionTick(frameWindow);
+      }
+      throw createTaggedPreviewCaptureError(
+        "render-timeout",
+        `Preview waitFor text "${step.text}" timed out before the state appeared.`
+      );
+    }
+    if (!step.target) {
+      throw createTaggedPreviewCaptureError(
+        "invalid-capture-target",
+        "waitFor interactions require text, target, or renderIdle."
+      );
+    }
+    const startedAt = Date.now();
+    while (Date.now() - startedAt < timeoutMs) {
+      const resolvedTarget = tryResolvePreviewInteractionTarget(root, step.target, "waitFor");
+      if (resolvedTarget) {
+        return resolvedTarget.targetDescription;
+      }
+      await waitForPreviewInteractionTick(frameWindow);
+    }
+    const targetDescription = describePreviewCaptureTarget(step.target);
+    throw createTaggedPreviewCaptureError(
+      "render-timeout",
+      `Preview waitFor target ${targetDescription} timed out before the state appeared.`
+    );
+  };
+  var resolvePreviewInteractionTarget = (root, target, kind) => {
+    const resolved = tryResolvePreviewInteractionTarget(root, target, kind);
+    if (!resolved) {
+      throw createTaggedPreviewCaptureError(
+        "invalid-capture-target",
+        `Preview interaction target ${describePreviewCaptureTarget(target)} did not match a Preview element.`
+      );
+    }
+    return resolved;
+  };
+  var tryResolvePreviewInteractionTarget = (root, target, kind) => {
+    if (target.selector) {
+      const element = queryPreviewTargetSelector(root, target.selector);
+      if (!element || isExcludedElement(element)) {
+        return null;
+      }
+      return {
+        element,
+        targetDescription: `selector "${target.selector}"`
+      };
+    }
+    const candidates = [root, ...Array.from(root.querySelectorAll("*"))];
+    const normalizedRole = target.role?.toLowerCase();
+    const normalizedName = normalizeComparableText(target.name);
+    const normalizedText = normalizeComparableText(target.text);
+    const normalizedLabel = normalizeComparableText(target.label);
+    const matchingCandidates = candidates.filter(
+      (candidate) => matchesPreviewCaptureTargetCandidate(candidate, {
+        normalizedRole,
+        normalizedName,
+        normalizedText,
+        normalizedLabel
+      })
+    ).sort((left, right) => {
+      const scoreDifference = getPreviewInteractionTargetScore(right, kind) - getPreviewInteractionTargetScore(left, kind);
+      if (scoreDifference !== 0) {
+        return scoreDifference;
+      }
+      return getPreviewTargetDepth(right) - getPreviewTargetDepth(left);
+    });
+    const matchingElement = matchingCandidates[0] ?? null;
+    if (!matchingElement) {
+      return null;
+    }
+    return {
+      element: matchingElement,
+      targetDescription: describePreviewCaptureTarget(target)
+    };
+  };
+  var getPreviewInteractionTargetScore = (element, kind) => {
+    let score = getPreviewTargetDepth(element);
+    if (element instanceof HTMLLabelElement) {
+      score -= 20;
+    }
+    const role = getElementRole(element);
+    if (role !== "generic") {
+      score += 10;
+    }
+    if (isElementFocusable(element)) {
+      score += 25;
+    }
+    switch (kind) {
+      case "click":
+        if (isElementClickable(element)) score += 80;
+        break;
+      case "fill":
+        if (isFillableInteractionElement(element)) score += 120;
+        break;
+      case "select":
+        if (isSelectableInteractionElement(element)) score += 120;
+        break;
+      case "press":
+        if (isElementFocusable(element)) score += 80;
+        break;
+      case "scroll":
+        if (element instanceof HTMLElement) score += 20;
+        break;
+      case "waitFor":
+        if (role !== "generic" || isElementFocusable(element)) score += 20;
+        break;
+    }
+    return score;
+  };
+  var getPreviewTargetDepth = (element) => {
+    let depth = 0;
+    let current = element;
+    while (current) {
+      depth += 1;
+      current = current.parentElement;
+    }
+    return depth;
+  };
+  var queryPreviewTargetSelector = (root, selector) => {
+    try {
+      return root.matches(selector) ? root : root.querySelector(selector);
+    } catch {
+      throw createTaggedPreviewCaptureError(
+        "invalid-capture-target",
+        `Preview selector "${selector}" is not a valid CSS selector.`
+      );
+    }
+  };
+  var resolveFillInteractionElement = (element) => {
+    const control = resolveAssociatedInteractionControl(element);
+    if (control && isFillableInteractionElement(control)) {
+      return control;
+    }
+    throw createTaggedPreviewCaptureError(
+      "invalid-capture-target",
+      "Fill interactions require a text input or textarea inside the Preview."
+    );
+  };
+  var resolveSelectableInteractionElement = (element) => {
+    const control = resolveAssociatedInteractionControl(element);
+    if (control && isSelectableInteractionElement(control)) {
+      return control;
+    }
+    throw createTaggedPreviewCaptureError(
+      "invalid-capture-target",
+      "Select interactions require a select, radio, or checkbox control inside the Preview."
+    );
+  };
+  var resolvePressInteractionElement = (root, element) => {
+    const candidate = element ?? (root.ownerDocument.activeElement instanceof HTMLElement && root.contains(root.ownerDocument.activeElement) ? root.ownerDocument.activeElement : getFocusablePreviewElements(root)[0] ?? null);
+    if (!candidate) {
+      return null;
+    }
+    const control = resolveAssociatedInteractionControl(candidate);
+    return control instanceof HTMLElement ? control : candidate instanceof HTMLElement ? candidate : null;
+  };
+  var resolveAssociatedInteractionControl = (element) => {
+    if (element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement) {
+      return element;
+    }
+    if (element instanceof HTMLSelectElement) {
+      return element;
+    }
+    if (element instanceof HTMLOptionElement) {
+      return element.parentElement instanceof HTMLSelectElement ? element.parentElement : null;
+    }
+    if (element instanceof HTMLLabelElement) {
+      const labelControl = element.control;
+      if (labelControl) {
+        return labelControl;
+      }
+    }
+    return element.querySelector('input, textarea, select, [contenteditable="true"]') ?? (element.closest("label") instanceof HTMLLabelElement ? element.closest("label")?.control : null) ?? element;
+  };
+  var isFillableInteractionElement = (element) => {
+    if (element instanceof HTMLTextAreaElement) {
+      return !element.disabled && !element.readOnly;
+    }
+    if (!(element instanceof HTMLInputElement)) {
+      return false;
+    }
+    return !element.disabled && !element.readOnly && ["text", "search", "email", "url", "tel", "password", "number", ""].includes(element.type);
+  };
+  var isSelectableInteractionElement = (element) => {
+    if (element instanceof HTMLSelectElement) {
+      return !element.disabled;
+    }
+    return element instanceof HTMLInputElement && !element.disabled && (element.type === "checkbox" || element.type === "radio");
+  };
+  var isElementClickable = (element) => element instanceof HTMLElement && (typeof element.onclick === "function" || ["button", "a", "summary", "label"].includes(element.tagName.toLowerCase()) || element.getAttribute("role") === "button");
+  var focusPreviewInteractionElement = (element) => {
+    if (element instanceof HTMLElement || element instanceof SVGElement) {
+      element.focus();
+    }
+  };
+  var triggerPreviewClick = (element) => {
+    if (element instanceof HTMLElement) {
+      element.click();
+      return;
+    }
+    element.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true, button: 0 }));
+  };
+  var dispatchKeyboardInteraction = (element, key, root, frameWindow) => {
+    const keydownEvent = new KeyboardEvent("keydown", {
+      key,
+      bubbles: true,
+      cancelable: true
+    });
+    const keydownAccepted = element.dispatchEvent(keydownEvent);
+    if (keydownAccepted) {
+      if (key === "Tab") {
+        movePreviewFocus(root, element);
+      } else if (key === "Enter" || key === " " || key === "Space") {
+        if (isElementClickable(element)) {
+          assertPreviewInteractionNavigationAllowed(element);
+          triggerPreviewClick(element);
+        }
+      } else if (PREVIEW_INTERACTION_PRINTABLE_KEY_PATTERN.test(key)) {
+        if (isFillableInteractionElement(element)) {
+          setFormControlValue(element, `${element.value}${key}`);
+          dispatchInputEvents(element);
+        }
+      } else if (key === "Backspace" && isFillableInteractionElement(element)) {
+        setFormControlValue(element, element.value.slice(0, -1));
+        dispatchInputEvents(element);
+      }
+    }
+    element.dispatchEvent(
+      new KeyboardEvent("keyup", {
+        key,
+        bubbles: true,
+        cancelable: true
+      })
+    );
+    if (key === "PageDown" || key === "ArrowDown") {
+      frameWindow.dispatchEvent(new Event("scroll"));
+    }
+  };
+  var movePreviewFocus = (root, currentElement) => {
+    const focusableElements = getFocusablePreviewElements(root);
+    if (focusableElements.length === 0) {
+      return;
+    }
+    const currentIndex = focusableElements.indexOf(currentElement);
+    const nextElement = focusableElements[(currentIndex + 1 + focusableElements.length) % focusableElements.length];
+    nextElement.focus();
+  };
+  var getFocusablePreviewElements = (root) => [root, ...Array.from(root.querySelectorAll("*"))].filter(
+    (candidate) => candidate instanceof HTMLElement && isElementFocusable(candidate) && !isElementDisabled(candidate)
+  );
+  var setFormControlValue = (element, value) => {
+    const prototype = Object.getPrototypeOf(element);
+    const descriptor = Object.getOwnPropertyDescriptor(prototype, "value");
+    if (descriptor?.set) {
+      descriptor.set.call(element, value);
+    } else {
+      element.value = value;
+    }
+  };
+  var setFormControlChecked = (element, checked) => {
+    const prototype = Object.getPrototypeOf(element);
+    const descriptor = Object.getOwnPropertyDescriptor(prototype, "checked");
+    if (descriptor?.set) {
+      descriptor.set.call(element, checked);
+    } else {
+      element.checked = checked;
+    }
+  };
+  var dispatchInputEvents = (element) => {
+    element.dispatchEvent(new Event("input", { bubbles: true, cancelable: true }));
+    element.dispatchEvent(new Event("change", { bubbles: true, cancelable: true }));
+  };
+  var normalizePreviewInteractionKey = (key) => {
+    const normalizedKey = key.trim();
+    if (PREVIEW_INTERACTION_SUPPORTED_KEYS.has(normalizedKey) || PREVIEW_INTERACTION_PRINTABLE_KEY_PATTERN.test(normalizedKey)) {
+      return normalizedKey;
+    }
+    throw createTaggedPreviewCaptureError(
+      "invalid-capture-target",
+      `Preview press key "${key}" is not supported for bounded Preview interactions.`
+    );
+  };
+  var normalizePreviewInteractionNumber = (value) => typeof value === "number" && Number.isFinite(value) ? value : 0;
+  var assertPreviewInteractionNavigationAllowed = (element) => {
+    const anchor = element.closest("a");
+    if (!anchor) {
+      return;
+    }
+    const href = anchor.getAttribute("href");
+    const to = anchor.getAttribute("to");
+    const targetPageId = href ?? to;
+    if (targetPageId && /^page\d+$/.test(targetPageId)) {
+      return;
+    }
+    throw createTaggedPreviewCaptureError(
+      "invalid-capture-target",
+      "Preview interactions block browser/external navigation targets. Only in-prototype Arcade page references are allowed."
+    );
+  };
+  var waitForPreviewRenderIdle = async (root, timeoutMs, frameWindow) => {
+    const startedAt = Date.now();
+    let lastMutationAt = startedAt;
+    const observer = new MutationObserver(() => {
+      lastMutationAt = Date.now();
+    });
+    observer.observe(root, {
+      subtree: true,
+      childList: true,
+      attributes: true,
+      characterData: true
+    });
+    try {
+      while (Date.now() - startedAt < timeoutMs) {
+        if (Date.now() - lastMutationAt >= PREVIEW_INTERACTION_RENDER_IDLE_MS) {
+          return;
+        }
+        await waitForPreviewInteractionTick(frameWindow);
+      }
+    } finally {
+      observer.disconnect();
+    }
+    throw createTaggedPreviewCaptureError(
+      "render-timeout",
+      "Preview waitFor renderIdle timed out before the render settled."
+    );
+  };
+  var settleAfterPreviewInteraction = async (frameWindow) => {
+    for (let index = 0; index < PREVIEW_INTERACTION_SETTLE_FRAMES; index += 1) {
+      await waitForPreviewInteractionTick(frameWindow);
+    }
+  };
+  var waitForPreviewInteractionTick = (frameWindow) => new Promise((resolve) => {
+    frameWindow.setTimeout(resolve, PREVIEW_INTERACTION_POLL_INTERVAL_MS);
+  });
+  var getPreviewInteractionWaitTimeout = (timeoutMs, deadline) => {
+    const remainingBudget = Math.max(1, deadline - Date.now());
+    const requestedTimeout = typeof timeoutMs === "number" && Number.isFinite(timeoutMs) ? Math.max(1, Math.min(timeoutMs, MAX_PREVIEW_INTERACTION_WAIT_TIMEOUT_MS)) : DEFAULT_PREVIEW_INTERACTION_WAIT_TIMEOUT_MS;
+    return Math.max(1, Math.min(requestedTimeout, remainingBudget));
+  };
+  var readCurrentPreviewInteractionPageId = (currentPageId, getCurrentPageId) => {
+    if (!getCurrentPageId) {
+      return currentPageId;
+    }
+    try {
+      return getCurrentPageId();
+    } catch {
+      return currentPageId;
+    }
+  };
+  var clonePreviewInteractionStep = (step) => {
+    const base = {
+      ...step
+    };
+    if ("target" in step && step.target) {
+      base.target = { ...step.target };
+    }
+    return base;
   };
   var matchesPreviewCaptureTargetCandidate = (candidate, {
     normalizedRole,
@@ -976,12 +1550,13 @@ var previewEvidenceUtils = (() => {
     };
   }
   var createPreviewUnavailableFailure = (message) => createPreviewCaptureFailure("preview-unavailable", message);
-  var createPreviewCaptureFailure = (code, message) => ({
+  var createPreviewCaptureFailure = (code, message, extras = {}) => ({
     ok: false,
     error: {
       code,
       message
-    }
+    },
+    ...extras
   });
   var createTaggedPreviewCaptureError = (code, message) => Object.assign(new Error(message), { code });
   var isTaggedPreviewCaptureError = (error) => error instanceof Error && (() => {
