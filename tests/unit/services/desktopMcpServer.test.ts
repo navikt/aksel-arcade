@@ -350,11 +350,24 @@ describe('desktopMcpServer', () => {
     })
   })
 
-  it('returns clear JSON-RPC errors for known and unknown resources and rejects unsupported resource fields', async () => {
+  it('reads the Desktop MCP guide and capabilities resources', async () => {
     const server = createManagedServer({ port: 0 })
     const state = await server.start()
 
-    const knownResourceResponse = await postJson(state.url, {
+    const toolsResponse = await postJson(state.url, {
+      jsonrpc: '2.0',
+      id: 80,
+      method: 'tools/list',
+    })
+    const toolsPayload = await toolsResponse.json()
+    const resourcesResponse = await postJson(state.url, {
+      jsonrpc: '2.0',
+      id: 81,
+      method: 'resources/list',
+    })
+    const resourcesPayload = await resourcesResponse.json()
+
+    const operatingGuideResponse = await postJson(state.url, {
       jsonrpc: '2.0',
       id: 8,
       method: 'resources/read',
@@ -365,20 +378,152 @@ describe('desktopMcpServer', () => {
         },
       },
     })
-    expect(knownResourceResponse.status).toBe(200)
-    await expect(knownResourceResponse.json()).resolves.toEqual({
+    expect(operatingGuideResponse.status).toBe(200)
+    const operatingGuidePayload = await operatingGuideResponse.json()
+    expect(operatingGuidePayload.result.contents).toEqual([
+      expect.objectContaining({
+        uri: 'arcade://desktop/operating-guide',
+        mimeType: 'text/markdown',
+      }),
+    ])
+    expect(operatingGuidePayload.result.contents[0].text).toContain(
+      'do not edit repository files, package metadata, or the local filesystem'
+    )
+    expect(operatingGuidePayload.result.contents[0].text).toContain(
+      'read `arcade://project/manifest`'
+    )
+    expect(operatingGuidePayload.result.contents[0].text).toContain(
+      '`capture_preview_evidence({ pageId })` is the normal autonomous inspection path'
+    )
+    expect(operatingGuidePayload.result.contents[0].text).toContain(
+      '`select_active_page` is for human-facing coordination'
+    )
+    expect(operatingGuidePayload.result.contents[0].text).toContain(
+      'still returns `not-yet-implemented`, treat the current build as read-only'
+    )
+
+    const authoringGuideResponse = await postJson(state.url, {
       jsonrpc: '2.0',
-      id: 8,
-      error: {
-        code: -32002,
-        message:
-          'Desktop Arcade MCP resource "arcade://desktop/operating-guide" is not implemented yet.',
-        data: {
-          code: 'not-yet-implemented',
-          resourceUri: 'arcade://desktop/operating-guide',
-        },
+      id: 82,
+      method: 'resources/read',
+      params: {
+        uri: 'arcade://desktop/authoring-guide',
       },
     })
+    expect(authoringGuideResponse.status).toBe(200)
+    const authoringGuidePayload = await authoringGuideResponse.json()
+    expect(authoringGuidePayload.result.contents).toEqual([
+      expect.objectContaining({
+        uri: 'arcade://desktop/authoring-guide',
+        mimeType: 'text/markdown',
+      }),
+    ])
+    expect(authoringGuidePayload.result.contents[0].text).toContain(
+      'Arcade source is import-free JSX and Hooks'
+    )
+    expect(authoringGuidePayload.result.contents[0].text).toContain('`Global config`')
+    expect(authoringGuidePayload.result.contents[0].text).toContain('{{pageRef:name}}')
+
+    const capabilitiesResponse = await postJson(state.url, {
+      jsonrpc: '2.0',
+      id: 83,
+      method: 'resources/read',
+      params: {
+        uri: 'arcade://desktop/capabilities',
+      },
+    })
+    expect(capabilitiesResponse.status).toBe(200)
+    const capabilitiesPayload = await capabilitiesResponse.json()
+    expect(capabilitiesPayload.result.contents).toEqual([
+      expect.objectContaining({
+        uri: 'arcade://desktop/capabilities',
+        mimeType: 'application/json',
+      }),
+    ])
+
+    const capabilities = JSON.parse(capabilitiesPayload.result.contents[0].text)
+    expect(capabilities).toMatchObject({
+      serverName: 'desktop-arcade',
+      serverVersion: '0.0.0',
+      endpoint: 'http://127.0.0.1:3846/mcp',
+      transport: 'HTTP (MCP Streamable HTTP)',
+      requiresAuth: false,
+      authDescription: 'No token/header required.',
+      captureLayers: ['screenshot', 'accessibility', 'dom_layout_style', 'frame'],
+      screenshotScopes: ['viewport', 'full_page', 'region'],
+      interactionActions: ['click', 'fill', 'select', 'press', 'scroll', 'waitFor'],
+      limits: {
+        requestBodyBytes: 1024 * 1024,
+      },
+    })
+    expect(capabilities.toolNames).toEqual(
+      toolsPayload.result.tools.map((tool: { name: string }) => tool.name)
+    )
+    expect(capabilities.stableResourceUris).toEqual(
+      resourcesPayload.result.resources.map((resource: { uri: string }) => resource.uri)
+    )
+    expect(capabilities.dynamicSourceUriTemplates).toEqual([
+      'arcade://project/source/global/jsx',
+      'arcade://project/source/global/hooks',
+      'arcade://project/source/pages/{pageId}/jsx',
+      'arcade://project/source/pages/{pageId}/hooks',
+    ])
+    expect(capabilities.previewEvidenceUriTemplates).toEqual([
+      'arcade://preview/captures/{captureId}/manifest',
+      'arcade://preview/captures/{captureId}/screenshot',
+      'arcade://preview/captures/{captureId}/frame',
+      'arcade://preview/captures/{captureId}/accessibility',
+      'arcade://preview/captures/{captureId}/dom-layout-style',
+    ])
+    expect(capabilities.captureLayerPurposes).toMatchObject({
+      screenshot: 'visual appearance and spatial gestalt',
+      accessibility:
+        'semantic roles, accessible names, landmarks, focusable controls, and semantic hierarchy',
+      dom_layout_style:
+        'actionable hierarchy, bounds, styles, spacing, colors, typography, and overflow',
+      frame: 'viewport, theme, page, scroll, diagnostics, truncation, and capture metadata',
+    })
+    expect(capabilities.implementationStatus).toMatchObject({
+      stableDesktopResourceReads: 'available',
+      projectResourceReads: 'available when an active project reader is connected',
+      toolExecution: {
+        capture_preview_evidence: 'not-yet-implemented',
+        apply_changes: 'not-yet-implemented',
+      },
+      captureLayers: {
+        screenshot: 'not-yet-implemented',
+        accessibility: 'not-yet-implemented',
+        dom_layout_style: 'not-yet-implemented',
+        frame: 'not-yet-implemented',
+      },
+      screenshotScopes: {
+        viewport: 'not-yet-implemented',
+        full_page: 'not-yet-implemented',
+        region: 'not-yet-implemented',
+      },
+      interactionActions: {
+        click: 'not-yet-implemented',
+        fill: 'not-yet-implemented',
+        select: 'not-yet-implemented',
+        press: 'not-yet-implemented',
+        scroll: 'not-yet-implemented',
+        waitFor: 'not-yet-implemented',
+      },
+    })
+    expect(capabilities.implementationStatus.previewEvidenceUriTemplates).toMatchObject({
+      'arcade://preview/captures/{captureId}/manifest': 'not-yet-implemented',
+      'arcade://preview/captures/{captureId}/screenshot': 'not-yet-implemented',
+      'arcade://preview/captures/{captureId}/frame': 'not-yet-implemented',
+      'arcade://preview/captures/{captureId}/accessibility': 'not-yet-implemented',
+      'arcade://preview/captures/{captureId}/dom-layout-style': 'not-yet-implemented',
+    })
+    expect(capabilities.v1Omissions).toContain('No prompts surface.')
+    expect(capabilities.contractNote).toContain('current implementation status')
+  })
+
+  it('returns clear JSON-RPC errors for unknown resources and rejects unsupported resource fields', async () => {
+    const server = createManagedServer({ port: 0 })
+    const state = await server.start()
 
     const unknownResourceResponse = await postJson(state.url, {
       jsonrpc: '2.0',

@@ -13,6 +13,50 @@ const VALID_VIEWPORT_SIZES = ['2XL', 'XL', 'LG', 'MD', 'SM', 'XS']
 const VALID_THEMES = ['light', 'dark']
 const VALID_PREVIEW_CAPTURE_LAYERS = ['screenshot', 'frame']
 const VALID_PREVIEW_SCREENSHOT_SCOPES = ['viewport', 'full_page', 'region']
+const CAPABILITY_PREVIEW_CAPTURE_LAYERS = [
+  'screenshot',
+  'accessibility',
+  'dom_layout_style',
+  'frame',
+]
+const CAPABILITY_PREVIEW_CAPTURE_LAYER_PURPOSES = Object.freeze({
+  screenshot: 'visual appearance and spatial gestalt',
+  accessibility:
+    'semantic roles, accessible names, landmarks, focusable controls, and semantic hierarchy',
+  dom_layout_style:
+    'actionable hierarchy, bounds, styles, spacing, colors, typography, and overflow',
+  frame: 'viewport, theme, page, scroll, diagnostics, truncation, and capture metadata',
+})
+const CAPABILITY_PREVIEW_INTERACTION_ACTIONS = [
+  'click',
+  'fill',
+  'select',
+  'press',
+  'scroll',
+  'waitFor',
+]
+const CAPABILITY_SOURCE_URI_TEMPLATES = Object.freeze([
+  'arcade://project/source/global/jsx',
+  'arcade://project/source/global/hooks',
+  'arcade://project/source/pages/{pageId}/jsx',
+  'arcade://project/source/pages/{pageId}/hooks',
+])
+const CAPABILITY_PREVIEW_EVIDENCE_URI_TEMPLATES = Object.freeze([
+  'arcade://preview/captures/{captureId}/manifest',
+  'arcade://preview/captures/{captureId}/screenshot',
+  'arcade://preview/captures/{captureId}/frame',
+  'arcade://preview/captures/{captureId}/accessibility',
+  'arcade://preview/captures/{captureId}/dom-layout-style',
+])
+const CAPABILITY_V1_OMISSIONS = Object.freeze([
+  'No prompts surface.',
+  'No SSE subscriptions or list-changed notifications.',
+  'No general filesystem, network, shell, or clipboard access.',
+  'No import, export, Share URL, or Arcade project package tools.',
+  'No arbitrary JavaScript execution.',
+  'No visual diff API.',
+  'No Web Arcade MCP endpoint.',
+])
 const PROJECT_SOURCE_PAGE_URI_PATTERN = /^arcade:\/\/project\/source\/pages\/(page\d+)\/(jsx|hooks)$/
 
 const MCP_TOOL_DEFINITIONS = Object.freeze([
@@ -154,6 +198,41 @@ const MCP_STABLE_RESOURCE_DEFINITIONS = Object.freeze([
     mimeType: 'application/json',
   }),
 ])
+
+const TOOL_EXECUTION_STATUS = Object.freeze(
+  MCP_TOOL_DEFINITIONS.reduce((status, toolDefinition) => {
+    status[toolDefinition.name] = 'not-yet-implemented'
+    return status
+  }, {})
+)
+
+const PREVIEW_EVIDENCE_URI_TEMPLATE_STATUS = Object.freeze(
+  CAPABILITY_PREVIEW_EVIDENCE_URI_TEMPLATES.reduce((status, uriTemplate) => {
+    status[uriTemplate] = 'not-yet-implemented'
+    return status
+  }, {})
+)
+
+const CAPTURE_LAYER_STATUS = Object.freeze(
+  CAPABILITY_PREVIEW_CAPTURE_LAYERS.reduce((status, layer) => {
+    status[layer] = 'not-yet-implemented'
+    return status
+  }, {})
+)
+
+const SCREENSHOT_SCOPE_STATUS = Object.freeze(
+  VALID_PREVIEW_SCREENSHOT_SCOPES.reduce((status, scope) => {
+    status[scope] = 'not-yet-implemented'
+    return status
+  }, {})
+)
+
+const INTERACTION_ACTION_STATUS = Object.freeze(
+  CAPABILITY_PREVIEW_INTERACTION_ACTIONS.reduce((status, action) => {
+    status[action] = 'not-yet-implemented'
+    return status
+  }, {})
+)
 
 const createDesktopMcpServer = ({
   host = DESKTOP_MCP_HOST,
@@ -711,6 +790,24 @@ const routeResourcesReadRequest = async (payload, response, readProjectResource)
     return
   }
 
+  const desktopResourceText = createDesktopStableResourceText(resourceDefinition.uri)
+  if (desktopResourceText !== null) {
+    sendJson(response, 200, {
+      jsonrpc: '2.0',
+      id: payload.id,
+      result: {
+        contents: [
+          {
+            uri: resourceDefinition.uri,
+            mimeType: resourceDefinition.mimeType,
+            text: desktopResourceText,
+          },
+        ],
+      },
+    })
+    return
+  }
+
   sendJsonRpcError(response, {
     id: payload.id,
     code: -32002,
@@ -967,6 +1064,72 @@ const createToolExecutionErrorResult = (toolName, code, message) => ({
     message,
   },
 })
+
+const createDesktopStableResourceText = (uri) => {
+  switch (uri) {
+    case 'arcade://desktop/operating-guide':
+      return [
+        '# Desktop Arcade MCP operating guide',
+        '',
+        '- Work through `arcade://` resources and MCP tools only; do not edit repository files, package metadata, or the local filesystem.',
+        '- Default loop: read this guide, read `arcade://project/manifest`, read the relevant source resources, use `apply_changes` for durable edits, read `arcade://project/diagnostics` unless the human asked for a different workflow, then capture Preview evidence when visual validation is needed.',
+        '- Durable project edits happen through `apply_changes`, not by patching files outside the active Arcade project.',
+        '- `capture_preview_evidence({ pageId })` is the normal autonomous inspection path for pages and targeted visual states.',
+        '- `select_active_page` is for human-facing coordination; it is not the routine inspection path.',
+        '- Saved Preview preferences live in `arcade://project/preview-context`; capture-only overrides must not mutate them.',
+        '- If `apply_changes` or `capture_preview_evidence` still returns `not-yet-implemented`, treat the current build as read-only and stop after discovery instead of falling back to repository or filesystem edits.',
+        '- When state is unclear, re-read the manifest before making another durable change.',
+      ].join('\n')
+    case 'arcade://desktop/authoring-guide':
+      return [
+        '# Desktop Arcade MCP authoring guide',
+        '',
+        '- Arcade source is import-free JSX and Hooks for the active Arcade project.',
+        '- Prefer Aksel-valid Arcade JSX: current Aksel components, layout primitives, icons, and `--ax` design tokens before native HTML or custom CSS fallbacks.',
+        '- `Global config` is shared code in scope for every Arcade page; it is not a renderable page.',
+        '- Durable page navigation targets stable page ids, not page names.',
+        '- Use `{{pageRef:name}}` placeholders only inside `apply_changes` batches that create or relink pages; durable source must end with permanent page ids.',
+        '- Diagnostics plus Preview evidence are the feedback loop after source changes.',
+        '- Keep the output context-light: no broad Aksel training, package edits, or repository/file edits.',
+      ].join('\n')
+    case 'arcade://desktop/capabilities':
+      return JSON.stringify({
+        serverName: DESKTOP_MCP_SERVER_NAME,
+        serverVersion: DESKTOP_MCP_SERVER_VERSION,
+        endpoint: `http://${DESKTOP_MCP_HOST}:${DESKTOP_MCP_PORT}${DESKTOP_MCP_PATH}`,
+        transport: DESKTOP_MCP_TRANSPORT_LABEL,
+        requiresAuth: false,
+        authDescription: DESKTOP_MCP_AUTH_DESCRIPTION,
+        contractNote:
+          'This resource lists the stable v1 MCP contract and the current implementation status for each published tool and preview surface.',
+        toolNames: MCP_TOOL_DEFINITIONS.map((toolDefinition) => toolDefinition.name),
+        stableResourceUris: MCP_STABLE_RESOURCE_DEFINITIONS.map(
+          (resourceDefinition) => resourceDefinition.uri
+        ),
+        dynamicSourceUriTemplates: CAPABILITY_SOURCE_URI_TEMPLATES,
+        previewEvidenceUriTemplates: CAPABILITY_PREVIEW_EVIDENCE_URI_TEMPLATES,
+        captureLayers: CAPABILITY_PREVIEW_CAPTURE_LAYERS,
+        captureLayerPurposes: CAPABILITY_PREVIEW_CAPTURE_LAYER_PURPOSES,
+        screenshotScopes: VALID_PREVIEW_SCREENSHOT_SCOPES,
+        interactionActions: CAPABILITY_PREVIEW_INTERACTION_ACTIONS,
+        limits: {
+          requestBodyBytes: MAX_MCP_BODY_BYTES,
+        },
+        implementationStatus: {
+          stableDesktopResourceReads: 'available',
+          projectResourceReads: 'available when an active project reader is connected',
+          toolExecution: TOOL_EXECUTION_STATUS,
+          previewEvidenceUriTemplates: PREVIEW_EVIDENCE_URI_TEMPLATE_STATUS,
+          captureLayers: CAPTURE_LAYER_STATUS,
+          screenshotScopes: SCREENSHOT_SCOPE_STATUS,
+          interactionActions: INTERACTION_ACTION_STATUS,
+        },
+        v1Omissions: CAPABILITY_V1_OMISSIONS,
+      })
+    default:
+      return null
+  }
+}
 
 const createProjectUnavailableResourceResult = async ({ uri }) => ({
   ok: false,
