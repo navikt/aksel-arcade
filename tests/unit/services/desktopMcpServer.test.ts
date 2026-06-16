@@ -261,6 +261,12 @@ describe('desktopMcpServer', () => {
       result: {
         tools: [
           {
+            name: 'read_resource',
+            inputSchema: {
+              additionalProperties: false,
+            },
+          },
+          {
             name: 'capture_preview_evidence',
             inputSchema: {
               additionalProperties: false,
@@ -562,9 +568,40 @@ describe('desktopMcpServer', () => {
       },
     })
 
-    const manifestResponse = await postJson(state.url, {
+    const toolReadResponse = await postJson(state.url, {
       jsonrpc: '2.0',
       id: 62,
+      method: 'tools/call',
+      params: {
+        name: 'read_resource',
+        arguments: {
+          uri: 'arcade://preview/captures/capture-demo/accessibility',
+        },
+      },
+    })
+    expect(toolReadResponse.status).toBe(200)
+    await expect(toolReadResponse.json()).resolves.toEqual({
+      jsonrpc: '2.0',
+      id: 62,
+      result: {
+        content: [
+          {
+            type: 'text',
+            text: 'Read Desktop Arcade MCP resource arcade://preview/captures/capture-demo/accessibility (application/json).',
+          },
+        ],
+        structuredContent: {
+          ok: true,
+          uri: 'arcade://preview/captures/capture-demo/accessibility',
+          mimeType: 'application/json',
+          text: '{"rootSelector":"#root","nodeCount":2,"truncated":false,"nodes":[{"role":"heading","name":"Details","level":1}]}',
+        },
+      },
+    })
+
+    const manifestResponse = await postJson(state.url, {
+      jsonrpc: '2.0',
+      id: 63,
       method: 'resources/read',
       params: {
         uri: 'arcade://preview/captures/capture-demo/manifest',
@@ -573,7 +610,7 @@ describe('desktopMcpServer', () => {
     expect(manifestResponse.status).toBe(200)
     await expect(manifestResponse.json()).resolves.toEqual({
       jsonrpc: '2.0',
-      id: 62,
+      id: 63,
       result: {
         contents: [
           {
@@ -587,7 +624,7 @@ describe('desktopMcpServer', () => {
 
     const screenshotResponse = await postJson(state.url, {
       jsonrpc: '2.0',
-      id: 63,
+      id: 64,
       method: 'resources/read',
       params: {
         uri: 'arcade://preview/captures/capture-demo/screenshot',
@@ -596,7 +633,7 @@ describe('desktopMcpServer', () => {
     expect(screenshotResponse.status).toBe(200)
     await expect(screenshotResponse.json()).resolves.toEqual({
       jsonrpc: '2.0',
-      id: 63,
+      id: 64,
       result: {
         contents: [
           {
@@ -610,7 +647,7 @@ describe('desktopMcpServer', () => {
 
     const accessibilityResponse = await postJson(state.url, {
       jsonrpc: '2.0',
-      id: 64,
+      id: 65,
       method: 'resources/read',
       params: {
         uri: 'arcade://preview/captures/capture-demo/accessibility',
@@ -619,7 +656,7 @@ describe('desktopMcpServer', () => {
     expect(accessibilityResponse.status).toBe(200)
     await expect(accessibilityResponse.json()).resolves.toEqual({
       jsonrpc: '2.0',
-      id: 64,
+      id: 65,
       result: {
         contents: [
           {
@@ -633,7 +670,7 @@ describe('desktopMcpServer', () => {
 
     const domLayoutStyleResponse = await postJson(state.url, {
       jsonrpc: '2.0',
-      id: 65,
+      id: 66,
       method: 'resources/read',
       params: {
         uri: 'arcade://preview/captures/capture-demo/dom-layout-style',
@@ -642,7 +679,7 @@ describe('desktopMcpServer', () => {
     expect(domLayoutStyleResponse.status).toBe(200)
     await expect(domLayoutStyleResponse.json()).resolves.toEqual({
       jsonrpc: '2.0',
-      id: 65,
+      id: 66,
       result: {
         contents: [
           {
@@ -657,7 +694,7 @@ describe('desktopMcpServer', () => {
     await new Promise((resolve) => setTimeout(resolve, 75))
     const expiredResponse = await postJson(state.url, {
       jsonrpc: '2.0',
-      id: 66,
+      id: 67,
       method: 'resources/read',
       params: {
         uri: 'arcade://preview/captures/capture-demo/screenshot',
@@ -666,7 +703,7 @@ describe('desktopMcpServer', () => {
     expect(expiredResponse.status).toBe(200)
     await expect(expiredResponse.json()).resolves.toEqual({
       jsonrpc: '2.0',
-      id: 66,
+      id: 67,
       error: {
         code: -32002,
         message:
@@ -953,6 +990,9 @@ describe('desktopMcpServer', () => {
       '`capture_preview_evidence({ pageId })` is the normal autonomous inspection path'
     )
     expect(operatingGuidePayload.result.contents[0].text).toContain(
+      'use `read_resource({ uri })` as a compatibility bridge'
+    )
+    expect(operatingGuidePayload.result.contents[0].text).toContain(
       'If `apply_changes` returns `project-unavailable`, wait for an active Desktop Arcade window'
     )
     expect(operatingGuidePayload.result.contents[0].text).toContain(
@@ -1057,6 +1097,7 @@ describe('desktopMcpServer', () => {
       stableDesktopResourceReads: 'available',
       projectResourceReads: 'available when an active project reader is connected',
       toolExecution: {
+        read_resource: 'available',
         capture_preview_evidence:
           'available when an active preview capture bridge is connected',
         apply_changes: 'available when an active project writer is connected',

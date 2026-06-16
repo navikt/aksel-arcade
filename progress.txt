@@ -3452,3 +3452,24 @@ Verification:
 Next note:
 
 - `#278` can now treat `capture_preview_evidence` as a full four-layer inspection primitive. Reuse the new `accessibility` and `dom_layout_style` resources instead of inventing parallel interaction-inspection payloads, and keep `public/preview-evidence-global.js` regenerated whenever `src/services/previewEvidence.ts` changes.
+
+### 2026-06-16 - PR #288 follow-up: add tool-level MCP resource reads
+
+Fixed after manual MCP verification:
+
+- Reproduced a host-compatibility gap after `#276`: `capture_preview_evidence` succeeded and returned `arcade://preview/captures/...` URIs, but some agent-facing MCP hosts expose only `tools/call` and not raw `resources/read`, so the returned evidence resources could not actually be inspected from that environment.
+- Added a new Desktop Arcade MCP tool, `read_resource({ uri })`, in `desktop/mcpServer.cjs`. It reuses the same underlying resource-read path as raw `resources/read`, so tool-only hosts can now fetch Preview capture resources, project resources, and stable desktop resources without widening the surface beyond existing `arcade://...` contracts.
+- Kept the existing raw `resources/read` behavior unchanged while centralizing the shared read logic, updated capability/operating-guide output to advertise the compatibility bridge, and added unit coverage that exercises the new tool against Preview capture resources.
+- Updated `tests/e2e/desktop-mcp-preview-capture.spec.ts` to verify the real Electron/Desktop MCP flow through `capture_preview_evidence` plus `read_resource`, which matches the failing agent-facing usage more closely than direct `resources/read`.
+
+Verification:
+
+- CI=1 npm run test -- --run tests/unit/services/desktopMcpServer.test.ts
+- npm run test:e2e -- tests/e2e/desktop-mcp-preview-capture.spec.ts --reporter=line
+- npm run typecheck
+- npm run lint
+- CI=1 npm run test -- --run
+
+Next note:
+
+- Keep `read_resource` as the compatibility path for MCP hosts that cannot issue raw `resources/read` requests. If a later issue changes Preview capture manifests or adds new `arcade://preview/captures/{captureId}/*` resources, make sure both the raw resource path and the tool-only bridge stay in sync.
