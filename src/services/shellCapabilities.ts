@@ -25,6 +25,7 @@ export interface ShellCapabilities {
 
 export interface DesktopArcadePreloadApi {
   getShellCapabilities: () => Promise<unknown>
+  getDesktopMcpServerState?: () => Promise<unknown>
   startAgentTransportSession?: (
     session: DesktopAgentTransportSession
   ) => Promise<DesktopAgentTransportEndpoint>
@@ -84,12 +85,13 @@ export const getDesktopPreloadApi = (): DesktopArcadePreloadApi | undefined => {
   if (
     !isRecord(api) ||
     typeof api.getShellCapabilities !== 'function' ||
+    !hasOptionalFunction(api, 'getDesktopMcpServerState') ||
     !hasOptionalFunction(api, 'startAgentTransportSession') ||
     !hasOptionalFunction(api, 'stopAgentTransportSession') ||
     !hasOptionalFunction(api, 'setAgentTransportRequestHandler')
   ) {
     throw new Error(
-      'Invalid Desktop Arcade preload API. Expected narrow shell capability and Agent transport IPC bridges.'
+      'Invalid Desktop Arcade preload API. Expected narrow shell capability and desktop shell IPC bridges.'
     )
   }
 
