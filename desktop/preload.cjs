@@ -1,6 +1,7 @@
 const { contextBridge, ipcRenderer } = require('electron')
 
 const SHELL_CAPABILITIES_CHANNEL = 'aksel-arcade:get-shell-capabilities'
+const GET_DESKTOP_MCP_SERVER_STATE_CHANNEL = 'aksel-arcade:get-desktop-mcp-server-state'
 const START_AGENT_TRANSPORT_CHANNEL = 'aksel-arcade:start-agent-transport-session'
 const STOP_AGENT_TRANSPORT_CHANNEL = 'aksel-arcade:stop-agent-transport-session'
 const ROUTE_AGENT_TRANSPORT_REQUEST_CHANNEL = 'aksel-arcade:route-agent-transport-request'
@@ -72,6 +73,7 @@ contextBridge.exposeInMainWorld(
   '__AKSEL_ARCADE_DESKTOP__',
   Object.freeze({
     getShellCapabilities: () => ipcRenderer.invoke(SHELL_CAPABILITIES_CHANNEL),
+    getDesktopMcpServerState: () => ipcRenderer.invoke(GET_DESKTOP_MCP_SERVER_STATE_CHANNEL),
     startAgentTransportSession: (session) =>
       ipcRenderer.invoke(START_AGENT_TRANSPORT_CHANNEL, session),
     stopAgentTransportSession: (sessionId, reason) =>

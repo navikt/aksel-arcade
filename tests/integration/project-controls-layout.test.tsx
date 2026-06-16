@@ -1082,7 +1082,7 @@ describe('ProjectControls layout', () => {
     expect(screen.queryByText('Experiments')).toBeNull()
     expect(screen.queryByRole('menuitemcheckbox', { name: /multiple pages/i })).toBeNull()
     expect(screen.queryByRole('menuitem', { name: /multiple pages/i })).toBeNull()
-    expect(screen.getAllByRole('separator')).toHaveLength(2)
+    expect(screen.getAllByRole('separator')).toHaveLength(3)
   })
 
   it('revokes active Agent access when loading a shared project snapshot', async () => {

@@ -2,8 +2,10 @@ const { app, BrowserWindow, ipcMain, net, protocol } = require('electron')
 const path = require('node:path')
 const { pathToFileURL } = require('node:url')
 const { createAgentLoopbackJsonRpcTransport } = require('./agentLoopbackTransport.cjs')
+const { createDesktopMcpServer } = require('./mcpServer.cjs')
 
 const SHELL_CAPABILITIES_CHANNEL = 'aksel-arcade:get-shell-capabilities'
+const GET_DESKTOP_MCP_SERVER_STATE_CHANNEL = 'aksel-arcade:get-desktop-mcp-server-state'
 const START_AGENT_TRANSPORT_CHANNEL = 'aksel-arcade:start-agent-transport-session'
 const STOP_AGENT_TRANSPORT_CHANNEL = 'aksel-arcade:stop-agent-transport-session'
 const ROUTE_AGENT_TRANSPORT_REQUEST_CHANNEL = 'aksel-arcade:route-agent-transport-request'
@@ -18,6 +20,7 @@ const AGENT_TRANSPORT_ROUTE_TIMEOUT_MS = 5000
 const agentLoopbackTransport = createAgentLoopbackJsonRpcTransport({
   routeRequest: routeAgentTransportRequest,
 })
+const desktopMcpServer = createDesktopMcpServer()
 let activeMainWindow = null
 let nextAgentTransportRouteRequestId = 0
 const pendingAgentTransportRouteRequests = new Map()
@@ -60,6 +63,7 @@ const cloneDesktopCapabilities = () => ({
 
 const registerDesktopIpc = () => {
   ipcMain.handle(SHELL_CAPABILITIES_CHANNEL, () => cloneDesktopCapabilities())
+  ipcMain.handle(GET_DESKTOP_MCP_SERVER_STATE_CHANNEL, () => desktopMcpServer.getState())
   ipcMain.handle(START_AGENT_TRANSPORT_CHANNEL, (_event, payload) =>
     agentLoopbackTransport.startSession(parseTransportSessionPayload(payload))
   )
@@ -72,6 +76,7 @@ const registerDesktopIpc = () => {
 
 const removeDesktopIpc = () => {
   ipcMain.removeHandler(SHELL_CAPABILITIES_CHANNEL)
+  ipcMain.removeHandler(GET_DESKTOP_MCP_SERVER_STATE_CHANNEL)
   ipcMain.removeHandler(START_AGENT_TRANSPORT_CHANNEL)
   ipcMain.removeHandler(STOP_AGENT_TRANSPORT_CHANNEL)
   ipcMain.off(ROUTE_AGENT_TRANSPORT_RESPONSE_CHANNEL, handleAgentTransportRouteResponse)
@@ -354,6 +359,7 @@ const createWindow = async () => {
 app
   .whenReady()
   .then(async () => {
+    await desktopMcpServer.start()
     registerDesktopIpc()
     registerDesktopRendererProtocol()
     await createWindow()
@@ -376,6 +382,7 @@ app.on('window-all-closed', () => {
 })
 
 app.on('will-quit', () => {
+  void desktopMcpServer.stop()
   void agentLoopbackTransport.stopSession()
   resolvePendingAgentTransportRouteRequests((id) =>
     createAgentTransportRouteErrorResponse(

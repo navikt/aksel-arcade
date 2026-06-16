@@ -28,6 +28,8 @@ import { SharePopoverButton } from '@/components/Share/SharePopoverButton'
 import { useSettings } from '@/contexts/SettingsContext'
 import type { Project } from '@/types/project'
 import type { SaveStatus } from '@/hooks/useAutoSave'
+import { DesktopMcpSettingsGroup } from './DesktopMcpSettingsGroup'
+import type { DesktopMcpServerState } from '@/services/desktopMcp'
 import {
   ARCADE_PROJECT_IMPORT_ACCEPT,
   exportProject,
@@ -70,6 +72,7 @@ interface AppHeaderProps {
   onLoadHooksDemo: () => void
   shareOptions?: UseShareLinkOptions
   shellCapabilities?: ShellCapabilities
+  desktopMcpServerState?: DesktopMcpServerState | null
 }
 
 export const AppHeader = ({
@@ -84,6 +87,7 @@ export const AppHeader = ({
   onLoadHooksDemo,
   shareOptions,
   shellCapabilities = WEB_ARCADE_CAPABILITIES,
+  desktopMcpServerState = null,
 }: AppHeaderProps) => {
   const MAX_PROJECT_SIZE = 5 * 1024 * 1024 // 5MB
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -337,6 +341,12 @@ export const AppHeader = ({
                   Switch to {theme === 'dark' ? 'light' : 'dark'} theme
                 </ActionMenu.Item>
               </ActionMenu.Group>
+              {shellCapabilities.surface === 'desktop' && (
+                <>
+                  <ActionMenu.Divider />
+                  <DesktopMcpSettingsGroup mcpState={desktopMcpServerState} />
+                </>
+              )}
               <ActionMenu.Divider />
               <ActionMenu.Group label="Templates">
                 <ActionMenu.Item onSelect={onLoadFormSummaryTemplate}>

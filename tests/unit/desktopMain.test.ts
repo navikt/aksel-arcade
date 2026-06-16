@@ -71,6 +71,18 @@ const runDesktopMain = async ({ isPackaged, env = {} }: RunDesktopMainOptions) =
     startSession: vi.fn(),
     stopSession: vi.fn(() => Promise.resolve()),
   }
+  const desktopMcpServer = {
+    getState: vi.fn(() => ({
+      serverName: 'desktop-arcade',
+      transportLabel: 'HTTP (MCP Streamable HTTP)',
+      url: 'http://127.0.0.1:3846/mcp',
+      requiresAuth: false,
+      authDescription: 'No token/header required.',
+      availability: { status: 'available' },
+    })),
+    start: vi.fn(() => Promise.resolve()),
+    stop: vi.fn(() => Promise.resolve(true)),
+  }
   const processMock = {
     env: { ...process.env, ...env },
     platform: process.platform,
@@ -88,6 +100,11 @@ const runDesktopMain = async ({ isPackaged, env = {} }: RunDesktopMainOptions) =
         if (request === './agentLoopbackTransport.cjs') {
           return {
             createAgentLoopbackJsonRpcTransport: () => agentLoopbackTransport,
+          }
+        }
+        if (request === './mcpServer.cjs') {
+          return {
+            createDesktopMcpServer: () => desktopMcpServer,
           }
         }
         return require(request)

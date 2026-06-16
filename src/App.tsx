@@ -10,15 +10,20 @@ import { WarningNotification } from './components/Header/WarningNotification'
 import { SplitPane } from './components/Layout/SplitPane'
 import { validateProjectSize } from './services/storage'
 import type { Project } from './types/project'
+import type { DesktopMcpServerState } from './services/desktopMcp'
 import { WEB_ARCADE_CAPABILITIES, type ShellCapabilities } from './services/shellCapabilities'
 import { useSettings } from './contexts/SettingsContext'
 import './App.css'
 
 interface AppProps {
   shellCapabilities?: ShellCapabilities
+  desktopMcpServerState?: DesktopMcpServerState | null
 }
 
-function App({ shellCapabilities = WEB_ARCADE_CAPABILITIES }: AppProps) {
+function App({
+  shellCapabilities = WEB_ARCADE_CAPABILITIES,
+  desktopMcpServerState = null,
+}: AppProps) {
   const context = useContext(AppContext)
   if (!context) throw new Error('App must be used within AppProvider')
 
@@ -151,6 +156,7 @@ function App({ shellCapabilities = WEB_ARCADE_CAPABILITIES }: AppProps) {
             onLoadFormSummaryTemplate={loadFormSummaryTemplate}
             onLoadHooksDemo={loadHooksDemo}
             shellCapabilities={shellCapabilities}
+            desktopMcpServerState={desktopMcpServerState}
           />
         </div>
 

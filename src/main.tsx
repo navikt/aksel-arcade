@@ -2,6 +2,7 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { AppProvider } from './hooks/useProject.tsx'
 import { SettingsProvider } from './contexts/SettingsContext'
+import { readDesktopMcpServerState, type DesktopMcpServerState } from './services/desktopMcp'
 import {
   resolveInitialShellCapabilities,
   type ShellCapabilities,
@@ -17,12 +18,21 @@ if (!rootElement) {
 
 const root = createRoot(rootElement)
 
-const renderApp = (shellCapabilities: ShellCapabilities) => {
+const renderApp = ({
+  shellCapabilities,
+  desktopMcpServerState,
+}: {
+  shellCapabilities: ShellCapabilities
+  desktopMcpServerState: DesktopMcpServerState | null
+}) => {
   root.render(
     <StrictMode>
       <SettingsProvider>
         <AppProvider>
-          <App shellCapabilities={shellCapabilities} />
+          <App
+            shellCapabilities={shellCapabilities}
+            desktopMcpServerState={desktopMcpServerState}
+          />
         </AppProvider>
       </SettingsProvider>
     </StrictMode>
@@ -38,4 +48,11 @@ const renderBootstrapError = (error: unknown) => {
   )
 }
 
-void resolveInitialShellCapabilities().then(renderApp, renderBootstrapError)
+void Promise.all([resolveInitialShellCapabilities(), readDesktopMcpServerState()]).then(
+  ([shellCapabilities, desktopMcpServerState]) =>
+    renderApp({
+      shellCapabilities,
+      desktopMcpServerState,
+    }),
+  renderBootstrapError
+)
