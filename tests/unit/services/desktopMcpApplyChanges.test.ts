@@ -436,6 +436,44 @@ describe('desktopMcpApplyChanges', () => {
     })
   })
 
+  it('rejects page-ref placeholders that target a temp-ref page deleted earlier in the batch', () => {
+    const result = prepareDesktopMcpApplyChanges(
+      {
+        summary: 'Delete a temp-ref page before linking to it',
+        operations: [
+          {
+            type: 'create_page',
+            newPageRef: 'landing',
+          },
+          {
+            type: 'delete_page',
+            tempPageRef: 'landing',
+          },
+          {
+            type: 'replace_source',
+            resourceUri: createDesktopMcpProjectPageSourceUri('page01', 'jsx'),
+            content:
+              'export default function PageOne() {\n  return <a href="{{pageRef:landing}}">Broken</a>\n}',
+          },
+        ],
+      },
+      {
+        project: createProject({ includeSecondPage: true, startPageId: 'page02', activePageId: 'page02' }),
+        theme: 'dark',
+        diagnostics: createDiagnostics(),
+      },
+      FIXED_TIMESTAMP
+    )
+
+    expect(result).toEqual({
+      ok: false,
+      code: 'invalid-operation-target',
+      message:
+        'apply_changes replace_source operation 2 content contains {{pageRef:landing}} placeholder, but Arcade page "page03" is no longer available at that step.',
+      manifestResourceUri: DESKTOP_MCP_PROJECT_MANIFEST_URI,
+    })
+  })
+
   it('requires an explicit start-page replacement when deleting the current start page', () => {
     const result = prepareDesktopMcpApplyChanges(
       {

@@ -3416,3 +3416,16 @@ Verification:
 Next note:
 
 - `#278` should reuse the new `#277` temp-ref workflow exactly as-is: agents can now create/link pages durably through `apply_changes`, so Preview interaction work should keep page inspection on `capture_preview_evidence({ pageId })` and treat `select_active_page` as human-visible coordination only.
+
+### 2026-06-16 - PR #287 review follow-up for issue #277
+
+Fixed after review:
+
+- Closed a temp-ref lifecycle hole in `src/services/desktopMcpApplyChanges.ts`: `{{pageRef:name}}` rewriting now verifies that an earlier temp-ref page still exists at the current batch step before substituting its permanent page id, so batches can no longer create a page, delete it, and then persist a stale page reference to that deleted page later in the same `apply_changes` request.
+- Added focused regression coverage in `tests/unit/services/desktopMcpApplyChanges.test.ts` for the create -> delete -> replace_source sequence, asserting the batch fails with `invalid-operation-target` instead of writing a stale durable link.
+
+Verification:
+
+- npm run typecheck
+- npm run lint
+- CI=1 npm run test -- --run

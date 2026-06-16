@@ -118,6 +118,7 @@ export const prepareDesktopMcpApplyChanges = (
           content: operation.content,
           contextLabel: `apply_changes replace_source operation ${index} content`,
           currentIndex: index,
+          project: nextProject,
           plannedCreatedPages: plannedCreatedPages.value,
         })
         if (!rewrittenContent.ok) {
@@ -159,6 +160,7 @@ export const prepareDesktopMcpApplyChanges = (
           content: operation.jsxCode ?? '',
           contextLabel: `apply_changes create_page operation ${index} jsxCode`,
           currentIndex: index,
+          project: nextProject,
           plannedCreatedPages: plannedCreatedPages.value,
         })
         if (!rewrittenJsx.ok) {
@@ -169,6 +171,7 @@ export const prepareDesktopMcpApplyChanges = (
           content: operation.hooksCode ?? '',
           contextLabel: `apply_changes create_page operation ${index} hooksCode`,
           currentIndex: index,
+          project: nextProject,
           plannedCreatedPages: plannedCreatedPages.value,
         })
         if (!rewrittenHooks.ok) {
@@ -666,11 +669,13 @@ const rewritePageRefPlaceholders = ({
   content,
   contextLabel,
   currentIndex,
+  project,
   plannedCreatedPages,
 }: {
   content: string
   contextLabel: string
   currentIndex: number
+  project: Project
   plannedCreatedPages: PlannedCreatedPages
 }):
   | {
@@ -713,6 +718,17 @@ const rewritePageRefPlaceholders = ({
       failure = createApplyChangesFailure(
         'invalid-operation-target',
         `${contextLabel} contains ${fullMatch} before create_page declares "${normalizedTempPageRef.value}". Move the create_page earlier in the batch.`,
+        {
+          manifestResourceUri: DESKTOP_MCP_PROJECT_MANIFEST_URI,
+        }
+      )
+      return fullMatch
+    }
+
+    if (plannedPage.index !== currentIndex && !getPageById(project.source, plannedPage.pageId)) {
+      failure = createApplyChangesFailure(
+        'invalid-operation-target',
+        `${contextLabel} contains ${fullMatch} placeholder, but Arcade page "${plannedPage.pageId}" is no longer available at that step.`,
         {
           manifestResourceUri: DESKTOP_MCP_PROJECT_MANIFEST_URI,
         }
