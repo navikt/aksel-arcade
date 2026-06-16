@@ -95,7 +95,7 @@ describe('Desktop Arcade MCP settings', () => {
     expect(screen.getByText('No token/header required.')).toBeTruthy()
     expect(screen.getByText('Last activity: No MCP activity yet.')).toBeTruthy()
     expect(await screen.findByRole('menuitem', { name: /copy server name/i })).toBeTruthy()
-    expect(await screen.findByRole('menuitem', { name: /copy type/i })).toBeTruthy()
+    expect(await screen.findByRole('menuitem', { name: /copy transport type/i })).toBeTruthy()
     expect(await screen.findByRole('menuitem', { name: /copy mcp url/i })).toBeTruthy()
   })
 
@@ -146,7 +146,7 @@ describe('Desktop Arcade MCP settings', () => {
     expect(screen.queryByText('URL: http://127.0.0.1:3846/mcp')).toBeNull()
     expect(screen.queryByText('No token/header required.')).toBeNull()
     expect(screen.queryByRole('menuitem', { name: /copy server name/i })).toBeNull()
-    expect(screen.queryByRole('menuitem', { name: /copy type/i })).toBeNull()
+    expect(screen.queryByRole('menuitem', { name: /copy transport type/i })).toBeNull()
     expect(screen.queryByRole('menuitem', { name: /copy mcp url/i })).toBeNull()
   })
 

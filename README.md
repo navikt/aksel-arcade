@@ -211,6 +211,35 @@ npm run desktop:dev
 
 The desktop script starts Vite on the first available `127.0.0.1` port from `5173` and opens an Electron shell around that exact renderer. Desktop capabilities are supplied only through a narrow preload IPC bridge, so React components stay browser-like: the Electron shell receives the Desktop Arcade capability set without direct Node, socket, process, or filesystem access. The same renderer URL opened in a normal browser remains Web Arcade with Share URL available and no Agent access, Agent runtime, browser-global Agent bridge, or Agent pairing handoff.
 
+### Desktop Arcade MCP v1 setup and smoke checklist
+
+Desktop Arcade exposes a local MCP server only in the desktop shell. Web Arcade does **not** expose an MCP endpoint.
+
+| Setting | Value |
+| --- | --- |
+| Server name | `desktop-arcade` |
+| Type | `HTTP (MCP Streamable HTTP)` |
+| URL | `http://127.0.0.1:3846/mcp` |
+| Auth | No token/header required. |
+
+Desktop MCP v1 publishes exactly two tools — `capture_preview_evidence` and `apply_changes` — plus `arcade://desktop/*`, `arcade://project/*`, and capture-produced `arcade://preview/captures/*` resources. Read those resources through MCP `resources/list` and `resources/read`; Arcade source is virtual `arcade://...` content, not repository or filesystem files.
+
+For the full smoke checklist, use an MCP client that exposes `resources/list` and `resources/read` (or an equivalent resource inspector). Tool-only MCP hosts can still exercise the two listed v1 tools, but the published discovery surface cannot complete the stable-resource, diagnostics, or evidence-resource read steps without those resource methods.
+
+1. Start Desktop Arcade with a multi-page Arcade project.
+2. Add the MCP server to your client with the exact settings above.
+3. Verify `tools/list` returns only `capture_preview_evidence` and `apply_changes`.
+4. Verify `resources/list` and `resources/read` can read `arcade://desktop/operating-guide`, `arcade://desktop/authoring-guide`, `arcade://desktop/capabilities`, `arcade://project/manifest`, `arcade://project/preview-context`, and `arcade://project/diagnostics`.
+5. Read `arcade://project/manifest`, follow the source resource URIs it returns, and confirm the source matches the open Arcade project.
+6. Run `apply_changes` with one batch that updates existing source and creates/links a page by using `create_page.newPageRef`, later `tempPageRef` targets, and `{{pageRef:name}}` placeholders.
+7. Unless the user asked for a different workflow, read `arcade://project/diagnostics` after the batch, then confirm the visible Desktop preview reflects the durable change.
+8. Call `capture_preview_evidence({ pageId })` for the new page, then read the returned `manifest`, `screenshot`, `accessibility`, `dom-layout-style`, and `frame` resources.
+9. Verify capturing a non-active page does not change the visible Active page unless `select_active_page` was used intentionally.
+10. Open Desktop Settings and verify MCP availability plus safe last-activity metadata only.
+11. Open the same renderer in a normal browser and verify Web Arcade shows no Desktop MCP settings section and no Web MCP endpoint.
+
+Desktop MCP v1 intentionally omits prompts, SSE/subscriptions, general filesystem/network/shell/clipboard access, import/export/share/package tools, arbitrary JavaScript execution, visual diffing, and any Web Arcade MCP endpoint.
+
 ### Local unsigned Desktop packaging
 
 Use `npm run desktop:build` to create Desktop Arcade renderer output in `dist-desktop` with relative asset URLs, separate from the Web Arcade GitHub Pages build in `dist`. Use `AKSEL_ARCADE_DESKTOP_VERSION=0.1.0 npm run desktop:package` to build the configured unsigned local installers into `release/desktop` without publishing:

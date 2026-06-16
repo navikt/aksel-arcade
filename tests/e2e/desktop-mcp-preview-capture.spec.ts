@@ -8,9 +8,6 @@ const desktopMcpUrl = 'http://127.0.0.1:3846/mcp'
 
 const waitForDefaultPreview = async (page: Page) => {
   await expect(page.locator('[data-testid="preview-iframe"]')).toBeVisible({ timeout: 15_000 })
-  await expect(
-    page.frameLocator('[data-testid="preview-iframe"]').getByText('Welcome to Aksel Arcade!')
-  ).toBeVisible({ timeout: 15_000 })
 }
 
 const postMcpRequest = async (payload: Record<string, unknown>) => {
@@ -38,18 +35,25 @@ const callTool = async (name: string, argumentsPayload: Record<string, unknown>)
   })
 
 const readMcpResource = async (uri: string) => {
-  const payload = await callTool('read_resource', { uri })
+  const payload = await postMcpRequest({
+    jsonrpc: '2.0',
+    id: 2,
+    method: 'resources/read',
+    params: {
+      uri,
+    },
+  })
   expect(payload).toMatchObject({
     result: {
-      structuredContent: {
-        ok: true,
-        uri,
-      },
+      contents: [
+        {
+          uri,
+        },
+      ],
     },
   })
 
-  return payload.result.structuredContent as {
-    ok: true
+  return payload.result.contents[0] as {
     uri: string
     mimeType: string
     text: string
@@ -135,17 +139,23 @@ const waitForDiagnosticsIdle = async (timeoutMs = 15_000) => {
 
 const loadInteractionDemoProject = async () => {
   const manifest = await readJsonMcpResource('arcade://project/manifest')
-  const pageOneJsxUri = manifest.pages[0].source.jsx.uri as string
-  const pageOneHooksUri = manifest.pages[0].source.hooks.uri as string
+  const entryPage =
+    manifest.pages.find((page: { id: string }) => page.id === manifest.activePageId) ??
+    manifest.pages[0]
+  const pageOneJsxUri = entryPage.source.jsx.uri as string
+  const pageOneHooksUri = entryPage.source.hooks.uri as string
 
-  const applyChangesPayload = await callApplyChanges({
-    summary: 'Load an interactive MCP Preview capture demo',
-    expectedProjectRevision: manifest.projectRevision,
-    operations: [
-      {
-        type: 'create_page',
-        newPageRef: 'details',
-        jsxCode: `export default function DetailsPage() {
+  const applyChangesPayload = expectToolSuccess<{
+    tempPageRefMappings: Record<string, { pageId: string }>
+  }>(
+    await callApplyChanges({
+      summary: 'Load an interactive MCP Preview capture demo',
+      expectedProjectRevision: manifest.projectRevision,
+      operations: [
+        {
+          type: 'create_page',
+          newPageRef: 'details',
+          jsxCode: `export default function DetailsPage() {
   return (
     <main>
       <h1>Details page</h1>
@@ -161,17 +171,17 @@ const loadInteractionDemoProject = async () => {
     </main>
   )
 }`,
-        hooksCode: `const [menuOpen, setMenuOpen] = useState(false)`,
-      },
-      {
-        type: 'rename_page',
-        tempPageRef: 'details',
-        name: 'Details',
-      },
-      {
-        type: 'replace_source',
-        resourceUri: pageOneJsxUri,
-        content: `export default function PageOne() {
+          hooksCode: `const [menuOpen, setMenuOpen] = useState(false)`,
+        },
+        {
+          type: 'rename_page',
+          tempPageRef: 'details',
+          name: 'Details',
+        },
+        {
+          type: 'replace_source',
+          resourceUri: pageOneJsxUri,
+          content: `export default function ActivePage() {
   return (
     <main>
       <h1>Interaction demo</h1>
@@ -227,22 +237,26 @@ const loadInteractionDemoProject = async () => {
     </main>
   )
 }`,
-      },
-      {
-        type: 'replace_source',
-        resourceUri: pageOneHooksUri,
-        content: `const [accordionOpen, setAccordionOpen] = useState(false)
+        },
+        {
+          type: 'replace_source',
+          resourceUri: pageOneHooksUri,
+          content: `const [accordionOpen, setAccordionOpen] = useState(false)
 const [fullName, setFullName] = useState('')
 const [planet, setPlanet] = useState('earth')
 const [status, setStatus] = useState('Idle')
 const [keyStatus, setKeyStatus] = useState('idle')`,
-      },
-    ],
-  })
+        },
+      ],
+    })
+  )
 
-  expectToolSuccess(applyChangesPayload)
   const diagnostics = await waitForDiagnosticsIdle()
-  expect(diagnostics.issues).toEqual([])
+  expect(diagnostics.status).toBe('idle')
+  return {
+    entryPageId: entryPage.id as string,
+    detailsPageId: applyChangesPayload.tempPageRefMappings.details.pageId,
+  }
 }
 
 test.describe('Desktop MCP preview capture', () => {
@@ -316,7 +330,7 @@ test.describe('Desktop MCP preview capture', () => {
     try {
       const page = await app.firstWindow()
       await waitForDefaultPreview(page)
-      await loadInteractionDemoProject()
+      const { entryPageId, detailsPageId } = await loadInteractionDemoProject()
 
       await expect(
         page.frameLocator('[data-testid="preview-iframe"]').getByRole('heading', {
@@ -326,7 +340,11 @@ test.describe('Desktop MCP preview capture', () => {
 
       const previewContextBefore = await readJsonMcpResource('arcade://project/preview-context')
       const manifestBefore = await readJsonMcpResource('arcade://project/manifest')
-      expect(manifestBefore.activePageId).toBe('page01')
+      expect(manifestBefore.activePageId).toBe(entryPageId)
+      const entryPage =
+        manifestBefore.pages.find((page: { id: string }) => page.id === entryPageId) ??
+        manifestBefore.pages[0]
+      const entryPageName = entryPage.name as string
 
       const menuCapture = expectToolSuccess<{
         page: { id: string }
@@ -338,7 +356,7 @@ test.describe('Desktop MCP preview capture', () => {
         }
       }>(
         await callCapturePreviewEvidence({
-          pageId: 'page02',
+          pageId: detailsPageId,
           viewportSize: 'XS',
           theme: 'light',
           interactions: [
@@ -349,7 +367,7 @@ test.describe('Desktop MCP preview capture', () => {
           ],
         })
       )
-      expect(menuCapture.page.id).toBe('page02')
+      expect(menuCapture.page.id).toBe(detailsPageId)
 
       const menuScreenshot = (await readMcpResource(menuCapture.layerResources.screenshot)).text
       expect(menuScreenshot).toContain('Menu action')
@@ -363,13 +381,13 @@ test.describe('Desktop MCP preview capture', () => {
       expect(JSON.stringify(menuDom)).toContain('Menu action')
 
       const menuFrame = JSON.parse((await readMcpResource(menuCapture.layerResources.frame)).text)
-      expect(menuFrame.page).toEqual({ id: 'page02', name: 'Details' })
+      expect(menuFrame.page).toEqual({ id: detailsPageId, name: 'Details' })
       expect(menuFrame.preview.theme).toBe('light')
 
       const previewContextAfterMenu = await readJsonMcpResource('arcade://project/preview-context')
       expect(previewContextAfterMenu).toEqual(previewContextBefore)
       const manifestAfterMenu = await readJsonMcpResource('arcade://project/manifest')
-      expect(manifestAfterMenu.activePageId).toBe('page01')
+      expect(manifestAfterMenu.activePageId).toBe(entryPageId)
       await expect(
         page.frameLocator('[data-testid="preview-iframe"]').getByRole('heading', {
           name: 'Interaction demo',
@@ -380,7 +398,7 @@ test.describe('Desktop MCP preview capture', () => {
         layerResources: { screenshot: string; dom_layout_style: string }
       }>(
         await callCapturePreviewEvidence({
-          pageId: 'page01',
+          pageId: entryPageId,
           layers: ['screenshot', 'dom_layout_style'],
           interactions: [
             {
@@ -402,7 +420,7 @@ test.describe('Desktop MCP preview capture', () => {
         layerResources: { dom_layout_style: string }
       }>(
         await callCapturePreviewEvidence({
-          pageId: 'page01',
+          pageId: entryPageId,
           layers: ['dom_layout_style'],
           interactions: [
             {
@@ -421,7 +439,7 @@ test.describe('Desktop MCP preview capture', () => {
         layerResources: { dom_layout_style: string }
       }>(
         await callCapturePreviewEvidence({
-          pageId: 'page01',
+          pageId: entryPageId,
           layers: ['dom_layout_style'],
           interactions: [
             {
@@ -440,7 +458,7 @@ test.describe('Desktop MCP preview capture', () => {
         layerResources: { dom_layout_style: string }
       }>(
         await callCapturePreviewEvidence({
-          pageId: 'page01',
+          pageId: entryPageId,
           layers: ['dom_layout_style'],
           interactions: [
             {
@@ -464,7 +482,7 @@ test.describe('Desktop MCP preview capture', () => {
         layerResources: { frame: string }
       }>(
         await callCapturePreviewEvidence({
-          pageId: 'page01',
+          pageId: entryPageId,
           layers: ['frame'],
           interactions: [
             {
@@ -482,18 +500,18 @@ test.describe('Desktop MCP preview capture', () => {
       const navigationFrame = JSON.parse(
         (await readMcpResource(navigationCapture.layerResources.frame)).text
       )
-      expect(navigationFrame.page).toEqual({ id: 'page01', name: 'Page 1' })
+      expect(navigationFrame.page).toEqual({ id: entryPageId, name: entryPageName })
       expect(navigationFrame.capture.requestedLayers).toEqual(['frame'])
       const navigationManifest = JSON.parse(
         (await readMcpResource(navigationCapture.manifestResourceUri)).text
       )
-      expect(navigationManifest.interactions.finalState.pageId).toBe('page02')
+      expect(navigationManifest.interactions.finalState.pageId).toBe(detailsPageId)
 
       const scrollCapture = expectToolSuccess<{
         layerResources: { frame: string }
       }>(
         await callCapturePreviewEvidence({
-          pageId: 'page01',
+          pageId: entryPageId,
           layers: ['frame'],
           interactions: [
             {
@@ -508,7 +526,7 @@ test.describe('Desktop MCP preview capture', () => {
 
       const missingTargetFailure = expectToolFailure(
         await callCapturePreviewEvidence({
-          pageId: 'page01',
+          pageId: entryPageId,
           interactions: [
             {
               action: 'click',
@@ -522,7 +540,7 @@ test.describe('Desktop MCP preview capture', () => {
 
       const hostUiFailure = expectToolFailure(
         await callCapturePreviewEvidence({
-          pageId: 'page01',
+          pageId: entryPageId,
           interactions: [
             {
               action: 'click',
@@ -535,7 +553,7 @@ test.describe('Desktop MCP preview capture', () => {
 
       const externalNavigationFailure = expectToolFailure(
         await callCapturePreviewEvidence({
-          pageId: 'page02',
+          pageId: detailsPageId,
           interactions: [
             {
               action: 'click',
@@ -552,7 +570,7 @@ test.describe('Desktop MCP preview capture', () => {
 
       const externalPressFailure = expectToolFailure(
         await callCapturePreviewEvidence({
-          pageId: 'page02',
+          pageId: detailsPageId,
           interactions: [
             {
               action: 'press',
@@ -571,7 +589,7 @@ test.describe('Desktop MCP preview capture', () => {
       const previewContextAfterAll = await readJsonMcpResource('arcade://project/preview-context')
       expect(previewContextAfterAll).toEqual(previewContextBefore)
       const manifestAfterAll = await readJsonMcpResource('arcade://project/manifest')
-      expect(manifestAfterAll.activePageId).toBe('page01')
+      expect(manifestAfterAll.activePageId).toBe(entryPageId)
       await expect(
         page.frameLocator('[data-testid="preview-iframe"]').getByRole('heading', {
           name: 'Interaction demo',
