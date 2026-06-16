@@ -244,6 +244,43 @@ describe('desktopMcpServer', () => {
       },
     })
 
+    const applyChangesResponse = await postJson(state.url, {
+      jsonrpc: '2.0',
+      id: 51,
+      method: 'tools/call',
+      params: {
+        name: 'apply_changes',
+        arguments: {
+          summary: 'Rename the project',
+          operations: [
+            {
+              type: 'rename_project',
+              name: 'Renamed project',
+            },
+          ],
+        },
+      },
+    })
+    expect(applyChangesResponse.status).toBe(200)
+    await expect(applyChangesResponse.json()).resolves.toEqual({
+      jsonrpc: '2.0',
+      id: 51,
+      result: {
+        content: [
+          {
+            type: 'text',
+            text: 'Desktop Arcade MCP tool "apply_changes" is not implemented yet.',
+          },
+        ],
+        isError: true,
+        structuredContent: {
+          code: 'not-yet-implemented',
+          toolName: 'apply_changes',
+          message: 'Desktop Arcade MCP tool "apply_changes" is not implemented yet.',
+        },
+      },
+    })
+
     const unknownToolResponse = await postJson(state.url, {
       jsonrpc: '2.0',
       id: 6,

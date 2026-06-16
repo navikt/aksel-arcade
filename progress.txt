@@ -3160,3 +3160,15 @@ Verification:
 Next note:
 
 - #272 should fill in `resources/read` for project resources through narrow main→renderer IPC and keep the existing URI list stable. #273 should fill in the three Desktop resources and the machine-readable capabilities resource. Keep `resources/templates/list` absent until the later slices are ready to publish the real dynamic source/capture URI templates.
+
+### 2026-06-16 - PR #282 review follow-up for issue #271
+
+Fixed before merge:
+
+- PR review found a meaningful test gap in the MCP foundation coverage: the placeholder `tools/call` path was asserted for `capture_preview_evidence`, but not for the second declared tool, `apply_changes`.
+- Added a regression in `tests/unit/services/desktopMcpServer.test.ts` that calls `apply_changes` with a schema-valid operation batch and asserts the same structured `isError: true` placeholder contract used by the other known tool.
+
+Verification:
+
+- npm run typecheck
+- CI=1 npm run test -- --run
