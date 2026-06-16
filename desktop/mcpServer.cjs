@@ -12,7 +12,7 @@ const MAX_MCP_BODY_BYTES = 1024 * 1024
 const DEFAULT_PREVIEW_CAPTURE_TTL_MS = 5 * 60 * 1000
 const VALID_VIEWPORT_SIZES = ['2XL', 'XL', 'LG', 'MD', 'SM', 'XS']
 const VALID_THEMES = ['light', 'dark']
-const VALID_PREVIEW_CAPTURE_LAYERS = ['screenshot', 'frame']
+const VALID_PREVIEW_CAPTURE_LAYERS = ['screenshot', 'accessibility', 'dom_layout_style', 'frame']
 const VALID_PREVIEW_SCREENSHOT_SCOPES = ['viewport', 'full_page', 'region']
 const APPLY_CHANGES_OPERATION_TYPES = [
   'replace_source',
@@ -71,12 +71,13 @@ const CAPABILITY_V1_OMISSIONS = Object.freeze([
 ])
 const PROJECT_SOURCE_PAGE_URI_PATTERN = /^arcade:\/\/project\/source\/pages\/(page\d+)\/(jsx|hooks)$/
 const PREVIEW_CAPTURE_RESOURCE_URI_PATTERN =
-  /^arcade:\/\/preview\/captures\/([a-z0-9-]+)\/(manifest|screenshot|frame)$/
+  /^arcade:\/\/preview\/captures\/([a-z0-9-]+)\/(manifest|screenshot|frame|accessibility|dom-layout-style)$/
 
 const MCP_TOOL_DEFINITIONS = Object.freeze([
   Object.freeze({
     name: 'capture_preview_evidence',
-    description: 'Capture targeted Preview evidence for the active Arcade project.',
+    description:
+      'Capture targeted Preview evidence for the active Arcade project across screenshot, accessibility, DOM/layout/style, and frame layers.',
     inputSchema: Object.freeze({
       type: 'object',
       additionalProperties: false,
@@ -102,7 +103,8 @@ const MCP_TOOL_DEFINITIONS = Object.freeze([
             type: 'string',
             enum: VALID_PREVIEW_CAPTURE_LAYERS,
           }),
-          description: 'Optional requested baseline evidence layers.',
+          description:
+            'Optional requested evidence layers. screenshot = visual appearance and spatial gestalt; accessibility = roles, names, landmarks, focusable controls, and semantic hierarchy; dom_layout_style = actionable hierarchy, bounds, styles, spacing, colors, typography, and overflow; frame = viewport, theme, page, scroll, diagnostics, truncation, and capture metadata. Omit to capture all available layers.',
         }),
         screenshotScope: Object.freeze({
           type: 'string',
@@ -274,14 +276,16 @@ const PREVIEW_EVIDENCE_URI_TEMPLATE_STATUS = Object.freeze({
     'available after a successful capture until the capture expires',
   'arcade://preview/captures/{captureId}/frame':
     'available after a successful capture until the capture expires',
-  'arcade://preview/captures/{captureId}/accessibility': 'not-yet-implemented',
-  'arcade://preview/captures/{captureId}/dom-layout-style': 'not-yet-implemented',
+  'arcade://preview/captures/{captureId}/accessibility':
+    'available after a successful capture until the capture expires',
+  'arcade://preview/captures/{captureId}/dom-layout-style':
+    'available after a successful capture until the capture expires',
 })
 
 const CAPTURE_LAYER_STATUS = Object.freeze({
   screenshot: 'available',
-  accessibility: 'not-yet-implemented',
-  dom_layout_style: 'not-yet-implemented',
+  accessibility: 'available',
+  dom_layout_style: 'available',
   frame: 'available',
 })
 
@@ -1464,7 +1468,7 @@ const createDesktopStableResourceText = (uri) => {
         '- Use `select_active_page` only when you intentionally want the human-visible Active page to change; ordinary inspection should keep using `capture_preview_evidence({ pageId })`.',
         '- Saved Preview preferences live in `arcade://project/preview-context`; capture-only overrides must not mutate them.',
         '- If `apply_changes` returns `project-unavailable`, wait for an active Desktop Arcade window instead of falling back to repository or filesystem edits.',
-        '- Baseline Preview capture currently supports `screenshot` and `frame` layers, with `viewport`, `full_page`, and `region` screenshot scopes. Later semantic layers may still be unavailable.',
+        '- Preview capture supports `screenshot`, `accessibility`, `dom_layout_style`, and `frame` layers, with `viewport`, `full_page`, and `region` screenshot scopes. Omit `layers` to capture all available layers.',
         '- When state is unclear, re-read the manifest before making another durable change.',
       ].join('\n')
     case 'arcade://desktop/authoring-guide':
@@ -1682,6 +1686,13 @@ const isCapturePreviewResult = (value) => {
       typeof value.page.id === 'string' &&
       typeof value.page.name === 'string' &&
       isPlainObject(value.layerResources) &&
+      (value.layerResources.accessibility === undefined ||
+        typeof value.layerResources.accessibility === 'string') &&
+      (value.layerResources.dom_layout_style === undefined ||
+        typeof value.layerResources.dom_layout_style === 'string') &&
+      (value.layerResources.frame === undefined || typeof value.layerResources.frame === 'string') &&
+      (value.layerResources.screenshot === undefined ||
+        typeof value.layerResources.screenshot === 'string') &&
       Array.isArray(value.resources) &&
       value.resources.every(
         (resource) =>

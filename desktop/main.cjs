@@ -872,10 +872,14 @@ const isDesktopMcpPreviewCaptureResult = (value) => {
       Array.isArray(value.producedLayers) &&
       value.producedLayers.every((layer) => typeof layer === 'string') &&
       isRecord(value.layerResources) &&
-      (value.layerResources.screenshot === undefined ||
-        typeof value.layerResources.screenshot === 'string') &&
+      (value.layerResources.accessibility === undefined ||
+        typeof value.layerResources.accessibility === 'string') &&
+      (value.layerResources.dom_layout_style === undefined ||
+        typeof value.layerResources.dom_layout_style === 'string') &&
       (value.layerResources.frame === undefined ||
         typeof value.layerResources.frame === 'string') &&
+      (value.layerResources.screenshot === undefined ||
+        typeof value.layerResources.screenshot === 'string') &&
       Array.isArray(value.resources) &&
       value.resources.every(
         (resource) =>

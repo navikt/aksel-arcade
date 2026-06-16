@@ -3429,3 +3429,26 @@ Verification:
 - npm run typecheck
 - npm run lint
 - CI=1 npm run test -- --run
+
+### 2026-06-16 - Issue #276: Add accessibility and DOM/layout/style Preview evidence layers
+
+Implemented:
+
+- Selected `#276` as the single highest-priority `ready-for-agent` feature from `#276`-`#280` after checking issue `#269`, `CONTEXT.md`, and the existing `progress.txt` notes. `#279` and `#280` are still blocked, `#277` was already complete, and `#276` beat `#278` because it finishes the core Preview evidence contract that later interaction workflows depend on.
+- Extended `src/services/previewEvidence.ts` so Preview capture now produces a bounded `accessibility` layer with roles, accessible names, heading levels, focusability, and selected/expanded/checked/current/pressed/disabled states alongside the existing DOM/layout/style evidence, including overflow styles and deterministic truncation metadata.
+- Extended `src/services/desktopMcpPreviewCapture.ts`, `src/services/desktopMcpPreviewCaptureProtocol.ts`, `src/services/desktopMcpPreviewCaptureSandbox.ts`, `desktop/main.cjs`, and `desktop/mcpServer.cjs` so `capture_preview_evidence` defaults omitted `layers` to all available layers, publishes short-lived `accessibility` and `dom_layout_style` resources plus the manifest/frame/screenshot set, validates the expanded contract end-to-end, and updates the MCP capability/guide text to mark both new layers as available.
+- Regenerated `public/preview-evidence-global.js` via `npm run build:sandbox` so the hidden Desktop Preview capture sandbox stays in sync with the TypeScript evidence serializer.
+- Added focused regression coverage in `tests/unit/services/previewEvidence.test.ts`, new `tests/unit/services/desktopMcpPreviewCapture.test.ts`, updated `tests/unit/services/desktopMcpServer.test.ts`, and extended `tests/e2e/desktop-mcp-preview-capture.spec.ts` so the new layers, default-all-layer behavior, manifest/resource payloads, and live Desktop MCP preview-capture flow are all covered.
+
+Verification:
+
+- npm run build:sandbox
+- npm run typecheck
+- npm run lint
+- CI=1 npm run test -- --run
+- npm run test:e2e -- tests/e2e/desktop-mcp-preview-capture.spec.ts --reporter=line
+- Browser/console smoke check at `http://127.0.0.1:5173/aksel-arcade/` via `npm run dev -- --host 127.0.0.1 --port 5173 --strictPort`, confirming the app shell and live preview render cleanly with no browser-console warnings/errors
+
+Next note:
+
+- `#278` can now treat `capture_preview_evidence` as a full four-layer inspection primitive. Reuse the new `accessibility` and `dom_layout_style` resources instead of inventing parallel interaction-inspection payloads, and keep `public/preview-evidence-global.js` regenerated whenever `src/services/previewEvidence.ts` changes.

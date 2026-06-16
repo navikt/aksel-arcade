@@ -223,6 +223,89 @@ describe('preview evidence', () => {
       },
     })
   })
+
+  it('captures accessibility roles, names, hierarchy, focusability, and states', () => {
+    document.body.innerHTML = `
+      <div id="root">
+        <nav aria-label="Primary">
+          <h2>Account</h2>
+          <button aria-pressed="true">Open menu</button>
+          <label>
+            Accept terms
+            <input id="accept" type="checkbox" />
+          </label>
+        </nav>
+      </div>
+    `
+
+    const root = document.getElementById('root')
+    const checkbox = document.getElementById('accept') as HTMLInputElement | null
+    if (!root || !checkbox) {
+      throw new Error('Expected accessibility fixture elements to exist.')
+    }
+
+    checkbox.checked = true
+
+    const result = capturePreviewEvidenceSnapshot(root, { layers: ['accessibility'] }, window)
+    expect(result).toMatchObject({
+      ok: true,
+      accessibility: {
+        rootSelector: '#root',
+        truncated: false,
+      },
+    })
+    if (!result.ok || !result.accessibility) {
+      throw new Error('Expected accessibility capture to succeed.')
+    }
+
+    expect(result.accessibility.nodes).toEqual([
+      {
+        role: 'navigation',
+        name: 'Primary',
+        children: [
+          {
+            role: 'heading',
+            name: 'Account',
+            level: 2,
+          },
+          {
+            role: 'button',
+            name: 'Open menu',
+            focusable: true,
+            states: {
+              pressed: true,
+            },
+          },
+          {
+            role: 'checkbox',
+            name: 'Accept terms',
+            focusable: true,
+            states: {
+              checked: true,
+            },
+          },
+        ],
+      },
+    ])
+  })
+
+  it('caps large accessibility trees deterministically', () => {
+    document.body.innerHTML = `<div id="root">${'<button>Item</button>'.repeat(
+      MAX_PREVIEW_EVIDENCE_ELEMENTS + 10
+    )}</div>`
+    const root = document.getElementById('root')
+    if (!root) {
+      throw new Error('Expected preview root to exist.')
+    }
+
+    const result = capturePreviewEvidenceSnapshot(root, { layers: ['accessibility'] }, window)
+    if (!result.ok || !result.accessibility) {
+      throw new Error('Expected accessibility capture to succeed.')
+    }
+
+    expect(result.accessibility.nodeCount).toBe(MAX_PREVIEW_EVIDENCE_ELEMENTS)
+    expect(result.accessibility.truncated).toBe(true)
+  })
 })
 
 const renderPreviewFixture = () => {

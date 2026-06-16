@@ -14,22 +14,30 @@ import type {
   DesktopMcpPreviewCaptureResult,
   DesktopMcpPreviewCaptureSuccess,
 } from './desktopMcpPreviewCaptureProtocol'
-import type {
-  PreviewEvidenceCaptureTarget,
-  PreviewEvidenceFrameMetadata,
-  PreviewEvidenceScreenshot,
-  PreviewEvidenceScreenshotScope,
+import {
+  MAX_PREVIEW_EVIDENCE_ELEMENTS,
+  type PreviewEvidence,
+  type PreviewEvidenceAccessibility,
+  type PreviewEvidenceCaptureTarget,
+  type PreviewEvidenceScreenshot,
+  type PreviewEvidenceScreenshotScope,
 } from './previewEvidence'
 
 export const DESKTOP_MCP_PREVIEW_CAPTURE_TIMEOUT_MS = 20_000
 
 export const DESKTOP_MCP_PREVIEW_CAPTURE_LAYER_PURPOSES = Object.freeze({
   screenshot: 'visual appearance and spatial gestalt',
+  accessibility:
+    'semantic roles, accessible names, landmarks, focusable controls, and semantic hierarchy',
+  dom_layout_style:
+    'actionable hierarchy, bounds, styles, spacing, colors, typography, and overflow',
   frame: 'viewport, theme, page, scroll, diagnostics, truncation, and capture metadata',
 })
 
-export const BASELINE_DESKTOP_MCP_PREVIEW_CAPTURE_LAYERS = Object.freeze([
+export const DEFAULT_DESKTOP_MCP_PREVIEW_CAPTURE_LAYERS = Object.freeze([
   'screenshot',
+  'accessibility',
+  'dom_layout_style',
   'frame',
 ] satisfies DesktopMcpPreviewCaptureLayer[])
 
@@ -53,7 +61,8 @@ export interface PreparedDesktopMcpPreviewCapture {
 
 export interface DesktopMcpSandboxCaptureSuccess {
   ok: true
-  frame: PreviewEvidenceFrameMetadata
+  evidence: PreviewEvidence
+  accessibility?: PreviewEvidenceAccessibility
   screenshot?: PreviewEvidenceScreenshot
   targetDescription?: string | null
 }
@@ -75,6 +84,12 @@ export const createDesktopMcpPreviewCaptureManifestUri = (captureId: string): st
 
 export const createDesktopMcpPreviewCaptureScreenshotUri = (captureId: string): string =>
   `arcade://preview/captures/${captureId}/screenshot`
+
+export const createDesktopMcpPreviewCaptureAccessibilityUri = (captureId: string): string =>
+  `arcade://preview/captures/${captureId}/accessibility`
+
+export const createDesktopMcpPreviewCaptureDomLayoutStyleUri = (captureId: string): string =>
+  `arcade://preview/captures/${captureId}/dom-layout-style`
 
 export const createDesktopMcpPreviewCaptureFrameUri = (captureId: string): string =>
   `arcade://preview/captures/${captureId}/frame`
@@ -117,7 +132,7 @@ export const prepareDesktopMcpPreviewCapture = (
   const requestedLayers =
     request.layers && request.layers.length > 0
       ? [...request.layers]
-      : [...BASELINE_DESKTOP_MCP_PREVIEW_CAPTURE_LAYERS]
+      : [...DEFAULT_DESKTOP_MCP_PREVIEW_CAPTURE_LAYERS]
 
   return {
     ok: true,
@@ -157,27 +172,25 @@ export const finalizeDesktopMcpPreviewCapture = (
     )
   }
 
+  if (prepared.requestedLayers.includes('accessibility') && !capture.accessibility) {
+    return createPreviewCaptureFailure(
+      'render-failed',
+      'capture_preview_evidence did not receive the requested accessibility layer from the isolated Preview render.'
+    )
+  }
+
   const manifestResourceUri = createDesktopMcpPreviewCaptureManifestUri(captureId)
+  const accessibilityResourceUri = createDesktopMcpPreviewCaptureAccessibilityUri(captureId)
+  const domLayoutStyleResourceUri = createDesktopMcpPreviewCaptureDomLayoutStyleUri(captureId)
   const frameResourceUri = createDesktopMcpPreviewCaptureFrameUri(captureId)
   const screenshotResourceUri = createDesktopMcpPreviewCaptureScreenshotUri(captureId)
   const diagnosticsSummary = summarizePreviewDiagnostics(context)
   const resources: DesktopMcpPreviewCaptureResource[] = []
-  const producedResources = [manifestResourceUri, frameResourceUri]
-  const producedLayers: DesktopMcpPreviewCaptureLayer[] = ['frame']
-  const layerResources: DesktopMcpPreviewCaptureSuccess['layerResources'] = {
-    frame: frameResourceUri,
-  }
+  const producedResources = [manifestResourceUri]
+  const producedLayers: DesktopMcpPreviewCaptureLayer[] = []
+  const layerResources: DesktopMcpPreviewCaptureSuccess['layerResources'] = {}
 
-  if (prepared.requestedLayers.includes('screenshot') && capture.screenshot) {
-    producedResources.push(screenshotResourceUri)
-    producedLayers.unshift('screenshot')
-    layerResources.screenshot = screenshotResourceUri
-    resources.push({
-      uri: screenshotResourceUri,
-      mimeType: capture.screenshot.mimeType,
-      text: capture.screenshot.text,
-    })
-  }
+  const frame = capture.evidence.frame
 
   const frameResource = {
     captureId,
@@ -189,9 +202,9 @@ export const finalizeDesktopMcpPreviewCapture = (
     preview: {
       viewportSize: prepared.viewportSize,
       theme: prepared.theme,
-      viewport: capture.frame.viewport,
-      scroll: capture.frame.scroll,
-      rootSelector: capture.frame.rootSelector,
+      viewport: frame.viewport,
+      scroll: frame.scroll,
+      rootSelector: frame.rootSelector,
     },
     diagnostics: {
       ...diagnosticsSummary,
@@ -203,18 +216,16 @@ export const finalizeDesktopMcpPreviewCapture = (
       producedLayers,
       screenshotScope: prepared.screenshotScope,
       ...(capture.targetDescription ? { targetDescription: capture.targetDescription } : {}),
-      capturedElementCount: capture.frame.capturedElementCount,
-      truncated: capture.frame.truncated,
+      capturedElementCount: frame.capturedElementCount,
+      truncated: frame.truncated,
+      limits: {
+        maxDomElements: MAX_PREVIEW_EVIDENCE_ELEMENTS,
+        maxAccessibilityNodes: MAX_PREVIEW_EVIDENCE_ELEMENTS,
+      },
       timeoutMs: DESKTOP_MCP_PREVIEW_CAPTURE_TIMEOUT_MS,
       capturedAt: timestamp,
     },
   }
-
-  resources.push({
-    uri: frameResourceUri,
-    mimeType: 'application/json',
-    text: JSON.stringify(frameResource),
-  })
 
   const manifest = {
     captureId,
@@ -234,22 +245,118 @@ export const finalizeDesktopMcpPreviewCapture = (
       producedLayers.map((layer) => [layer, DESKTOP_MCP_PREVIEW_CAPTURE_LAYER_PURPOSES[layer]])
     ),
     layerResources,
-    screenshot: {
-      scope: prepared.screenshotScope,
-      ...(capture.targetDescription ? { targetDescription: capture.targetDescription } : {}),
-    },
+    ...(producedLayers.includes('screenshot')
+      ? {
+          screenshot: {
+            scope: prepared.screenshotScope,
+            ...(capture.targetDescription ? { targetDescription: capture.targetDescription } : {}),
+          },
+        }
+      : {}),
     diagnostics: {
       ...diagnosticsSummary,
       capturedAt: timestamp,
     },
     capture: {
       isolatedRender: true,
-      rootSelector: capture.frame.rootSelector,
-      capturedElementCount: capture.frame.capturedElementCount,
-      truncated: capture.frame.truncated,
+      rootSelector: frame.rootSelector,
+      capturedElementCount: frame.capturedElementCount,
+      truncated: frame.truncated,
+      limits: {
+        maxDomElements: MAX_PREVIEW_EVIDENCE_ELEMENTS,
+        maxAccessibilityNodes: MAX_PREVIEW_EVIDENCE_ELEMENTS,
+      },
       timeoutMs: DESKTOP_MCP_PREVIEW_CAPTURE_TIMEOUT_MS,
       capturedAt: timestamp,
     },
+  }
+
+  const addLayerResource = (
+    layer: DesktopMcpPreviewCaptureLayer,
+    resource: DesktopMcpPreviewCaptureResource
+  ) => {
+    producedLayers.push(layer)
+    producedResources.push(resource.uri)
+    resources.push(resource)
+
+    if (layer === 'screenshot') {
+      layerResources.screenshot = resource.uri
+      return
+    }
+
+    if (layer === 'accessibility') {
+      layerResources.accessibility = resource.uri
+      return
+    }
+
+    if (layer === 'dom_layout_style') {
+      layerResources.dom_layout_style = resource.uri
+      return
+    }
+
+    layerResources.frame = resource.uri
+  }
+
+  for (const layer of prepared.requestedLayers) {
+    switch (layer) {
+      case 'screenshot':
+        if (capture.screenshot) {
+          addLayerResource('screenshot', {
+            uri: screenshotResourceUri,
+            mimeType: capture.screenshot.mimeType,
+            text: capture.screenshot.text,
+          })
+        }
+        break
+      case 'accessibility':
+        if (capture.accessibility) {
+          addLayerResource('accessibility', {
+            uri: accessibilityResourceUri,
+            mimeType: 'application/json',
+            text: JSON.stringify(capture.accessibility),
+          })
+        }
+        break
+      case 'dom_layout_style':
+        addLayerResource('dom_layout_style', {
+          uri: domLayoutStyleResourceUri,
+          mimeType: 'application/json',
+          text: JSON.stringify({
+            rootSelector: frame.rootSelector,
+            capturedElementCount: frame.capturedElementCount,
+            truncated: frame.truncated,
+            tree: capture.evidence.tree,
+          }),
+        })
+        break
+      case 'frame':
+        addLayerResource('frame', {
+          uri: frameResourceUri,
+          mimeType: 'application/json',
+          text: '',
+        })
+        break
+    }
+  }
+
+  if (layerResources.frame) {
+    const frameResourceEntry = resources.find((resource) => resource.uri === frameResourceUri)
+    if (frameResourceEntry) {
+      frameResourceEntry.text = JSON.stringify(frameResource)
+    }
+  }
+
+  manifest.summary = createPreviewCaptureSummary(prepared, capture, producedLayers)
+  manifest.producedLayers = producedLayers
+  manifest.layerPurposes = Object.fromEntries(
+    producedLayers.map((layer) => [layer, DESKTOP_MCP_PREVIEW_CAPTURE_LAYER_PURPOSES[layer]])
+  )
+  manifest.layerResources = layerResources
+  if (producedLayers.includes('screenshot')) {
+    manifest.screenshot = {
+      scope: prepared.screenshotScope,
+      ...(capture.targetDescription ? { targetDescription: capture.targetDescription } : {}),
+    }
   }
 
   resources.unshift({
@@ -324,19 +431,30 @@ const createPreviewCaptureSummary = (
   capture: DesktopMcpSandboxCaptureSuccess,
   producedLayers: DesktopMcpPreviewCaptureLayer[]
 ): string => {
-  const lastProducedLayer = producedLayers[producedLayers.length - 1] ?? ''
+  const formattedLayers = producedLayers.map(formatPreviewCaptureLayerLabel)
+  const lastProducedLayer = formattedLayers[formattedLayers.length - 1] ?? ''
   const layerSummary =
-    producedLayers.length === 1
-      ? producedLayers[0]
-      : `${producedLayers.slice(0, -1).join(', ')} and ${lastProducedLayer}`
-  const scopeSummary =
-    prepared.screenshotScope === 'region'
+    formattedLayers.length === 1
+      ? formattedLayers[0]
+      : `${formattedLayers.slice(0, -1).join(', ')} and ${lastProducedLayer}`
+  const scopeSummary = producedLayers.includes('screenshot')
+    ? prepared.screenshotScope === 'region'
       ? capture.targetDescription
-        ? `region (${capture.targetDescription})`
-        : 'region'
-      : prepared.screenshotScope.replace('_', '-')
+        ? ` (region (${capture.targetDescription}))`
+        : ' (region)'
+      : ` (${prepared.screenshotScope.replace('_', '-')})`
+    : ''
 
-  return `Captured ${prepared.pageName} (${prepared.pageId}) in ${prepared.theme} ${prepared.viewportSize} preview with ${layerSummary} evidence (${scopeSummary}).`
+  return `Captured ${prepared.pageName} (${prepared.pageId}) in ${prepared.theme} ${prepared.viewportSize} preview with ${layerSummary} evidence${scopeSummary}.`
+}
+
+const formatPreviewCaptureLayerLabel = (layer: DesktopMcpPreviewCaptureLayer): string => {
+  switch (layer) {
+    case 'dom_layout_style':
+      return 'DOM/layout/style'
+    default:
+      return layer
+  }
 }
 
 const createPreviewCaptureFailure = (

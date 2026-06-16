@@ -75,6 +75,18 @@ const captureDefaultPreviewEvidence = async () => {
   expect(screenshotMatch).not.toBeNull()
   expect(Number(screenshotMatch?.[1])).toBeGreaterThan(1)
   expect(Number(screenshotMatch?.[2])).toBeGreaterThan(1)
+
+  const accessibilityResourceResponse = await readMcpResource(capture.layerResources.accessibility)
+  const accessibilityResource = JSON.parse(accessibilityResourceResponse.result.contents[0].text)
+  expect(accessibilityResource.rootSelector).toBe('#root')
+  expect(accessibilityResource.nodeCount).toBeGreaterThan(0)
+  expect(Array.isArray(accessibilityResource.nodes)).toBe(true)
+
+  const domLayoutStyleResponse = await readMcpResource(capture.layerResources.dom_layout_style)
+  const domLayoutStyleResource = JSON.parse(domLayoutStyleResponse.result.contents[0].text)
+  expect(domLayoutStyleResource.rootSelector).toBe('#root')
+  expect(domLayoutStyleResource.capturedElementCount).toBeGreaterThan(0)
+  expect(domLayoutStyleResource.tree.tagName).toBe('div')
 }
 
 test.describe('Desktop MCP preview capture', () => {

@@ -132,7 +132,8 @@ export const capturePreviewInIsolatedSandbox = async ({
 
       finish({
         ok: true,
-        frame: result.evidence.frame,
+        evidence: result.evidence,
+        ...(result.accessibility ? { accessibility: result.accessibility } : {}),
         ...(result.screenshot ? { screenshot: result.screenshot } : {}),
         ...(result.captureMeta?.targetDescription
           ? { targetDescription: result.captureMeta.targetDescription }

@@ -1,0 +1,238 @@
+import { describe, expect, it } from 'vitest'
+import { collectPreviewDiagnostics } from '@/services/previewDiagnostics'
+import {
+  DEFAULT_DESKTOP_MCP_PREVIEW_CAPTURE_LAYERS,
+  finalizeDesktopMcpPreviewCapture,
+  prepareDesktopMcpPreviewCapture,
+  type DesktopMcpSandboxCaptureSuccess,
+} from '@/services/desktopMcpPreviewCapture'
+import { MAX_PREVIEW_EVIDENCE_ELEMENTS } from '@/services/previewEvidence'
+import { createDefaultPreviewState, createDefaultProject } from '@/utils/projectDefaults'
+
+describe('desktopMcpPreviewCapture', () => {
+  it('defaults omitted layer requests to all available capture layers', () => {
+    const context = createCaptureContext()
+    const prepared = prepareDesktopMcpPreviewCapture({}, context)
+    if (!prepared.ok) {
+      throw new Error('Expected preview capture preparation to succeed.')
+    }
+
+    expect(prepared.requestedLayers).toEqual([...DEFAULT_DESKTOP_MCP_PREVIEW_CAPTURE_LAYERS])
+  })
+
+  it('finalizes all requested evidence layers with manifest docs and resource payloads', () => {
+    const context = createCaptureContext()
+    const prepared = prepareDesktopMcpPreviewCapture({}, context)
+    if (!prepared.ok) {
+      throw new Error('Expected preview capture preparation to succeed.')
+    }
+
+    const result = finalizeDesktopMcpPreviewCapture(prepared, createSandboxCapture(), context, {
+      captureId: 'capture-demo',
+      timestamp: '2026-06-16T12:00:00.000Z',
+    })
+    expect(result).toMatchObject({
+      ok: true,
+      requestedLayers: [...DEFAULT_DESKTOP_MCP_PREVIEW_CAPTURE_LAYERS],
+      producedLayers: [...DEFAULT_DESKTOP_MCP_PREVIEW_CAPTURE_LAYERS],
+      layerResources: {
+        screenshot: 'arcade://preview/captures/capture-demo/screenshot',
+        accessibility: 'arcade://preview/captures/capture-demo/accessibility',
+        dom_layout_style: 'arcade://preview/captures/capture-demo/dom-layout-style',
+        frame: 'arcade://preview/captures/capture-demo/frame',
+      },
+    })
+    if (!result.ok) {
+      throw new Error('Expected finalized preview capture to succeed.')
+    }
+
+    const manifest = JSON.parse(findResourceText(result.resources, result.manifestResourceUri))
+    expect(manifest.layerPurposes).toMatchObject({
+      screenshot: 'visual appearance and spatial gestalt',
+      accessibility:
+        'semantic roles, accessible names, landmarks, focusable controls, and semantic hierarchy',
+      dom_layout_style:
+        'actionable hierarchy, bounds, styles, spacing, colors, typography, and overflow',
+      frame: 'viewport, theme, page, scroll, diagnostics, truncation, and capture metadata',
+    })
+    expect(manifest.capture.limits).toEqual({
+      maxDomElements: MAX_PREVIEW_EVIDENCE_ELEMENTS,
+      maxAccessibilityNodes: MAX_PREVIEW_EVIDENCE_ELEMENTS,
+    })
+
+    const accessibilityResource = JSON.parse(
+      findResourceText(
+        result.resources,
+        'arcade://preview/captures/capture-demo/accessibility'
+      )
+    )
+    expect(accessibilityResource).toMatchObject({
+      rootSelector: '#root',
+      nodeCount: 2,
+      truncated: false,
+      nodes: [
+        {
+          role: 'heading',
+          name: 'Details',
+          level: 1,
+        },
+        {
+          role: 'button',
+          name: 'Continue',
+          focusable: true,
+        },
+      ],
+    })
+
+    const domLayoutStyleResource = JSON.parse(
+      findResourceText(
+        result.resources,
+        'arcade://preview/captures/capture-demo/dom-layout-style'
+      )
+    )
+    expect(domLayoutStyleResource).toMatchObject({
+      rootSelector: '#root',
+      capturedElementCount: 4,
+      truncated: false,
+      tree: {
+        tagName: 'div',
+      },
+    })
+  })
+
+  it('publishes only the selected layer resources when a caller narrows the request', () => {
+    const context = createCaptureContext()
+    const prepared = prepareDesktopMcpPreviewCapture(
+      {
+        layers: ['accessibility', 'dom_layout_style'],
+      },
+      context
+    )
+    if (!prepared.ok) {
+      throw new Error('Expected preview capture preparation to succeed.')
+    }
+
+    const result = finalizeDesktopMcpPreviewCapture(prepared, createSandboxCapture(), context, {
+      captureId: 'capture-selected',
+      timestamp: '2026-06-16T12:00:00.000Z',
+    })
+    expect(result).toMatchObject({
+      ok: true,
+      producedResources: [
+        'arcade://preview/captures/capture-selected/manifest',
+        'arcade://preview/captures/capture-selected/accessibility',
+        'arcade://preview/captures/capture-selected/dom-layout-style',
+      ],
+      producedLayers: ['accessibility', 'dom_layout_style'],
+      layerResources: {
+        accessibility: 'arcade://preview/captures/capture-selected/accessibility',
+        dom_layout_style: 'arcade://preview/captures/capture-selected/dom-layout-style',
+      },
+    })
+    if (!result.ok) {
+      throw new Error('Expected finalized preview capture to succeed.')
+    }
+
+    expect(result.layerResources.screenshot).toBeUndefined()
+    expect(result.layerResources.frame).toBeUndefined()
+
+    const manifest = JSON.parse(findResourceText(result.resources, result.manifestResourceUri))
+    expect(manifest.producedLayers).toEqual(['accessibility', 'dom_layout_style'])
+    expect(manifest.layerResources).toEqual({
+      accessibility: 'arcade://preview/captures/capture-selected/accessibility',
+      dom_layout_style: 'arcade://preview/captures/capture-selected/dom-layout-style',
+    })
+    expect(manifest.screenshot).toBeUndefined()
+  })
+})
+
+const createCaptureContext = () => ({
+  project: createDefaultProject(),
+  theme: 'dark' as const,
+  diagnostics: collectPreviewDiagnostics(createDefaultPreviewState()),
+})
+
+const createSandboxCapture = (): DesktopMcpSandboxCaptureSuccess => ({
+  ok: true,
+  evidence: {
+    frame: {
+      rootSelector: '#root',
+      viewport: {
+        width: 768,
+        height: 900,
+        devicePixelRatio: 2,
+      },
+      scroll: {
+        x: 0,
+        y: 0,
+      },
+      capturedElementCount: 4,
+      truncated: false,
+    },
+    tree: {
+      tagName: 'div',
+      text: 'Root text',
+      boundingBox: createRect(320, 200),
+      computedStyle: {
+        display: 'flex',
+      },
+      children: [
+        {
+          tagName: 'button',
+          text: 'Continue',
+          boundingBox: createRect(96, 32),
+          computedStyle: {
+            display: 'inline-flex',
+          },
+        },
+      ],
+    },
+  },
+  accessibility: {
+    rootSelector: '#root',
+    nodeCount: 2,
+    truncated: false,
+    nodes: [
+      {
+        role: 'heading',
+        name: 'Details',
+        level: 1,
+      },
+      {
+        role: 'button',
+        name: 'Continue',
+        focusable: true,
+      },
+    ],
+  },
+  screenshot: {
+    mimeType: 'image/svg+xml',
+    text: '<svg xmlns="http://www.w3.org/2000/svg" width="320" height="200"></svg>',
+    width: 320,
+    height: 200,
+  },
+  targetDescription: 'role=button name="Continue"',
+})
+
+const createRect = (width: number, height: number) => ({
+  x: 0,
+  y: 0,
+  width,
+  height,
+  top: 0,
+  right: width,
+  bottom: height,
+  left: 0,
+})
+
+const findResourceText = (
+  resources: Array<{ uri: string; text: string }>,
+  uri: string
+): string => {
+  const resource = resources.find((candidate) => candidate.uri === uri)
+  if (!resource) {
+    throw new Error(`Expected capture resource ${uri} to exist.`)
+  }
+
+  return resource.text
+}
