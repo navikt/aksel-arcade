@@ -3135,3 +3135,40 @@ Verification:
 - `npm run build`
 - `CI=1 npm run test`
 - Browser check at `http://127.0.0.1:4196/aksel-arcade/` with mocked desktop preload states confirming the Settings MCP section still shows fixed details when available, hides them when the port is unavailable, and logs no console errors in either state
+
+### 2026-06-16 - Issue #271: MCP protocol foundation and safe discovery contract
+
+Implemented:
+
+- Selected #271 as the highest-priority open `ready-for-agent` feature from #271-#280 after checking issue #269, `CONTEXT.md`, and the existing `progress.txt` notes; it is the MCP foundation that #272-#280 build on, and #270 was already closed.
+- Expanded `desktop/mcpServer.cjs` from initialize-only handling into a strict v1 MCP foundation: POST-only JSON-RPC lifecycle/discovery, explicit `initialize` capabilities for `tools` and `resources`, `tools/list`, `resources/list`, `tools/call`, and `resources/read`.
+- Kept the discovery surface intentionally narrow: `tools/list` now exposes only `capture_preview_evidence` and `apply_changes`, while `resources/list` exposes only the six agreed stable direct `arcade://desktop/*` and `arcade://project/*` resources.
+- Rejected any request carrying a browser `Origin` header, kept origin-less local MCP requests working, and returned a clear 405 for GET/SSE-style entry attempts instead of leaving the endpoint hanging.
+- Added strict MCP validation around the protocol layer and placeholder business layer: top-level JSON-RPC envelopes reject unknown fields, `tools/call` and `resources/read` reject unsupported params/argument fields, unknown tool names fail as JSON-RPC invalid-params errors, known tools return structured `isError: true` placeholder results, and known/unknown resources fail with clear JSON-RPC resource errors until #272/#273/#274/#275 implement real behavior.
+- Deliberately left `resources/templates/list` and prompts/subscriptions out of the v1 surface for now so later slices can own the dynamic source/capture URI shapes instead of the foundation overcommitting early.
+- Replaced the old minimal MCP server unit coverage with focused discovery/protocol tests in `tests/unit/services/desktopMcpServer.test.ts` for initialize capabilities, tools/resources discovery, initialized notifications, known-vs-unknown tool/resource behavior, strict schema rejection, browser-origin rejection, GET/SSE rejection, malformed JSON-RPC envelopes, and the fixed-port availability error path.
+
+Verification:
+
+- npm run typecheck
+- npm run lint (existing `.eslintignore` deprecation notice only)
+- CI=1 npm run test -- --run
+- npm run build
+- Browser smoke check at `http://127.0.0.1:5173/aksel-arcade/` confirmed the app still renders and the console stayed free of runtime error/warn messages during the check
+- Node MCP smoke against `createDesktopMcpServer({ port: 0 })` confirmed `initialize` advertises only `tools`/`resources`, `tools/list` returns `capture_preview_evidence` + `apply_changes`, and `resources/list` returns only the six stable direct resource URIs
+
+Next note:
+
+- #272 should fill in `resources/read` for project resources through narrow main→renderer IPC and keep the existing URI list stable. #273 should fill in the three Desktop resources and the machine-readable capabilities resource. Keep `resources/templates/list` absent until the later slices are ready to publish the real dynamic source/capture URI templates.
+
+### 2026-06-16 - PR #282 review follow-up for issue #271
+
+Fixed before merge:
+
+- PR review found a meaningful test gap in the MCP foundation coverage: the placeholder `tools/call` path was asserted for `capture_preview_evidence`, but not for the second declared tool, `apply_changes`.
+- Added a regression in `tests/unit/services/desktopMcpServer.test.ts` that calls `apply_changes` with a schema-valid operation batch and asserts the same structured `isError: true` placeholder contract used by the other known tool.
+
+Verification:
+
+- npm run typecheck
+- CI=1 npm run test -- --run
