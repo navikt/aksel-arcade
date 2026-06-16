@@ -1,4 +1,4 @@
-import { useContext, useState, useEffect } from 'react'
+import { useCallback, useContext, useState, useEffect } from 'react'
 import { Box, Page } from '@navikt/ds-react'
 import { AppContext } from './hooks/useProject'
 import { useAutoSave } from './hooks/useAutoSave'
@@ -11,6 +11,7 @@ import { SplitPane } from './components/Layout/SplitPane'
 import { validateProjectSize } from './services/storage'
 import type { Project } from './types/project'
 import type { DesktopMcpServerState } from './services/desktopMcp'
+import type { DesktopMcpLastActivity } from './services/desktopMcpApplyChangesProtocol'
 import { WEB_ARCADE_CAPABILITIES, type ShellCapabilities } from './services/shellCapabilities'
 import { useSettings } from './contexts/SettingsContext'
 import { useDesktopMcpProjectResourceBridge } from './hooks/useDesktopMcpProjectResourceBridge'
@@ -36,6 +37,7 @@ function App({
     loadFormSummaryTemplate,
     loadHooksDemo,
     previewState,
+    updatePreviewState,
     shareHydration,
     applySharedSnapshot,
     dismissShareHydration,
@@ -48,23 +50,48 @@ function App({
     pagePanelOpen,
     selectedEditTarget,
     previewFullscreen,
+    setTheme,
   } = useSettings()
+  const [liveDesktopMcpServerState, setLiveDesktopMcpServerState] =
+    useState<DesktopMcpServerState | null>(desktopMcpServerState)
 
-  useDesktopMcpProjectResourceBridge({
-    project,
-    previewState,
-    theme,
-  })
+  useEffect(() => {
+    setLiveDesktopMcpServerState(desktopMcpServerState)
+  }, [desktopMcpServerState])
 
-  // T097: Auto-save integration
-  const { saveStatus, saveError } = useAutoSave(project, {
+  const handleDesktopMcpActivity = useCallback((activity: DesktopMcpLastActivity) => {
+    setLiveDesktopMcpServerState((prev) =>
+      prev
+        ? {
+            ...prev,
+            lastActivity: activity,
+          }
+        : prev
+    )
+  }, [])
+
+  const workingCopyPreferences = {
     theme,
     panelOrder,
     multiPageEnabled,
     pagePanelOpen,
     selectedEditTarget,
     previewFullscreen,
+  }
+
+  useDesktopMcpProjectResourceBridge({
+    project,
+    previewState,
+    theme,
+    workingCopyPreferences,
+    setTheme,
+    updateProject,
+    updatePreviewState,
+    onDesktopMcpActivity: handleDesktopMcpActivity,
   })
+
+  // T097: Auto-save integration
+  const { saveStatus, saveError } = useAutoSave(project, workingCopyPreferences)
 
   // T094, T095, T096: Project size monitoring
   const [projectSizeBytes, setProjectSizeBytes] = useState(0)
@@ -164,7 +191,7 @@ function App({
             onLoadFormSummaryTemplate={loadFormSummaryTemplate}
             onLoadHooksDemo={loadHooksDemo}
             shellCapabilities={shellCapabilities}
-            desktopMcpServerState={desktopMcpServerState}
+            desktopMcpServerState={liveDesktopMcpServerState}
           />
         </div>
 
