@@ -1,7 +1,12 @@
 import type { ArcadePageId } from './project'
 import type { CompileError, RuntimeError } from './preview'
 import type { InspectionData } from './inspection'
-import type { PreviewEvidenceCaptureResult } from '@/services/previewEvidence'
+import type {
+  PreviewEvidenceCaptureResult,
+  PreviewEvidenceCaptureTarget,
+  PreviewEvidenceLayer,
+  PreviewEvidenceScreenshotScope,
+} from '@/services/previewEvidence'
 
 // Main → Sandbox messages
 export type MainToSandboxMessage =
@@ -12,7 +17,16 @@ export type MainToSandboxMessage =
   | { type: 'TOGGLE_INSPECT'; payload: { enabled: boolean } }
   | { type: 'GET_INSPECTION_DATA'; payload: { x: number; y: number } }
   | { type: 'UPDATE_THEME'; payload: { theme: 'light' | 'dark' } }
-  | { type: 'CAPTURE_PREVIEW_EVIDENCE'; payload: { requestId: string } }
+  | {
+      type: 'CAPTURE_PREVIEW_EVIDENCE'
+      payload: {
+        requestId: string
+        layers?: PreviewEvidenceLayer[]
+        screenshotScope?: PreviewEvidenceScreenshotScope
+        target?: PreviewEvidenceCaptureTarget
+        expectedPageId?: ArcadePageId
+      }
+    }
 
 // Sandbox → Main messages
 export type SandboxToMainMessage =

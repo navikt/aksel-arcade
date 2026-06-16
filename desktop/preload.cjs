@@ -14,10 +14,15 @@ const ROUTE_DESKTOP_MCP_APPLY_CHANGES_REQUEST_CHANNEL =
   'aksel-arcade:route-desktop-mcp-apply-changes-request'
 const ROUTE_DESKTOP_MCP_APPLY_CHANGES_RESPONSE_CHANNEL =
   'aksel-arcade:route-desktop-mcp-apply-changes-response'
+const ROUTE_DESKTOP_MCP_PREVIEW_CAPTURE_REQUEST_CHANNEL =
+  'aksel-arcade:route-desktop-mcp-preview-capture-request'
+const ROUTE_DESKTOP_MCP_PREVIEW_CAPTURE_RESPONSE_CHANNEL =
+  'aksel-arcade:route-desktop-mcp-preview-capture-response'
 
 let agentTransportRequestHandler = null
 let desktopMcpProjectResourceReadHandler = null
 let desktopMcpApplyChangesHandler = null
+let desktopMcpPreviewCaptureHandler = null
 
 ipcRenderer.on(ROUTE_AGENT_TRANSPORT_REQUEST_CHANNEL, (_event, payload) => {
   void routeAgentTransportRequest(payload)
@@ -27,6 +32,9 @@ ipcRenderer.on(ROUTE_DESKTOP_MCP_PROJECT_RESOURCE_REQUEST_CHANNEL, (_event, payl
 })
 ipcRenderer.on(ROUTE_DESKTOP_MCP_APPLY_CHANGES_REQUEST_CHANNEL, (_event, payload) => {
   void routeDesktopMcpApplyChangesRequest(payload)
+})
+ipcRenderer.on(ROUTE_DESKTOP_MCP_PREVIEW_CAPTURE_REQUEST_CHANNEL, (_event, payload) => {
+  void routeDesktopMcpPreviewCaptureRequest(payload)
 })
 
 const routeAgentTransportRequest = async (payload) => {
@@ -188,6 +196,56 @@ const routeDesktopMcpApplyChangesRequest = async (payload) => {
   }
 }
 
+const routeDesktopMcpPreviewCaptureRequest = async (payload) => {
+  const requestId =
+    isRecord(payload) && typeof payload.requestId === 'string' ? payload.requestId : null
+  if (!requestId) {
+    return
+  }
+
+  const request = parseDesktopMcpPreviewCaptureRequest(payload)
+  if (!request) {
+    ipcRenderer.send(ROUTE_DESKTOP_MCP_PREVIEW_CAPTURE_RESPONSE_CHANNEL, {
+      requestId,
+      response: createDesktopMcpPreviewCaptureFailure(
+        'project-unavailable',
+        'Desktop MCP capture_preview_evidence route request from the main process was invalid.'
+      ),
+    })
+    return
+  }
+
+  if (!desktopMcpPreviewCaptureHandler) {
+    ipcRenderer.send(ROUTE_DESKTOP_MCP_PREVIEW_CAPTURE_RESPONSE_CHANNEL, {
+      requestId,
+      response: createDesktopMcpPreviewCaptureFailure(
+        'project-unavailable',
+        'Desktop MCP capture_preview_evidence is not available in the renderer yet.'
+      ),
+    })
+    return
+  }
+
+  try {
+    const response = await desktopMcpPreviewCaptureHandler(request)
+    ipcRenderer.send(ROUTE_DESKTOP_MCP_PREVIEW_CAPTURE_RESPONSE_CHANNEL, {
+      requestId,
+      response,
+    })
+  } catch (error) {
+    ipcRenderer.send(ROUTE_DESKTOP_MCP_PREVIEW_CAPTURE_RESPONSE_CHANNEL, {
+      requestId,
+      response: createDesktopMcpPreviewCaptureFailure(
+        'project-unavailable',
+        getRedactedAgentErrorMessage(
+          error,
+          'Desktop MCP capture_preview_evidence failed unexpectedly in the renderer.'
+        )
+      ),
+    })
+  }
+}
+
 contextBridge.exposeInMainWorld(
   '__AKSEL_ARCADE_DESKTOP__',
   Object.freeze({
@@ -216,6 +274,14 @@ contextBridge.exposeInMainWorld(
         throw new Error('Desktop MCP apply_changes handler must be a function or null.')
       }
       desktopMcpApplyChangesHandler = handler
+    },
+    setDesktopMcpPreviewCaptureHandler: (handler) => {
+      if (handler !== null && typeof handler !== 'function') {
+        throw new Error(
+          'Desktop MCP capture_preview_evidence handler must be a function or null.'
+        )
+      }
+      desktopMcpPreviewCaptureHandler = handler
     },
   })
 )
@@ -279,6 +345,66 @@ const parseDesktopMcpApplyChangesRequest = (payload) => {
   }
 }
 
+const parseDesktopMcpPreviewCaptureRequest = (payload) => {
+  if (!isRecord(payload)) {
+    return null
+  }
+
+  const target = parseDesktopMcpPreviewCaptureTarget(payload.target)
+  if (payload.target !== undefined && target === null) {
+    return null
+  }
+
+  if (
+    (payload.pageId !== undefined &&
+      (typeof payload.pageId !== 'string' || payload.pageId.trim().length === 0)) ||
+    (payload.viewportSize !== undefined && typeof payload.viewportSize !== 'string') ||
+    (payload.theme !== undefined && typeof payload.theme !== 'string') ||
+    (payload.layers !== undefined &&
+      (!Array.isArray(payload.layers) ||
+        payload.layers.some((layer) => typeof layer !== 'string'))) ||
+    (payload.screenshotScope !== undefined && typeof payload.screenshotScope !== 'string')
+  ) {
+    return null
+  }
+
+  return {
+    ...(typeof payload.pageId === 'string' ? { pageId: payload.pageId } : {}),
+    ...(typeof payload.viewportSize === 'string' ? { viewportSize: payload.viewportSize } : {}),
+    ...(typeof payload.theme === 'string' ? { theme: payload.theme } : {}),
+    ...(Array.isArray(payload.layers) ? { layers: payload.layers } : {}),
+    ...(typeof payload.screenshotScope === 'string'
+      ? { screenshotScope: payload.screenshotScope }
+      : {}),
+    ...(target ? { target } : {}),
+  }
+}
+
+const parseDesktopMcpPreviewCaptureTarget = (value) => {
+  if (value === undefined) {
+    return undefined
+  }
+
+  if (!isRecord(value)) {
+    return null
+  }
+
+  const target = {}
+  for (const key of ['selector', 'role', 'name', 'text', 'label']) {
+    if (value[key] === undefined) {
+      continue
+    }
+
+    if (typeof value[key] !== 'string') {
+      return null
+    }
+
+    target[key] = value[key]
+  }
+
+  return target
+}
+
 const createRouteErrorResponse = (id, jsonRpcCode, code, message) => ({
   jsonrpc: '2.0',
   id,
@@ -302,6 +428,13 @@ const createDesktopMcpApplyChangesFailure = (code, message) => ({
   ok: false,
   code,
   message,
+})
+
+const createDesktopMcpPreviewCaptureFailure = (code, message, extras = {}) => ({
+  ok: false,
+  code,
+  message,
+  ...extras,
 })
 
 const getRedactedAgentErrorMessage = (error, fallback) => {

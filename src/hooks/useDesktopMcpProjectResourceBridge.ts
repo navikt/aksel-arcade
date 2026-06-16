@@ -1,6 +1,7 @@
-import { useCallback, useLayoutEffect, useRef } from 'react'
+import { useCallback, useLayoutEffect, useRef, type RefObject } from 'react'
 import type { ThemeMode, Project, ProjectSourceTarget } from '@/types/project'
 import type { PreviewState } from '@/types/preview'
+import { getViewportWidth } from '@/types/viewports'
 import { collectPreviewDiagnostics } from '@/services/previewDiagnostics'
 import {
   saveProject,
@@ -17,6 +18,16 @@ import type {
   DesktopMcpApplyChangesRequest,
   DesktopMcpLastActivity,
 } from '@/services/desktopMcpApplyChangesProtocol'
+import {
+  finalizeDesktopMcpPreviewCapture,
+  prepareDesktopMcpPreviewCapture,
+} from '@/services/desktopMcpPreviewCapture'
+import { registerDesktopPreloadMcpPreviewCaptureHandler } from '@/services/desktopMcpPreviewCaptureAdapter'
+import { capturePreviewInIsolatedSandbox } from '@/services/desktopMcpPreviewCaptureSandbox'
+import type {
+  DesktopMcpPreviewCaptureRequest,
+  DesktopMcpPreviewCaptureResult,
+} from '@/services/desktopMcpPreviewCaptureProtocol'
 import { readDesktopMcpProjectResource } from '@/services/desktopMcpProjectResources'
 import { registerDesktopPreloadMcpProjectResourceReadHandler } from '@/services/desktopMcpProjectResourceAdapter'
 import type { DesktopMcpProjectResourceReadRequest } from '@/services/desktopMcpProjectResourceProtocol'
@@ -24,6 +35,7 @@ import type { DesktopMcpProjectResourceReadRequest } from '@/services/desktopMcp
 interface UseDesktopMcpProjectResourceBridgeOptions {
   project: Project
   previewState: PreviewState
+  previewIframeRef: RefObject<HTMLIFrameElement | null>
   theme: ThemeMode
   workingCopyPreferences: WebArcadeWorkingCopyPreferences
   setTheme: (theme: ThemeMode) => void
@@ -41,6 +53,7 @@ type DesktopMcpProjectUpdates = Partial<Pick<Project, 'name' | 'viewportSize'>> 
 export const useDesktopMcpProjectResourceBridge = ({
   project,
   previewState,
+  previewIframeRef,
   theme,
   workingCopyPreferences,
   setTheme,
@@ -52,6 +65,8 @@ export const useDesktopMcpProjectResourceBridge = ({
     project,
     theme,
     diagnostics: collectPreviewDiagnostics(previewState),
+    transpiledCode: previewState.transpiledCode,
+    compileError: previewState.compileError ?? previewState.pendingCompileError,
   })
 
   useLayoutEffect(() => {
@@ -59,6 +74,8 @@ export const useDesktopMcpProjectResourceBridge = ({
       project,
       theme,
       diagnostics: collectPreviewDiagnostics(previewState),
+      transpiledCode: previewState.transpiledCode,
+      compileError: previewState.compileError ?? previewState.pendingCompileError,
     }
   }, [previewState, project, theme])
 
@@ -102,6 +119,16 @@ export const useDesktopMcpProjectResourceBridge = ({
         project: preparedResult.nextProject,
         theme: preparedResult.nextTheme,
         diagnostics: preparedResult.nextDiagnostics,
+        transpiledCode: preparedResult.appliedOperations.some(
+          (operation) => operation.type === 'replace_source'
+        )
+          ? null
+          : currentContext.transpiledCode,
+        compileError: preparedResult.appliedOperations.some(
+          (operation) => operation.type === 'replace_source'
+        )
+          ? null
+          : currentContext.compileError,
       }
       workingCopyPreferencesRef.current = nextWorkingCopyPreferences
 
@@ -127,16 +154,64 @@ export const useDesktopMcpProjectResourceBridge = ({
     [onDesktopMcpActivity, setTheme, updateProject, updatePreviewState]
   )
 
+  const handleCapturePreviewEvidence = useCallback(
+    async (
+      request: DesktopMcpPreviewCaptureRequest
+    ): Promise<DesktopMcpPreviewCaptureResult> => {
+      const currentContext = resourceContextRef.current
+      const prepared = prepareDesktopMcpPreviewCapture(request, currentContext)
+      if (!prepared.ok) {
+        return prepared
+      }
+
+      if (currentContext.compileError || !currentContext.transpiledCode) {
+        return {
+          ok: false as const,
+          code: 'render-failed' as const,
+          message:
+            'capture_preview_evidence is unavailable because the current Arcade project source does not render cleanly yet. Read arcade://project/diagnostics before retrying.',
+          manifestResourceUri: 'arcade://project/manifest',
+        }
+      }
+
+      const captureResult = await capturePreviewInIsolatedSandbox({
+        transpiledCode: currentContext.transpiledCode,
+        pageId: prepared.pageId,
+        startPageId: currentContext.project.source.startPageId,
+        viewportWidth: getViewportWidth(prepared.viewportSize),
+        viewportHeight: Math.max(1, previewIframeRef.current?.clientHeight ?? 900),
+        theme: prepared.theme,
+        layers: prepared.requestedLayers,
+        screenshotScope: prepared.screenshotScope,
+        ...(prepared.target ? { target: prepared.target } : {}),
+      })
+
+      if (!captureResult.ok) {
+        return captureResult
+      }
+
+      const finalized = finalizeDesktopMcpPreviewCapture(prepared, captureResult, currentContext)
+      if (finalized.ok) {
+        onDesktopMcpActivity?.(finalized.safeActivity)
+      }
+      return finalized
+    },
+    [onDesktopMcpActivity, previewIframeRef]
+  )
+
   useLayoutEffect(() => {
     const unregisterProjectRead =
       registerDesktopPreloadMcpProjectResourceReadHandler(handleProjectResourceRead)
     const unregisterApplyChanges = registerDesktopPreloadMcpApplyChangesHandler(handleApplyChanges)
+    const unregisterPreviewCapture =
+      registerDesktopPreloadMcpPreviewCaptureHandler(handleCapturePreviewEvidence)
 
     return () => {
+      unregisterPreviewCapture?.()
       unregisterApplyChanges?.()
       unregisterProjectRead?.()
     }
-  }, [handleApplyChanges, handleProjectResourceRead])
+  }, [handleApplyChanges, handleCapturePreviewEvidence, handleProjectResourceRead])
 }
 
 const createApplyChangesPersistenceFailure = ({

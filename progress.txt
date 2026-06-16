@@ -188,6 +188,30 @@ Verification:
 - CI=1 npm run test -- --run
 - Browser check at `http://127.0.0.1:4177/aksel-arcade/` for multi-page preview navigation to Page 2, staying on Page 2 after editing Page 1, corrected labeled compile errors during an induced broken Page 2 edit, and no console errors on a clean reload
 
+### 2026-06-16 - Issue #274: Baseline targeted Preview evidence capture
+
+Implemented:
+
+- Selected `#274` as the highest-priority open `ready-for-agent` feature from `#274`-`#280` after checking issue `#269`, `CONTEXT.md`, and the existing `progress.txt` notes; it is the first unblocked Preview-capture slice and the foundation that later evidence-layer and interaction follow-ups build on.
+- Added a dedicated Desktop MCP preview-capture bridge across `desktop/main.cjs`, `desktop/preload.cjs`, `src/services/shellCapabilities.ts`, `src/services/agentBridge.ts`, `src/App.tsx`, and `src/hooks/useDesktopMcpProjectResourceBridge.ts` so `capture_preview_evidence` routes through the active Desktop renderer without focusing the window or mutating the visible project session.
+- Added `src/services/desktopMcpPreviewCaptureProtocol.ts`, `src/services/desktopMcpPreviewCaptureAdapter.ts`, `src/services/desktopMcpPreviewCapture.ts`, and `src/services/desktopMcpPreviewCaptureSandbox.ts` to validate/default capture requests, resolve target pages from the active project, run each capture through a fresh hidden sandbox iframe, and finalize the short-lived manifest / frame / screenshot MCP resources.
+- Extended `src/services/previewEvidence.ts`, `public/sandbox.html`, and `src/types/messages.ts` so the sandbox capture path now supports baseline `screenshot` and `frame` layers, screenshot scopes `viewport` / `full_page` / `region`, accessibility-or-selector region targeting, SVG screenshot output, and structured capture failures for invalid targets or render timeouts.
+- Updated `desktop/mcpServer.cjs` to expose the live `capture_preview_evidence` capability status, keep short-lived `arcade://preview/captures/{captureId}/*` resources in an expiring in-memory store, and serve manifest/frame/screenshot reads independently from the durable `arcade://project/*` resource path.
+- Added regression coverage in `tests/unit/services/desktopMcpServer.test.ts` for routed capture success, expired capture-resource reads, and updated capability text, plus the small hook test fix in `tests/unit/hooks/useDesktopMcpProjectResourceBridge.test.tsx` for the new preview-iframe bridge dependency.
+
+Verification:
+
+- npm run typecheck
+- CI=1 npm test -- --run
+- npm run lint
+- npm run build
+- Browser/console smoke check at `http://127.0.0.1:4193/aksel-arcade/` using `npm run preview -- --host 127.0.0.1 --port 4193 --strictPort`, confirming the default preview renders and the browser console stays free of errors and warnings
+
+Next note:
+
+- `#277` should build on the existing isolated hidden-sandbox capture bridge and expiring `arcade://preview/captures/{captureId}/*` store instead of trying to inspect the human-visible preview iframe directly; the production sandbox still runs without `allow-same-origin`, so parent-side DOM scraping is the wrong architecture for later evidence layers too.
+- `capture_preview_evidence` now intentionally stops at baseline `screenshot` + `frame` resources. `accessibility` and `dom_layout_style` layers are still explicitly unimplemented and should layer onto the same manifest/store contract instead of inventing a second capture path.
+
 2026-05-23 - Issue #7: Palette groups, statuses, and docs links
 
 Selected #7 as the highest-priority ready-for-agent feature because it is unblocked by #6 and unlocks later contextual icon autocomplete (#9) and v8 chrome work (#12).

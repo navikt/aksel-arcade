@@ -155,8 +155,8 @@
       postMessageToParent,
     } = window.sandboxMessaging;
     const {
+      capturePreviewEvidenceSnapshot,
       PREVIEW_EVIDENCE_ROOT_SELECTOR,
-      serializePreviewEvidence,
     } = window.previewEvidenceUtils;
 
     // React and Aksel are loaded from the pre-bundled sandbox runtime.
@@ -515,32 +515,76 @@
         return;
       }
 
-      try {
-        const root = document.querySelector(PREVIEW_EVIDENCE_ROOT_SELECTOR);
-        if (!root) {
-          sendPreviewEvidenceResult(requestId, {
-            ok: false,
-            error: {
-              code: 'preview-unavailable',
-              message: 'Preview root element was not found in the sandbox.',
-            },
-          });
+      const expectedPageId =
+        typeof payload?.expectedPageId === 'string' && payload.expectedPageId.length > 0
+          ? payload.expectedPageId
+          : null;
+      const layers = Array.isArray(payload?.layers) ? payload.layers : undefined;
+      const screenshotScope =
+        typeof payload?.screenshotScope === 'string' ? payload.screenshotScope : undefined;
+      const target =
+        payload?.target && typeof payload.target === 'object' ? payload.target : undefined;
+      const maxFrames = 30;
+
+      const captureWhenReady = (remainingFrames = maxFrames) => {
+        if (expectedPageId && getCurrentPreviewPageId() !== expectedPageId) {
+          if (remainingFrames <= 0) {
+            sendPreviewEvidenceResult(requestId, {
+              ok: false,
+              error: {
+                code: 'render-timeout',
+                message: `Preview did not reach page "${expectedPageId}" before capture timed out.`,
+              },
+            });
+            return;
+          }
+
+          window.requestAnimationFrame(() => captureWhenReady(remainingFrames - 1));
           return;
         }
 
-        sendPreviewEvidenceResult(requestId, {
-          ok: true,
-          evidence: serializePreviewEvidence(root, window),
+        window.requestAnimationFrame(() => {
+          window.requestAnimationFrame(() => {
+            try {
+              const root = document.querySelector(PREVIEW_EVIDENCE_ROOT_SELECTOR);
+              if (!root) {
+                sendPreviewEvidenceResult(requestId, {
+                  ok: false,
+                  error: {
+                    code: 'preview-unavailable',
+                    message: 'Preview root element was not found in the sandbox.',
+                  },
+                });
+                return;
+              }
+
+              sendPreviewEvidenceResult(
+                requestId,
+                capturePreviewEvidenceSnapshot(
+                  root,
+                  {
+                    layers,
+                    screenshotScope,
+                    target,
+                    currentPageId: getCurrentPreviewPageId(),
+                  },
+                  window
+                )
+              );
+            } catch (error) {
+              sendPreviewEvidenceResult(requestId, {
+                ok: false,
+                error: {
+                  code: 'preview-unavailable',
+                  message: `Preview evidence could not be captured: ${getErrorMessage(error)}`,
+                },
+              });
+            }
+          });
         });
-      } catch (error) {
-        sendPreviewEvidenceResult(requestId, {
-          ok: false,
-          error: {
-            code: 'preview-unavailable',
-            message: `Preview evidence could not be captured: ${getErrorMessage(error)}`,
-          },
-        });
-      }
+      };
+
+      captureWhenReady();
     }
 
     function sendPreviewEvidenceResult(requestId, result) {
