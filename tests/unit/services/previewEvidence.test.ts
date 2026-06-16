@@ -1,5 +1,26 @@
-import { describe, expect, it } from 'vitest'
-import { MAX_PREVIEW_EVIDENCE_ELEMENTS, serializePreviewEvidence } from '@/services/previewEvidence'
+import { afterEach, describe, expect, it } from 'vitest'
+import {
+  MAX_PREVIEW_EVIDENCE_ELEMENTS,
+  capturePreviewEvidenceSnapshot,
+  serializePreviewEvidence,
+} from '@/services/previewEvidence'
+
+const originalWindowMetricDescriptors = {
+  innerWidth: Object.getOwnPropertyDescriptor(window, 'innerWidth'),
+  innerHeight: Object.getOwnPropertyDescriptor(window, 'innerHeight'),
+  devicePixelRatio: Object.getOwnPropertyDescriptor(window, 'devicePixelRatio'),
+  scrollX: Object.getOwnPropertyDescriptor(window, 'scrollX'),
+  scrollY: Object.getOwnPropertyDescriptor(window, 'scrollY'),
+}
+
+afterEach(() => {
+  document.body.innerHTML = ''
+  restoreWindowMetric('innerWidth')
+  restoreWindowMetric('innerHeight')
+  restoreWindowMetric('devicePixelRatio')
+  restoreWindowMetric('scrollX')
+  restoreWindowMetric('scrollY')
+})
 
 describe('preview evidence', () => {
   it('serializes useful layout facts from the preview root', () => {
@@ -117,6 +138,42 @@ describe('preview evidence', () => {
     expect(evidence.frame.capturedElementCount).toBe(MAX_PREVIEW_EVIDENCE_ELEMENTS)
     expect(evidence.frame.truncated).toBe(true)
   })
+
+  it('falls back to the requested viewport dimensions when iframe window metrics are zero', () => {
+    const { root } = renderPreviewFixture()
+
+    Object.defineProperties(window, {
+      innerWidth: { configurable: true, value: 0 },
+      innerHeight: { configurable: true, value: 0 },
+    })
+    mockRect(root, { x: 0, y: 0, width: 0, height: 0 })
+
+    const result = capturePreviewEvidenceSnapshot(
+      root,
+      {
+        layers: ['screenshot'],
+        viewportFallback: { width: 640, height: 480 },
+      },
+      window
+    )
+
+    expect(result).toMatchObject({
+      ok: true,
+      evidence: {
+        frame: {
+          viewport: {
+            width: 640,
+            height: 480,
+            devicePixelRatio: 2,
+          },
+        },
+      },
+      screenshot: {
+        width: 640,
+        height: 480,
+      },
+    })
+  })
 })
 
 const renderPreviewFixture = () => {
@@ -191,4 +248,14 @@ const mockRect = (element: Element, rect: Pick<DOMRect, 'x' | 'y' | 'width' | 'h
   } as DOMRect
 
   element.getBoundingClientRect = () => fullRect
+}
+
+const restoreWindowMetric = (key: keyof typeof originalWindowMetricDescriptors) => {
+  const descriptor = originalWindowMetricDescriptors[key]
+  if (descriptor) {
+    Object.defineProperty(window, key, descriptor)
+    return
+  }
+
+  delete window[key]
 }

@@ -3352,3 +3352,24 @@ Verification:
 Next note:
 
 - If a future follow-up touches isolated Preview capture timing, keep the regression at `tests/e2e/desktop-mcp-preview-capture.spec.ts` green and prefer timer-based settling over `requestAnimationFrame` inside the offscreen sandbox unless Electron behavior is revalidated.
+### 2026-06-16 - Issue #274 follow-up: stabilize default Desktop MCP Preview capture
+
+Implemented:
+
+- Fixed the remaining default `capture_preview_evidence({})` regressions reported after the initial #274 delivery.
+- Threaded the host-requested hidden-preview viewport dimensions into the sandbox capture payload and used them as a fallback in `src/services/previewEvidence.ts`, so frame metadata and SVG screenshots no longer collapse to `0x0` / `1x1` when Electron reports zero inner-window metrics in the hidden iframe path.
+- Removed the extra post-render timer chain inside `public/sandbox.html` capture execution and now capture immediately once the expected page is present; this eliminated the flaky hidden-iframe stall where fresh default captures could time out after render success but before any capture result returned.
+- Tightened the Desktop MCP Playwright regression to cover repeated default captures across multiple fresh Electron launches, so the suite now protects against both timeout flakes and zero-sized output.
+
+Verification:
+
+- npm run type-check
+- CI=1 npm test -- --run
+- npm run lint
+- npm run build
+- npx playwright test tests/e2e/desktop-mcp-preview-capture.spec.ts --reporter=line
+- Direct Electron + MCP JSON-RPC stress loop over repeated fresh launches confirmed default captures now return nonzero frame viewport metadata and matching screenshot dimensions consistently
+
+Next note:
+
+- The current default project still exposes only `page01`, so the exact "capture a non-active page without changing the visible active page" verifier step remains non-executable until a multi-page default fixture exists; keep treating that as fixture coverage, not a regression in the capture pipeline.

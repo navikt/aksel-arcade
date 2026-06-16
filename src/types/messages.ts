@@ -23,6 +23,8 @@ export type MainToSandboxMessage =
         requestId: string
         layers?: PreviewEvidenceLayer[]
         screenshotScope?: PreviewEvidenceScreenshotScope
+        viewportWidth?: number
+        viewportHeight?: number
         target?: PreviewEvidenceCaptureTarget
         expectedPageId?: ArcadePageId
       }

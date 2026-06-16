@@ -54,6 +54,7 @@ export const capturePreviewInIsolatedSandbox = async ({
   return new Promise((resolve) => {
     const iframe = document.createElement('iframe')
     iframe.src = SANDBOX_IFRAME_SRC
+    iframe.name = 'desktop-mcp-preview-capture'
     iframe.setAttribute('sandbox', 'allow-scripts')
     iframe.setAttribute('referrerpolicy', 'no-referrer')
     iframe.style.position = 'fixed'
@@ -114,6 +115,8 @@ export const capturePreviewInIsolatedSandbox = async ({
           requestId: PREVIEW_CAPTURE_REQUEST_ID,
           layers,
           screenshotScope,
+          viewportWidth,
+          viewportHeight,
           ...(target ? { target } : {}),
           expectedPageId: pageId,
         },
@@ -201,7 +204,11 @@ export const capturePreviewInIsolatedSandbox = async ({
     }
 
     const handleWindowMessage = (event: MessageEvent) => {
-      if (event.source !== iframe.contentWindow || event.data?.type !== 'SANDBOX_READY') {
+      if (event.source !== iframe.contentWindow) {
+        return
+      }
+
+      if (event.data?.type !== 'SANDBOX_READY') {
         return
       }
 

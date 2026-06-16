@@ -125,6 +125,11 @@ export interface PreviewEvidenceCaptureMetadata {
   targetDescription?: string
 }
 
+interface PreviewEvidenceViewportFallback {
+  width: number
+  height: number
+}
+
 export interface PreviewEvidenceCaptureFailure {
   ok: false
   error: {
@@ -227,13 +232,15 @@ export const requestPreviewEvidenceFromFrame = (
 
 export const serializePreviewEvidence = (
   root: Element,
-  frameWindow: Window = root.ownerDocument.defaultView ?? window
+  frameWindow: Window = root.ownerDocument.defaultView ?? window,
+  viewportFallback?: PreviewEvidenceViewportFallback
 ): PreviewEvidence => {
   const state: SerializationState = {
     capturedElementCount: 0,
     truncated: false,
   }
   const tree = serializeElement(root, frameWindow, state)
+  const viewport = getEffectiveViewportSize(frameWindow, viewportFallback)
 
   if (!tree) {
     throw new Error('Preview evidence root could not be serialized.')
@@ -242,11 +249,7 @@ export const serializePreviewEvidence = (
   return {
     frame: {
       rootSelector: PREVIEW_EVIDENCE_ROOT_SELECTOR,
-      viewport: {
-        width: roundNumber(frameWindow.innerWidth),
-        height: roundNumber(frameWindow.innerHeight),
-        devicePixelRatio: roundNumber(frameWindow.devicePixelRatio || 1),
-      },
+      viewport: { ...viewport, devicePixelRatio: roundNumber(frameWindow.devicePixelRatio || 1) },
       scroll: {
         x: roundNumber(frameWindow.scrollX),
         y: roundNumber(frameWindow.scrollY),
@@ -265,20 +268,22 @@ export const capturePreviewEvidenceSnapshot = (
     screenshotScope = 'viewport',
     target,
     currentPageId = null,
+    viewportFallback,
   }: {
     layers?: PreviewEvidenceLayer[]
     screenshotScope?: PreviewEvidenceScreenshotScope
     target?: PreviewEvidenceCaptureTarget
     currentPageId?: ArcadePageId | null
+    viewportFallback?: PreviewEvidenceViewportFallback
   } = {},
   frameWindow: Window = root.ownerDocument.defaultView ?? window
 ): PreviewEvidenceCaptureResult => {
   try {
-    const evidence = serializePreviewEvidence(root, frameWindow)
+    const evidence = serializePreviewEvidence(root, frameWindow, viewportFallback)
     const normalizedLayers = layers ? [...layers] : []
     const screenshotRequested = normalizedLayers.includes('screenshot')
     const screenshot = screenshotRequested
-      ? createPreviewScreenshot(root, { screenshotScope, target }, frameWindow)
+      ? createPreviewScreenshot(root, { screenshotScope, target, viewportFallback }, frameWindow)
       : null
 
     if (screenshotRequested && !screenshot) {
@@ -370,20 +375,28 @@ const createPreviewScreenshot = (
   {
     screenshotScope,
     target,
+    viewportFallback,
   }: {
     screenshotScope: PreviewEvidenceScreenshotScope
     target?: PreviewEvidenceCaptureTarget
+    viewportFallback?: PreviewEvidenceViewportFallback
   },
   frameWindow: Window
 ): PreviewScreenshotResult | null => {
-  const captureRegion = resolvePreviewCaptureRegion(root, frameWindow, screenshotScope, target)
+  const captureRegion = resolvePreviewCaptureRegion(
+    root,
+    frameWindow,
+    screenshotScope,
+    target,
+    viewportFallback
+  )
   if (!captureRegion) {
     return null
   }
 
   const frameDocument = root.ownerDocument
-  const documentWidth = getCaptureDocumentWidth(root, frameWindow)
-  const documentHeight = getCaptureDocumentHeight(root, frameWindow)
+  const documentWidth = getCaptureDocumentWidth(root, frameWindow, viewportFallback)
+  const documentHeight = getCaptureDocumentHeight(root, frameWindow, viewportFallback)
   const stage = frameDocument.createElement('div')
   stage.setAttribute('xmlns', 'http://www.w3.org/1999/xhtml')
   stage.style.width = `${documentWidth}px`
@@ -428,28 +441,31 @@ const resolvePreviewCaptureRegion = (
   root: Element,
   frameWindow: Window,
   screenshotScope: PreviewEvidenceScreenshotScope,
-  target?: PreviewEvidenceCaptureTarget
+  target?: PreviewEvidenceCaptureTarget,
+  viewportFallback?: PreviewEvidenceViewportFallback
 ): {
   rect: CaptureRect
   targetDescription?: string
 } | null => {
   switch (screenshotScope) {
-    case 'viewport':
+    case 'viewport': {
+      const viewport = getEffectiveViewportSize(frameWindow, viewportFallback)
       return {
         rect: {
           x: roundNumber(frameWindow.scrollX),
           y: roundNumber(frameWindow.scrollY),
-          width: roundNumber(frameWindow.innerWidth),
-          height: roundNumber(frameWindow.innerHeight),
+          width: viewport.width,
+          height: viewport.height,
         },
       }
+    }
     case 'full_page':
       return {
         rect: {
           x: 0,
           y: 0,
-          width: roundNumber(getCaptureDocumentWidth(root, frameWindow)),
-          height: roundNumber(getCaptureDocumentHeight(root, frameWindow)),
+          width: roundNumber(getCaptureDocumentWidth(root, frameWindow, viewportFallback)),
+          height: roundNumber(getCaptureDocumentHeight(root, frameWindow, viewportFallback)),
         },
       }
     case 'region': {
@@ -475,24 +491,36 @@ const resolvePreviewCaptureRegion = (
   }
 }
 
-const getCaptureDocumentWidth = (root: Element, frameWindow: Window): number => {
+const getCaptureDocumentWidth = (
+  root: Element,
+  frameWindow: Window,
+  viewportFallback?: PreviewEvidenceViewportFallback
+): number => {
   const document = root.ownerDocument
   const rootRect = root.getBoundingClientRect()
+  const viewport = getEffectiveViewportSize(frameWindow, viewportFallback)
   return Math.max(
-    roundNumber(frameWindow.innerWidth),
+    viewport.width,
     roundNumber(document.documentElement.scrollWidth),
     roundNumber(document.body.scrollWidth),
+    roundNumber(rootRect.width),
     roundNumber(rootRect.right + frameWindow.scrollX)
   )
 }
 
-const getCaptureDocumentHeight = (root: Element, frameWindow: Window): number => {
+const getCaptureDocumentHeight = (
+  root: Element,
+  frameWindow: Window,
+  viewportFallback?: PreviewEvidenceViewportFallback
+): number => {
   const document = root.ownerDocument
   const rootRect = root.getBoundingClientRect()
+  const viewport = getEffectiveViewportSize(frameWindow, viewportFallback)
   return Math.max(
-    roundNumber(frameWindow.innerHeight),
+    viewport.height,
     roundNumber(document.documentElement.scrollHeight),
     roundNumber(document.body.scrollHeight),
+    roundNumber(rootRect.height),
     roundNumber(rootRect.bottom + frameWindow.scrollY)
   )
 }
@@ -892,6 +920,44 @@ const roundNumber = (value: number): number => {
 
   const rounded = Math.round(value * 100) / 100
   return Object.is(rounded, -0) ? 0 : rounded
+}
+
+function getEffectiveViewportSize(
+  frameWindow: Window,
+  viewportFallback?: PreviewEvidenceViewportFallback
+): { width: number; height: number } {
+  const document = frameWindow.document
+  const normalizedFallback = normalizeViewportFallback(viewportFallback)
+
+  return {
+    width: Math.max(
+      roundNumber(frameWindow.innerWidth),
+      roundNumber(frameWindow.visualViewport?.width ?? 0),
+      roundNumber(document.documentElement.clientWidth),
+      roundNumber(document.body?.clientWidth ?? 0),
+      normalizedFallback?.width ?? 0
+    ),
+    height: Math.max(
+      roundNumber(frameWindow.innerHeight),
+      roundNumber(frameWindow.visualViewport?.height ?? 0),
+      roundNumber(document.documentElement.clientHeight),
+      roundNumber(document.body?.clientHeight ?? 0),
+      normalizedFallback?.height ?? 0
+    ),
+  }
+}
+
+function normalizeViewportFallback(
+  viewportFallback?: PreviewEvidenceViewportFallback
+): PreviewEvidenceViewportFallback | undefined {
+  if (!viewportFallback) {
+    return undefined
+  }
+
+  return {
+    width: Math.max(1, roundNumber(viewportFallback.width)),
+    height: Math.max(1, roundNumber(viewportFallback.height)),
+  }
 }
 
 const createPreviewUnavailableFailure = (message: string): PreviewEvidenceCaptureFailure =>
