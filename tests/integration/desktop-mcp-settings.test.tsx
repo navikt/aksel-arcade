@@ -116,7 +116,14 @@ describe('Desktop Arcade MCP settings', () => {
     expect(
       await screen.findByText('Status: Unavailable: Port 3846 on 127.0.0.1 is already in use.')
     ).toBeTruthy()
-    expect(screen.getByText('URL: http://127.0.0.1:3846/mcp')).toBeTruthy()
+    expect(
+      screen.getByText('Connection details are available once Desktop Arcade owns the MCP endpoint.')
+    ).toBeTruthy()
+    expect(screen.queryByText('URL: http://127.0.0.1:3846/mcp')).toBeNull()
+    expect(screen.queryByText('No token/header required.')).toBeNull()
+    expect(screen.queryByRole('menuitem', { name: /copy server name/i })).toBeNull()
+    expect(screen.queryByRole('menuitem', { name: /copy type/i })).toBeNull()
+    expect(screen.queryByRole('menuitem', { name: /copy mcp url/i })).toBeNull()
   })
 
   it('keeps the MCP section out of Web Arcade settings', async () => {

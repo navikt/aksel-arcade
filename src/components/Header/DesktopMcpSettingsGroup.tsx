@@ -33,6 +33,7 @@ export const DesktopMcpSettingsGroup = ({
   const statusText = mcpState
     ? formatDesktopMcpAvailability(mcpState.availability)
     : 'Status: Unavailable: Desktop Arcade MCP configuration is unavailable.'
+  const isAvailable = mcpState?.availability.status === 'available'
 
   const copyValue = async (value: string, label: string) => {
     if (!navigator.clipboard?.writeText) {
@@ -64,13 +65,16 @@ export const DesktopMcpSettingsGroup = ({
           <Detail role="status" aria-live="polite">
             {statusText}
           </Detail>
-          {mcpState && (
+          {isAvailable && mcpState && (
             <>
               <Detail>Server name: {mcpState.serverName}</Detail>
               <Detail>Type: {mcpState.transportLabel}</Detail>
               <Detail>URL: {mcpState.url}</Detail>
               <Detail>{mcpState.authDescription}</Detail>
             </>
+          )}
+          {mcpState && !isAvailable && (
+            <Detail>Connection details are available once Desktop Arcade owns the MCP endpoint.</Detail>
           )}
           <Detail>{DESKTOP_MCP_LAST_ACTIVITY_PLACEHOLDER}</Detail>
           {copyFeedback && (
@@ -83,7 +87,7 @@ export const DesktopMcpSettingsGroup = ({
           )}
         </VStack>
       </Box>
-      {mcpState && (
+      {isAvailable && mcpState && (
         <>
           <ActionMenu.Item
             icon={<FilesIcon aria-hidden />}

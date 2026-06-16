@@ -3119,3 +3119,19 @@ Next note:
 
 - `#271` should build directly on `desktop/mcpServer.cjs` and the `getDesktopMcpServerState` preload bridge instead of reintroducing another discovery/config surface; keep the fixed endpoint and Settings values authoritative while the MCP protocol surface is filled in.
 - The old Desktop Agent loopback/pairing UI still exists for now; `#279` is the cleanup slice that should remove the superseded user-facing model once the MCP discovery/resources/tools flow is in place.
+
+### 2026-06-16 - PR #281 review follow-up for Issue #270
+
+Fixed after review:
+
+- Kept the fixed MCP endpoint slice on `#270`, but closed the biggest correctness gap in `desktop/mcpServer.cjs` by teaching the endpoint to accept a minimal MCP `initialize` request and return JSON-RPC `method not implemented` errors for later calls instead of failing every request with HTTP 501.
+- Tightened `src/components/Header/DesktopMcpSettingsGroup.tsx` so an unavailable fixed port no longer exposes or copies Arcade’s MCP URL/auth copy while another local process owns `127.0.0.1:3846`; the menu now shows the unavailable reason and a clear hidden-details note instead.
+- Updated `tests/unit/services/desktopMcpServer.test.ts` and `tests/integration/desktop-mcp-settings.test.tsx` to cover the new initialize handshake and the hidden-details unavailable state.
+
+Verification:
+
+- `npm run typecheck`
+- `npm run lint`
+- `npm run build`
+- `CI=1 npm run test`
+- Browser check at `http://127.0.0.1:4196/aksel-arcade/` with mocked desktop preload states confirming the Settings MCP section still shows fixed details when available, hides them when the port is unavailable, and logs no console errors in either state

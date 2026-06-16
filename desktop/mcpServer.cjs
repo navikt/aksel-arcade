@@ -4,8 +4,10 @@ const DESKTOP_MCP_HOST = '127.0.0.1'
 const DESKTOP_MCP_PORT = 3846
 const DESKTOP_MCP_PATH = '/mcp'
 const DESKTOP_MCP_SERVER_NAME = 'desktop-arcade'
+const DESKTOP_MCP_SERVER_VERSION = '0.0.0'
 const DESKTOP_MCP_TRANSPORT_LABEL = 'HTTP (MCP Streamable HTTP)'
 const DESKTOP_MCP_AUTH_DESCRIPTION = 'No token/header required.'
+const MAX_MCP_BODY_BYTES = 1024 * 1024
 
 const createDesktopMcpServer = ({
   host = DESKTOP_MCP_HOST,
@@ -116,12 +118,12 @@ const handleDesktopMcpRequest = (request, response, { host, path, port }) => {
     return
   }
 
-  sendJson(response, 501, {
-    error: {
-      code: 'not-yet-implemented',
-      message: 'Desktop Arcade MCP protocol foundation is not implemented yet.',
-    },
-  })
+  if (request.method !== 'POST') {
+    sendText(response, 405, 'Desktop Arcade MCP currently supports POST only.')
+    return
+  }
+
+  void routeDesktopMcpRequest(request, response)
 }
 
 const sendJson = (response, statusCode, payload) => {
@@ -130,10 +132,106 @@ const sendJson = (response, statusCode, payload) => {
   response.end(JSON.stringify(payload))
 }
 
+const sendJsonRpcError = (response, { httpStatus = 200, id, code, message }) => {
+  sendJson(response, httpStatus, {
+    jsonrpc: '2.0',
+    id,
+    error: {
+      code,
+      message,
+    },
+  })
+}
+
 const sendText = (response, statusCode, message) => {
   response.statusCode = statusCode
   response.setHeader('content-type', 'text/plain; charset=utf-8')
   response.end(message)
+}
+
+const sendNoContent = (response, statusCode = 204) => {
+  response.statusCode = statusCode
+  response.end()
+}
+
+const routeDesktopMcpRequest = async (request, response) => {
+  let bodyText
+  try {
+    bodyText = await readRequestBody(request)
+  } catch (error) {
+    sendJsonRpcError(response, {
+      httpStatus: 413,
+      id: null,
+      code: -32000,
+      message:
+        error instanceof Error
+          ? error.message
+          : 'Desktop Arcade MCP request body exceeds the 1MB limit.',
+    })
+    return
+  }
+
+  let payload
+  try {
+    payload = JSON.parse(bodyText)
+  } catch {
+    sendJsonRpcError(response, {
+      httpStatus: 400,
+      id: null,
+      code: -32700,
+      message: 'Desktop Arcade MCP request body must be valid JSON.',
+    })
+    return
+  }
+
+  if (!isJsonRpcRequest(payload)) {
+    sendJsonRpcError(response, {
+      httpStatus: 400,
+      id: getJsonRpcId(payload),
+      code: -32600,
+      message:
+        'Desktop Arcade MCP requests must be single JSON-RPC 2.0 objects with a string method.',
+    })
+    return
+  }
+
+  if (payload.method === 'initialize') {
+    if (payload.id === null) {
+      sendJsonRpcError(response, {
+        httpStatus: 400,
+        id: null,
+        code: -32600,
+        message: 'Desktop Arcade MCP initialize requests must include a JSON-RPC id.',
+      })
+      return
+    }
+
+    sendJson(response, 200, {
+      jsonrpc: '2.0',
+      id: payload.id,
+      result: {
+        protocolVersion: '2024-11-05',
+        capabilities: {},
+        serverInfo: {
+          name: DESKTOP_MCP_SERVER_NAME,
+          version: DESKTOP_MCP_SERVER_VERSION,
+        },
+      },
+    })
+    return
+  }
+
+  if (payload.method === 'notifications/initialized') {
+    sendNoContent(response)
+    return
+  }
+
+  sendJsonRpcError(response, {
+    httpStatus: 200,
+    id: payload.id,
+    code: -32601,
+    message: `Desktop Arcade MCP method "${payload.method}" is not implemented yet.`,
+  })
 }
 
 const formatServerErrorReason = (error, { host, port }) => {
@@ -170,6 +268,34 @@ const closeServer = (server) =>
     closeActiveConnections()
   })
 
+const readRequestBody = async (request) => {
+  const chunks = []
+  let bodyBytes = 0
+
+  for await (const chunk of request) {
+    const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)
+    bodyBytes += buffer.length
+    if (bodyBytes > MAX_MCP_BODY_BYTES) {
+      throw new Error('Desktop Arcade MCP request body exceeds the 1MB limit.')
+    }
+    chunks.push(buffer)
+  }
+
+  return Buffer.concat(chunks).toString('utf8')
+}
+
+const getJsonRpcId = (value) => (isRecord(value) && isJsonRpcId(value.id) ? value.id : null)
+
+const isJsonRpcRequest = (value) =>
+  isRecord(value) &&
+  value.jsonrpc === '2.0' &&
+  typeof value.method === 'string' &&
+  value.method.trim().length > 0 &&
+  isJsonRpcId(value.id)
+
+const isJsonRpcId = (value) =>
+  value === undefined || value === null || typeof value === 'string' || typeof value === 'number'
+
 const isRecord = (value) => typeof value === 'object' && value !== null
 
 module.exports = {
@@ -178,6 +304,7 @@ module.exports = {
   DESKTOP_MCP_PATH,
   DESKTOP_MCP_PORT,
   DESKTOP_MCP_SERVER_NAME,
+  DESKTOP_MCP_SERVER_VERSION,
   DESKTOP_MCP_TRANSPORT_LABEL,
   createDesktopMcpServer,
 }
