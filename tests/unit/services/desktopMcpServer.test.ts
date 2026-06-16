@@ -398,6 +398,9 @@ describe('desktopMcpServer', () => {
     expect(operatingGuidePayload.result.contents[0].text).toContain(
       '`select_active_page` is for human-facing coordination'
     )
+    expect(operatingGuidePayload.result.contents[0].text).toContain(
+      'still returns `not-yet-implemented`, treat the current build as read-only'
+    )
 
     const authoringGuideResponse = await postJson(state.url, {
       jsonrpc: '2.0',
@@ -480,8 +483,42 @@ describe('desktopMcpServer', () => {
         'actionable hierarchy, bounds, styles, spacing, colors, typography, and overflow',
       frame: 'viewport, theme, page, scroll, diagnostics, truncation, and capture metadata',
     })
+    expect(capabilities.implementationStatus).toMatchObject({
+      stableDesktopResourceReads: 'available',
+      projectResourceReads: 'available when an active project reader is connected',
+      toolExecution: {
+        capture_preview_evidence: 'not-yet-implemented',
+        apply_changes: 'not-yet-implemented',
+      },
+      captureLayers: {
+        screenshot: 'not-yet-implemented',
+        accessibility: 'not-yet-implemented',
+        dom_layout_style: 'not-yet-implemented',
+        frame: 'not-yet-implemented',
+      },
+      screenshotScopes: {
+        viewport: 'not-yet-implemented',
+        full_page: 'not-yet-implemented',
+        region: 'not-yet-implemented',
+      },
+      interactionActions: {
+        click: 'not-yet-implemented',
+        fill: 'not-yet-implemented',
+        select: 'not-yet-implemented',
+        press: 'not-yet-implemented',
+        scroll: 'not-yet-implemented',
+        waitFor: 'not-yet-implemented',
+      },
+    })
+    expect(capabilities.implementationStatus.previewEvidenceUriTemplates).toMatchObject({
+      'arcade://preview/captures/{captureId}/manifest': 'not-yet-implemented',
+      'arcade://preview/captures/{captureId}/screenshot': 'not-yet-implemented',
+      'arcade://preview/captures/{captureId}/frame': 'not-yet-implemented',
+      'arcade://preview/captures/{captureId}/accessibility': 'not-yet-implemented',
+      'arcade://preview/captures/{captureId}/dom-layout-style': 'not-yet-implemented',
+    })
     expect(capabilities.v1Omissions).toContain('No prompts surface.')
-    expect(capabilities.contractNote).toContain('stable v1 MCP contract')
+    expect(capabilities.contractNote).toContain('current implementation status')
   })
 
   it('returns clear JSON-RPC errors for unknown resources and rejects unsupported resource fields', async () => {

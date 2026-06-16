@@ -3243,3 +3243,20 @@ Verification:
 Next note:
 
 - `#275` can now build on the real Desktop guidance/capabilities resources instead of placeholder Desktop reads, but it still needs to implement the actual `apply_changes` execution path. Keep the capabilities JSON generated from the MCP server constants so later tool/resource additions do not drift from the published contract.
+
+### 2026-06-16 - PR #284 review follow-up for Issue #273
+
+Fixed before merge:
+
+- PR review found that `arcade://desktop/capabilities` published the full later-slice Preview evidence contract without saying those tools/resources still return placeholders in the current build. Kept the full contract visible as required by `#273`, but added machine-readable `implementationStatus` metadata so MCP clients can distinguish the published v1 contract from the parts that are still `not-yet-implemented`.
+- PR review also found that the operating guide prescribed `apply_changes` / `capture_preview_evidence` as if they were already executable. Kept the required default loop, but added an explicit read-only guard: if either tool still returns `not-yet-implemented`, the client should stop after discovery instead of falling back to repository or filesystem edits.
+- Extended `tests/unit/services/desktopMcpServer.test.ts` to assert the new read-only guard text plus the per-tool, per-layer, per-scope, per-interaction, and per-preview-resource implementation-status fields in the capabilities JSON.
+
+Verification:
+
+- `npm run typecheck`
+- `npm run lint` (passes with the existing `.eslintignore` deprecation notice)
+- `CI=1 npm run test`
+- Direct MCP probe against a local ephemeral `createDesktopMcpServer({ port: 0 })` instance confirmed:
+  - the capabilities resource returns `implementationStatus.toolExecution.apply_changes = "not-yet-implemented"` and the matching layer/template statuses
+  - the operating guide now tells clients to treat the build as read-only while those tools are still placeholders

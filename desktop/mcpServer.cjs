@@ -199,6 +199,41 @@ const MCP_STABLE_RESOURCE_DEFINITIONS = Object.freeze([
   }),
 ])
 
+const TOOL_EXECUTION_STATUS = Object.freeze(
+  MCP_TOOL_DEFINITIONS.reduce((status, toolDefinition) => {
+    status[toolDefinition.name] = 'not-yet-implemented'
+    return status
+  }, {})
+)
+
+const PREVIEW_EVIDENCE_URI_TEMPLATE_STATUS = Object.freeze(
+  CAPABILITY_PREVIEW_EVIDENCE_URI_TEMPLATES.reduce((status, uriTemplate) => {
+    status[uriTemplate] = 'not-yet-implemented'
+    return status
+  }, {})
+)
+
+const CAPTURE_LAYER_STATUS = Object.freeze(
+  CAPABILITY_PREVIEW_CAPTURE_LAYERS.reduce((status, layer) => {
+    status[layer] = 'not-yet-implemented'
+    return status
+  }, {})
+)
+
+const SCREENSHOT_SCOPE_STATUS = Object.freeze(
+  VALID_PREVIEW_SCREENSHOT_SCOPES.reduce((status, scope) => {
+    status[scope] = 'not-yet-implemented'
+    return status
+  }, {})
+)
+
+const INTERACTION_ACTION_STATUS = Object.freeze(
+  CAPABILITY_PREVIEW_INTERACTION_ACTIONS.reduce((status, action) => {
+    status[action] = 'not-yet-implemented'
+    return status
+  }, {})
+)
+
 const createDesktopMcpServer = ({
   host = DESKTOP_MCP_HOST,
   port = DESKTOP_MCP_PORT,
@@ -1042,6 +1077,7 @@ const createDesktopStableResourceText = (uri) => {
         '- `capture_preview_evidence({ pageId })` is the normal autonomous inspection path for pages and targeted visual states.',
         '- `select_active_page` is for human-facing coordination; it is not the routine inspection path.',
         '- Saved Preview preferences live in `arcade://project/preview-context`; capture-only overrides must not mutate them.',
+        '- If `apply_changes` or `capture_preview_evidence` still returns `not-yet-implemented`, treat the current build as read-only and stop after discovery instead of falling back to repository or filesystem edits.',
         '- When state is unclear, re-read the manifest before making another durable change.',
       ].join('\n')
     case 'arcade://desktop/authoring-guide':
@@ -1065,7 +1101,7 @@ const createDesktopStableResourceText = (uri) => {
         requiresAuth: false,
         authDescription: DESKTOP_MCP_AUTH_DESCRIPTION,
         contractNote:
-          'This resource lists the stable v1 MCP contract; later slices fill in the listed capture layers and interaction actions.',
+          'This resource lists the stable v1 MCP contract and the current implementation status for each published tool and preview surface.',
         toolNames: MCP_TOOL_DEFINITIONS.map((toolDefinition) => toolDefinition.name),
         stableResourceUris: MCP_STABLE_RESOURCE_DEFINITIONS.map(
           (resourceDefinition) => resourceDefinition.uri
@@ -1078,6 +1114,15 @@ const createDesktopStableResourceText = (uri) => {
         interactionActions: CAPABILITY_PREVIEW_INTERACTION_ACTIONS,
         limits: {
           requestBodyBytes: MAX_MCP_BODY_BYTES,
+        },
+        implementationStatus: {
+          stableDesktopResourceReads: 'available',
+          projectResourceReads: 'available when an active project reader is connected',
+          toolExecution: TOOL_EXECUTION_STATUS,
+          previewEvidenceUriTemplates: PREVIEW_EVIDENCE_URI_TEMPLATE_STATUS,
+          captureLayers: CAPTURE_LAYER_STATUS,
+          screenshotScopes: SCREENSHOT_SCOPE_STATUS,
+          interactionActions: INTERACTION_ACTION_STATUS,
         },
         v1Omissions: CAPABILITY_V1_OMISSIONS,
       })
