@@ -9,6 +9,7 @@ export interface CompileError {
   column: number | null
   stack: string | null
   pageId?: ArcadePageId | null
+  resourceUri?: string | null
 }
 
 export interface RuntimeError {
@@ -34,6 +35,7 @@ export interface PreviewState {
 
   // Error state
   compileError: CompileError | null
+  pendingCompileError: CompileError | null
   runtimeError: RuntimeError | null
   sandboxConsoleMessages: SandboxConsoleMessage[]
 

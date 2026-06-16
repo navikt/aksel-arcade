@@ -1,5 +1,10 @@
 import type { ArcadePageId, ProjectSource } from '@/types/project'
 import type { TranspileResult, CompileError } from '@/types/preview'
+import {
+  DESKTOP_MCP_PROJECT_SOURCE_GLOBAL_HOOKS_URI,
+  DESKTOP_MCP_PROJECT_SOURCE_GLOBAL_JSX_URI,
+  createDesktopMcpProjectPageSourceUri,
+} from '@/services/desktopMcpProjectSourceUris'
 
 interface BabelParserNode {
   type: string
@@ -76,12 +81,19 @@ interface UnsupportedImport {
   source: string
   line: number
   column: number
+  pageId: ArcadePageId | null
+  resourceUri: string | null
 }
 
 interface StripSupportedImportsResult {
   code: string
   runtimePrelude: string
   unsupportedImports: UnsupportedImport[]
+}
+
+interface SourceIdentity {
+  pageId?: ArcadePageId | null
+  resourceUri?: string | null
 }
 
 interface ImportBinding {
@@ -254,7 +266,10 @@ const createRuntimePreludeStatements = (
   })
 }
 
-const stripSupportedImports = (sourceCode: string): StripSupportedImportsResult => {
+const stripSupportedImports = (
+  sourceCode: string,
+  { pageId = null, resourceUri = null }: SourceIdentity = {}
+): StripSupportedImportsResult => {
   const unsupportedImports: UnsupportedImport[] = []
   const runtimePreludeStatements: string[] = []
 
@@ -278,6 +293,8 @@ const stripSupportedImports = (sourceCode: string): StripSupportedImportsResult 
         unsupportedImports.push({
           source: importSource,
           ...getLineColumn(sourceCode, offset),
+          pageId,
+          resourceUri,
         })
         return statement
       }
@@ -301,6 +318,8 @@ const createUnsupportedImportError = (unsupportedImport: UnsupportedImport): Com
   line: unsupportedImport.line,
   column: unsupportedImport.column,
   stack: null,
+  pageId: unsupportedImport.pageId,
+  resourceUri: unsupportedImport.resourceUri,
 })
 
 const getRuntimePreludeStatements = (runtimePrelude: string): string[] =>
@@ -607,6 +626,7 @@ interface CombinedSourceMapping {
   sourceLineOffset: number
   sourceLineCount: number
   pageId: ArcadePageId | null
+  resourceUri: string | null
 }
 
 interface BuildCombinedSourceResult {
@@ -617,6 +637,8 @@ interface BuildCombinedSourceResult {
 
 interface PreparedSourceBlock extends StripSupportedImportsResult {
   label: string
+  pageId: ArcadePageId | null
+  resourceUri: string | null
 }
 
 interface ComponentEntrySource {
@@ -633,9 +655,15 @@ const getFirstUnsupportedImport = (
 ): UnsupportedImport | undefined =>
   preparedBlocks.flatMap((block) => block.unsupportedImports)[0]
 
-const createPreparedSourceBlock = (label: string, sourceCode: string): PreparedSourceBlock => ({
+const createPreparedSourceBlock = (
+  label: string,
+  sourceCode: string,
+  { pageId = null, resourceUri = null }: SourceIdentity = {}
+): PreparedSourceBlock => ({
   label,
-  ...stripSupportedImports(sourceCode),
+  pageId,
+  resourceUri,
+  ...stripSupportedImports(sourceCode, { pageId, resourceUri }),
 })
 
 const buildSinglePageCombinedSource = async (
@@ -703,6 +731,7 @@ const createGlobalConfigJsxError = (): CompileError => ({
   column: 0,
   stack: null,
   pageId: null,
+  resourceUri: DESKTOP_MCP_PROJECT_SOURCE_GLOBAL_JSX_URI,
 })
 
 const createEmptyPagesError = (): CompileError => ({
@@ -724,9 +753,17 @@ const appendMappedLines = (
   sourceMappings: CombinedSourceMapping[],
   label: string,
   sourceCode: string,
-  sourceLineOffset = 0,
-  sourceLineCount = splitLines(sourceCode).length,
-  pageId: ArcadePageId | null = null
+  {
+    sourceLineOffset = 0,
+    sourceLineCount = splitLines(sourceCode).length,
+    pageId = null,
+    resourceUri = null,
+  }: {
+    sourceLineOffset?: number
+    sourceLineCount?: number
+    pageId?: ArcadePageId | null
+    resourceUri?: string | null
+  } = {}
 ): void => {
   if (!sourceCode) {
     return
@@ -741,6 +778,7 @@ const appendMappedLines = (
     sourceLineOffset,
     sourceLineCount,
     pageId,
+    resourceUri,
   })
 }
 
@@ -756,12 +794,26 @@ const buildProjectSourceCombinedCode = async (
     }
   }
 
-  const strippedGlobalHooks = createPreparedSourceBlock('global config Hooks', source.globalConfig.hooks)
-  const strippedGlobalJsx = createPreparedSourceBlock('global config JSX', source.globalConfig.jsx)
+  const strippedGlobalHooks = createPreparedSourceBlock(
+    'global config Hooks',
+    source.globalConfig.hooks,
+    { resourceUri: DESKTOP_MCP_PROJECT_SOURCE_GLOBAL_HOOKS_URI }
+  )
+  const strippedGlobalJsx = createPreparedSourceBlock(
+    'global config JSX',
+    source.globalConfig.jsx,
+    { resourceUri: DESKTOP_MCP_PROJECT_SOURCE_GLOBAL_JSX_URI }
+  )
   const preparedPages = source.pages.map((page) => ({
     page,
-    strippedHooks: createPreparedSourceBlock(`${page.id} Hooks`, page.source.hooks),
-    strippedJsx: createPreparedSourceBlock(`${page.id} JSX`, page.source.jsx),
+    strippedHooks: createPreparedSourceBlock(`${page.id} Hooks`, page.source.hooks, {
+      pageId: page.id,
+      resourceUri: createDesktopMcpProjectPageSourceUri(page.id, 'hooks'),
+    }),
+    strippedJsx: createPreparedSourceBlock(`${page.id} JSX`, page.source.jsx, {
+      pageId: page.id,
+      resourceUri: createDesktopMcpProjectPageSourceUri(page.id, 'jsx'),
+    }),
   }))
   const unsupportedImport = getFirstUnsupportedImport([
     strippedGlobalHooks,
@@ -834,10 +886,14 @@ const buildProjectSourceCombinedCode = async (
   const sourceMappings: CombinedSourceMapping[] = []
 
   appendLines(lines, strippedGlobalHooks.runtimePrelude)
-  appendMappedLines(lines, sourceMappings, strippedGlobalHooks.label, processedGlobalHooks)
+  appendMappedLines(lines, sourceMappings, strippedGlobalHooks.label, processedGlobalHooks, {
+    resourceUri: strippedGlobalHooks.resourceUri,
+  })
   appendLines(lines, '')
   appendLines(lines, globalJsxRuntimePrelude)
-  appendMappedLines(lines, sourceMappings, strippedGlobalJsx.label, processedGlobalJsx)
+  appendMappedLines(lines, sourceMappings, strippedGlobalJsx.label, processedGlobalJsx, {
+    resourceUri: strippedGlobalJsx.resourceUri,
+  })
   appendLines(lines, '')
   appendLines(
     lines,
@@ -934,9 +990,11 @@ __AkselArcadeSyncPreviewRuntimeBridge();`
         sourceMappings,
         strippedHooks.label,
         processedPageHooks,
-        0,
-        splitLines(strippedHooks.code).length,
-        pageId
+        {
+          sourceLineCount: splitLines(strippedHooks.code).length,
+          pageId,
+          resourceUri: strippedHooks.resourceUri,
+        }
       )
       appendLines(lines, '')
       appendLines(lines, pageJsxRuntimePrelude)
@@ -945,9 +1003,12 @@ __AkselArcadeSyncPreviewRuntimeBridge();`
         sourceMappings,
         strippedJsx.label,
         processedPageJsx.code,
-        processedPageJsx.wrapperPrefixLines,
-        splitLines(strippedJsx.code).length,
-        pageId
+        {
+          sourceLineOffset: processedPageJsx.wrapperPrefixLines,
+          sourceLineCount: splitLines(strippedJsx.code).length,
+          pageId,
+          resourceUri: strippedJsx.resourceUri,
+        }
       )
       appendLines(lines, '')
       appendLines(lines, `  return ${getPageComponentName(pageId)}`)
@@ -1193,6 +1254,7 @@ const parseBabelError = (
       column: match ? parseInt(match[2], 10) : null,
       stack: error.stack || null,
       pageId: sourceMapping?.pageId ?? null,
+      resourceUri: sourceMapping?.resourceUri ?? null,
     }
   }
 

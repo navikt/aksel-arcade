@@ -1,6 +1,6 @@
 import { createServer, type Server } from 'node:http'
 import { createRequire } from 'node:module'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
 const require = createRequire(import.meta.url)
 const {
@@ -36,11 +36,32 @@ interface DesktopMcpServer {
   stop: () => Promise<boolean>
 }
 
+interface ProjectResourceReadSuccess {
+  ok: true
+  uri: string
+  mimeType: string
+  text: string
+}
+
+interface ProjectResourceReadFailure {
+  ok: false
+  code: 'project-unavailable' | 'source-not-found' | 'invalid-resource-uri'
+  resourceUri: string
+  message: string
+}
+
+type ProjectResourceReadResult = ProjectResourceReadSuccess | ProjectResourceReadFailure
+
 const activeServers: DesktopMcpServer[] = []
 const occupiedServers: Server[] = []
 
 const createManagedServer = (
-  options?: Partial<{ host: string; port: number; path: string }>
+  options?: Partial<{
+    host: string
+    port: number
+    path: string
+    readProjectResource: (request: { uri: string }) => ProjectResourceReadResult | Promise<ProjectResourceReadResult>
+  }>
 ): DesktopMcpServer => {
   const server = createDesktopMcpServer(options)
   activeServers.push(server)
@@ -397,6 +418,127 @@ describe('desktopMcpServer', () => {
       error: {
         code: -32602,
         message: 'Desktop Arcade MCP resources/read params contain unsupported fields: extra.',
+      },
+    })
+  })
+
+  it('reads project resources through the injected project reader while keeping desktop resources out of scope', async () => {
+    const readProjectResource = vi.fn(
+      async ({ uri }: { uri: string }): Promise<ProjectResourceReadResult> => {
+        if (uri === 'arcade://project/manifest') {
+          return {
+            ok: true,
+            uri,
+            mimeType: 'application/json',
+            text: '{"name":"Desktop MCP project"}',
+          }
+        }
+
+        if (uri === 'arcade://project/source/pages/page01/jsx') {
+          return {
+            ok: true,
+            uri,
+            mimeType: 'text/plain',
+            text: '<Page />',
+          }
+        }
+
+        return {
+          ok: false,
+          code: 'source-not-found',
+          resourceUri: uri,
+          message: `Missing ${uri}`,
+        }
+      }
+    )
+    const server = createManagedServer({ port: 0, readProjectResource })
+    const state = await server.start()
+
+    const manifestResponse = await postJson(state.url, {
+      jsonrpc: '2.0',
+      id: 13,
+      method: 'resources/read',
+      params: {
+        uri: 'arcade://project/manifest',
+      },
+    })
+    expect(manifestResponse.status).toBe(200)
+    await expect(manifestResponse.json()).resolves.toEqual({
+      jsonrpc: '2.0',
+      id: 13,
+      result: {
+        contents: [
+          {
+            uri: 'arcade://project/manifest',
+            mimeType: 'application/json',
+            text: '{"name":"Desktop MCP project"}',
+          },
+        ],
+      },
+    })
+
+    const pageSourceResponse = await postJson(state.url, {
+      jsonrpc: '2.0',
+      id: 14,
+      method: 'resources/read',
+      params: {
+        uri: 'arcade://project/source/pages/page01/jsx',
+      },
+    })
+    expect(pageSourceResponse.status).toBe(200)
+    await expect(pageSourceResponse.json()).resolves.toEqual({
+      jsonrpc: '2.0',
+      id: 14,
+      result: {
+        contents: [
+          {
+            uri: 'arcade://project/source/pages/page01/jsx',
+            mimeType: 'text/plain',
+            text: '<Page />',
+          },
+        ],
+      },
+    })
+
+    expect(readProjectResource).toHaveBeenNthCalledWith(1, {
+      uri: 'arcade://project/manifest',
+    })
+    expect(readProjectResource).toHaveBeenNthCalledWith(2, {
+      uri: 'arcade://project/source/pages/page01/jsx',
+    })
+  })
+
+  it('returns clear project-unavailable errors for project resources when the project reader cannot serve them', async () => {
+    const server = createManagedServer({
+      port: 0,
+      readProjectResource: async ({ uri }: { uri: string }) => ({
+        ok: false,
+        code: 'project-unavailable',
+        resourceUri: uri,
+        message: `Project unavailable for ${uri}`,
+      }),
+    })
+    const state = await server.start()
+
+    const response = await postJson(state.url, {
+      jsonrpc: '2.0',
+      id: 15,
+      method: 'resources/read',
+      params: {
+        uri: 'arcade://project/diagnostics',
+      },
+    })
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toEqual({
+      jsonrpc: '2.0',
+      id: 15,
+      error: {
+        code: -32002,
+        message: 'Project unavailable for arcade://project/diagnostics',
+        data: {
+          code: 'project-unavailable',
+          resourceUri: 'arcade://project/diagnostics',
+        },
       },
     })
   })

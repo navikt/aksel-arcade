@@ -7,6 +7,10 @@ import {
   createArcadeSourceFile,
   FIRST_PAGE_ID,
 } from '@/services/projectSource'
+import {
+  DESKTOP_MCP_PROJECT_SOURCE_GLOBAL_JSX_URI,
+  createDesktopMcpProjectPageSourceUri,
+} from '@/services/desktopMcpProjectSourceUris'
 import { transpileProjectSource } from '@/services/transpiler'
 import type { ProjectSource } from '@/types/project'
 
@@ -393,6 +397,9 @@ export const getSharedVisits = () => sharedVisits`,
     expect(result.error?.message).toContain('(1:')
     expect(result.error?.line).toBe(0)
     expect(result.error?.pageId).toBe('page02')
+    expect(result.error?.resourceUri).toBe(
+      createDesktopMcpProjectPageSourceUri('page02', 'jsx')
+    )
   })
 
   it('rejects bare global config JSX because it is shared scope, not a screen', async () => {
@@ -404,5 +411,44 @@ export const getSharedVisits = () => sharedVisits`,
 
     expect(result.success).toBe(false)
     expect(result.error?.message).toContain('Global config JSX')
+    expect(result.error?.resourceUri).toBe(DESKTOP_MCP_PROJECT_SOURCE_GLOBAL_JSX_URI)
+  })
+
+  it('maps unsupported imports back to the originating project source file', async () => {
+    const result = await transpileProjectSource(
+      createProjectSource({
+        pages: [
+          createArcadePage(
+            'page01',
+            'Intro',
+            createArcadeSourceFile(
+              `export default function IntroPage() {
+  return <div>Okay</div>
+}`,
+              ''
+            )
+          ),
+          createArcadePage(
+            'page02',
+            'Details',
+            createArcadeSourceFile(
+              `import { fetchUser } from "./api";
+
+export default function DetailsPage() {
+  return <div>{fetchUser.name}</div>
+}`,
+              ''
+            )
+          ),
+        ],
+      })
+    )
+
+    expect(result.success).toBe(false)
+    expect(result.error?.message).toContain('Unsupported import from "./api"')
+    expect(result.error?.pageId).toBe('page02')
+    expect(result.error?.resourceUri).toBe(
+      createDesktopMcpProjectPageSourceUri('page02', 'jsx')
+    )
   })
 })

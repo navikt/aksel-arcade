@@ -48,13 +48,17 @@ export const appendSandboxConsoleMessage = (
 ): SandboxConsoleMessage[] =>
   [...messages, message].slice(-MAX_SANDBOX_CONSOLE_MESSAGES)
 
-export const collectPreviewDiagnostics = (previewState: PreviewState): PreviewDiagnostics =>
-  clonePreviewDiagnostics({
-    status: previewState.status,
-    compileError: previewState.compileError,
-    runtimeError: previewState.runtimeError,
+export const collectPreviewDiagnostics = (previewState: PreviewState): PreviewDiagnostics => {
+  const compileError = previewState.compileError ?? previewState.pendingCompileError
+  const runtimeError = previewState.runtimeError
+
+  return clonePreviewDiagnostics({
+    status: compileError || runtimeError ? 'error' : previewState.status,
+    compileError,
+    runtimeError,
     sandboxConsoleMessages: previewState.sandboxConsoleMessages,
   })
+}
 
 export const clonePreviewDiagnostics = (
   diagnostics: PreviewDiagnostics

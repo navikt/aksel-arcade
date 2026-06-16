@@ -40,6 +40,35 @@ Verification:
 - npm run typecheck
 - CI=1 npm run test -- --run
 
+### 2026-06-16 - Issue #272: Expose active Arcade project read resources over MCP
+
+Implemented:
+
+- Selected `#272` as the highest-priority open `ready-for-agent` feature from `#272`-`#280` after checking issue `#269`, `CONTEXT.md`, and the existing `progress.txt` notes; `#271` is already complete, and `#272` is the main active-project discovery layer that later MCP resources, mutations, and preview evidence depend on.
+- Added a dedicated Desktop MCP project-resource bridge from Electron main to the renderer without reopening or focusing Desktop Arcade: `desktop/main.cjs` now routes `arcade://project/*` reads over a narrow request/response IPC path, validates renderer replies, times out cleanly, and returns `project-unavailable` or `source-not-found` resource errors instead of exposing arbitrary renderer access.
+- Extended `desktop/preload.cjs` and `src/services/shellCapabilities.ts` with a narrow `setDesktopMcpProjectResourceReadHandler` preload API, then registered a stable renderer-side handler from `src/hooks/useDesktopMcpProjectResourceBridge.ts` so MCP reads always use the latest project/theme/diagnostics state without effect re-registration churn.
+- Added `src/services/desktopMcpProjectResources.ts` plus the small protocol/adapter helpers to shape the real project resources:
+  - `arcade://project/manifest` now returns compact JSON with project name, deterministic `projectRevision`, ordered pages, start/active page ids, global/page source resource links, byte/line metadata, and valid/stale page references grouped by Global config and page.
+  - `arcade://project/preview-context` now returns only the saved viewport/theme preview preferences.
+  - `arcade://project/diagnostics` now returns compact issue summaries for compile errors, runtime errors, and stale page references, including page ids/names, resource URIs where they can be inferred, line/column, and bounded details/snippets.
+  - Dynamic source URIs (`arcade://project/source/global/*` and `arcade://project/source/pages/{pageId}/*`) now return pure source text through MCP.
+- Kept issue `#273` out of scope: `arcade://desktop/*` resources still stay on the placeholder `not-yet-implemented` path while `resources/list` remains the same six stable direct URIs from `#271`.
+- Added focused regression coverage in `tests/unit/services/desktopMcpProjectResources.test.ts`, `tests/unit/services/desktopMcpProjectResourceAdapter.test.ts`, and extended `tests/unit/services/desktopMcpServer.test.ts` so project resource reads, dynamic source reads, revision changes, stale references, and `project-unavailable` errors are all covered.
+
+Verification:
+
+- npm install
+- npm run typecheck
+- npm run lint
+- CI=1 npm run test
+- npm run build
+- Browser/console smoke check at `http://127.0.0.1:4173/aksel-arcade/` using `npm run preview -- --host 127.0.0.1 --port 4173`, confirming the app shell and live preview render and the browser console stays free of errors/warnings
+
+Next note:
+
+- `#273` can now fill in the three `arcade://desktop/*` resources on top of the same MCP `resources/read` plumbing without touching the new project-resource contract.
+- `#275` should reuse `projectRevision`, the dynamic source resource URIs, and the narrow main→renderer request pattern rather than introducing a second state-discovery path for `apply_changes`.
+
 ### 2026-06-09 - Issue #190: Multi-page active-page sync across preview, panel, and editor
 
 Implemented:
@@ -1628,6 +1657,7 @@ Verified:
 - Checked `CONTEXT.md` Desktop language and `docs/desktop-release.md` local unsigned packaging contract before touching the feature.
 - Confirmed the current branch already contains the #143 local packaging path: `npm run desktop:build` emits `dist-desktop` with relative asset URLs, Electron Builder targets Windows x64 NSIS plus macOS arm64/x64 DMGs without publishing, artifact names include product/version/OS/architecture, installed metadata uses `Aksel Arcade` and `no.nav.aksel.arcade`, and desktop icons are generated from `public/aksel-favicon.svg`.
 - Confirmed `tests/unit/desktopPackagingConfig.test.ts` covers the Desktop build profile, app metadata, target matrix, artifact naming, icon wiring, version injection, and local unsigned packaging commands.
+
 - No acceptance gap required a code change in this pass; kept the work scoped to the single #143 feature.
 
 Verification:
@@ -3172,3 +3202,21 @@ Verification:
 
 - npm run typecheck
 - CI=1 npm run test -- --run
+
+### 2026-06-16 - PR #283 review follow-up for Issue #272
+
+Fixed before merge:
+
+- Kept the delayed visible compile-error UX in `PreviewPane`, but stopped Desktop MCP/agent diagnostics from missing active compile failures while the code editor stays focused by carrying a separate `pendingCompileError` through preview state and teaching `collectPreviewDiagnostics()` to surface it as an error immediately.
+- Cleared stale error state in both directions: a newer runtime error now drops any queued compile error before blur, and a newer focused compile error now clears any stale runtime overlay from the last successful preview.
+- Added regression coverage for that focused-editing path in `tests/integration/multi-page-preview-sync.test.tsx` plus a unit guard in `tests/unit/services/previewDiagnostics.test.ts`, so diagnostics stay accurate even when the visible overlay is still intentionally suppressed.
+- Replaced compile-error source inference-by-message with explicit source metadata: `CompileError` now carries `resourceUri`, project transpilation attaches that URI for global config, page JSX/Hooks, unsupported imports, and mapped Babel errors, and Desktop MCP diagnostics prefer the explicit URI before falling back to the old label parser.
+- Extracted shared Desktop MCP project source URI helpers into `src/services/desktopMcpProjectSourceUris.ts`, reused them from both the transpiler and MCP resource builder, and added regression assertions in `tests/integration/multi-page-preview-runtime.test.tsx` plus `tests/unit/services/desktopMcpProjectResources.test.ts` so page/global compile diagnostics keep stable source links even when error messages are unlabeled.
+
+Verification:
+
+- npm run type-check
+- npm run lint
+- CI=1 npm run test
+- npm run build
+- Browser/console smoke check at `http://127.0.0.1:4173/aksel-arcade/` using `npm run preview -- --host 127.0.0.1 --port 4173`, confirming the app shell and preview render and the console stays free of errors/warnings

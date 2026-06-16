@@ -95,4 +95,28 @@ describe('preview diagnostics', () => {
     })
     expect(previewState.sandboxConsoleMessages[0]?.args).toEqual(['console failed'])
   })
+
+  it('surfaces pending compile errors before the UI reveals them', () => {
+    const diagnostics = collectPreviewDiagnostics({
+      ...createDefaultPreviewState(),
+      status: 'transpiling',
+      compileError: null,
+      pendingCompileError: {
+        message: 'Unexpected token',
+        line: 0,
+        column: 1,
+        stack: null,
+      },
+    })
+
+    expect(diagnostics).toMatchObject({
+      status: 'error',
+      compileError: {
+        message: 'Unexpected token',
+        line: 0,
+        column: 1,
+      },
+      runtimeError: null,
+    })
+  })
 })

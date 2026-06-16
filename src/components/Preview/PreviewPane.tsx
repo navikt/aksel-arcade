@@ -55,9 +55,11 @@ export const PreviewPane = ({
     (error: CompileError) => {
       console.error('❌ Compile error:', error)
       setCompileError(error)
+      setRuntimeError(null)
       updatePreviewState({
         status: 'error',
         compileError: error,
+        pendingCompileError: null,
         runtimeError: null,
       })
     },
@@ -68,13 +70,20 @@ export const PreviewPane = ({
     (error: CompileError) => {
       pendingCompileErrorRef.current = error
       if (isCodeEditorFocusedRef.current) {
+        setRuntimeError(null)
+        updatePreviewState({
+          status: 'error',
+          compileError: null,
+          pendingCompileError: error,
+          runtimeError: null,
+        })
         return
       }
 
       pendingCompileErrorRef.current = null
       revealCompileError(error)
     },
-    [revealCompileError]
+    [revealCompileError, updatePreviewState]
   )
 
   useEffect(() => {
@@ -129,6 +138,7 @@ export const PreviewPane = ({
               status: 'rendering',
               transpiledCode: result.code,
               compileError: null,
+              pendingCompileError: null,
             })
           } else if (result.error) {
             queueCompileError(result.error)
@@ -159,6 +169,7 @@ export const PreviewPane = ({
     updatePreviewState({
       status: 'transpiling',
       compileError: null,
+      pendingCompileError: null,
       runtimeError: null,
     })
 
@@ -203,6 +214,7 @@ export const PreviewPane = ({
       status: 'idle',
       lastRenderTime: Date.now(),
       compileError: null,
+      pendingCompileError: null,
       runtimeError: null,
     })
   }
@@ -212,9 +224,13 @@ export const PreviewPane = ({
   }
 
   const handleRuntimeError = (error: RuntimeError) => {
+    pendingCompileErrorRef.current = null
+    setCompileError(null)
     setRuntimeError(error)
     updatePreviewState({
       status: 'error',
+      compileError: null,
+      pendingCompileError: null,
       runtimeError: error,
     })
   }
