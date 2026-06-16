@@ -550,6 +550,24 @@ test.describe('Desktop MCP preview capture', () => {
           'Preview interactions block browser/external navigation targets. Only in-prototype Arcade page references are allowed.',
       })
 
+      const externalPressFailure = expectToolFailure(
+        await callCapturePreviewEvidence({
+          pageId: 'page02',
+          interactions: [
+            {
+              action: 'press',
+              target: { role: 'link', name: 'External docs' },
+              key: 'Enter',
+            },
+          ],
+        })
+      )
+      expect(externalPressFailure).toMatchObject({
+        code: 'invalid-capture-target',
+        message:
+          'Preview interactions block browser/external navigation targets. Only in-prototype Arcade page references are allowed.',
+      })
+
       const previewContextAfterAll = await readJsonMcpResource('arcade://project/preview-context')
       expect(previewContextAfterAll).toEqual(previewContextBefore)
       const manifestAfterAll = await readJsonMcpResource('arcade://project/manifest')

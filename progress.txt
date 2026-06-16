@@ -3550,3 +3550,23 @@ Human-testable verification notes:
 Next note:
 
 - `#279` should build on the new interaction manifest/result metadata instead of inventing a parallel post-capture format. Keep all transient UI mutation inside the hidden isolated Preview sandbox, and regenerate `public/preview-evidence-global.js` whenever `src/services/previewEvidence.ts` changes.
+
+### 2026-06-16 - PR #289 review follow-up for issue #278
+
+Fixed after review:
+
+- Closed a real interaction-safety gap in `src/services/previewEvidence.ts`: `press` interactions with activation keys (`Enter` / `Space`) could synthesize a click on external links without passing through the existing external-navigation guard, even though `click` interactions correctly rejected those targets.
+- Applied the same `assertPreviewInteractionNavigationAllowed(...)` check to keyboard-triggered activation before synthesizing the click, so bounded Preview `press` interactions now preserve the same host-safety and browser-navigation boundary as direct `click` interactions.
+- Added focused regression coverage in `tests/unit/services/previewInteractions.test.ts` and `tests/e2e/desktop-mcp-preview-capture.spec.ts` so external link activation is rejected consistently for both `click` and `press`.
+
+Verification:
+
+- npm run build
+- npm run typecheck
+- npm run lint
+- CI=1 npm test -- --run
+- npm run test:e2e -- tests/e2e/desktop-mcp-preview-capture.spec.ts --reporter=line
+
+Next note:
+
+- If the Desktop MCP preview-capture e2e unexpectedly talks to the wrong project state, first check for a stale local Electron process still listening on `127.0.0.1:3846`; that can make the test hit an old MCP server even when the newly launched window looks correct.

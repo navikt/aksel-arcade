@@ -252,7 +252,7 @@ describe('preview interactions', () => {
     })
   })
 
-  it('blocks selectors outside the preview root and external navigation targets', async () => {
+  it('blocks selectors outside the preview root and external navigation targets for click and press', async () => {
     document.body.innerHTML = `
       <button id="outside">Settings</button>
       <div id="root">
@@ -282,6 +282,21 @@ describe('preview interactions', () => {
       window
     )
     expect(externalLinkResult).toMatchObject({
+      ok: false,
+      error: {
+        code: 'invalid-capture-target',
+        message:
+          'Preview interactions block browser/external navigation targets. Only in-prototype Arcade page references are allowed.',
+      },
+    })
+
+    const externalPressResult = await runPreviewInteractionSequence(
+      root,
+      [{ action: 'press', target: { role: 'link', name: 'External docs' }, key: 'Enter' }],
+      { currentPageId: 'page01' },
+      window
+    )
+    expect(externalPressResult).toMatchObject({
       ok: false,
       error: {
         code: 'invalid-capture-target',

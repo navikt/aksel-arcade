@@ -909,6 +909,7 @@ var previewEvidenceUtils = (() => {
         movePreviewFocus(root, element);
       } else if (key === "Enter" || key === " " || key === "Space") {
         if (isElementClickable(element)) {
+          assertPreviewInteractionNavigationAllowed(element);
           triggerPreviewClick(element);
         }
       } else if (PREVIEW_INTERACTION_PRINTABLE_KEY_PATTERN.test(key)) {
