@@ -3330,3 +3330,25 @@ Verification:
 - CI=1 npm run test -- --run
 - npm run build
 - Browser/console smoke check at `http://127.0.0.1:4174/aksel-arcade/` via `npm run dev -- --host 127.0.0.1 --port 4174`, confirming the app shell and live preview render and the console stays free of warnings/errors in the clean flow
+
+### 2026-06-16 - Issue #274 follow-up: fix Desktop MCP hidden Preview capture timeout
+
+Implemented:
+
+- Investigated the reported `capture_preview_evidence({})` failure with a real Electron + MCP regression at `tests/e2e/desktop-mcp-preview-capture.spec.ts` that launches Desktop Arcade, waits for the default Preview, and calls the live MCP HTTP endpoint.
+- Confirmed the first misleading local symptom was a stale Electron process still bound to port `3846`; after clearing that, the real bug reproduced inside the hidden isolated capture sandbox.
+- Narrowed the timeout to the hidden iframe capture path in `public/sandbox.html`: the isolated render reached `RENDER_SUCCESS`, but the follow-up capture never completed because the offscreen iframe was waiting on nested `requestAnimationFrame` callbacks before collecting evidence.
+- Replaced that hidden-sandbox capture scheduling with timer-based settling (`setTimeout`-driven retries / double-settle) so Desktop Electron does not stall the capture step for an offscreen iframe before posting `PREVIEW_EVIDENCE_CAPTURED`.
+- Removed the temporary `[DEBUG-*]` route/capture instrumentation after confirming the fix, and kept the new Electron Playwright regression as the permanent seam for this exact Desktop MCP flow.
+
+Verification:
+
+- npm run type-check
+- CI=1 npm test -- --run
+- npm run lint
+- npm run build
+- npx playwright test tests/e2e/desktop-mcp-preview-capture.spec.ts --reporter=line
+
+Next note:
+
+- If a future follow-up touches isolated Preview capture timing, keep the regression at `tests/e2e/desktop-mcp-preview-capture.spec.ts` green and prefer timer-based settling over `requestAnimationFrame` inside the offscreen sandbox unless Electron behavior is revalidated.

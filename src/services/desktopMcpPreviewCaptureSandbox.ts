@@ -51,7 +51,6 @@ export const capturePreviewInIsolatedSandbox = async ({
       'capture_preview_evidence is unavailable because the Desktop Arcade renderer DOM is not ready.'
     )
   }
-
   return new Promise((resolve) => {
     const iframe = document.createElement('iframe')
     iframe.src = SANDBOX_IFRAME_SRC

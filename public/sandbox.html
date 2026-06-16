@@ -526,6 +526,10 @@
         payload?.target && typeof payload.target === 'object' ? payload.target : undefined;
       const maxFrames = 30;
 
+      const settleCaptureStep = (callback) => {
+        window.setTimeout(callback, 16);
+      };
+
       const captureWhenReady = (remainingFrames = maxFrames) => {
         if (expectedPageId && getCurrentPreviewPageId() !== expectedPageId) {
           if (remainingFrames <= 0) {
@@ -539,12 +543,12 @@
             return;
           }
 
-          window.requestAnimationFrame(() => captureWhenReady(remainingFrames - 1));
+          settleCaptureStep(() => captureWhenReady(remainingFrames - 1));
           return;
         }
 
-        window.requestAnimationFrame(() => {
-          window.requestAnimationFrame(() => {
+        settleCaptureStep(() => {
+          settleCaptureStep(() => {
             try {
               const root = document.querySelector(PREVIEW_EVIDENCE_ROOT_SELECTOR);
               if (!root) {
