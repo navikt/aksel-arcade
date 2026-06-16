@@ -910,6 +910,11 @@ const getElementAccessibleName = (element: Element): string => {
     }
   }
 
+  const altText = getElementAltText(element)
+  if (altText) {
+    return altText
+  }
+
   const labelText = getElementLabelText(element)
   if (labelText) {
     return labelText
@@ -920,7 +925,7 @@ const getElementAccessibleName = (element: Element): string => {
     return normalizeWhitespace(title)
   }
 
-  if (element instanceof HTMLInputElement && element.value) {
+  if (element instanceof HTMLInputElement && inputUsesValueAsAccessibleName(element) && element.value) {
     return normalizeWhitespace(element.value)
   }
 
@@ -930,9 +935,12 @@ const getElementAccessibleName = (element: Element): string => {
 const hasExplicitAccessibleName = (element: Element): boolean =>
   element.hasAttribute('aria-label') ||
   element.hasAttribute('aria-labelledby') ||
+  getElementAltText(element).length > 0 ||
   element.hasAttribute('title') ||
   getElementLabelText(element).length > 0 ||
-  (element instanceof HTMLInputElement && normalizeWhitespace(element.value).length > 0)
+  (element instanceof HTMLInputElement &&
+    inputUsesValueAsAccessibleName(element) &&
+    normalizeWhitespace(element.value).length > 0)
 
 const getElementLabelText = (element: Element): string => {
   if (!(element instanceof HTMLElement)) {
@@ -971,7 +979,11 @@ const getSanitizedSubtreeText = (node: Node): string => {
 
   if (node.nodeType === Node.ELEMENT_NODE) {
     const element = node as Element
-    if (isExcludedElement(element)) {
+    if (
+      isExcludedElement(element) ||
+      element.getAttribute('aria-hidden') === 'true' ||
+      element.hasAttribute('hidden')
+    ) {
       return ''
     }
   }
@@ -980,6 +992,21 @@ const getSanitizedSubtreeText = (node: Node): string => {
     .map((child) => getSanitizedSubtreeText(child))
     .join(' ')
 }
+
+const getElementAltText = (element: Element): string => {
+  if (element instanceof HTMLImageElement) {
+    return normalizeWhitespace(element.getAttribute('alt') ?? '')
+  }
+
+  if (element instanceof HTMLInputElement && element.type === 'image') {
+    return normalizeWhitespace(element.getAttribute('alt') ?? '')
+  }
+
+  return ''
+}
+
+const inputUsesValueAsAccessibleName = (input: HTMLInputElement): boolean =>
+  input.type === 'button' || input.type === 'submit' || input.type === 'reset'
 
 const elementUsesContentAsAccessibleName = (element: Element): boolean => {
   const explicitRole = element.getAttribute('role')?.trim().toLowerCase()

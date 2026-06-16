@@ -353,6 +353,53 @@ describe('preview evidence', () => {
     expect(serializedAccessibility).not.toContain('hotpink')
     expect(serializedAccessibility).not.toContain('Hidden template text')
   })
+
+  it('matches browser-like accessible names for images, text inputs, and aria-hidden descendants', () => {
+    document.body.innerHTML = `
+      <div id="root">
+        <main>
+          <img alt="Hero art" />
+          <input type="text" value="xyz" />
+          <button>Run<span aria-hidden="true">hidden</span></button>
+        </main>
+      </div>
+    `
+
+    const root = document.getElementById('root')
+    if (!root) {
+      throw new Error('Expected preview root to exist.')
+    }
+
+    const result = capturePreviewEvidenceSnapshot(root, { layers: ['accessibility'] }, window)
+    if (!result.ok || !result.accessibility) {
+      throw new Error('Expected accessibility capture to succeed.')
+    }
+
+    expect(result.accessibility.nodes).toEqual([
+      {
+        role: 'main',
+        children: [
+          {
+            role: 'img',
+            name: 'Hero art',
+          },
+          {
+            role: 'textbox',
+            focusable: true,
+          },
+          {
+            role: 'button',
+            name: 'Run',
+            focusable: true,
+          },
+        ],
+      },
+    ])
+
+    const serializedAccessibility = JSON.stringify(result.accessibility)
+    expect(serializedAccessibility).not.toContain('"xyz"')
+    expect(serializedAccessibility).not.toContain('hidden')
+  })
 })
 
 const renderPreviewFixture = () => {

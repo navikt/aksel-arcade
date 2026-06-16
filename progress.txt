@@ -3496,3 +3496,27 @@ Verification:
 Next note:
 
 - If later Preview evidence work expands accessible-name heuristics, keep the current distinction between explicit names and content-derived names. Excluded descendant text must stay out of both the DOM/layout/style layer and the accessibility layer, and `public/preview-evidence-global.js` must be regenerated whenever `src/services/previewEvidence.ts` changes.
+
+### 2026-06-16 - PR #288 review follow-up: align accessible names with browser behavior
+
+Fixed during merge review:
+
+- Confirmed a remaining PR-scoped accuracy gap in the new accessibility layer: fallback name extraction still diverged from browser behavior for three common cases — `<img alt>`, text-like `<input value>`, and content names polluted by `aria-hidden` descendants.
+- Tightened `src/services/previewEvidence.ts` so image/image-input `alt` text is used as the accessible name, text-like inputs no longer use their current `value` as a fake name, button-like inputs still keep value-backed names where appropriate, and sanitized subtree text now skips `aria-hidden` / `hidden` descendants as well as excluded nodes.
+- Reused the same helper path for label text, `aria-labelledby`, and content-derived names, so the accessibility layer and `target.name` capture matching stay aligned with each other instead of drifting across separate heuristics.
+- Added focused regression coverage in `tests/unit/services/previewEvidence.test.ts` proving `<img alt="Hero art">` is named, `<input type="text" value="xyz">` stays unnamed, and `<button>Run<span aria-hidden="true">hidden</span></button>` captures as `Run` instead of `Run hidden`.
+- Regenerated `public/preview-evidence-global.js` so the checked-in hidden Preview sandbox bundle matches the updated serializer logic.
+
+Verification:
+
+- CI=1 npm run test -- --run tests/unit/services/previewEvidence.test.ts
+- npm run build:sandbox
+- npm run test:e2e -- tests/e2e/desktop-mcp-preview-capture.spec.ts --reporter=line
+- npm run typecheck
+- npm run lint
+- CI=1 npm run test -- --run
+- Browser/console smoke check at `http://127.0.0.1:5173/aksel-arcade/` via `npm run dev -- --host 127.0.0.1 --port 5173 --strictPort`, confirming the app shell and live preview render cleanly with no browser-console warnings/errors
+
+Next note:
+
+- Keep accessibility-name extraction grounded in browser/AT semantics rather than raw DOM text. If future work expands roles or target matching, preserve the current split between explicit names (`aria-*`, `alt`, labels, titles), content-derived names for the roles that support them, and sanitized descendant text that excludes hidden/unsafe nodes.

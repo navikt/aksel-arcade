@@ -553,6 +553,10 @@ var previewEvidenceUtils = (() => {
         return normalizeWhitespace(text);
       }
     }
+    const altText = getElementAltText(element);
+    if (altText) {
+      return altText;
+    }
     const labelText = getElementLabelText(element);
     if (labelText) {
       return labelText;
@@ -561,12 +565,12 @@ var previewEvidenceUtils = (() => {
     if (title) {
       return normalizeWhitespace(title);
     }
-    if (element instanceof HTMLInputElement && element.value) {
+    if (element instanceof HTMLInputElement && inputUsesValueAsAccessibleName(element) && element.value) {
       return normalizeWhitespace(element.value);
     }
     return elementUsesContentAsAccessibleName(element) ? getElementVisibleText(element) : "";
   };
-  var hasExplicitAccessibleName = (element) => element.hasAttribute("aria-label") || element.hasAttribute("aria-labelledby") || element.hasAttribute("title") || getElementLabelText(element).length > 0 || element instanceof HTMLInputElement && normalizeWhitespace(element.value).length > 0;
+  var hasExplicitAccessibleName = (element) => element.hasAttribute("aria-label") || element.hasAttribute("aria-labelledby") || getElementAltText(element).length > 0 || element.hasAttribute("title") || getElementLabelText(element).length > 0 || element instanceof HTMLInputElement && inputUsesValueAsAccessibleName(element) && normalizeWhitespace(element.value).length > 0;
   var getElementLabelText = (element) => {
     if (!(element instanceof HTMLElement)) {
       return "";
@@ -596,12 +600,22 @@ var previewEvidenceUtils = (() => {
     }
     if (node.nodeType === Node.ELEMENT_NODE) {
       const element = node;
-      if (isExcludedElement(element)) {
+      if (isExcludedElement(element) || element.getAttribute("aria-hidden") === "true" || element.hasAttribute("hidden")) {
         return "";
       }
     }
     return Array.from(node.childNodes).map((child) => getSanitizedSubtreeText(child)).join(" ");
   };
+  var getElementAltText = (element) => {
+    if (element instanceof HTMLImageElement) {
+      return normalizeWhitespace(element.getAttribute("alt") ?? "");
+    }
+    if (element instanceof HTMLInputElement && element.type === "image") {
+      return normalizeWhitespace(element.getAttribute("alt") ?? "");
+    }
+    return "";
+  };
+  var inputUsesValueAsAccessibleName = (input) => input.type === "button" || input.type === "submit" || input.type === "reset";
   var elementUsesContentAsAccessibleName = (element) => {
     const explicitRole = element.getAttribute("role")?.trim().toLowerCase();
     if (explicitRole) {
