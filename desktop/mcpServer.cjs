@@ -13,6 +13,7 @@ const VALID_VIEWPORT_SIZES = ['2XL', 'XL', 'LG', 'MD', 'SM', 'XS']
 const VALID_THEMES = ['light', 'dark']
 const VALID_PREVIEW_CAPTURE_LAYERS = ['screenshot', 'frame']
 const VALID_PREVIEW_SCREENSHOT_SCOPES = ['viewport', 'full_page', 'region']
+const PROJECT_SOURCE_PAGE_URI_PATTERN = /^arcade:\/\/project\/source\/pages\/(page\d+)\/(jsx|hooks)$/
 
 const MCP_TOOL_DEFINITIONS = Object.freeze([
   Object.freeze({
@@ -158,6 +159,7 @@ const createDesktopMcpServer = ({
   host = DESKTOP_MCP_HOST,
   port = DESKTOP_MCP_PORT,
   path = DESKTOP_MCP_PATH,
+  readProjectResource = createProjectUnavailableResourceResult,
 } = {}) => {
   let activeServer = null
   let startOperation = null
@@ -197,7 +199,12 @@ const createDesktopMcpServer = ({
     }
 
     const nextServer = http.createServer((request, response) => {
-      handleDesktopMcpRequest(request, response, { host, path, port: getPort() })
+      handleDesktopMcpRequest(request, response, {
+        host,
+        path,
+        port: getPort(),
+        readProjectResource,
+      })
     })
 
     startOperation = new Promise((resolve) => {
@@ -256,7 +263,7 @@ const createDesktopMcpServer = ({
   }
 }
 
-const handleDesktopMcpRequest = (request, response, { host, path, port }) => {
+const handleDesktopMcpRequest = (request, response, { host, path, port, readProjectResource }) => {
   const requestUrl = new URL(request.url ?? '/', `http://${host}:${port}`)
   if (requestUrl.pathname !== path) {
     sendText(response, 404, 'Desktop Arcade MCP endpoint not found.')
@@ -281,7 +288,21 @@ const handleDesktopMcpRequest = (request, response, { host, path, port }) => {
     return
   }
 
-  void routeDesktopMcpRequest(request, response)
+  void routeDesktopMcpRequest(request, response, { readProjectResource }).catch((error) => {
+    if (response.writableEnded) {
+      return
+    }
+
+    sendJsonRpcError(response, {
+      httpStatus: 500,
+      id: null,
+      code: -32603,
+      message:
+        error instanceof Error
+          ? error.message
+          : 'Desktop Arcade MCP request handling failed unexpectedly.',
+    })
+  })
 }
 
 const sendJson = (response, statusCode, payload) => {
@@ -320,7 +341,7 @@ const sendNoContent = (response, statusCode = 204) => {
   response.end()
 }
 
-const routeDesktopMcpRequest = async (request, response) => {
+const routeDesktopMcpRequest = async (request, response, { readProjectResource }) => {
   let bodyText
   try {
     bodyText = await readRequestBody(request)
@@ -361,10 +382,10 @@ const routeDesktopMcpRequest = async (request, response) => {
     return
   }
 
-  routeDesktopMcpJsonRpcRequest(payload, response)
+  await routeDesktopMcpJsonRpcRequest(payload, response, { readProjectResource })
 }
 
-const routeDesktopMcpJsonRpcRequest = (payload, response) => {
+const routeDesktopMcpJsonRpcRequest = async (payload, response, { readProjectResource }) => {
   switch (payload.method) {
     case 'initialize':
       routeInitializeRequest(payload, response)
@@ -382,7 +403,7 @@ const routeDesktopMcpJsonRpcRequest = (payload, response) => {
       routeToolsCallRequest(payload, response)
       return
     case 'resources/read':
-      routeResourcesReadRequest(payload, response)
+      await routeResourcesReadRequest(payload, response, readProjectResource)
       return
     default:
       sendJsonRpcError(response, {
@@ -578,7 +599,7 @@ const routeToolsCallRequest = (payload, response) => {
   })
 }
 
-const routeResourcesReadRequest = (payload, response) => {
+const routeResourcesReadRequest = async (payload, response, readProjectResource) => {
   if (!isJsonRpcResponseId(payload.id)) {
     sendJsonRpcError(response, {
       httpStatus: 400,
@@ -611,6 +632,69 @@ const routeResourcesReadRequest = (payload, response) => {
     return
   }
 
+  if (isKnownProjectResourceUri(params.uri)) {
+    let resourceResult
+    try {
+      resourceResult = await readProjectResource({ uri: params.uri })
+    } catch (error) {
+      sendJsonRpcError(response, {
+        id: payload.id,
+        code: -32002,
+        message:
+          error instanceof Error
+            ? error.message
+            : `Desktop Arcade MCP resource "${params.uri}" is unavailable.`,
+        data: {
+          code: 'project-unavailable',
+          resourceUri: params.uri,
+        },
+      })
+      return
+    }
+
+    if (!isProjectResourceReadResult(resourceResult, params.uri)) {
+      sendJsonRpcError(response, {
+        id: payload.id,
+        code: -32002,
+        message:
+          `Desktop Arcade MCP resource "${params.uri}" returned an invalid project resource response.`,
+        data: {
+          code: 'project-unavailable',
+          resourceUri: params.uri,
+        },
+      })
+      return
+    }
+
+    if (!resourceResult.ok) {
+      sendJsonRpcError(response, {
+        id: payload.id,
+        code: -32002,
+        message: resourceResult.message,
+        data: {
+          code: resourceResult.code,
+          resourceUri: resourceResult.resourceUri,
+        },
+      })
+      return
+    }
+
+    sendJson(response, 200, {
+      jsonrpc: '2.0',
+      id: payload.id,
+      result: {
+        contents: [
+          {
+            uri: resourceResult.uri,
+            mimeType: resourceResult.mimeType,
+            text: resourceResult.text,
+          },
+        ],
+      },
+    })
+    return
+  }
+
   const resourceDefinition = MCP_STABLE_RESOURCE_DEFINITIONS.find(
     (resource) => resource.uri === params.uri
   )
@@ -637,6 +721,14 @@ const routeResourcesReadRequest = (payload, response) => {
     },
   })
 }
+
+const isKnownProjectResourceUri = (uri) =>
+  uri === 'arcade://project/manifest' ||
+  uri === 'arcade://project/preview-context' ||
+  uri === 'arcade://project/diagnostics' ||
+  uri === 'arcade://project/source/global/jsx' ||
+  uri === 'arcade://project/source/global/hooks' ||
+  PROJECT_SOURCE_PAGE_URI_PATTERN.test(uri)
 
 const readStrictParamsObject = (payload, { allowedKeys, id, method, response }) => {
   const params = payload.params === undefined ? {} : payload.params
@@ -876,6 +968,13 @@ const createToolExecutionErrorResult = (toolName, code, message) => ({
   },
 })
 
+const createProjectUnavailableResourceResult = async ({ uri }) => ({
+  ok: false,
+  code: 'project-unavailable',
+  resourceUri: uri,
+  message: `Desktop Arcade MCP resource "${uri}" is unavailable because no project reader is connected.`,
+})
+
 const formatServerErrorReason = (error, { host, port }) => {
   if (isPlainObject(error) && error.code === 'EADDRINUSE') {
     return `Port ${port} on ${host} is already in use.`
@@ -949,6 +1048,21 @@ const getRequestOrigin = (request) =>
   typeof request.headers.origin === 'string' && request.headers.origin.trim().length > 0
     ? request.headers.origin.trim()
     : null
+
+const isProjectResourceReadResult = (value, expectedUri) =>
+  isPlainObject(value) &&
+  typeof value.ok === 'boolean' &&
+  (value.ok
+    ? value.uri === expectedUri &&
+      typeof value.mimeType === 'string' &&
+      value.mimeType.trim().length > 0 &&
+      typeof value.text === 'string'
+    : value.resourceUri === expectedUri &&
+      (value.code === 'project-unavailable' ||
+        value.code === 'source-not-found' ||
+        value.code === 'invalid-resource-uri') &&
+      typeof value.message === 'string' &&
+      value.message.trim().length > 0)
 
 const isPlainObject = (value) =>
   typeof value === 'object' && value !== null && !Array.isArray(value)

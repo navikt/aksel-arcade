@@ -10,6 +10,10 @@ const START_AGENT_TRANSPORT_CHANNEL = 'aksel-arcade:start-agent-transport-sessio
 const STOP_AGENT_TRANSPORT_CHANNEL = 'aksel-arcade:stop-agent-transport-session'
 const ROUTE_AGENT_TRANSPORT_REQUEST_CHANNEL = 'aksel-arcade:route-agent-transport-request'
 const ROUTE_AGENT_TRANSPORT_RESPONSE_CHANNEL = 'aksel-arcade:route-agent-transport-response'
+const ROUTE_DESKTOP_MCP_PROJECT_RESOURCE_REQUEST_CHANNEL =
+  'aksel-arcade:route-desktop-mcp-project-resource-request'
+const ROUTE_DESKTOP_MCP_PROJECT_RESOURCE_RESPONSE_CHANNEL =
+  'aksel-arcade:route-desktop-mcp-project-resource-response'
 const DEFAULT_RENDERER_URL = 'http://127.0.0.1:5173/aksel-arcade/'
 const DIST_DIR = path.resolve(__dirname, '..', 'dist-desktop')
 const DESKTOP_RENDERER_PROTOCOL = 'aksel-arcade'
@@ -17,13 +21,18 @@ const DESKTOP_RENDERER_HOST = 'app'
 const DESKTOP_RENDERER_ORIGIN = `${DESKTOP_RENDERER_PROTOCOL}://${DESKTOP_RENDERER_HOST}`
 const DESKTOP_RENDERER_URL = `${DESKTOP_RENDERER_ORIGIN}/index.html`
 const AGENT_TRANSPORT_ROUTE_TIMEOUT_MS = 5000
+const DESKTOP_MCP_PROJECT_RESOURCE_ROUTE_TIMEOUT_MS = 5000
 const agentLoopbackTransport = createAgentLoopbackJsonRpcTransport({
   routeRequest: routeAgentTransportRequest,
 })
-const desktopMcpServer = createDesktopMcpServer()
+const desktopMcpServer = createDesktopMcpServer({
+  readProjectResource: routeDesktopMcpProjectResourceRead,
+})
 let activeMainWindow = null
 let nextAgentTransportRouteRequestId = 0
 const pendingAgentTransportRouteRequests = new Map()
+let nextDesktopMcpProjectResourceRequestId = 0
+const pendingDesktopMcpProjectResourceRequests = new Map()
 let desktopRendererProtocolRegistered = false
 const DESKTOP_ARCADE_CAPABILITIES = Object.freeze({
   surface: 'desktop',
@@ -72,6 +81,10 @@ const registerDesktopIpc = () => {
     return agentLoopbackTransport.stopSession(sessionId)
   })
   ipcMain.on(ROUTE_AGENT_TRANSPORT_RESPONSE_CHANNEL, handleAgentTransportRouteResponse)
+  ipcMain.on(
+    ROUTE_DESKTOP_MCP_PROJECT_RESOURCE_RESPONSE_CHANNEL,
+    handleDesktopMcpProjectResourceResponse
+  )
 }
 
 const removeDesktopIpc = () => {
@@ -80,6 +93,10 @@ const removeDesktopIpc = () => {
   ipcMain.removeHandler(START_AGENT_TRANSPORT_CHANNEL)
   ipcMain.removeHandler(STOP_AGENT_TRANSPORT_CHANNEL)
   ipcMain.off(ROUTE_AGENT_TRANSPORT_RESPONSE_CHANNEL, handleAgentTransportRouteResponse)
+  ipcMain.off(
+    ROUTE_DESKTOP_MCP_PROJECT_RESOURCE_RESPONSE_CHANNEL,
+    handleDesktopMcpProjectResourceResponse
+  )
 }
 
 const registerDesktopRendererProtocol = () => {
@@ -160,6 +177,58 @@ function routeAgentTransportRequest({ id, method, params, session }) {
   })
 }
 
+function routeDesktopMcpProjectResourceRead({ uri }) {
+  const targetWindow = getDesktopMcpProjectResourceWindow()
+  if (!targetWindow) {
+    return Promise.resolve(
+      createDesktopMcpProjectResourceFailure(
+        'project-unavailable',
+        uri,
+        'Desktop Arcade project resources are unavailable because no renderer window is available.'
+      )
+    )
+  }
+
+  const requestId = `desktop-mcp-project-resource-${++nextDesktopMcpProjectResourceRequestId}`
+
+  return new Promise((resolve) => {
+    const timeout = setTimeout(() => {
+      pendingDesktopMcpProjectResourceRequests.delete(requestId)
+      resolve(
+        createDesktopMcpProjectResourceFailure(
+          'project-unavailable',
+          uri,
+          'Desktop Arcade project resources are unavailable because the renderer did not respond in time.'
+        )
+      )
+    }, DESKTOP_MCP_PROJECT_RESOURCE_ROUTE_TIMEOUT_MS)
+
+    pendingDesktopMcpProjectResourceRequests.set(requestId, {
+      resolve,
+      timeout,
+      uri,
+      webContentsId: targetWindow.webContents.id,
+    })
+
+    try {
+      targetWindow.webContents.send(ROUTE_DESKTOP_MCP_PROJECT_RESOURCE_REQUEST_CHANNEL, {
+        requestId,
+        uri,
+      })
+    } catch {
+      pendingDesktopMcpProjectResourceRequests.delete(requestId)
+      clearTimeout(timeout)
+      resolve(
+        createDesktopMcpProjectResourceFailure(
+          'project-unavailable',
+          uri,
+          'Desktop Arcade project resources are unavailable because the renderer window is no longer reachable.'
+        )
+      )
+    }
+  })
+}
+
 function handleAgentTransportRouteResponse(event, payload) {
   if (!isRecord(payload) || typeof payload.requestId !== 'string') {
     return
@@ -188,7 +257,42 @@ function handleAgentTransportRouteResponse(event, payload) {
   pendingRequest.resolve(payload.response)
 }
 
+function handleDesktopMcpProjectResourceResponse(event, payload) {
+  if (!isRecord(payload) || typeof payload.requestId !== 'string') {
+    return
+  }
+
+  const pendingRequest = pendingDesktopMcpProjectResourceRequests.get(payload.requestId)
+  if (!pendingRequest || pendingRequest.webContentsId !== event.sender.id) {
+    return
+  }
+
+  pendingDesktopMcpProjectResourceRequests.delete(payload.requestId)
+  clearTimeout(pendingRequest.timeout)
+
+  if (!isDesktopMcpProjectResourceReadResult(payload.response, pendingRequest.uri)) {
+    pendingRequest.resolve(
+      createDesktopMcpProjectResourceFailure(
+        'project-unavailable',
+        pendingRequest.uri,
+        'Desktop Arcade project resources are unavailable because the renderer returned an invalid response.'
+      )
+    )
+    return
+  }
+
+  pendingRequest.resolve(payload.response)
+}
+
 const getAgentTransportWindow = () => {
+  if (activeMainWindow && !activeMainWindow.isDestroyed()) {
+    return activeMainWindow
+  }
+
+  return BrowserWindow.getAllWindows().find((browserWindow) => !browserWindow.isDestroyed()) ?? null
+}
+
+const getDesktopMcpProjectResourceWindow = () => {
   if (activeMainWindow && !activeMainWindow.isDestroyed()) {
     return activeMainWindow
   }
@@ -204,6 +308,14 @@ const resolvePendingAgentTransportRouteRequests = (responseFactory) => {
   }
 }
 
+const resolvePendingDesktopMcpProjectResourceRequests = (responseFactory) => {
+  for (const [requestId, pendingRequest] of pendingDesktopMcpProjectResourceRequests) {
+    pendingDesktopMcpProjectResourceRequests.delete(requestId)
+    clearTimeout(pendingRequest.timeout)
+    pendingRequest.resolve(responseFactory(pendingRequest))
+  }
+}
+
 const createAgentTransportRouteErrorResponse = (id, jsonRpcCode, code, message) => ({
   jsonrpc: '2.0',
   id: isJsonRpcId(id) ? id : null,
@@ -214,6 +326,13 @@ const createAgentTransportRouteErrorResponse = (id, jsonRpcCode, code, message) 
       code,
     },
   },
+})
+
+const createDesktopMcpProjectResourceFailure = (code, resourceUri, message) => ({
+  ok: false,
+  code,
+  resourceUri,
+  message,
 })
 
 const parseTransportSessionPayload = (payload) => {
@@ -339,6 +458,13 @@ const createWindow = async () => {
         'Desktop Agent transport renderer closed before it returned a response.'
       )
     )
+    resolvePendingDesktopMcpProjectResourceRequests((pendingRequest) =>
+      createDesktopMcpProjectResourceFailure(
+        'project-unavailable',
+        pendingRequest.uri,
+        'Desktop Arcade project resources are unavailable because the renderer window closed.'
+      )
+    )
   })
 
   mainWindow.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
@@ -392,6 +518,13 @@ app.on('will-quit', () => {
       'Desktop Agent transport renderer is shutting down.'
     )
   )
+  resolvePendingDesktopMcpProjectResourceRequests((pendingRequest) =>
+    createDesktopMcpProjectResourceFailure(
+      'project-unavailable',
+      pendingRequest.uri,
+      'Desktop Arcade project resources are unavailable because the renderer is shutting down.'
+    )
+  )
   removeDesktopIpc()
 })
 
@@ -416,3 +549,27 @@ const isAgentTransportRouteResponse = (value, expectedId) => {
 
 const isJsonRpcId = (value) =>
   value === null || value === undefined || typeof value === 'string' || typeof value === 'number'
+
+const isDesktopMcpProjectResourceReadResult = (value, expectedUri) => {
+  if (!isRecord(value) || typeof value.ok !== 'boolean') {
+    return false
+  }
+
+  if (value.ok) {
+    return (
+      value.uri === expectedUri &&
+      typeof value.mimeType === 'string' &&
+      value.mimeType.length > 0 &&
+      typeof value.text === 'string'
+    )
+  }
+
+  return (
+    value.resourceUri === expectedUri &&
+    (value.code === 'project-unavailable' ||
+      value.code === 'source-not-found' ||
+      value.code === 'invalid-resource-uri') &&
+    typeof value.message === 'string' &&
+    value.message.trim().length > 0
+  )
+}

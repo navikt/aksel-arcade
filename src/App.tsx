@@ -13,6 +13,7 @@ import type { Project } from './types/project'
 import type { DesktopMcpServerState } from './services/desktopMcp'
 import { WEB_ARCADE_CAPABILITIES, type ShellCapabilities } from './services/shellCapabilities'
 import { useSettings } from './contexts/SettingsContext'
+import { useDesktopMcpProjectResourceBridge } from './hooks/useDesktopMcpProjectResourceBridge'
 import './App.css'
 
 interface AppProps {
@@ -34,6 +35,7 @@ function App({
     resetToIntro,
     loadFormSummaryTemplate,
     loadHooksDemo,
+    previewState,
     shareHydration,
     applySharedSnapshot,
     dismissShareHydration,
@@ -47,6 +49,12 @@ function App({
     selectedEditTarget,
     previewFullscreen,
   } = useSettings()
+
+  useDesktopMcpProjectResourceBridge({
+    project,
+    previewState,
+    theme,
+  })
 
   // T097: Auto-save integration
   const { saveStatus, saveError } = useAutoSave(project, {

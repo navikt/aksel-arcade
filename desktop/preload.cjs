@@ -6,11 +6,19 @@ const START_AGENT_TRANSPORT_CHANNEL = 'aksel-arcade:start-agent-transport-sessio
 const STOP_AGENT_TRANSPORT_CHANNEL = 'aksel-arcade:stop-agent-transport-session'
 const ROUTE_AGENT_TRANSPORT_REQUEST_CHANNEL = 'aksel-arcade:route-agent-transport-request'
 const ROUTE_AGENT_TRANSPORT_RESPONSE_CHANNEL = 'aksel-arcade:route-agent-transport-response'
+const ROUTE_DESKTOP_MCP_PROJECT_RESOURCE_REQUEST_CHANNEL =
+  'aksel-arcade:route-desktop-mcp-project-resource-request'
+const ROUTE_DESKTOP_MCP_PROJECT_RESOURCE_RESPONSE_CHANNEL =
+  'aksel-arcade:route-desktop-mcp-project-resource-response'
 
 let agentTransportRequestHandler = null
+let desktopMcpProjectResourceReadHandler = null
 
 ipcRenderer.on(ROUTE_AGENT_TRANSPORT_REQUEST_CHANNEL, (_event, payload) => {
   void routeAgentTransportRequest(payload)
+})
+ipcRenderer.on(ROUTE_DESKTOP_MCP_PROJECT_RESOURCE_REQUEST_CHANNEL, (_event, payload) => {
+  void routeDesktopMcpProjectResourceRequest(payload)
 })
 
 const routeAgentTransportRequest = async (payload) => {
@@ -69,6 +77,59 @@ const routeAgentTransportRequest = async (payload) => {
   }
 }
 
+const routeDesktopMcpProjectResourceRequest = async (payload) => {
+  const requestId =
+    isRecord(payload) && typeof payload.requestId === 'string' ? payload.requestId : null
+  if (!requestId) {
+    return
+  }
+
+  const request = parseDesktopMcpProjectResourceRequest(payload)
+  if (!request) {
+    ipcRenderer.send(ROUTE_DESKTOP_MCP_PROJECT_RESOURCE_RESPONSE_CHANNEL, {
+      requestId,
+      response: createDesktopMcpProjectResourceFailure(
+        'invalid-resource-uri',
+        getPayloadResourceUri(payload),
+        'Desktop MCP project resource read request from the main process was invalid.'
+      ),
+    })
+    return
+  }
+
+  if (!desktopMcpProjectResourceReadHandler) {
+    ipcRenderer.send(ROUTE_DESKTOP_MCP_PROJECT_RESOURCE_RESPONSE_CHANNEL, {
+      requestId,
+      response: createDesktopMcpProjectResourceFailure(
+        'project-unavailable',
+        request.uri,
+        'Desktop MCP project resources are not available in the renderer yet.'
+      ),
+    })
+    return
+  }
+
+  try {
+    const response = await desktopMcpProjectResourceReadHandler(request)
+    ipcRenderer.send(ROUTE_DESKTOP_MCP_PROJECT_RESOURCE_RESPONSE_CHANNEL, {
+      requestId,
+      response,
+    })
+  } catch (error) {
+    ipcRenderer.send(ROUTE_DESKTOP_MCP_PROJECT_RESOURCE_RESPONSE_CHANNEL, {
+      requestId,
+      response: createDesktopMcpProjectResourceFailure(
+        'project-unavailable',
+        request.uri,
+        getRedactedAgentErrorMessage(
+          error,
+          'Desktop MCP project resource read failed unexpectedly in the renderer.'
+        )
+      ),
+    })
+  }
+}
+
 contextBridge.exposeInMainWorld(
   '__AKSEL_ARCADE_DESKTOP__',
   Object.freeze({
@@ -83,6 +144,14 @@ contextBridge.exposeInMainWorld(
         throw new Error('Desktop Agent transport request handler must be a function or null.')
       }
       agentTransportRequestHandler = handler
+    },
+    setDesktopMcpProjectResourceReadHandler: (handler) => {
+      if (handler !== null && typeof handler !== 'function') {
+        throw new Error(
+          'Desktop MCP project resource read handler must be a function or null.'
+        )
+      }
+      desktopMcpProjectResourceReadHandler = handler
     },
   })
 )
@@ -110,6 +179,23 @@ const parseAgentTransportRouteRequest = (payload) => {
 const getPayloadJsonRpcId = (payload) =>
   isRecord(payload) && isJsonRpcId(payload.id) ? payload.id : null
 
+const parseDesktopMcpProjectResourceRequest = (payload) => {
+  if (
+    !isRecord(payload) ||
+    typeof payload.uri !== 'string' ||
+    payload.uri.trim().length === 0
+  ) {
+    return null
+  }
+
+  return {
+    uri: payload.uri,
+  }
+}
+
+const getPayloadResourceUri = (payload) =>
+  isRecord(payload) && typeof payload.uri === 'string' ? payload.uri : ''
+
 const createRouteErrorResponse = (id, jsonRpcCode, code, message) => ({
   jsonrpc: '2.0',
   id,
@@ -120,6 +206,13 @@ const createRouteErrorResponse = (id, jsonRpcCode, code, message) => ({
       code,
     },
   },
+})
+
+const createDesktopMcpProjectResourceFailure = (code, resourceUri, message) => ({
+  ok: false,
+  code,
+  resourceUri,
+  message,
 })
 
 const getRedactedAgentErrorMessage = (error, fallback) => {

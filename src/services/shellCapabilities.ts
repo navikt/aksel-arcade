@@ -4,6 +4,7 @@ import type {
   DesktopAgentTransportSession,
 } from './desktopAgentSessionCoordinator'
 import type { DesktopAgentTransportRequestHandler } from './desktopAgentTransportProtocol'
+import type { DesktopMcpProjectResourceReadHandler } from './desktopMcpProjectResourceProtocol'
 
 export type ArcadeShellSurface = 'web' | 'desktop'
 
@@ -34,6 +35,9 @@ export interface DesktopArcadePreloadApi {
     reason: DesktopAgentSessionEndReason
   ) => Promise<unknown>
   setAgentTransportRequestHandler?: (handler: DesktopAgentTransportRequestHandler | null) => void
+  setDesktopMcpProjectResourceReadHandler?: (
+    handler: DesktopMcpProjectResourceReadHandler | null
+  ) => void
 }
 
 export const WEB_ARCADE_CAPABILITIES: ShellCapabilities = Object.freeze({
@@ -88,7 +92,8 @@ export const getDesktopPreloadApi = (): DesktopArcadePreloadApi | undefined => {
     !hasOptionalFunction(api, 'getDesktopMcpServerState') ||
     !hasOptionalFunction(api, 'startAgentTransportSession') ||
     !hasOptionalFunction(api, 'stopAgentTransportSession') ||
-    !hasOptionalFunction(api, 'setAgentTransportRequestHandler')
+    !hasOptionalFunction(api, 'setAgentTransportRequestHandler') ||
+    !hasOptionalFunction(api, 'setDesktopMcpProjectResourceReadHandler')
   ) {
     throw new Error(
       'Invalid Desktop Arcade preload API. Expected narrow shell capability and desktop shell IPC bridges.'
