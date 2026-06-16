@@ -1,13 +1,19 @@
-import { useCallback, useEffect, useRef } from 'react'
+import { useCallback, useLayoutEffect, useRef } from 'react'
 import type { ThemeMode, Project, ProjectSourceTarget } from '@/types/project'
 import type { PreviewState } from '@/types/preview'
 import { collectPreviewDiagnostics } from '@/services/previewDiagnostics'
+import {
+  saveProject,
+  type SaveResult,
+  type WebArcadeWorkingCopyPreferences,
+} from '@/services/storage'
 import {
   prepareDesktopMcpApplyChanges,
   type PreparedDesktopMcpApplyChangesSuccess,
 } from '@/services/desktopMcpApplyChanges'
 import { registerDesktopPreloadMcpApplyChangesHandler } from '@/services/desktopMcpApplyChangesAdapter'
 import type {
+  DesktopMcpApplyChangesFailure,
   DesktopMcpApplyChangesRequest,
   DesktopMcpLastActivity,
 } from '@/services/desktopMcpApplyChangesProtocol'
@@ -19,6 +25,7 @@ interface UseDesktopMcpProjectResourceBridgeOptions {
   project: Project
   previewState: PreviewState
   theme: ThemeMode
+  workingCopyPreferences: WebArcadeWorkingCopyPreferences
   setTheme: (theme: ThemeMode) => void
   updateProject: (updates: DesktopMcpProjectUpdates) => void
   updatePreviewState: (updates: Partial<PreviewState>) => void
@@ -35,6 +42,7 @@ export const useDesktopMcpProjectResourceBridge = ({
   project,
   previewState,
   theme,
+  workingCopyPreferences,
   setTheme,
   updateProject,
   updatePreviewState,
@@ -46,13 +54,19 @@ export const useDesktopMcpProjectResourceBridge = ({
     diagnostics: collectPreviewDiagnostics(previewState),
   })
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     resourceContextRef.current = {
       project,
       theme,
       diagnostics: collectPreviewDiagnostics(previewState),
     }
   }, [previewState, project, theme])
+
+  const workingCopyPreferencesRef = useRef(workingCopyPreferences)
+
+  useLayoutEffect(() => {
+    workingCopyPreferencesRef.current = workingCopyPreferences
+  }, [workingCopyPreferences])
 
   const handleProjectResourceRead = useCallback(
     (request: DesktopMcpProjectResourceReadRequest) =>
@@ -68,11 +82,28 @@ export const useDesktopMcpProjectResourceBridge = ({
         return preparedResult
       }
 
+      const nextWorkingCopyPreferences: WebArcadeWorkingCopyPreferences = {
+        ...workingCopyPreferencesRef.current,
+        theme: preparedResult.nextTheme,
+      }
+      const saveResult = saveProject(preparedResult.nextProject, {
+        preferences: nextWorkingCopyPreferences,
+        updateLastModified: false,
+      })
+      if (!saveResult.success) {
+        return createApplyChangesPersistenceFailure(saveResult)
+      }
+
+      if (saveResult.warning) {
+        console.warn(saveResult.warning)
+      }
+
       resourceContextRef.current = {
         project: preparedResult.nextProject,
         theme: preparedResult.nextTheme,
         diagnostics: preparedResult.nextDiagnostics,
       }
+      workingCopyPreferencesRef.current = nextWorkingCopyPreferences
 
       if (preparedResult.appliedOperations.some((operation) => operation.type === 'replace_source')) {
         updatePreviewState({
@@ -96,7 +127,7 @@ export const useDesktopMcpProjectResourceBridge = ({
     [onDesktopMcpActivity, setTheme, updateProject, updatePreviewState]
   )
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const unregisterProjectRead =
       registerDesktopPreloadMcpProjectResourceReadHandler(handleProjectResourceRead)
     const unregisterApplyChanges = registerDesktopPreloadMcpApplyChangesHandler(handleApplyChanges)
@@ -106,6 +137,20 @@ export const useDesktopMcpProjectResourceBridge = ({
       unregisterProjectRead?.()
     }
   }, [handleApplyChanges, handleProjectResourceRead])
+}
+
+const createApplyChangesPersistenceFailure = ({
+  error,
+}: Pick<SaveResult, 'error'>): DesktopMcpApplyChangesFailure => {
+  const baseMessage = 'apply_changes could not persist the updated Arcade project.'
+  const detail = error?.trim()
+  const message = detail ? `${baseMessage} ${detail}` : baseMessage
+
+  return {
+    ok: false,
+    code: detail && /exceeds 5MB limit/i.test(detail) ? 'payload-too-large' : 'persistence-failed',
+    message,
+  }
 }
 
 const applyPreparedOperation = (

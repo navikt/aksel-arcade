@@ -70,10 +70,20 @@ function App({
     )
   }, [])
 
+  const workingCopyPreferences = {
+    theme,
+    panelOrder,
+    multiPageEnabled,
+    pagePanelOpen,
+    selectedEditTarget,
+    previewFullscreen,
+  }
+
   useDesktopMcpProjectResourceBridge({
     project,
     previewState,
     theme,
+    workingCopyPreferences,
     setTheme,
     updateProject,
     updatePreviewState,
@@ -81,14 +91,7 @@ function App({
   })
 
   // T097: Auto-save integration
-  const { saveStatus, saveError } = useAutoSave(project, {
-    theme,
-    panelOrder,
-    multiPageEnabled,
-    pagePanelOpen,
-    selectedEditTarget,
-    previewFullscreen,
-  })
+  const { saveStatus, saveError } = useAutoSave(project, workingCopyPreferences)
 
   // T094, T095, T096: Project size monitoring
   const [projectSizeBytes, setProjectSizeBytes] = useState(0)

@@ -718,7 +718,8 @@ const isDesktopMcpApplyChangesResult = (value) => {
     value.code === 'stale-project-revision' ||
     value.code === 'invalid-operation-target' ||
     value.code === 'invalid-project-name' ||
-    value.code === 'payload-too-large') &&
+    value.code === 'payload-too-large' ||
+    value.code === 'persistence-failed') &&
     typeof value.message === 'string' &&
     value.message.trim().length > 0 &&
     (value.manifestResourceUri === undefined || typeof value.manifestResourceUri === 'string') &&

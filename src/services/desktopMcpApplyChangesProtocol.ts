@@ -28,6 +28,7 @@ export type DesktopMcpApplyChangesErrorCode =
   | 'invalid-operation-target'
   | 'invalid-project-name'
   | 'payload-too-large'
+  | 'persistence-failed'
 
 export interface DesktopMcpLastActivity {
   toolName: 'apply_changes' | 'capture_preview_evidence'

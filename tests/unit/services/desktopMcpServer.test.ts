@@ -36,6 +36,11 @@ interface DesktopMcpServerState {
   requiresAuth: false
   authDescription: string
   availability: { status: 'available' } | { status: 'unavailable'; reason: string }
+  lastActivity?: {
+    toolName: 'apply_changes' | 'capture_preview_evidence'
+    operationTypes?: string[]
+    timestamp: string
+  } | null
 }
 
 interface DesktopMcpServer {
@@ -82,6 +87,7 @@ interface ApplyChangesFailure {
     | 'invalid-operation-target'
     | 'invalid-project-name'
     | 'payload-too-large'
+    | 'persistence-failed'
   message: string
   manifestResourceUri?: string
   resourceUri?: string
@@ -380,11 +386,8 @@ describe('desktopMcpServer', () => {
       })
       .mockResolvedValueOnce({
         ok: false,
-        code: 'stale-project-revision',
-        message: 'Revision mismatch.',
-        manifestResourceUri: 'arcade://project/manifest',
-        expectedProjectRevision: 'rev-old',
-        currentProjectRevision: 'rev-new',
+        code: 'persistence-failed',
+        message: 'Working copy save failed.',
       })
 
     const server = createManagedServer({ port: 0, applyChanges })
@@ -442,6 +445,13 @@ describe('desktopMcpServer', () => {
         },
       },
     })
+    expect(server.getState()).toMatchObject({
+      lastActivity: {
+        toolName: 'apply_changes',
+        operationTypes: ['rename_project'],
+        timestamp: '2026-06-16T12:00:00.000Z',
+      },
+    })
 
     const staleResponse = await postJson(state.url, {
       jsonrpc: '2.0',
@@ -469,17 +479,14 @@ describe('desktopMcpServer', () => {
         content: [
           {
             type: 'text',
-            text: 'Revision mismatch.',
+            text: 'Working copy save failed.',
           },
         ],
         isError: true,
         structuredContent: {
-          code: 'stale-project-revision',
+          code: 'persistence-failed',
           toolName: 'apply_changes',
-          message: 'Revision mismatch.',
-          manifestResourceUri: 'arcade://project/manifest',
-          expectedProjectRevision: 'rev-old',
-          currentProjectRevision: 'rev-new',
+          message: 'Working copy save failed.',
         },
       },
     })
@@ -551,9 +558,6 @@ describe('desktopMcpServer', () => {
       '`capture_preview_evidence({ pageId })` is the normal autonomous inspection path'
     )
     expect(operatingGuidePayload.result.contents[0].text).toContain(
-      '`select_active_page` is for human-facing coordination'
-    )
-    expect(operatingGuidePayload.result.contents[0].text).toContain(
       'If `apply_changes` returns `project-unavailable`, wait for an active Desktop Arcade window'
     )
     expect(operatingGuidePayload.result.contents[0].text).toContain(
@@ -580,7 +584,6 @@ describe('desktopMcpServer', () => {
       'Arcade source is import-free JSX and Hooks'
     )
     expect(authoringGuidePayload.result.contents[0].text).toContain('`Global config`')
-    expect(authoringGuidePayload.result.contents[0].text).toContain('{{pageRef:name}}')
 
     const capabilitiesResponse = await postJson(state.url, {
       jsonrpc: '2.0',

@@ -241,6 +241,7 @@ const createDesktopMcpServer = ({
 } = {}) => {
   let activeServer = null
   let startOperation = null
+  let lastActivity = null
   let availability = {
     status: 'unavailable',
     reason: 'Desktop Arcade MCP has not started yet.',
@@ -257,6 +258,7 @@ const createDesktopMcpServer = ({
     url: `http://${host}:${getPort()}${path}`,
     requiresAuth: false,
     authDescription: DESKTOP_MCP_AUTH_DESCRIPTION,
+    lastActivity,
     availability:
       availability.status === 'available'
         ? { status: 'available' }
@@ -282,7 +284,13 @@ const createDesktopMcpServer = ({
         path,
         port: getPort(),
         readProjectResource,
-        applyChanges,
+        applyChanges: async (requestPayload) => {
+          const applyChangesResult = await applyChanges(requestPayload)
+          if (isApplyChangesResult(applyChangesResult) && applyChangesResult.ok) {
+            lastActivity = applyChangesResult.safeActivity
+          }
+          return applyChangesResult
+        },
       })
     })
 
@@ -1154,7 +1162,6 @@ const createDesktopStableResourceText = (uri) => {
         '- Default loop: read this guide, read `arcade://project/manifest`, read the relevant source resources, use `apply_changes` for durable edits, read `arcade://project/diagnostics` unless the human asked for a different workflow, then capture Preview evidence when visual validation is needed.',
         '- Durable project edits happen through `apply_changes`, not by patching files outside the active Arcade project.',
         '- `capture_preview_evidence({ pageId })` is the normal autonomous inspection path for pages and targeted visual states.',
-        '- `select_active_page` is for human-facing coordination; it is not the routine inspection path.',
         '- Saved Preview preferences live in `arcade://project/preview-context`; capture-only overrides must not mutate them.',
         '- If `apply_changes` returns `project-unavailable`, wait for an active Desktop Arcade window instead of falling back to repository or filesystem edits.',
         '- If `capture_preview_evidence` still returns `not-yet-implemented`, continue with manifest/source/diagnostics reads and `apply_changes`; do not fall back to repository or filesystem edits for missing Preview evidence.',
@@ -1168,7 +1175,6 @@ const createDesktopStableResourceText = (uri) => {
         '- Prefer Aksel-valid Arcade JSX: current Aksel components, layout primitives, icons, and `--ax` design tokens before native HTML or custom CSS fallbacks.',
         '- `Global config` is shared code in scope for every Arcade page; it is not a renderable page.',
         '- Durable page navigation targets stable page ids, not page names.',
-        '- Use `{{pageRef:name}}` placeholders only inside `apply_changes` batches that create or relink pages; durable source must end with permanent page ids.',
         '- Diagnostics plus Preview evidence are the feedback loop after source changes.',
         '- Keep the output context-light: no broad Aksel training, package edits, or repository/file edits.',
       ].join('\n')
@@ -1337,7 +1343,8 @@ const isApplyChangesResult = (value) =>
         value.code === 'stale-project-revision' ||
         value.code === 'invalid-operation-target' ||
         value.code === 'invalid-project-name' ||
-        value.code === 'payload-too-large') &&
+        value.code === 'payload-too-large' ||
+        value.code === 'persistence-failed') &&
       typeof value.message === 'string' &&
       value.message.trim().length > 0 &&
       (value.manifestResourceUri === undefined ||

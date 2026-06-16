@@ -3288,3 +3288,21 @@ Next note:
 - `#277` should build on this `apply_changes` path for page-lifecycle mutations instead of introducing a second writer bridge; the current existing-project mutation surface already has revision checks, source-resource targeting, and immediate read-after-write behavior.
 - `capture_preview_evidence` is still intentionally unimplemented. Keep the next MCP slices on the manifest/source/diagnostics/apply loop unless that issue is the one being worked.
 - Desktop MCP Settings last-activity is currently renderer-managed UI state. If a later issue needs persistence or parity from the main-process server state, that should be a separate follow-up rather than folded into `#275`.
+
+### 2026-06-16 - PR #285 review follow-up for issue #275
+
+Fixed after review:
+
+- Made `apply_changes` persist the full working copy synchronously before returning success, so MCP mutations now fail fast instead of reporting success and relying on delayed autosave. Persistence failures surface as `persistence-failed`, while full working-copy size overflows keep the existing `payload-too-large` contract.
+- Added focused hook coverage in `tests/unit/hooks/useDesktopMcpProjectResourceBridge.test.tsx` so persistence failures do not mutate renderer state and the full-envelope size guard still maps to `payload-too-large`.
+- Persisted Desktop MCP `lastActivity` in the main-process/server state so Settings survives renderer reloads, while keeping the immediate renderer-side live update for the current session.
+- Tightened the renderer bridge to refresh its project/theme/diagnostics/preferences refs in `useLayoutEffect`, closing the post-render race where incoming MCP requests could read stale state or stale working-copy preferences.
+- Removed two MCP guide-contract mismatches: the operating guide no longer references the nonexistent `select_active_page` tool, and the authoring guide no longer documents the unsupported `{{pageRef:name}}` placeholder workflow.
+
+Verification:
+
+- npm run typecheck
+- npm run lint
+- CI=1 npm run test -- --run
+- npm run build
+- Browser/console smoke check at `http://127.0.0.1:4174/aksel-arcade/` via `npm run dev -- --host 127.0.0.1 --port 4174`, confirming the app shell and live preview render and the console stays free of warnings/errors in the clean flow
