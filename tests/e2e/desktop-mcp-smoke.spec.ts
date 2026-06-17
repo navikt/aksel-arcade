@@ -161,7 +161,7 @@ test.describe('Desktop MCP v1 smoke flow', () => {
 
       const capabilities = await readJsonMcpResource(5, 'arcade://desktop/capabilities')
       expect(capabilities).toMatchObject({
-        serverName: 'desktop-arcade',
+        serverName: 'aksel-arcade',
         endpoint: desktopMcpUrl,
         transport: 'HTTP (MCP Streamable HTTP)',
         requiresAuth: false,
@@ -312,14 +312,15 @@ test.describe('Desktop MCP v1 smoke flow', () => {
       await page.getByTestId('project-controls-settings').click()
       await expect(page.getByText('Desktop Arcade MCP')).toBeVisible()
       await expect(page.getByText('Status: Available')).toBeVisible()
-      await expect(page.getByText('Server name: desktop-arcade')).toBeVisible()
+      await expect(page.getByText('Server name: aksel-arcade')).toBeVisible()
       await expect(page.getByText('Type: HTTP (MCP Streamable HTTP)')).toBeVisible()
       await expect(page.getByText('URL: http://127.0.0.1:3846/mcp')).toBeVisible()
-      await expect(page.getByText('No token/header required.')).toBeVisible()
+      await expect(page.getByText('No token/header required.')).toHaveCount(0)
       const activityLine = page.getByText(/Last activity:/)
       await expect(activityLine).toContainText('capture_preview_evidence')
       await expect(activityLine).not.toContainText('Details page')
       await expect(activityLine).not.toContainText('Smoke path ready')
+      await expect(page.getByRole('menuitem', { name: 'Copy VSCode json' })).toBeVisible()
     } finally {
       await app.close()
     }

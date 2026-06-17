@@ -17,7 +17,7 @@ interface HeaderHarnessProps {
 }
 
 const AVAILABLE_MCP_STATE: DesktopMcpServerState = {
-  serverName: 'desktop-arcade',
+  serverName: 'aksel-arcade',
   transportLabel: 'HTTP (MCP Streamable HTTP)',
   url: 'http://127.0.0.1:3846/mcp',
   requiresAuth: false,
@@ -88,15 +88,24 @@ describe('Desktop Arcade MCP settings', () => {
     await user.click(screen.getByRole('button', { name: /settings/i }))
 
     expect(await screen.findByText('Desktop Arcade MCP')).toBeTruthy()
-    expect(await screen.findByText('Status: Available')).toBeTruthy()
-    expect(screen.getByText('Server name: desktop-arcade')).toBeTruthy()
+    expect((await screen.findByText('Status: Available')).tagName).toBe('STRONG')
+    expect(screen.getByText('Server name: aksel-arcade')).toBeTruthy()
     expect(screen.getByText('Type: HTTP (MCP Streamable HTTP)')).toBeTruthy()
     expect(screen.getByText('URL: http://127.0.0.1:3846/mcp')).toBeTruthy()
-    expect(screen.getByText('No token/header required.')).toBeTruthy()
+    expect(screen.queryByText('No token/header required.')).toBeNull()
     expect(screen.getByText('Last activity: No MCP activity yet.')).toBeTruthy()
-    expect(await screen.findByRole('menuitem', { name: /copy server name/i })).toBeTruthy()
-    expect(await screen.findByRole('menuitem', { name: /copy transport type/i })).toBeTruthy()
-    expect(await screen.findByRole('menuitem', { name: /copy mcp url/i })).toBeTruthy()
+    const copyServerName = await screen.findByRole('menuitem', { name: /copy server name/i })
+    const copyMcpUrl = await screen.findByRole('menuitem', { name: /copy mcp url/i })
+    const copyVsCodeJson = await screen.findByRole('menuitem', { name: /copy vscode json/i })
+    const menuItems = screen.getAllByRole('menuitem').map((item) => item.textContent?.trim() ?? '')
+
+    expect(copyServerName).toBeTruthy()
+    expect(copyMcpUrl).toBeTruthy()
+    expect(copyVsCodeJson).toBeTruthy()
+    expect(copyServerName.compareDocumentPosition(copyMcpUrl) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(copyMcpUrl.compareDocumentPosition(copyVsCodeJson) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(menuItems.slice(-3)).toEqual(['Copy server name', 'Copy MCP URL', 'Copy VSCode json'])
+    expect(screen.queryByRole('menuitem', { name: /copy transport type/i })).toBeNull()
   })
 
   it('shows only safe Desktop MCP last-activity metadata in settings', async () => {
@@ -139,7 +148,7 @@ describe('Desktop Arcade MCP settings', () => {
 
     expect(
       await screen.findByText('Status: Unavailable: Port 3846 on 127.0.0.1 is already in use.')
-    ).toBeTruthy()
+    ).toHaveProperty('tagName', 'STRONG')
     expect(
       screen.getByText('Connection details are available once Desktop Arcade owns the MCP endpoint.')
     ).toBeTruthy()
@@ -148,6 +157,7 @@ describe('Desktop Arcade MCP settings', () => {
     expect(screen.queryByRole('menuitem', { name: /copy server name/i })).toBeNull()
     expect(screen.queryByRole('menuitem', { name: /copy transport type/i })).toBeNull()
     expect(screen.queryByRole('menuitem', { name: /copy mcp url/i })).toBeNull()
+    expect(screen.queryByRole('menuitem', { name: /copy vscode json/i })).toBeNull()
   })
 
   it('keeps the MCP section out of Web Arcade settings', async () => {

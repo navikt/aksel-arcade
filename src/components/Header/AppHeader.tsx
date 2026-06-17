@@ -341,12 +341,6 @@ export const AppHeader = ({
                   Switch to {theme === 'dark' ? 'light' : 'dark'} theme
                 </ActionMenu.Item>
               </ActionMenu.Group>
-              {shellCapabilities.surface === 'desktop' && (
-                <>
-                  <ActionMenu.Divider />
-                  <DesktopMcpSettingsGroup mcpState={desktopMcpServerState} />
-                </>
-              )}
               <ActionMenu.Divider />
               <ActionMenu.Group label="Templates">
                 <ActionMenu.Item onSelect={onLoadFormSummaryTemplate}>
@@ -369,6 +363,12 @@ export const AppHeader = ({
                   Reset editor
                 </ActionMenu.Item>
               </ActionMenu.Group>
+              {shellCapabilities.surface === 'desktop' && (
+                <>
+                  <ActionMenu.Divider />
+                  <DesktopMcpSettingsGroup mcpState={desktopMcpServerState} />
+                </>
+              )}
             </ActionMenu.Content>
           </ActionMenu>
         </HStack>

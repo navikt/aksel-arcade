@@ -3,7 +3,7 @@ const http = require('node:http')
 const DESKTOP_MCP_HOST = '127.0.0.1'
 const DESKTOP_MCP_PORT = 3846
 const DESKTOP_MCP_PATH = '/mcp'
-const DESKTOP_MCP_SERVER_NAME = 'desktop-arcade'
+const DESKTOP_MCP_SERVER_NAME = 'aksel-arcade'
 const DESKTOP_MCP_SERVER_VERSION = '0.0.0'
 const DESKTOP_MCP_TRANSPORT_LABEL = 'HTTP (MCP Streamable HTTP)'
 const DESKTOP_MCP_AUTH_DESCRIPTION = 'No token/header required.'
@@ -1843,7 +1843,7 @@ const createDesktopStableResourceText = (uri) => {
         },
         verificationBoundaries: {
           mcpVerifiable: [
-            'No token/header is required for the desktop-arcade MCP endpoint.',
+            'No token/header is required for the aksel-arcade MCP endpoint.',
             'The published v1 tool/resource contract and omissions are discoverable from MCP itself.',
             'Business failures stay structured and redacted in MCP tool/resource responses.',
             'Unknown browser Origins are rejected and GET/SSE entrypoints stay unsupported.',
