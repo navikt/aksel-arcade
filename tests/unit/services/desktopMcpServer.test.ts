@@ -256,6 +256,8 @@ describe('desktopMcpServer', () => {
     expect(initializePayload.result.instructions).toContain('goToPage')
     expect(initializePayload.result.instructions).toContain('import-free')
     expect(initializePayload.result.instructions).toContain('arcade://desktop/authoring-guide')
+    expect(initializePayload.result.instructions).toContain('page Hooks tab')
+    expect(initializePayload.result.instructions).toContain('Global config hooks as module scope')
   })
 
   it('lists the v1 MCP tools and stable direct resources', async () => {
@@ -358,7 +360,8 @@ describe('desktopMcpServer', () => {
       },
     })
     expect(readResourceResponse.status).toBe(200)
-    await expect(readResourceResponse.json()).resolves.toEqual({
+    const readResourcePayload = await readResourceResponse.json()
+    expect(readResourcePayload).toEqual({
       jsonrpc: '2.0',
       id: 32,
       result: {
@@ -376,6 +379,12 @@ describe('desktopMcpServer', () => {
         },
       },
     })
+    expect(readResourcePayload.result.structuredContent.text).toContain(
+      'Global config `hooks` is module scope'
+    )
+    expect(readResourcePayload.result.structuredContent.text).toContain(
+      'page state belongs there'
+    )
   })
 
   it('returns 202 for initialized notifications and keeps unsupported MCP surfaces undiscoverable', async () => {
@@ -1341,6 +1350,12 @@ describe('desktopMcpServer', () => {
     expect(authoringGuidePayload.result.contents[0].text).toContain('arcade://aksel/catalog')
     expect(authoringGuidePayload.result.contents[0].text).toContain('https://aksel.nav.no/llm.md')
     expect(authoringGuidePayload.result.contents[0].text).toContain('two source tabs')
+    expect(authoringGuidePayload.result.contents[0].text).toContain(
+      'Global config `hooks` stays at module scope'
+    )
+    expect(authoringGuidePayload.result.contents[0].text).toContain(
+      'its `hooks` tab stays at module scope rather than becoming a page component'
+    )
     // The object-literal-wrapped page ({(() => {...})()}) breaks the whole preview and must
     // never be presented as a usable snippet — only as the explicit anti-pattern warning.
     expect(authoringGuidePayload.result.contents[0].text).not.toContain('\n{(() => {')
@@ -1536,6 +1551,9 @@ describe('desktopMcpServer', () => {
     const component = JSON.parse(componentPayload.result.contents[0].text)
     expect(component.akselVersion).toBe(catalog.akselVersion)
     expect(component.component.name).toBe('Button')
+    expect(component.usage).toContain('page Hooks tab')
+    expect(component.usage).toContain('Global config `hooks` is only for defining shared custom hooks')
+    expect(component.usage).not.toContain('page Hooks (or Global config)')
     expect(typeof component.component.snippet.jsx).toBe('string')
     expect(component.component.snippet.jsx).not.toMatch(/\bimport\b/)
     expect(component.component.snippet.jsx).not.toContain('${')

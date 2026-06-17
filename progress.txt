@@ -3862,3 +3862,28 @@ Verification:
 - npm run lint
 - CI=1 npx vitest run (578 passed, incl. new multi-page-preview-sync regression + desktopMcpServer guide guard)
 - Browser smoke check at http://localhost:5173/aksel-arcade/: with the agent's broken project on page02 active, the overlay now shows "Compile Error (line 1) in \"Step 1\"" instead of a stale/white preview.
+
+
+2026-06-17 - Issue #303: Correct Global-config-hooks guidance and add an invalid-hook-call diagnostics hint
+
+Selected `#303` as the highest-priority `ready-for-agent` slice from `#300`-`#303` after reading `#304`, `CONTEXT.md`, and the existing `progress.txt` notes, because the PRD calls the invalid-hook guidance problem the single most-cited agent pain point and it improves both first-try authoring and recovery from the same mistake.
+
+Implemented:
+- Tightened the three MCP guidance surfaces that are always or commonly read first:
+  - `desktop/mcpGuidanceResources.cjs` `arcade://desktop/start-here` now states that page-level hook calls belong in the page Hooks tab, while Global config `hooks` is module scope for defining shared custom hooks, helpers, constants, and components only.
+  - `desktop/mcpServer.cjs` `initialize` instructions now carry the same define-don't-call rule in the connect-time text.
+  - `desktop/mcpServer.cjs` `arcade://desktop/authoring-guide` now mirrors the same correction and explicitly says Global config `hooks` stays at module scope rather than becoming a page component.
+- Tightened the per-component MCP snippet guidance in `desktop/mcpServer.cjs` so component resources no longer say `hooks` can go in "page Hooks (or Global config)"; they now direct hook code to the page Hooks tab and reserve Global config for shared definitions only.
+- Added `src/services/runtimeDiagnosticHints.ts`, a small pure hint mapper that recognizes React's stable `Invalid hook call` runtime message and returns Arcade-specific recovery advice.
+- Wired the hint into `src/services/desktopMcpProjectResources.ts` so `arcade://project/diagnostics` now adds a `hint` field on matching runtime issues without changing unrelated diagnostics behavior.
+- Added regression coverage in `tests/unit/services/runtimeDiagnosticHints.test.ts`, `tests/unit/services/desktopMcpProjectResources.test.ts`, and `tests/unit/services/desktopMcpServer.test.ts` for the new hint plus the corrected start-here / initialize / authoring-guide / component-resource wording.
+
+Verification:
+- npm run typecheck
+- npm run lint
+- CI=1 npm test -- --run
+- npm run build
+- Browser smoke check at `http://127.0.0.1:4173/aksel-arcade/` with the app shell and sandbox preview rendered and no browser-console errors/warnings
+
+Next note:
+- `#300` can now add the single-page stateful-flow + sandbox-constraints guidance on top of the same MCP wording without revisiting the invalid-hook rule; keep the new "Global config hooks is module scope" phrasing consistent across any remaining MCP guidance edits.
