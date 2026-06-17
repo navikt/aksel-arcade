@@ -3,7 +3,7 @@ import type { RuntimeError } from '@/types/preview'
 const INVALID_HOOK_CALL_PATTERN = /invalid hook call/i
 
 export const INVALID_HOOK_CALL_ARCADE_HINT =
-  'Hooks cannot run at Global config/module scope. Move state into the page Hooks tab, or define a custom hook function in Global config and call it from a page.'
+  'This often means a hook is still running at module scope (for example Global config, or a bare page Hooks statement) instead of inside a page component. In Arcade, keep page state in top-level bindings in the page Hooks tab (for example `const [value, setValue] = useState(...)`), or define a custom hook function in Global config and call it from a page.'
 
 export const getArcadeRuntimeDiagnosticHint = (
   error: Pick<RuntimeError, 'message'>

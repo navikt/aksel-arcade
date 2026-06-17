@@ -203,7 +203,7 @@ describe('desktopMcpProjectResources', () => {
       message:
         'Invalid hook call. Hooks can only be called inside of the body of a function component.',
       hint:
-        'Hooks cannot run at Global config/module scope. Move state into the page Hooks tab, or define a custom hook function in Global config and call it from a page.',
+        'This often means a hook is still running at module scope (for example Global config, or a bare page Hooks statement) instead of inside a page component. In Arcade, keep page state in top-level bindings in the page Hooks tab (for example `const [value, setValue] = useState(...)`), or define a custom hook function in Global config and call it from a page.',
     })
     expect(runtimeIssue).not.toHaveProperty('pageId')
   })

@@ -257,6 +257,7 @@ describe('desktopMcpServer', () => {
     expect(initializePayload.result.instructions).toContain('import-free')
     expect(initializePayload.result.instructions).toContain('arcade://desktop/authoring-guide')
     expect(initializePayload.result.instructions).toContain('page Hooks tab')
+    expect(initializePayload.result.instructions).toContain('top-level hook bindings')
     expect(initializePayload.result.instructions).toContain('Global config hooks as module scope')
   })
 
@@ -385,6 +386,7 @@ describe('desktopMcpServer', () => {
     expect(readResourcePayload.result.structuredContent.text).toContain(
       'page state belongs there'
     )
+    expect(readResourcePayload.result.structuredContent.text).toContain('top-level hook bindings')
   })
 
   it('returns 202 for initialized notifications and keeps unsupported MCP surfaces undiscoverable', async () => {
@@ -1353,6 +1355,7 @@ describe('desktopMcpServer', () => {
     expect(authoringGuidePayload.result.contents[0].text).toContain(
       'Global config `hooks` stays at module scope'
     )
+    expect(authoringGuidePayload.result.contents[0].text).toContain('top-level hook bindings')
     expect(authoringGuidePayload.result.contents[0].text).toContain(
       'its `hooks` tab stays at module scope rather than becoming a page component'
     )
