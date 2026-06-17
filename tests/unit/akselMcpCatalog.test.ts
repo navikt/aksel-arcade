@@ -47,6 +47,21 @@ describe('akselMcpCatalog builder', () => {
     }
   })
 
+  it('encodes component resource URIs so names with spaces round-trip and stay dispatchable', () => {
+    const componentDispatchPattern = /^arcade:\/\/aksel\/components\/([A-Za-z0-9.%\- ]+)$/
+    const catalog = buildMcpAkselCatalog()
+
+    expect(akselComponentResourceUri('Chips Toggle')).toBe(
+      'arcade://aksel/components/Chips%20Toggle'
+    )
+
+    for (const indexEntry of catalog.components) {
+      const match = indexEntry.resourceUri.match(componentDispatchPattern)
+      expect(match, `unreachable resource URI for "${indexEntry.name}"`).not.toBeNull()
+      expect(decodeURIComponent(match![1])).toBe(indexEntry.name)
+    }
+  })
+
   it('excludes deprecated component roots and icons from the authoring set', () => {
     const names = listMcpAuthoringEntries().map((entry) => entry.name)
 

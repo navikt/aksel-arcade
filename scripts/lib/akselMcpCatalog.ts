@@ -63,7 +63,7 @@ export interface McpAkselCatalog {
 }
 
 export const akselComponentResourceUri = (name: string): string =>
-  `${AKSEL_COMPONENT_RESOURCE_URI_PREFIX}${name}`
+  `${AKSEL_COMPONENT_RESOURCE_URI_PREFIX}${encodeURIComponent(name)}`
 
 /**
  * Resolves an editor insertion template to the clean code an agent should read:

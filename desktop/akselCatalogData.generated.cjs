@@ -96,14 +96,14 @@ module.exports = {
       "group": "component",
       "status": "current",
       "purpose": "Toggle chips with selectable filter state.",
-      "resourceUri": "arcade://aksel/components/Chips Toggle"
+      "resourceUri": "arcade://aksel/components/Chips%20Toggle"
     },
     {
       "name": "Chips Removable",
       "group": "component",
       "status": "current",
       "purpose": "Removable chips for active filters.",
-      "resourceUri": "arcade://aksel/components/Chips Removable"
+      "resourceUri": "arcade://aksel/components/Chips%20Removable"
     },
     {
       "name": "Radio",

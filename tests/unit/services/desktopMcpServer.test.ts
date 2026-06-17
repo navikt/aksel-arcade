@@ -1503,6 +1503,26 @@ describe('desktopMcpServer', () => {
     const caseInsensitivePayload = await caseInsensitiveResponse.json()
     expect(JSON.parse(caseInsensitivePayload.result.contents[0].text).component.name).toBe('Button')
 
+    const spacedIndex = catalog.components.find((component: { name: string }) =>
+      component.name.includes(' ')
+    )
+    if (spacedIndex) {
+      const spacedResponse = await postJson(state.url, {
+        jsonrpc: '2.0',
+        id: 94,
+        method: 'resources/read',
+        params: {
+          uri: spacedIndex.resourceUri,
+        },
+      })
+      expect(spacedResponse.status).toBe(200)
+      const spacedPayload = await spacedResponse.json()
+      expect(spacedPayload.error).toBeUndefined()
+      expect(JSON.parse(spacedPayload.result.contents[0].text).component.name).toBe(
+        spacedIndex.name
+      )
+    }
+
     const unknownComponentResponse = await postJson(state.url, {
       jsonrpc: '2.0',
       id: 93,

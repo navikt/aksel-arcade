@@ -97,7 +97,7 @@ const PREVIEW_CAPTURE_RESOURCE_URI_PATTERN =
 const AKSEL_CATALOG_RESOURCE_URI = 'arcade://aksel/catalog'
 const AKSEL_COMPONENT_RESOURCE_URI_PREFIX = 'arcade://aksel/components/'
 const AKSEL_COMPONENT_RESOURCE_URI_TEMPLATE = `${AKSEL_COMPONENT_RESOURCE_URI_PREFIX}{name}`
-const AKSEL_COMPONENT_RESOURCE_URI_PATTERN = /^arcade:\/\/aksel\/components\/([A-Za-z0-9.]+)$/
+const AKSEL_COMPONENT_RESOURCE_URI_PATTERN = /^arcade:\/\/aksel\/components\/([A-Za-z0-9.%\- ]+)$/
 const APPLY_CHANGES_OPERATIONS_RESOURCE_URI = 'arcade://desktop/apply-changes-operations'
 
 const APPLY_CHANGES_NEXT_STEPS = Object.freeze([
@@ -146,6 +146,17 @@ const loadAkselCatalogData = () => {
 const AKSEL_CATALOG_DATA = loadAkselCatalogData()
 
 const isAkselComponentResourceUri = (uri) => AKSEL_COMPONENT_RESOURCE_URI_PATTERN.test(uri)
+
+// Component names are percent-encoded in their resource URIs (e.g. "Chips Toggle"
+// -> "Chips%20Toggle"), so decode before looking them up. Tolerate a raw,
+// unencoded name too, and never throw on a malformed escape sequence.
+const decodeAkselComponentName = (rawName) => {
+  try {
+    return decodeURIComponent(rawName)
+  } catch {
+    return rawName
+  }
+}
 
 const findAkselComponentDetail = (name) => {
   const byName = AKSEL_CATALOG_DATA.componentsByName
@@ -1210,7 +1221,7 @@ const readDesktopResource = async (uri, { previewCaptureStore, readProjectResour
 
   if (isAkselComponentResourceUri(uri)) {
     const match = uri.match(AKSEL_COMPONENT_RESOURCE_URI_PATTERN)
-    const requestedName = match ? match[1] : ''
+    const requestedName = decodeAkselComponentName(match ? match[1] : '')
     const detail = findAkselComponentDetail(requestedName)
     if (!detail) {
       return {
