@@ -40,11 +40,6 @@ interface DesktopMcpServerState {
   requiresAuth: false
   authDescription: string
   availability: { status: 'available' } | { status: 'unavailable'; reason: string }
-  lastActivity?: {
-    toolName: 'apply_changes' | 'capture_preview_evidence'
-    operationTypes?: string[]
-    timestamp: string
-  } | null
 }
 
 interface DesktopMcpServer {
@@ -695,14 +690,6 @@ describe('desktopMcpServer', () => {
         },
       },
     })
-    expect(server.getState()).toMatchObject({
-      lastActivity: {
-        toolName: 'capture_preview_evidence',
-        operationTypes: ['screenshot', 'accessibility', 'dom_layout_style', 'frame'],
-        timestamp: '2026-06-16T12:30:00.000Z',
-      },
-    })
-
     const accessibilityResponse = await postJson(state.url, {
       jsonrpc: '2.0',
       id: 62,
@@ -1190,14 +1177,6 @@ describe('desktopMcpServer', () => {
         },
       },
     })
-    expect(server.getState()).toMatchObject({
-      lastActivity: {
-        toolName: 'apply_changes',
-        operationTypes: ['create_page', 'select_active_page'],
-        timestamp: '2026-06-16T12:00:00.000Z',
-      },
-    })
-
     const staleResponse = await postJson(state.url, {
       jsonrpc: '2.0',
       id: 52,

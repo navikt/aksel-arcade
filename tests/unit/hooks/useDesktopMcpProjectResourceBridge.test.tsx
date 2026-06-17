@@ -37,17 +37,11 @@ const HookHarness = ({
   setTheme = vi.fn(),
   replaceProjectState = vi.fn(),
   updatePreviewState = vi.fn(),
-  onDesktopMcpActivity = vi.fn(),
 }: {
   theme?: 'dark' | 'light'
   setTheme?: (theme: 'dark' | 'light') => void
   replaceProjectState?: (project: ReturnType<typeof createDefaultProject>) => void
   updatePreviewState?: (updates: Record<string, unknown>) => void
-  onDesktopMcpActivity?: (activity: {
-    toolName: 'apply_changes' | 'capture_preview_evidence'
-    operationTypes?: string[]
-    timestamp: string
-  }) => void
 }) => {
   const project = createDefaultProject()
   const previewState = createDefaultPreviewState(project.viewportSize)
@@ -65,7 +59,6 @@ const HookHarness = ({
     setTheme,
     replaceProjectState,
     updatePreviewState,
-    onDesktopMcpActivity,
   })
 
   return null
@@ -87,14 +80,12 @@ describe('useDesktopMcpProjectResourceBridge', () => {
     const setTheme = vi.fn()
     const replaceProjectState = vi.fn()
     const updatePreviewState = vi.fn()
-    const onDesktopMcpActivity = vi.fn()
 
     render(
       <HookHarness
         setTheme={setTheme}
         replaceProjectState={replaceProjectState}
         updatePreviewState={updatePreviewState}
-        onDesktopMcpActivity={onDesktopMcpActivity}
       />
     )
 
@@ -113,7 +104,6 @@ describe('useDesktopMcpProjectResourceBridge', () => {
     expect(replaceProjectState).not.toHaveBeenCalled()
     expect(setTheme).not.toHaveBeenCalled()
     expect(updatePreviewState).not.toHaveBeenCalled()
-    expect(onDesktopMcpActivity).not.toHaveBeenCalled()
   })
 
   it('preserves payload-too-large semantics when full working-copy persistence overflows', () => {
@@ -159,13 +149,11 @@ describe('useDesktopMcpProjectResourceBridge', () => {
 
     const replaceProjectState = vi.fn()
     const updatePreviewState = vi.fn()
-    const onDesktopMcpActivity = vi.fn()
 
     render(
       <HookHarness
         replaceProjectState={replaceProjectState}
         updatePreviewState={updatePreviewState}
-        onDesktopMcpActivity={onDesktopMcpActivity}
       />
     )
 
@@ -225,11 +213,5 @@ describe('useDesktopMcpProjectResourceBridge', () => {
       pendingCompileError: null,
       runtimeError: null,
     })
-    expect(onDesktopMcpActivity).toHaveBeenCalledWith(
-      expect.objectContaining({
-        toolName: 'apply_changes',
-        operationTypes: ['create_page', 'replace_source', 'select_active_page'],
-      })
-    )
   })
 })

@@ -93,7 +93,6 @@ describe('Desktop Arcade MCP settings', () => {
     expect(screen.getByText('Type: HTTP (MCP Streamable HTTP)')).toBeTruthy()
     expect(screen.getByText('URL: http://127.0.0.1:3846/mcp')).toBeTruthy()
     expect(screen.queryByText('No token/header required.')).toBeNull()
-    expect(screen.getByText('Last activity: No MCP activity yet.')).toBeTruthy()
     const copyServerName = await screen.findByRole('menuitem', { name: /copy server name/i })
     const copyMcpUrl = await screen.findByRole('menuitem', { name: /copy mcp url/i })
     const copyVsCodeJson = await screen.findByRole('menuitem', { name: /copy vscode json/i })
@@ -106,29 +105,6 @@ describe('Desktop Arcade MCP settings', () => {
     expect(copyMcpUrl.compareDocumentPosition(copyVsCodeJson) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
     expect(menuItems.slice(-3)).toEqual(['Copy server name', 'Copy MCP URL', 'Copy VSCode json'])
     expect(screen.queryByRole('menuitem', { name: /copy transport type/i })).toBeNull()
-  })
-
-  it('shows only safe Desktop MCP last-activity metadata in settings', async () => {
-    const user = userEvent.setup()
-    renderHeader({
-      shellCapabilities: DESKTOP_ARCADE_CAPABILITIES,
-      desktopMcpServerState: {
-        ...AVAILABLE_MCP_STATE,
-        lastActivity: {
-          toolName: 'apply_changes',
-          operationTypes: ['replace_source', 'rename_project'],
-          timestamp: '2026-06-16T12:00:00.000Z',
-        },
-      },
-    })
-
-    await user.click(screen.getByRole('button', { name: /settings/i }))
-
-    expect(
-      await screen.findByText(
-        'Last activity: apply_changes (replace_source, rename_project) at 2026-06-16T12:00:00.000Z'
-      )
-    ).toBeTruthy()
   })
 
   it('shows the unavailable reason when Desktop Arcade cannot bind the fixed MCP port', async () => {
