@@ -15,7 +15,6 @@ import { registerDesktopPreloadMcpApplyChangesHandler } from '@/services/desktop
 import type {
   DesktopMcpApplyChangesFailure,
   DesktopMcpApplyChangesRequest,
-  DesktopMcpLastActivity,
 } from '@/services/desktopMcpApplyChangesProtocol'
 import {
   finalizeDesktopMcpPreviewCapture,
@@ -40,7 +39,6 @@ interface UseDesktopMcpProjectResourceBridgeOptions {
   setTheme: (theme: ThemeMode) => void
   replaceProjectState: (project: Project) => void
   updatePreviewState: (updates: Partial<PreviewState>) => void
-  onDesktopMcpActivity?: (activity: DesktopMcpLastActivity) => void
 }
 
 export const useDesktopMcpProjectResourceBridge = ({
@@ -52,7 +50,6 @@ export const useDesktopMcpProjectResourceBridge = ({
   setTheme,
   replaceProjectState,
   updatePreviewState,
-  onDesktopMcpActivity,
 }: UseDesktopMcpProjectResourceBridgeOptions): void => {
   const resourceContextRef = useRef({
     project,
@@ -131,10 +128,9 @@ export const useDesktopMcpProjectResourceBridge = ({
         setTheme(preparedResult.nextTheme)
       }
 
-      onDesktopMcpActivity?.(preparedResult.result.safeActivity)
       return preparedResult.result
     },
-    [onDesktopMcpActivity, replaceProjectState, setTheme, updatePreviewState]
+    [replaceProjectState, setTheme, updatePreviewState]
   )
 
   const handleCapturePreviewEvidence = useCallback(
@@ -174,13 +170,9 @@ export const useDesktopMcpProjectResourceBridge = ({
         return captureResult
       }
 
-      const finalized = finalizeDesktopMcpPreviewCapture(prepared, captureResult, currentContext)
-      if (finalized.ok) {
-        onDesktopMcpActivity?.(finalized.safeActivity)
-      }
-      return finalized
+      return finalizeDesktopMcpPreviewCapture(prepared, captureResult, currentContext)
     },
-    [onDesktopMcpActivity, previewIframeRef]
+    [previewIframeRef]
   )
 
   useLayoutEffect(() => {

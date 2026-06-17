@@ -2,9 +2,7 @@ import { useEffect, useState } from 'react'
 import { FilesIcon } from '@navikt/aksel-icons'
 import { ActionMenu, Box, Detail, VStack } from '@navikt/ds-react'
 import {
-  DESKTOP_MCP_LAST_ACTIVITY_PLACEHOLDER,
   formatDesktopMcpAvailability,
-  formatDesktopMcpLastActivity,
   formatDesktopMcpVsCodeConfig,
   type DesktopMcpServerState,
 } from '@/services/desktopMcp'
@@ -77,11 +75,6 @@ export const DesktopMcpSettingsGroup = ({
           {mcpState && !isAvailable && (
             <Detail>Connection details are available once Desktop Arcade owns the MCP endpoint.</Detail>
           )}
-          <Detail>
-            {mcpState
-              ? formatDesktopMcpLastActivity(mcpState.lastActivity)
-              : DESKTOP_MCP_LAST_ACTIVITY_PLACEHOLDER}
-          </Detail>
           {copyFeedback && (
             <Detail
               aria-live="polite"

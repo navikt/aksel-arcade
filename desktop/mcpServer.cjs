@@ -548,7 +548,6 @@ const createDesktopMcpServer = ({
 } = {}) => {
   let activeServer = null
   let startOperation = null
-  let lastActivity = null
   const previewCaptureStore = createPreviewCaptureStore({ ttlMs: previewCaptureTtlMs })
   let availability = {
     status: 'unavailable',
@@ -566,7 +565,6 @@ const createDesktopMcpServer = ({
     url: `http://${host}:${getPort()}${path}`,
     requiresAuth: false,
     authDescription: DESKTOP_MCP_AUTH_DESCRIPTION,
-    lastActivity,
     availability:
       availability.status === 'available'
         ? { status: 'available' }
@@ -594,17 +592,12 @@ const createDesktopMcpServer = ({
         previewCaptureStore,
         readProjectResource,
         applyChanges: async (requestPayload) => {
-          const applyChangesResult = await applyChanges(requestPayload)
-          if (isApplyChangesResult(applyChangesResult) && applyChangesResult.ok) {
-            lastActivity = applyChangesResult.safeActivity
-          }
-          return applyChangesResult
+          return applyChanges(requestPayload)
         },
         capturePreviewEvidence: async (requestPayload) => {
           const captureResult = await capturePreviewEvidence(requestPayload)
           if (isCapturePreviewResult(captureResult) && captureResult.ok) {
             previewCaptureStore.store(captureResult)
-            lastActivity = captureResult.safeActivity
           }
           return captureResult
         },
