@@ -3810,3 +3810,36 @@ Verification:
 Next note:
 
 - The Aksel snippet resources are derived from `src/data/akselCatalog.ts`; after any catalog/Aksel-version bump, re-run `npm run aksel:refresh-mcp-catalog` (also runs during `desktop:build`) so the committed `desktop/akselCatalogData.generated.cjs` stays in sync, or the drift test will fail.
+
+### 2026-06-17 - Desktop MCP replacement-workflow guardrails and Preview navigation fix
+
+Implemented:
+
+- Turned the failed MCP-agent retest into concrete Desktop MCP guardrails for zero-knowledge agents:
+  - promoted `read_resource` from hidden compatibility behavior to a listed MCP tool so tool-only hosts can discover/read `arcade://` resources instead of guessing from tool schemas;
+  - added focused guidance resources: `arcade://desktop/start-here`, `arcade://desktop/workflows/replace-project`, and `arcade://desktop/workflows/multi-page-navigation`;
+  - updated `initialize` instructions, `arcade://desktop/operating-guide`, `arcade://desktop/authoring-guide`, `arcade://desktop/capabilities`, `arcade://desktop/apply-changes-operations`, and README so they no longer describe the outdated two-tool/hidden-resource-reader contract.
+- Improved `apply_changes` for coherent replacement work:
+  - `{{pageRef:name}}` placeholders in source can now target any matching `create_page.newPageRef` in the same batch, so agents no longer need to create pages in reverse logical order just to link forward;
+  - added optional final-state `assertions` (`pageCount`, `startPage`, `activePage`, `forbidImports`) so replacement tasks can fail before persistence if the agent leaves extra pages, picks the wrong entry page, or writes importful Arcade source;
+  - added `postChangeSummary` to successful results so clients can immediately see final page count, ordered pages, start page, active page, and warnings.
+- Added regression coverage for the exact wasteful replacement pattern: reuse existing pages first, create only the missing page, delete extras, keep the first logical page as Start/Active, and forbid imports.
+- Hardened `public/sandbox.html` against the black-preview failure:
+  - capture-phase guards now block raw/browser link navigation and form submits before the sandbox iframe can unload;
+  - bare `pageNN` anchors are routed through the Arcade page runtime when valid;
+  - blocked raw navigation surfaces a runtime diagnostic while keeping the visible Preview rendered.
+- Cleaned up outdated raw-anchor examples in MCP tests/E2Es and replaced page-flow examples with `goToPage(...)` or Aksel Link/LinkCard bare page ids.
+
+Verification:
+
+- npm run type-check
+- npm run lint
+- npm test -- --run
+- npm run build
+- npm run test:e2e -- tests/e2e/desktop-mcp-smoke.spec.ts tests/e2e/desktop-mcp-apply-changes.spec.ts tests/e2e/desktop-mcp-preview-capture.spec.ts tests/e2e/desktop-mcp-aksel-resources.spec.ts tests/e2e/issue-279-mcp-hardening.spec.ts --reporter=line
+- npm run test:e2e -- tests/e2e/desktop-mcp-apply-changes.spec.ts --reporter=line
+- Browser smoke check at `http://127.0.0.1:5173/aksel-arcade/` with the app and sandbox rendered and no browser-console errors.
+
+Next note:
+
+- Desktop MCP E2E still requires a single owner of fixed port `127.0.0.1:3846`. During validation, an older `/Applications/Aksel Arcade.app` process was still listening on that port and made the first E2E run talk to the wrong MCP server; clearing that exact stale listener made the targeted Desktop MCP suite pass.

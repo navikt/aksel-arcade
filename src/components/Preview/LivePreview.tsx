@@ -22,6 +22,17 @@ const PREVIEW_EVIDENCE_REQUEST_TIMEOUT_MS = 5_000
 const SANDBOX_IFRAME_SRC =
   import.meta.env.MODE === 'test' ? 'about:blank' : import.meta.env.BASE_URL + 'sandbox.html'
 
+const getSandboxIframeSrc = (recoveryRevision: number) => {
+  if (SANDBOX_IFRAME_SRC === 'about:blank' || recoveryRevision === 0) {
+    return SANDBOX_IFRAME_SRC
+  }
+
+  const separator = SANDBOX_IFRAME_SRC.includes('?') ? '&' : '?'
+  return `${SANDBOX_IFRAME_SRC}${separator}sandboxRecovery=${recoveryRevision}`
+}
+
+const getSandboxIframeHref = (src: string) => new URL(src, window.location.href).href
+
 interface LivePreviewProps {
   iframeRef: React.RefObject<HTMLIFrameElement | null>
   transpiledCode: string | null
@@ -63,6 +74,8 @@ export const LivePreview = ({
   const previewEvidenceUnregisterRef = useRef<(() => void) | null>(null)
   const sandboxConnectedRef = useRef(false)
   const sandboxRetiredRef = useRef(false)
+  const sandboxRecoveryRevisionRef = useRef(0)
+  const expectedSandboxLoadSrcRef = useRef<string | null>(null)
   const lastReportedPageIdRef = useRef<ArcadePageId | null>(null)
   const handlersRef = useRef({
     onRenderSuccess,
@@ -269,17 +282,22 @@ export const LivePreview = ({
         return
       }
 
-      if (sandboxRetiredRef.current) {
-        console.warn('Ignored sandbox message after iframe navigation')
-        return
-      }
-
       // Check for SANDBOX_READY message (not in type-safe messages yet)
       if (event.data?.type === 'SANDBOX_READY') {
+        const expectedSandboxLoadSrc = expectedSandboxLoadSrcRef.current
+        if (expectedSandboxLoadSrc) {
+          const readyHref =
+            typeof event.data?.payload?.href === 'string' ? event.data.payload.href : null
+          if (readyHref !== getSandboxIframeHref(expectedSandboxLoadSrc)) {
+            return
+          }
+        }
+
         if (sandboxConnectedRef.current || !iframeRef.current?.contentWindow) {
           return
         }
 
+        sandboxRetiredRef.current = false
         const channel = new MessageChannel()
         sandboxPortRef.current = channel.port1
         sandboxPortRef.current.onmessage = (messageEvent) => handleSandboxMessage(messageEvent.data)
@@ -301,22 +319,45 @@ export const LivePreview = ({
         return
       }
 
+      if (sandboxRetiredRef.current) {
+        console.warn('Ignored sandbox message after iframe navigation')
+        return
+      }
+
       if (!sandboxConnectedRef.current) {
         handleSandboxMessage(event.data)
       }
     }
 
     const handleLoad = () => {
+      const iframe = iframeRef.current
+      if (iframe && expectedSandboxLoadSrcRef.current === iframe.getAttribute('src')) {
+        expectedSandboxLoadSrcRef.current = null
+        sandboxRetiredRef.current = false
+        return
+      }
+
       const hadActiveChannel = sandboxConnectedRef.current || sandboxPortRef.current
       if (hadActiveChannel) {
         sandboxRetiredRef.current = true
+        lastReportedPageIdRef.current = null
       }
 
       disconnectSandbox(true)
       setInspectionData(null)
-      if (!sandboxRetiredRef.current && latestTranspiledCodeRef.current) {
+      if (latestTranspiledCodeRef.current) {
         pendingCodeRef.current = latestTranspiledCodeRef.current
       }
+
+      if (hadActiveChannel && iframeRef.current) {
+        sandboxRecoveryRevisionRef.current += 1
+        const recoverySrc = getSandboxIframeSrc(sandboxRecoveryRevisionRef.current)
+        expectedSandboxLoadSrcRef.current = recoverySrc
+        iframeRef.current.src = recoverySrc
+        return
+      }
+
+      sandboxRetiredRef.current = false
     }
 
     const iframe = iframeRef.current
@@ -413,9 +454,9 @@ export const LivePreview = ({
       <iframe
         ref={iframeRef}
         className="live-preview__iframe"
-        src={SANDBOX_IFRAME_SRC}
+        src={getSandboxIframeSrc(0)}
         allow="clipboard-write"
-        sandbox="allow-scripts"
+        sandbox="allow-scripts allow-forms"
         referrerPolicy="no-referrer"
         title="Live Preview Sandbox"
         data-testid="preview-iframe"

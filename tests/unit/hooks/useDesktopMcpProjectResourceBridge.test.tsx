@@ -182,7 +182,7 @@ describe('useDesktopMcpProjectResourceBridge', () => {
           type: 'replace_source',
           resourceUri: createDesktopMcpProjectPageSourceUri('page01', 'jsx'),
           content:
-            'export default function PageOne() {\n  return <a href="{{pageRef:landing}}">Landing</a>\n}',
+            'export default function PageOne() {\n  return <Button onClick={() => goToPage("{{pageRef:landing}}")}>Landing</Button>\n}',
         },
         {
           type: 'select_active_page',

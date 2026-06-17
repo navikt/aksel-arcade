@@ -1,4 +1,8 @@
 const http = require('node:http')
+const {
+  MCP_GUIDANCE_RESOURCE_DEFINITIONS,
+  createMcpGuidanceResourceText,
+} = require('./mcpGuidanceResources.cjs')
 
 const DESKTOP_MCP_HOST = '127.0.0.1'
 const DESKTOP_MCP_PORT = 3846
@@ -111,10 +115,11 @@ const APPLY_CHANGES_NEXT_STEPS = Object.freeze([
 // list and no example so it never narrows what the agent thinks Arcade is for.
 const DESKTOP_MCP_INSTRUCTIONS = [
   'Desktop Arcade is a live sandbox for prototyping any UI with the Aksel design system. Build whatever the task needs — it is not limited to any one kind of screen.',
+  'Start by reading arcade://desktop/start-here. If your MCP host exposes only tools, call read_resource({ uri: "arcade://desktop/start-here" }).',
   'Source is import-free: React, Aksel components, Aksel icons, and hooks are injected globals — never add import statements.',
   'Use real Aksel components and props; do not hand-roll raw HTML or guess prop names. Per-component usage and runnable, version-matched snippets are available on demand — do not load them until you reach for a given component.',
   'Navigate between pages with goToPage("pageNN"), or an Aksel Link/LinkCard whose href/to is a bare page id; the current page id is injected read-only as currentPageId. There is no router and no <a href> navigation.',
-  'Page ids are assigned by the app. Within one apply_changes batch, link pages with {{pageRef:name}} placeholders, valid only after the matching create_page.newPageRef appears earlier in the same batch.',
+  'Page ids are assigned by the app. Within one apply_changes batch, link pages with {{pageRef:name}} placeholders targeting any create_page.newPageRef declared in that batch.',
   'Working loop: apply_changes, then read arcade://project/diagnostics, then capture_preview_evidence to inspect.',
   'Before authoring, read arcade://desktop/authoring-guide for the Arcade rules and for how to fetch Aksel component docs and snippets on demand.',
 ].join('\n')
@@ -169,6 +174,23 @@ const findAkselComponentDetail = (name) => {
 }
 
 const MCP_TOOL_DEFINITIONS = Object.freeze([
+  Object.freeze({
+    name: 'read_resource',
+    description:
+      'Read a Desktop Arcade MCP resource by URI. Use this first in tool-only MCP clients to fetch arcade://desktop/start-here, the project manifest, diagnostics, source resources, Aksel snippets, and Preview evidence resources.',
+    inputSchema: Object.freeze({
+      type: 'object',
+      additionalProperties: false,
+      required: Object.freeze(['uri']),
+      properties: Object.freeze({
+        uri: Object.freeze({
+          type: 'string',
+          minLength: 1,
+          description: 'Resource URI to read, e.g. arcade://desktop/start-here.',
+        }),
+      }),
+    }),
+  }),
   Object.freeze({
     name: 'capture_preview_evidence',
     description:
@@ -316,7 +338,7 @@ const MCP_TOOL_DEFINITIONS = Object.freeze([
   Object.freeze({
     name: 'apply_changes',
     description:
-      'Apply a validated, durable batch of Arcade project changes. Read arcade://desktop/authoring-guide for Arcade authoring rules and arcade://desktop/apply-changes-operations for the per-operation field matrix and {{pageRef:name}} batch ordering rule.',
+      'Apply a validated, durable batch of Arcade project changes. Read arcade://desktop/start-here and arcade://desktop/apply-changes-operations before editing. Use assertions to keep replacements scoped.',
     inputSchema: Object.freeze({
       type: 'object',
       additionalProperties: false,
@@ -351,7 +373,7 @@ const MCP_TOOL_DEFINITIONS = Object.freeze([
               content: Object.freeze({
                 type: 'string',
                 description:
-                  'Full source replacement content for replace_source operations. Supports {{pageRef:name}} placeholders when the batch declares matching create_page.newPageRef values earlier.',
+                  'Full source replacement content for replace_source operations. Supports {{pageRef:name}} placeholders for create_page.newPageRef values declared anywhere in the same batch.',
               }),
               pageId: Object.freeze({
                 type: 'string',
@@ -370,12 +392,12 @@ const MCP_TOOL_DEFINITIONS = Object.freeze([
               jsxCode: Object.freeze({
                 type: 'string',
                 description:
-                  'Optional initial JSX source for create_page operations. Supports {{pageRef:name}} placeholders.',
+                  'Optional initial JSX source for create_page operations. Supports {{pageRef:name}} placeholders for same-batch create_page.newPageRef values.',
               }),
               hooksCode: Object.freeze({
                 type: 'string',
                 description:
-                  'Optional initial Hooks source for create_page operations. Supports {{pageRef:name}} placeholders.',
+                  'Optional initial Hooks source for create_page operations. Supports {{pageRef:name}} placeholders for same-batch create_page.newPageRef values.',
               }),
               viewportSize: Object.freeze({
                 type: 'string',
@@ -392,23 +414,40 @@ const MCP_TOOL_DEFINITIONS = Object.freeze([
             }),
           }),
         }),
+        assertions: Object.freeze({
+          type: 'object',
+          additionalProperties: false,
+          description:
+            'Optional final-state assertions. Use for replacement tasks to prevent wasteful or incoherent output.',
+          properties: Object.freeze({
+            pageCount: Object.freeze({
+              type: 'number',
+              description: 'Expected final number of Arcade pages.',
+            }),
+            startPage: Object.freeze({
+              type: 'string',
+              description: 'Expected final Start page id, or "first" for the first ordered page.',
+            }),
+            activePage: Object.freeze({
+              type: 'string',
+              description: 'Expected final Active page id, or "first" for the first ordered page.',
+            }),
+            forbidImports: Object.freeze({
+              type: 'boolean',
+              description: 'When true, reject final source containing import statements.',
+            }),
+          }),
+        }),
       }),
     }),
   }),
 ])
 
-const MCP_COMPATIBILITY_TOOL_DEFINITIONS = Object.freeze([
-  Object.freeze({
-    name: 'read_resource',
-  }),
-])
-
 const findCallableToolDefinition = (toolName) =>
-  MCP_TOOL_DEFINITIONS.find((tool) => tool.name === toolName) ??
-  MCP_COMPATIBILITY_TOOL_DEFINITIONS.find((tool) => tool.name === toolName) ??
-  null
+  MCP_TOOL_DEFINITIONS.find((tool) => tool.name === toolName) ?? null
 
 const MCP_STABLE_RESOURCE_DEFINITIONS = Object.freeze([
+  ...MCP_GUIDANCE_RESOURCE_DEFINITIONS,
   Object.freeze({
     uri: 'arcade://desktop/operating-guide',
     name: 'Desktop Arcade MCP operating guide',
@@ -1036,7 +1075,7 @@ const routeToolsCallRequest = async (
         id: payload.id,
         result: resourceResult.ok
           ? createToolExecutionSuccessResult(
-              `Read Desktop Arcade MCP resource ${resourceResult.uri} (${resourceResult.mimeType}).`,
+              resourceResult.text,
               {
                 ok: true,
                 uri: resourceResult.uri,
@@ -1669,6 +1708,7 @@ const validateApplyChangesArguments = (argumentsPayload) => {
     'summary',
     'expectedProjectRevision',
     'operations',
+    'assertions',
   ])
   if (extraKeys.length > 0) {
     return `apply_changes arguments contain unsupported fields: ${extraKeys.join(', ')}.`
@@ -1702,6 +1742,52 @@ const validateApplyChangesArguments = (argumentsPayload) => {
     if (operationValidationMessage) {
       return operationValidationMessage
     }
+  }
+
+  if ('assertions' in argumentsPayload) {
+    const assertionsValidationMessage = validateApplyChangesAssertions(argumentsPayload.assertions)
+    if (assertionsValidationMessage) {
+      return assertionsValidationMessage
+    }
+  }
+
+  return null
+}
+
+const validateApplyChangesAssertions = (assertions) => {
+  if (!isPlainObject(assertions)) {
+    return 'apply_changes assertions must be an object when provided.'
+  }
+
+  const extraKeys = getUnexpectedKeys(assertions, [
+    'pageCount',
+    'startPage',
+    'activePage',
+    'forbidImports',
+  ])
+  if (extraKeys.length > 0) {
+    return `apply_changes assertions contain unsupported fields: ${extraKeys.join(', ')}.`
+  }
+
+  if (
+    'pageCount' in assertions &&
+    (!Number.isInteger(assertions.pageCount) || assertions.pageCount < 1)
+  ) {
+    return 'apply_changes assertions.pageCount must be a positive integer when provided.'
+  }
+
+  for (const fieldName of ['startPage', 'activePage']) {
+    if (
+      fieldName in assertions &&
+      (typeof assertions[fieldName] !== 'string' ||
+        (assertions[fieldName] !== 'first' && !/^page\d+$/.test(assertions[fieldName])))
+    ) {
+      return `apply_changes assertions.${fieldName} must be "first" or an Arcade page id when provided.`
+    }
+  }
+
+  if ('forbidImports' in assertions && typeof assertions.forbidImports !== 'boolean') {
+    return 'apply_changes assertions.forbidImports must be a boolean when provided.'
   }
 
   return null
@@ -1876,17 +1962,23 @@ const createAkselComponentResourceText = (detail) =>
   })
 
 const createDesktopStableResourceText = (uri) => {
+  const guidanceText = createMcpGuidanceResourceText(uri)
+  if (guidanceText !== null) {
+    return guidanceText
+  }
+
   switch (uri) {
     case 'arcade://desktop/operating-guide':
       return [
         '# Desktop Arcade MCP operating guide',
         '',
         '- Work through `arcade://` resources and MCP tools only; do not edit repository files, package metadata, or the local filesystem.',
-        '- Default loop: read this guide, read `arcade://project/manifest`, read the relevant source resources, use `apply_changes` for durable edits, read `arcade://project/diagnostics` unless the human asked for a different workflow, then capture Preview evidence when visual validation is needed.',
-        '- Start with `tools/list`, `resources/list`, and `resources/read`; `arcade://desktop/capabilities` is the shortest single place to inspect the published v1 contract.',
-        '- To complete the full smoke checklist from inside a client, the host must expose `resources/list` and `resources/read` (or an equivalent resource inspector). Tool-only hosts can exercise the two listed v1 tools, but the published discovery surface cannot complete the resource-read portions of the checklist without those resource methods.',
+        '- Default loop: read `arcade://desktop/start-here`, read `arcade://project/manifest`, read the relevant source resources, use `apply_changes` for durable edits, read `arcade://project/diagnostics` unless the human asked for a different workflow, then capture Preview evidence when visual validation is needed.',
+        '- Start with `tools/list`, `resources/list`, and `resources/read`; tool-only clients can call `read_resource({ uri })` for the same resources.',
+        '- `arcade://desktop/capabilities` is the shortest single place to inspect the published contract.',
         '- Durable project edits happen through `apply_changes`, not by patching files outside the active Arcade project.',
-        '- Use `create_page.newPageRef`, later `tempPageRef` targets, and `{{pageRef:name}}` placeholders when one batch must create a page and link to it.',
+        '- Use `create_page.newPageRef`, later lifecycle `tempPageRef` targets, and `{{pageRef:name}}` placeholders when one batch must create a page and link to it.',
+        '- If the human asks to replace content, read `arcade://desktop/workflows/replace-project` and use `apply_changes.assertions` to keep the final shape scoped.',
         '- `capture_preview_evidence({ pageId })` is the normal autonomous inspection path for pages and targeted visual states.',
         '- Use `select_active_page` only when you intentionally want the human-visible Active page to change; ordinary inspection should keep using `capture_preview_evidence({ pageId })`.',
         '- Saved Preview preferences live in `arcade://project/preview-context`; capture-only overrides must not mutate them.',
@@ -1909,7 +2001,7 @@ const createDesktopStableResourceText = (uri) => {
         '- Source is **import-free**: React, Aksel components, Aksel icons, and hooks are injected globals. Never write `import` statements.',
         '- Use **real Aksel components and props** — current components, layout primitives (`Page`, `Box`, `HStack`, `VStack`, `HGrid`), Aksel icons, and `--ax` design tokens — before reaching for raw HTML or custom CSS.',
         '- **Navigate** with `goToPage("pageNN")`, or an Aksel `Link`/`LinkCard` whose `href`/`to` is a bare page id. The current page id is injected read-only as `currentPageId`. There is no router and no `<a href>` navigation.',
-        '- **Page ids are assigned by the app.** Within one `apply_changes` batch, link pages with `{{pageRef:name}}` placeholders; a placeholder is valid only after the matching `create_page.newPageRef` appears earlier in the same batch.',
+        '- **Page ids are assigned by the app.** Within one `apply_changes` batch, link pages with `{{pageRef:name}}` placeholders targeting any matching `create_page.newPageRef` in the same batch.',
         '- **Global config** is shared code in scope for every page; it does not render as a page.',
         '- **Feedback loop:** `apply_changes` → read `arcade://project/diagnostics` → `capture_preview_evidence`.',
         '- `apply_changes` operations are heterogeneous; see `arcade://desktop/apply-changes-operations` for the per-operation fields.',
@@ -1959,6 +2051,8 @@ const createDesktopStableResourceText = (uri) => {
         '<Link href="{{pageRef:pageB}}">Continue</Link>',
         '```',
         '',
+        'For replacement tasks, read `arcade://desktop/workflows/replace-project` before applying changes.',
+        '',
         'Keep output context-light: no broad Aksel training dumps, no package edits, no repository or filesystem edits.',
       ].join('\n')
     case APPLY_CHANGES_OPERATIONS_RESOURCE_URI:
@@ -1970,7 +2064,7 @@ const createDesktopStableResourceText = (uri) => {
         '| type | fields | notes |',
         '| --- | --- | --- |',
         '| `replace_source` | `resourceUri` (required), `content` (required) | `resourceUri` must be an existing source resource from `arcade://project/manifest`. `content` is the full replacement and may contain `{{pageRef:name}}` placeholders. |',
-        '| `create_page` | `newPageRef`, `name`, `jsxCode`, `hooksCode` (all optional) | `newPageRef` declares a temporary ref later operations and `{{pageRef:name}}` placeholders can target. `jsxCode`/`hooksCode` seed the page source. |',
+        '| `create_page` | `newPageRef`, `name`, `jsxCode`, `hooksCode` (all optional) | `newPageRef` declares a temporary ref later lifecycle operations and same-batch `{{pageRef:name}}` placeholders can target. `jsxCode`/`hooksCode` seed the page source. |',
         '| `rename_page` | `name` (required) + target | Target the page with either `pageId` or `tempPageRef`. |',
         '| `delete_page` | target | Target with `pageId` or `tempPageRef`. |',
         '| `set_start_page` | target | Target with `pageId` or `tempPageRef`. |',
@@ -1981,8 +2075,11 @@ const createDesktopStableResourceText = (uri) => {
         '## Page targets',
         'Page-lifecycle operations (`rename_page`, `delete_page`, `set_start_page`, `select_active_page`) target a page with **either** `pageId` (an existing app-assigned id) **or** `tempPageRef` (a ref declared by an earlier `create_page.newPageRef` in the same batch).',
         '',
-        '## {{pageRef:name}} ordering rule',
-        `A \`${PAGE_REF_PLACEHOLDER_SYNTAX}\` placeholder (in \`content\`/\`jsxCode\`/\`hooksCode\`) and a \`tempPageRef\` target are valid only when the matching \`create_page.newPageRef\` is declared **earlier in the same batch**. To create a page and link to it in one batch, order the operations create-first, link-after.`,
+        '## {{pageRef:name}} same-batch rule',
+        `A \`${PAGE_REF_PLACEHOLDER_SYNTAX}\` placeholder (in \`content\`/\`jsxCode\`/\`hooksCode\`) may target any matching \`create_page.newPageRef\` declared in the same batch. Lifecycle \`tempPageRef\` targets still require the matching \`create_page\` to appear earlier because those operations act on a page at that step.`,
+        '',
+        '## Final-state assertions',
+        '`apply_changes` accepts optional `assertions` with `pageCount`, `startPage`, `activePage`, and `forbidImports`. Use them for replacement tasks, e.g. `{"pageCount":3,"startPage":"first","activePage":"first","forbidImports":true}`.',
       ].join('\n')
     case AKSEL_CATALOG_RESOURCE_URI:
       return JSON.stringify({
@@ -2005,13 +2102,13 @@ const createDesktopStableResourceText = (uri) => {
         contractNote:
           'This resource lists the stable v1 MCP contract, omissions, and current implementation status for the published tools and resource families.',
         discoveryAdvice: {
-          preferredFirstResourceUri: 'arcade://desktop/capabilities',
-          preferredDiscoveryMethods: ['tools/list', 'resources/list', 'resources/read'],
-          note: 'Use tools/list plus resources/list/resources/read to discover the published v1 surface. Read arcade://desktop/capabilities first when you want the full contract in one place.',
+          preferredFirstResourceUri: 'arcade://desktop/start-here',
+          preferredDiscoveryMethods: ['tools/list', 'resources/list', 'resources/read', 'read_resource'],
+          note: 'Use tools/list plus resources/list/resources/read to discover the published surface. In tool-only clients, call read_resource({ uri }) for the same resources. Read arcade://desktop/start-here before authoring.',
         },
         smokeChecklistRequirements: {
           requiresClientResourceReads: true,
-          note: 'Use an MCP client that exposes resources/list and resources/read, or verify those resource steps manually in a resource inspector. Tool-only hosts can call capture_preview_evidence and apply_changes, but the published v1 discovery surface cannot complete the stable-resource, diagnostics, or evidence-resource read checks without those resource methods.',
+          note: 'Use resources/list/resources/read when available. Tool-only hosts can call read_resource for stable resources, diagnostics, source, Aksel snippets, and capture-produced evidence resources.',
         },
         toolNames: MCP_TOOL_DEFINITIONS.map((toolDefinition) => toolDefinition.name),
         stableResourceUris: MCP_STABLE_RESOURCE_DEFINITIONS.map(
@@ -2344,6 +2441,7 @@ const isApplyChangesResult = (value) =>
       Array.isArray(value.nextRecommendedResources) &&
       value.nextRecommendedResources.every((resourceUri) => typeof resourceUri === 'string') &&
       Array.isArray(value.operationResults) &&
+      isApplyChangesPostChangeSummary(value.postChangeSummary) &&
       isPlainObject(value.safeActivity) &&
       typeof value.safeActivity.toolName === 'string' &&
       typeof value.safeActivity.timestamp === 'string' &&
@@ -2355,6 +2453,7 @@ const isApplyChangesResult = (value) =>
         value.code === 'stale-project-revision' ||
         value.code === 'invalid-operation-target' ||
         value.code === 'invalid-project-name' ||
+        value.code === 'assertion-failed' ||
         value.code === 'payload-too-large' ||
         value.code === 'persistence-failed') &&
       typeof value.message === 'string' &&
@@ -2366,6 +2465,25 @@ const isApplyChangesResult = (value) =>
         typeof value.expectedProjectRevision === 'string') &&
       (value.currentProjectRevision === undefined ||
         typeof value.currentProjectRevision === 'string'))
+
+const isApplyChangesPostChangeSummary = (value) =>
+  isPlainObject(value) &&
+  Number.isInteger(value.pageCount) &&
+  value.pageCount >= 1 &&
+  typeof value.startPageId === 'string' &&
+  typeof value.activePageId === 'string' &&
+  Array.isArray(value.pages) &&
+  value.pages.every(
+    (page) =>
+      isPlainObject(page) &&
+      typeof page.id === 'string' &&
+      typeof page.name === 'string' &&
+      isPlainObject(page.sourceResources) &&
+      typeof page.sourceResources.jsxResourceUri === 'string' &&
+      typeof page.sourceResources.hooksResourceUri === 'string'
+  ) &&
+  Array.isArray(value.warnings) &&
+  value.warnings.every((warning) => typeof warning === 'string')
 
 const isPlainObject = (value) =>
   typeof value === 'object' && value !== null && !Array.isArray(value)

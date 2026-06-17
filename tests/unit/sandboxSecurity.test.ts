@@ -18,7 +18,7 @@ describe('sandbox security boundaries', () => {
     const livePreview = readProjectFile('src/components/Preview/LivePreview.tsx')
 
     expect(livePreview).toContain('allow="clipboard-write"')
-    expect(livePreview).toContain('sandbox="allow-scripts"')
+    expect(livePreview).toContain('sandbox="allow-scripts allow-forms"')
     expect(livePreview).not.toContain('allow-same-origin')
   })
 
@@ -44,5 +44,16 @@ describe('sandbox security boundaries', () => {
     expect(sandboxHtml).toContain('event.source !== window.parent')
     expect(sandboxHtml).toContain('event.origin === window.location.origin')
     expect(sandboxHtml).toContain("window.location.protocol === 'file:' && event.origin === 'null'")
+  })
+
+  it('blocks browser navigation in sandbox before raw links or forms can unload the iframe', () => {
+    const sandboxHtml = readProjectFile('public/sandbox.html')
+
+    expect(sandboxHtml).toContain("document.addEventListener('click', handleSandboxClickNavigation, true)")
+    expect(sandboxHtml).toContain("document.addEventListener('submit', handleSandboxSubmitNavigation)")
+    expect(sandboxHtml).toContain('if (event.defaultPrevented)')
+    expect(sandboxHtml).toContain('Blocked browser navigation to')
+    expect(sandboxHtml).toContain('Blocked form submission inside the Preview sandbox')
+    expect(sandboxHtml).toContain('navigatePreviewToPage(rawHref)')
   })
 })

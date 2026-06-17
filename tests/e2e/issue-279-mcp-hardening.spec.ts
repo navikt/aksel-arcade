@@ -120,6 +120,7 @@ test.describe('Issue #279 MCP hardening', () => {
         method: 'tools/list',
       })
       expect(toolsListPayload.result.tools.map((tool: { name: string }) => tool.name)).toEqual([
+        'read_resource',
         'capture_preview_evidence',
         'apply_changes',
       ])

@@ -232,7 +232,7 @@ const loadInteractionDemoProject = async () => {
       </button>
       <p>{status}</p>
 
-      <a href="{{pageRef:details}}">Open details page</a>
+      <Button onClick={() => goToPage("{{pageRef:details}}")}>Open details page</Button>
       <div style={{ height: 1200 }} />
     </main>
   )
@@ -487,7 +487,7 @@ test.describe('Desktop MCP preview capture', () => {
           interactions: [
             {
               action: 'click',
-              target: { role: 'link', name: 'Open details page' },
+              target: { role: 'button', name: 'Open details page' },
             },
             {
               action: 'waitFor',
