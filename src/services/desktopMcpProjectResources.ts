@@ -1,6 +1,7 @@
 import type { ThemeMode, ArcadePageId, ArcadeSourceFile, Project } from '@/types/project'
 import type { CompileError, PreviewStatus, RuntimeError } from '@/types/preview'
 import type { PreviewDiagnostics } from '@/services/previewDiagnostics'
+import { getArcadeRuntimeDiagnosticHint } from '@/services/runtimeDiagnosticHints'
 import {
   DESKTOP_MCP_PROJECT_DIAGNOSTICS_URI,
   DESKTOP_MCP_PROJECT_MANIFEST_URI,
@@ -114,6 +115,7 @@ export interface DesktopMcpProjectDiagnosticIssue {
   kind: DesktopMcpProjectDiagnosticKind
   severity: DesktopMcpProjectDiagnosticSeverity
   message: string
+  hint?: string
   pageId?: ArcadePageId
   pageName?: string
   resourceUri?: string
@@ -419,11 +421,13 @@ const createRuntimeErrorIssue = (
   const details = [error.componentStack, error.stack]
     .filter((value): value is string => Boolean(value))
     .join('\n\n')
+  const hint = getArcadeRuntimeDiagnosticHint(error)
 
   return {
     kind: 'runtime-error',
     severity: 'error',
     message: error.message,
+    ...(hint ? { hint } : {}),
     ...(error.pageId ? { pageId: error.pageId } : {}),
     ...(error.pageId && pageNameById.has(error.pageId)
       ? { pageName: pageNameById.get(error.pageId)! }

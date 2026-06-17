@@ -60,7 +60,7 @@ const createProject = (): Project => ({
   lastModified: '2026-06-16T08:00:00.000Z',
 })
 
-const createDiagnostics = (): PreviewDiagnostics => ({
+const createDiagnostics = (overrides: Partial<PreviewDiagnostics> = {}): PreviewDiagnostics => ({
   status: 'error',
   compileError: {
     message: 'Unexpected token (3:10)',
@@ -77,6 +77,7 @@ const createDiagnostics = (): PreviewDiagnostics => ({
     pageId: 'page01',
   },
   sandboxConsoleMessages: [],
+  ...overrides,
 })
 
 describe('desktopMcpProjectResources', () => {
@@ -173,6 +174,38 @@ describe('desktopMcpProjectResources', () => {
       column: 41,
     })
     expect(staleIssue?.snippet).toContain("goToPage('page99')")
+  })
+
+  it('adds an Arcade-specific hint for invalid hook calls coming from Global config hooks', () => {
+    const project = createProject()
+    project.source.globalConfig = createArcadeSourceFile(
+      project.source.globalConfig.jsx,
+      'const [sharedCount, setSharedCount] = useState(0)'
+    )
+
+    const diagnostics = createDesktopMcpProjectDiagnostics({
+      project,
+      diagnostics: createDiagnostics({
+        compileError: null,
+        runtimeError: {
+          message:
+            'Invalid hook call. Hooks can only be called inside of the body of a function component.',
+          componentStack: null,
+          stack:
+            'Error: Invalid hook call. Hooks can only be called inside of the body of a function component.',
+        },
+      }),
+    })
+
+    const runtimeIssue = diagnostics.issues.find((issue) => issue.kind === 'runtime-error')
+    expect(runtimeIssue).toMatchObject({
+      kind: 'runtime-error',
+      message:
+        'Invalid hook call. Hooks can only be called inside of the body of a function component.',
+      hint:
+        'This often means a hook is still running at module scope (for example Global config, or a bare page Hooks statement) instead of inside a page component. In Arcade, keep page state in top-level bindings in the page Hooks tab (for example `const [value, setValue] = useState(...)`), or define a custom hook function in Global config and call it from a page.',
+    })
+    expect(runtimeIssue).not.toHaveProperty('pageId')
   })
 
   it('returns preview context and pure source text for project resources', () => {

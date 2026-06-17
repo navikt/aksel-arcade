@@ -117,7 +117,7 @@ const DESKTOP_MCP_INSTRUCTIONS = [
   'Desktop Arcade is a live sandbox for prototyping any UI with the Aksel design system. Build whatever the task needs — it is not limited to any one kind of screen.',
   'Start by reading arcade://desktop/start-here — it is self-sufficient: one read plus arcade://project/manifest is enough to author. If your MCP host exposes only tools, call read_resource({ uri: "arcade://desktop/start-here" }).',
   'Source is import-free: React, Aksel components, Aksel icons, and hooks are injected globals — never add import statements.',
-  'Each Arcade page (and Global config) has two source tabs: jsx and hooks. The jsx source is inlined into return ( … ), so it must be a single JSX element/expression and must never be wrapped in { … }; put state and hook calls in the hooks tab and reference them from jsx.',
+  'Each Arcade page (and Global config) has two source tabs: jsx and hooks. The jsx source is inlined into return ( … ), so it must be a single JSX element/expression and must never be wrapped in { … }; put page-level top-level hook bindings such as const [value, setValue] = useState(...) in the page Hooks tab, and treat Global config hooks as module scope where you define shared custom hooks, helpers, constants, and components and never call hooks at the top level.',
   'Use real Aksel components and props; do not hand-roll raw HTML or guess prop names. Per-component usage and runnable, version-matched snippets are available on demand — do not load them until you reach for a given component.',
   'Navigate between pages with goToPage("pageNN"), or an Aksel Link/LinkCard whose href/to is a bare page id; the current page id is injected read-only as currentPageId. There is no router and no <a href> navigation.',
   'Page ids are assigned by the app. Within one apply_changes batch, link pages with {{pageRef:name}} placeholders targeting any create_page.newPageRef declared in that batch.',
@@ -1951,7 +1951,7 @@ const createAkselComponentResourceText = (detail) =>
   JSON.stringify({
     akselVersion: AKSEL_CATALOG_DATA.akselVersion,
     usage:
-      'Import-free, version-matched Arcade snippet. Paste the JSX into a page; if `hooks` is present, put it in the page Hooks (or Global config). Do not add import statements.',
+      'Import-free, version-matched Arcade snippet. Paste the JSX into a page; if `hooks` is present, put it in the page Hooks tab. Global config `hooks` is only for defining shared custom hooks, helpers, constants, and components, never for top-level hook calls. Do not add import statements.',
     component: detail,
   })
 
@@ -1994,11 +1994,11 @@ const createDesktopStableResourceText = (uri) => {
         '',
         '## Arcade mechanics (specific to this sandbox)',
         '- Source is **import-free**: React, Aksel components, Aksel icons, and hooks are injected globals. Never write `import` statements.',
-        '- **Each page has two source tabs: `jsx` and `hooks`** (Global config has them too). The `jsx` source is inlined into `return ( … )`, so it must be a single JSX element/fragment or a parenthesized expression — **never wrap it in `{ … }`**. Put state and hook calls in the `hooks` tab: a top-level `const { … } = useThing()` (or `const [x, setX] = useState()`) there is hoisted into that page component, and the `jsx` tab references the values directly. Reusable hooks/helpers go in Global config `hooks`.',
+        '- **Each page has two source tabs: `jsx` and `hooks`** (Global config has them too). The `jsx` source is inlined into `return ( … )`, so it must be a single JSX element/fragment or a parenthesized expression — **never wrap it in `{ … }`**. In a page `hooks` tab, top-level hook bindings such as `const { … } = useThing()` or `const [x, setX] = useState()` are hoisted into that page component, and the `jsx` tab references the values directly. Global config `hooks` stays at module scope: define shared custom hooks, helpers, constants, and components there, but never call hooks at its top level.',
         '- Use **real Aksel components and props** — current components, layout primitives (`Page`, `Box`, `HStack`, `VStack`, `HGrid`), Aksel icons, and `--ax` design tokens — before reaching for raw HTML or custom CSS.',
         '- **Navigate** with `goToPage("pageNN")`, or an Aksel `Link`/`LinkCard` whose `href`/`to` is a bare page id. The current page id is injected read-only as `currentPageId`. There is no router and no `<a href>` navigation.',
         '- **Page ids are assigned by the app.** Within one `apply_changes` batch, link pages with `{{pageRef:name}}` placeholders targeting any matching `create_page.newPageRef` in the same batch.',
-        '- **Global config** is shared code in scope for every page; it does not render as a page.',
+        '- **Global config** is shared code in scope for every page; it does not render as a page, and its `hooks` tab stays at module scope rather than becoming a page component.',
         '- **Feedback loop:** `apply_changes` → read `arcade://project/diagnostics` → `capture_preview_evidence`. Capture renders in an isolated throwaway frame, so in-capture interactions/`goToPage` never change the durable Active page — never "restore" it after a capture.',
         '- `apply_changes` operations are heterogeneous; see `arcade://desktop/apply-changes-operations` for the per-operation fields.',
         '',
