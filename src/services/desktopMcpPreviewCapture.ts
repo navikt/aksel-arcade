@@ -171,6 +171,33 @@ export const prepareDesktopMcpPreviewCapture = (
   }
 }
 
+// Capture runs in a throwaway, isolated off-screen render that cannot reach the
+// durable project, the human-visible Active page, or saved Preview preferences.
+// Stating this in the output stops agents from "restoring" an Active page that
+// never moved after an in-capture goToPage navigation.
+export const DESKTOP_MCP_PREVIEW_CAPTURE_EPHEMERAL_NOTE =
+  'Isolated, throwaway render: in-capture interactions and goToPage navigation do not change the human-visible Active page, durable source, or saved Preview preferences. No restore needed.'
+
+// When in-capture interactions navigate to another page, report that destination
+// alongside the page the capture started on so the frame/manifest never contradict
+// the accessibility and screenshot layers, which reflect the post-navigation DOM.
+const resolveCaptureNavigatedToPage = (
+  prepared: PreparedDesktopMcpPreviewCapture,
+  capture: DesktopMcpSandboxCaptureSuccess,
+  context: DesktopMcpPreviewCaptureContext
+): { navigatedToId: Project['source']['pages'][number]['id']; navigatedToName?: string } | null => {
+  const navigatedToId = capture.captureMeta?.currentPageId
+  if (typeof navigatedToId !== 'string' || navigatedToId === prepared.pageId) {
+    return null
+  }
+
+  const navigatedToPage = getPageById(context.project.source, navigatedToId)
+  return {
+    navigatedToId,
+    ...(navigatedToPage ? { navigatedToName: navigatedToPage.name } : {}),
+  }
+}
+
 export const finalizeDesktopMcpPreviewCapture = (
   prepared: PreparedDesktopMcpPreviewCapture,
   capture: DesktopMcpSandboxCaptureSuccess,
@@ -214,6 +241,7 @@ export const finalizeDesktopMcpPreviewCapture = (
   const targetDescription = capture.captureMeta?.targetDescription
 
   const frame = capture.evidence.frame
+  const navigatedTo = resolveCaptureNavigatedToPage(prepared, capture, context)
   const screenshotMetadata = {
     scope: prepared.screenshotScope,
     ...(targetDescription ? { targetDescription } : {}),
@@ -225,6 +253,7 @@ export const finalizeDesktopMcpPreviewCapture = (
     page: {
       id: prepared.pageId,
       name: prepared.pageName,
+      ...(navigatedTo ?? {}),
     },
     preview: {
       viewportSize: prepared.viewportSize,
@@ -239,6 +268,8 @@ export const finalizeDesktopMcpPreviewCapture = (
     },
     capture: {
       isolatedRender: true,
+      ephemeral: true,
+      ephemeralNote: DESKTOP_MCP_PREVIEW_CAPTURE_EPHEMERAL_NOTE,
       requestedLayers: prepared.requestedLayers,
       producedLayers,
       screenshotScope: prepared.screenshotScope,
@@ -273,11 +304,12 @@ export const finalizeDesktopMcpPreviewCapture = (
     }
   } = {
     captureId,
-    summary: createPreviewCaptureSummary(prepared, capture, producedLayers),
+    summary: createPreviewCaptureSummary(prepared, capture, producedLayers, navigatedTo),
     projectRevision: prepared.projectRevision,
     page: {
       id: prepared.pageId,
       name: prepared.pageName,
+      ...(navigatedTo ?? {}),
     },
     preview: {
       viewportSize: prepared.viewportSize,
@@ -300,6 +332,8 @@ export const finalizeDesktopMcpPreviewCapture = (
     },
     capture: {
       isolatedRender: true,
+      ephemeral: true,
+      ephemeralNote: DESKTOP_MCP_PREVIEW_CAPTURE_EPHEMERAL_NOTE,
       rootSelector: frame.rootSelector,
       capturedElementCount: frame.capturedElementCount,
       truncated: frame.truncated,
@@ -404,7 +438,7 @@ export const finalizeDesktopMcpPreviewCapture = (
     }
   }
 
-  manifest.summary = createPreviewCaptureSummary(prepared, capture, producedLayers)
+  manifest.summary = createPreviewCaptureSummary(prepared, capture, producedLayers, navigatedTo)
   manifest.producedLayers = producedLayers
   manifest.layerPurposes = Object.fromEntries(
     producedLayers.map((layer) => [layer, DESKTOP_MCP_PREVIEW_CAPTURE_LAYER_PURPOSES[layer]])
@@ -429,6 +463,7 @@ export const finalizeDesktopMcpPreviewCapture = (
     page: {
       id: prepared.pageId,
       name: prepared.pageName,
+      ...(navigatedTo ?? {}),
     },
     requestedLayers: prepared.requestedLayers,
     producedLayers,
@@ -521,7 +556,8 @@ const summarizePreviewDiagnostics = (
 const createPreviewCaptureSummary = (
   prepared: PreparedDesktopMcpPreviewCapture,
   capture: DesktopMcpSandboxCaptureSuccess,
-  producedLayers: DesktopMcpPreviewCaptureLayer[]
+  producedLayers: DesktopMcpPreviewCaptureLayer[],
+  navigatedTo: { navigatedToId: string; navigatedToName?: string } | null
 ): string => {
   const formattedLayers = producedLayers.map(formatPreviewCaptureLayerLabel)
   const lastProducedLayer = formattedLayers[formattedLayers.length - 1] ?? ''
@@ -540,8 +576,11 @@ const createPreviewCaptureSummary = (
     prepared.requestedInteractions.length > 0
       ? ` after ${prepared.requestedInteractions.length} interaction${prepared.requestedInteractions.length === 1 ? '' : 's'}`
       : ''
+  const navigationSummary = navigatedTo
+    ? ` Interactions navigated to ${navigatedTo.navigatedToName ?? navigatedTo.navigatedToId} (${navigatedTo.navigatedToId}); this is an isolated render, so the Active page is unchanged.`
+    : ''
 
-  return `Captured ${prepared.pageName} (${prepared.pageId}) in ${prepared.theme} ${prepared.viewportSize} preview with ${layerSummary} evidence${interactionSummary}${scopeSummary}.`
+  return `Captured ${prepared.pageName} (${prepared.pageId}) in ${prepared.theme} ${prepared.viewportSize} preview with ${layerSummary} evidence${interactionSummary}${scopeSummary}.${navigationSummary}`
 }
 
 const formatPreviewCaptureLayerLabel = (layer: DesktopMcpPreviewCaptureLayer): string => {

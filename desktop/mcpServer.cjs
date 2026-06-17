@@ -111,17 +111,18 @@ const APPLY_CHANGES_NEXT_STEPS = Object.freeze([
 
 // The single auto-surfaced string every MCP host shows the model on connect.
 // Teaches only the Arcade-specific mechanics the agent cannot infer, and points
-// to the authoring guide for everything else. Deliberately carries no component
-// list and no example so it never narrows what the agent thinks Arcade is for.
+// to the self-sufficient start-here on-ramp for the rest. Deliberately carries no
+// component list and no worked example so it never narrows what Arcade is for.
 const DESKTOP_MCP_INSTRUCTIONS = [
   'Desktop Arcade is a live sandbox for prototyping any UI with the Aksel design system. Build whatever the task needs — it is not limited to any one kind of screen.',
-  'Start by reading arcade://desktop/start-here. If your MCP host exposes only tools, call read_resource({ uri: "arcade://desktop/start-here" }).',
+  'Start by reading arcade://desktop/start-here — it is self-sufficient: one read plus arcade://project/manifest is enough to author. If your MCP host exposes only tools, call read_resource({ uri: "arcade://desktop/start-here" }).',
   'Source is import-free: React, Aksel components, Aksel icons, and hooks are injected globals — never add import statements.',
+  'Each Arcade page (and Global config) has two source tabs: jsx and hooks. The jsx source is inlined into return ( … ), so it must be a single JSX element/expression and must never be wrapped in { … }; put state and hook calls in the hooks tab and reference them from jsx.',
   'Use real Aksel components and props; do not hand-roll raw HTML or guess prop names. Per-component usage and runnable, version-matched snippets are available on demand — do not load them until you reach for a given component.',
   'Navigate between pages with goToPage("pageNN"), or an Aksel Link/LinkCard whose href/to is a bare page id; the current page id is injected read-only as currentPageId. There is no router and no <a href> navigation.',
   'Page ids are assigned by the app. Within one apply_changes batch, link pages with {{pageRef:name}} placeholders targeting any create_page.newPageRef declared in that batch.',
-  'Working loop: apply_changes, then read arcade://project/diagnostics, then capture_preview_evidence to inspect.',
-  'Before authoring, read arcade://desktop/authoring-guide for the Arcade rules and for how to fetch Aksel component docs and snippets on demand.',
+  'Working loop: apply_changes, then read arcade://project/diagnostics, then capture_preview_evidence to inspect. Capture is an isolated throwaway render — it never changes the durable Active page.',
+  'Deeper references are on demand, not required before authoring: arcade://desktop/authoring-guide (depth + Aksel snippet reach paths), arcade://desktop/apply-changes-operations, the workflow guides, and the Aksel catalog.',
 ].join('\n')
 
 // Version-matched Aksel snippet data generated from src/data/akselCatalog.ts by
@@ -194,7 +195,7 @@ const MCP_TOOL_DEFINITIONS = Object.freeze([
   Object.freeze({
     name: 'capture_preview_evidence',
     description:
-      'Capture targeted Preview evidence for the active Arcade project across screenshot, accessibility, DOM/layout/style, and frame layers. For Arcade authoring rules and how to fetch Aksel component usage on demand, read arcade://desktop/authoring-guide.',
+      'Capture targeted Preview evidence for the active Arcade project across screenshot, accessibility, DOM/layout/style, and frame layers. Captures run in an isolated, throwaway render: in-capture interactions and goToPage navigation never change the human-visible Active page or durable source, so no restore is needed afterward. When interactions navigate, the frame/manifest add page.navigatedToId/navigatedToName so all layers agree. For Arcade authoring rules and how to fetch Aksel component usage on demand, read arcade://desktop/authoring-guide.',
     inputSchema: Object.freeze({
       type: 'object',
       additionalProperties: false,
@@ -1966,7 +1967,7 @@ const createDesktopStableResourceText = (uri) => {
         '# Desktop Arcade MCP operating guide',
         '',
         '- Work through `arcade://` resources and MCP tools only; do not edit repository files, package metadata, or the local filesystem.',
-        '- Default loop: read `arcade://desktop/start-here`, read `arcade://project/manifest`, read the relevant source resources, use `apply_changes` for durable edits, read `arcade://project/diagnostics` unless the human asked for a different workflow, then capture Preview evidence when visual validation is needed.',
+        '- `arcade://desktop/start-here` is the self-sufficient on-ramp and carries the default loop: read `arcade://project/manifest`, read the relevant source resources, `apply_changes` for durable edits, read `arcade://project/diagnostics`, then capture Preview evidence. This guide only adds the finer operating details below.',
         '- Start with `tools/list`, `resources/list`, and `resources/read`; tool-only clients can call `read_resource({ uri })` for the same resources.',
         '- `arcade://desktop/capabilities` is the shortest single place to inspect the published contract.',
         '- Durable project edits happen through `apply_changes`, not by patching files outside the active Arcade project.',
@@ -1981,6 +1982,7 @@ const createDesktopStableResourceText = (uri) => {
         `- Preview capture interactions support ${VALID_PREVIEW_INTERACTION_ACTIONS.join(', ')} with at most ${MAX_PREVIEW_INTERACTION_STEPS} steps and ${MAX_PREVIEW_INTERACTION_TOTAL_TIME_MS} ms total interaction time per capture.`,
         '- Interaction targets prefer accessibility fields (`role`, `name`, `text`, `label`) and allow Preview-root-scoped CSS selector fallback only.',
         '- Preview interactions are isolated to the hidden Preview render: they must not touch Desktop Arcade host UI, durable source, saved Preview preferences, or the human-visible Active page.',
+        '- Because capture is a throwaway isolated render, an in-capture `goToPage` does not move the human-visible Active page — do not call `select_active_page` to "restore" it afterward. When interactions navigate, the frame/manifest report `page.navigatedToId`/`page.navigatedToName` (the destination the accessibility and screenshot layers show) next to the `page.id` the capture started on.',
         '- Preview interactions block browser/external navigation targets; only in-prototype Arcade page references are allowed.',
         '- When state is unclear, re-read the manifest before making another durable change.',
       ].join('\n')
@@ -1997,7 +1999,7 @@ const createDesktopStableResourceText = (uri) => {
         '- **Navigate** with `goToPage("pageNN")`, or an Aksel `Link`/`LinkCard` whose `href`/`to` is a bare page id. The current page id is injected read-only as `currentPageId`. There is no router and no `<a href>` navigation.',
         '- **Page ids are assigned by the app.** Within one `apply_changes` batch, link pages with `{{pageRef:name}}` placeholders targeting any matching `create_page.newPageRef` in the same batch.',
         '- **Global config** is shared code in scope for every page; it does not render as a page.',
-        '- **Feedback loop:** `apply_changes` → read `arcade://project/diagnostics` → `capture_preview_evidence`.',
+        '- **Feedback loop:** `apply_changes` → read `arcade://project/diagnostics` → `capture_preview_evidence`. Capture renders in an isolated throwaway frame, so in-capture interactions/`goToPage` never change the durable Active page — never "restore" it after a capture.',
         '- `apply_changes` operations are heterogeneous; see `arcade://desktop/apply-changes-operations` for the per-operation fields.',
         '',
         '## Getting Aksel component usage (on demand — fetch only the components you need)',
