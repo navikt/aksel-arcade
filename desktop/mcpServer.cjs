@@ -94,11 +94,85 @@ const PROJECT_SOURCE_PAGE_URI_PATTERN = /^arcade:\/\/project\/source\/pages\/(pa
 const PREVIEW_CAPTURE_RESOURCE_URI_PATTERN =
   /^arcade:\/\/preview\/captures\/([a-z0-9-]+)\/(manifest|screenshot|frame|accessibility|dom-layout-style)$/
 
+const AKSEL_CATALOG_RESOURCE_URI = 'arcade://aksel/catalog'
+const AKSEL_COMPONENT_RESOURCE_URI_PREFIX = 'arcade://aksel/components/'
+const AKSEL_COMPONENT_RESOURCE_URI_TEMPLATE = `${AKSEL_COMPONENT_RESOURCE_URI_PREFIX}{name}`
+const AKSEL_COMPONENT_RESOURCE_URI_PATTERN = /^arcade:\/\/aksel\/components\/([A-Za-z0-9.%\- ]+)$/
+const APPLY_CHANGES_OPERATIONS_RESOURCE_URI = 'arcade://desktop/apply-changes-operations'
+
+const APPLY_CHANGES_NEXT_STEPS = Object.freeze([
+  'Read arcade://project/diagnostics to confirm the batch is healthy.',
+  'Run capture_preview_evidence({ pageId }) to inspect the rendered result.',
+])
+
+// The single auto-surfaced string every MCP host shows the model on connect.
+// Teaches only the Arcade-specific mechanics the agent cannot infer, and points
+// to the authoring guide for everything else. Deliberately carries no component
+// list and no example so it never narrows what the agent thinks Arcade is for.
+const DESKTOP_MCP_INSTRUCTIONS = [
+  'Desktop Arcade is a live sandbox for prototyping any UI with the Aksel design system. Build whatever the task needs — it is not limited to any one kind of screen.',
+  'Source is import-free: React, Aksel components, Aksel icons, and hooks are injected globals — never add import statements.',
+  'Use real Aksel components and props; do not hand-roll raw HTML or guess prop names. Per-component usage and runnable, version-matched snippets are available on demand — do not load them until you reach for a given component.',
+  'Navigate between pages with goToPage("pageNN"), or an Aksel Link/LinkCard whose href/to is a bare page id; the current page id is injected read-only as currentPageId. There is no router and no <a href> navigation.',
+  'Page ids are assigned by the app. Within one apply_changes batch, link pages with {{pageRef:name}} placeholders, valid only after the matching create_page.newPageRef appears earlier in the same batch.',
+  'Working loop: apply_changes, then read arcade://project/diagnostics, then capture_preview_evidence to inspect.',
+  'Before authoring, read arcade://desktop/authoring-guide for the Arcade rules and for how to fetch Aksel component docs and snippets on demand.',
+].join('\n')
+
+// Version-matched Aksel snippet data generated from src/data/akselCatalog.ts by
+// `npm run aksel:refresh-mcp-catalog`. Served on demand through the
+// arcade://aksel/catalog and arcade://aksel/components/{name} resources so the
+// agent never loads component data into context until it reaches for a component.
+const loadAkselCatalogData = () => {
+  try {
+    const data = require('./akselCatalogData.generated.cjs')
+    if (
+      data &&
+      typeof data === 'object' &&
+      typeof data.akselVersion === 'string' &&
+      Array.isArray(data.components) &&
+      data.componentsByName &&
+      typeof data.componentsByName === 'object'
+    ) {
+      return data
+    }
+  } catch {
+    // Artifact is generated at build time; fall back to an empty catalog in
+    // environments where it has not been generated yet.
+  }
+  return { akselVersion: 'unknown', components: [], componentsByName: {} }
+}
+
+const AKSEL_CATALOG_DATA = loadAkselCatalogData()
+
+const isAkselComponentResourceUri = (uri) => AKSEL_COMPONENT_RESOURCE_URI_PATTERN.test(uri)
+
+// Component names are percent-encoded in their resource URIs (e.g. "Chips Toggle"
+// -> "Chips%20Toggle"), so decode before looking them up. Tolerate a raw,
+// unencoded name too, and never throw on a malformed escape sequence.
+const decodeAkselComponentName = (rawName) => {
+  try {
+    return decodeURIComponent(rawName)
+  } catch {
+    return rawName
+  }
+}
+
+const findAkselComponentDetail = (name) => {
+  const byName = AKSEL_CATALOG_DATA.componentsByName
+  if (Object.prototype.hasOwnProperty.call(byName, name)) {
+    return byName[name]
+  }
+  const lowered = name.toLowerCase()
+  const matchKey = Object.keys(byName).find((key) => key.toLowerCase() === lowered)
+  return matchKey ? byName[matchKey] : null
+}
+
 const MCP_TOOL_DEFINITIONS = Object.freeze([
   Object.freeze({
     name: 'capture_preview_evidence',
     description:
-      'Capture targeted Preview evidence for the active Arcade project across screenshot, accessibility, DOM/layout/style, and frame layers.',
+      'Capture targeted Preview evidence for the active Arcade project across screenshot, accessibility, DOM/layout/style, and frame layers. For Arcade authoring rules and how to fetch Aksel component usage on demand, read arcade://desktop/authoring-guide.',
     inputSchema: Object.freeze({
       type: 'object',
       additionalProperties: false,
@@ -241,7 +315,8 @@ const MCP_TOOL_DEFINITIONS = Object.freeze([
   }),
   Object.freeze({
     name: 'apply_changes',
-    description: 'Apply a validated, durable batch of Arcade project changes.',
+    description:
+      'Apply a validated, durable batch of Arcade project changes. Read arcade://desktop/authoring-guide for Arcade authoring rules and arcade://desktop/apply-changes-operations for the per-operation field matrix and {{pageRef:name}} batch ordering rule.',
     inputSchema: Object.freeze({
       type: 'object',
       additionalProperties: false,
@@ -350,6 +425,19 @@ const MCP_STABLE_RESOURCE_DEFINITIONS = Object.freeze([
     uri: 'arcade://desktop/capabilities',
     name: 'Desktop Arcade MCP capabilities',
     description: 'Machine-readable Desktop Arcade MCP contract and omissions.',
+    mimeType: 'application/json',
+  }),
+  Object.freeze({
+    uri: APPLY_CHANGES_OPERATIONS_RESOURCE_URI,
+    name: 'Desktop Arcade apply_changes operations reference',
+    description: 'Per-operation field matrix and batch ordering rules for apply_changes.',
+    mimeType: 'text/markdown',
+  }),
+  Object.freeze({
+    uri: AKSEL_CATALOG_RESOURCE_URI,
+    name: 'Aksel component catalog (version-matched)',
+    description:
+      'On-demand index of Aksel components available in Arcade, each with a snippet-resource URI. Pull one component at a time.',
     mimeType: 'application/json',
   }),
   Object.freeze({
@@ -791,6 +879,7 @@ const routeInitializeRequest = (payload, response) => {
         name: DESKTOP_MCP_SERVER_NAME,
         version: DESKTOP_MCP_SERVER_VERSION,
       },
+      instructions: DESKTOP_MCP_INSTRUCTIONS,
     },
   })
 }
@@ -1030,7 +1119,7 @@ const routeToolsCallRequest = async (
       result: applyChangesResult.ok
         ? createToolExecutionSuccessResult(
             `Applied changes: ${applyChangesResult.summary}`,
-            applyChangesResult
+            { ...applyChangesResult, nextSteps: APPLY_CHANGES_NEXT_STEPS }
           )
         : createToolExecutionErrorResult(
             toolDefinition.name,
@@ -1127,6 +1216,27 @@ const readDesktopResource = async (uri, { previewCaptureStore, readProjectResour
       uri: resourceResult.uri,
       mimeType: resourceResult.mimeType,
       text: resourceResult.text,
+    }
+  }
+
+  if (isAkselComponentResourceUri(uri)) {
+    const match = uri.match(AKSEL_COMPONENT_RESOURCE_URI_PATTERN)
+    const requestedName = decodeAkselComponentName(match ? match[1] : '')
+    const detail = findAkselComponentDetail(requestedName)
+    if (!detail) {
+      return {
+        ok: false,
+        code: 'resource-not-found',
+        resourceUri: uri,
+        message: `Unknown Aksel component "${requestedName}". Read ${AKSEL_CATALOG_RESOURCE_URI} for the available components and their snippet-resource URIs.`,
+      }
+    }
+
+    return {
+      ok: true,
+      uri,
+      mimeType: 'application/json',
+      text: createAkselComponentResourceText(detail),
     }
   }
 
@@ -1757,6 +1867,14 @@ const createToolExecutionErrorResult = (toolName, code, message, extras = {}) =>
   },
 })
 
+const createAkselComponentResourceText = (detail) =>
+  JSON.stringify({
+    akselVersion: AKSEL_CATALOG_DATA.akselVersion,
+    usage:
+      'Import-free, version-matched Arcade snippet. Paste the JSX into a page; if `hooks` is present, put it in the page Hooks (or Global config). Do not add import statements.',
+    component: detail,
+  })
+
 const createDesktopStableResourceText = (uri) => {
   switch (uri) {
     case 'arcade://desktop/operating-guide':
@@ -1783,17 +1901,99 @@ const createDesktopStableResourceText = (uri) => {
       ].join('\n')
     case 'arcade://desktop/authoring-guide':
       return [
-        '# Desktop Arcade MCP authoring guide',
+        '# Desktop Arcade authoring guide',
         '',
-        '- Arcade source is import-free JSX and Hooks for the active Arcade project.',
-        '- Prefer Aksel-valid Arcade JSX: current Aksel components, layout primitives, icons, and `--ax` design tokens before native HTML or custom CSS fallbacks.',
-        '- `Global config` is shared code in scope for every Arcade page; it is not a renderable page.',
-        '- Durable page navigation targets stable page ids, not page names.',
-        '- When a batch creates and links pages together, use `{{pageRef:name}}` placeholders in source and let Arcade rewrite them to the app-assigned page ids.',
-        '- Temporary page refs become valid only after the matching `create_page.newPageRef` is declared in the batch order.',
-        '- Diagnostics plus Preview evidence are the feedback loop after source changes.',
-        '- Keep the output context-light: no broad Aksel training, package edits, or repository/file edits.',
+        'Arcade is a live sandbox for prototyping **any** UI with the Aksel design system. Build whatever the task calls for and choose Aksel components to fit it — nothing here narrows what you can make.',
+        '',
+        '## Arcade mechanics (specific to this sandbox)',
+        '- Source is **import-free**: React, Aksel components, Aksel icons, and hooks are injected globals. Never write `import` statements.',
+        '- Use **real Aksel components and props** — current components, layout primitives (`Page`, `Box`, `HStack`, `VStack`, `HGrid`), Aksel icons, and `--ax` design tokens — before reaching for raw HTML or custom CSS.',
+        '- **Navigate** with `goToPage("pageNN")`, or an Aksel `Link`/`LinkCard` whose `href`/`to` is a bare page id. The current page id is injected read-only as `currentPageId`. There is no router and no `<a href>` navigation.',
+        '- **Page ids are assigned by the app.** Within one `apply_changes` batch, link pages with `{{pageRef:name}}` placeholders; a placeholder is valid only after the matching `create_page.newPageRef` appears earlier in the same batch.',
+        '- **Global config** is shared code in scope for every page; it does not render as a page.',
+        '- **Feedback loop:** `apply_changes` → read `arcade://project/diagnostics` → `capture_preview_evidence`.',
+        '- `apply_changes` operations are heterogeneous; see `arcade://desktop/apply-changes-operations` for the per-operation fields.',
+        '',
+        '## Getting Aksel component usage (on demand — fetch only the components you need)',
+        'Do not guess props or hand-roll HTML. When you reach for a component, pull its usage one component at a time, in this priority order:',
+        `1. **\`${AKSEL_CATALOG_RESOURCE_URI}\`** — a compact index of the components available here, each with its own \`${AKSEL_COMPONENT_RESOURCE_URI_TEMPLATE}\` snippet resource. These snippets are import-free, version-matched to this Arcade runtime (Aksel ${AKSEL_CATALOG_DATA.akselVersion}), and guaranteed to run. Prefer this path.`,
+        '2. **`https://aksel.nav.no/llm.md`** — the public docs index; fetch the individual component `.md` article when you need more than the snippet.',
+        '3. **Aksel MCP tools** (`aksel_find_docs`, `aksel_get_component_info`, `aksel_find_icons`, `aksel_get_token_details`) — use them only if your client already has that server connected.',
+        '',
+        '## Mechanic snippets (illustrate wiring, not a use case)',
+        'These show how Arcade plumbing fits together. They are intentionally generic — put whatever content the task needs inside.',
+        '',
+        'Preferred page shape — a bare `Page` root:',
+        '```jsx',
+        '<Page>',
+        '  <Page.Block width="text" gutters>',
+        '    {/* your content */}',
+        '  </Page.Block>',
+        '</Page>',
+        '```',
+        '',
+        'When you need local JS before the JSX, use an IIFE page:',
+        '```jsx',
+        '{(() => {',
+        '  const items = ["a", "b", "c"]',
+        '  return (',
+        '    <Page>',
+        '      <Page.Block width="text" gutters>',
+        '        <VStack gap="4">',
+        '          {items.map((item) => (',
+        '            <Box key={item}>{item}</Box>',
+        '          ))}',
+        '        </VStack>',
+        '      </Page.Block>',
+        '    </Page>',
+        '  )',
+        '})()}',
+        '```',
+        '',
+        'Page-to-page navigation with `goToPage` (two generic pages — the same wiring scales to any number of screens and any content):',
+        '```jsx',
+        '// On "Page A": move to another page by its id',
+        '<Button onClick={() => goToPage("{{pageRef:pageB}}")}>Continue</Button>',
+        '',
+        '// Equivalent with an Aksel Link (href is a bare page id, not a URL)',
+        '<Link href="{{pageRef:pageB}}">Continue</Link>',
+        '```',
+        '',
+        'Keep output context-light: no broad Aksel training dumps, no package edits, no repository or filesystem edits.',
       ].join('\n')
+    case APPLY_CHANGES_OPERATIONS_RESOURCE_URI:
+      return [
+        '# apply_changes operations reference',
+        '',
+        'Every entry in `operations[]` is an object with a `type`. The other fields it accepts depend on that `type` — the shared input schema lists every field, but each operation only uses the ones below.',
+        '',
+        '| type | fields | notes |',
+        '| --- | --- | --- |',
+        '| `replace_source` | `resourceUri` (required), `content` (required) | `resourceUri` must be an existing source resource from `arcade://project/manifest`. `content` is the full replacement and may contain `{{pageRef:name}}` placeholders. |',
+        '| `create_page` | `newPageRef`, `name`, `jsxCode`, `hooksCode` (all optional) | `newPageRef` declares a temporary ref later operations and `{{pageRef:name}}` placeholders can target. `jsxCode`/`hooksCode` seed the page source. |',
+        '| `rename_page` | `name` (required) + target | Target the page with either `pageId` or `tempPageRef`. |',
+        '| `delete_page` | target | Target with `pageId` or `tempPageRef`. |',
+        '| `set_start_page` | target | Target with `pageId` or `tempPageRef`. |',
+        '| `select_active_page` | target | Target with `pageId` or `tempPageRef`. Changes the human-visible Active page. |',
+        '| `set_preview_context` | `viewportSize`, `theme` (at least one) | Saved preview preferences. Not accepted by `create_page`. |',
+        '| `rename_project` | `name` (required) | New project name. |',
+        '',
+        '## Page targets',
+        'Page-lifecycle operations (`rename_page`, `delete_page`, `set_start_page`, `select_active_page`) target a page with **either** `pageId` (an existing app-assigned id) **or** `tempPageRef` (a ref declared by an earlier `create_page.newPageRef` in the same batch).',
+        '',
+        '## {{pageRef:name}} ordering rule',
+        `A \`${PAGE_REF_PLACEHOLDER_SYNTAX}\` placeholder (in \`content\`/\`jsxCode\`/\`hooksCode\`) and a \`tempPageRef\` target are valid only when the matching \`create_page.newPageRef\` is declared **earlier in the same batch**. To create a page and link to it in one batch, order the operations create-first, link-after.`,
+      ].join('\n')
+    case AKSEL_CATALOG_RESOURCE_URI:
+      return JSON.stringify({
+        akselVersion: AKSEL_CATALOG_DATA.akselVersion,
+        description:
+          'On-demand index of Aksel components available in this Arcade runtime. Read one component resource at a time, only for components you are about to use. Each snippet is import-free and version-matched.',
+        componentResourceUriTemplate: AKSEL_COMPONENT_RESOURCE_URI_TEMPLATE,
+        iconDiscovery:
+          'Aksel icons are injected globals (e.g. <PersonIcon />) and are not listed here. Browse names at https://aksel.nav.no/ikoner, or use the Aksel MCP aksel_find_icons tool if your client has it.',
+        components: AKSEL_CATALOG_DATA.components,
+      })
     case 'arcade://desktop/capabilities':
       return JSON.stringify({
         serverName: DESKTOP_MCP_SERVER_NAME,
@@ -1818,8 +2018,15 @@ const createDesktopStableResourceText = (uri) => {
           (resourceDefinition) => resourceDefinition.uri
         ),
         applyChangesOperationTypes: APPLY_CHANGES_OPERATION_TYPES,
+        applyChangesOperationsReferenceUri: APPLY_CHANGES_OPERATIONS_RESOURCE_URI,
         pageRefPlaceholderSyntax: PAGE_REF_PLACEHOLDER_SYNTAX,
         dynamicSourceUriTemplates: CAPABILITY_SOURCE_URI_TEMPLATES,
+        akselSnippetResources: {
+          akselVersion: AKSEL_CATALOG_DATA.akselVersion,
+          catalogUri: AKSEL_CATALOG_RESOURCE_URI,
+          componentUriTemplate: AKSEL_COMPONENT_RESOURCE_URI_TEMPLATE,
+          note: 'On-demand, version-matched, import-free Aksel component snippets. Read the catalog index, then read one component resource at a time.',
+        },
         previewEvidenceUriTemplates: CAPABILITY_PREVIEW_EVIDENCE_URI_TEMPLATES,
         captureLayers: CAPABILITY_PREVIEW_CAPTURE_LAYERS,
         captureLayerPurposes: CAPABILITY_PREVIEW_CAPTURE_LAYER_PURPOSES,

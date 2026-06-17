@@ -10,6 +10,8 @@ const stableResourceUris = [
   'arcade://desktop/operating-guide',
   'arcade://desktop/authoring-guide',
   'arcade://desktop/capabilities',
+  'arcade://desktop/apply-changes-operations',
+  'arcade://aksel/catalog',
   'arcade://project/manifest',
   'arcade://project/preview-context',
   'arcade://project/diagnostics',
@@ -156,8 +158,10 @@ test.describe('Desktop MCP v1 smoke flow', () => {
       expect(operatingGuide.text).not.toContain('read_resource')
 
       const authoringGuide = await readMcpResource(4, 'arcade://desktop/authoring-guide')
-      expect(authoringGuide.text).toContain('`Global config`')
+      expect(authoringGuide.text).toContain('Global config')
       expect(authoringGuide.text).toContain('`{{pageRef:name}}` placeholders')
+      expect(authoringGuide.text).toContain('goToPage')
+      expect(authoringGuide.text).toContain('arcade://aksel/catalog')
 
       const capabilities = await readJsonMcpResource(5, 'arcade://desktop/capabilities')
       expect(capabilities).toMatchObject({

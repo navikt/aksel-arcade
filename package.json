@@ -8,7 +8,7 @@
     "dev": "vite",
     "desktop:dev": "node scripts/desktop-dev.mjs",
     "desktop:icons": "node scripts/generate-desktop-icons.mjs",
-    "desktop:build": "npm run desktop:icons && node scripts/build-sandbox.mjs && vite build --config vite.desktop.config.ts",
+    "desktop:build": "npm run desktop:icons && npm run aksel:refresh-mcp-catalog && node scripts/build-sandbox.mjs && vite build --config vite.desktop.config.ts",
     "desktop:package": "npm run desktop:build && electron-builder --config electron-builder.config.cjs --mac --win --publish never",
     "desktop:package:mac": "npm run desktop:build && electron-builder --config electron-builder.config.cjs --mac --publish never",
     "desktop:package:mac:release": "node scripts/desktop-macos-release-signing.cjs package",
@@ -30,6 +30,7 @@
     "format": "prettier --write \"src/**/*.{ts,tsx,css}\"",
     "share-strategy-bench": "node scripts/share-strategy-bench.mjs",
     "aksel:refresh-docs": "tsx --tsconfig tsconfig.node.json scripts/generate-aksel-autocomplete-data.ts --write src/data/akselAutocompleteData.ts",
+    "aksel:refresh-mcp-catalog": "tsx --tsconfig tsconfig.node.json scripts/generate-mcp-aksel-catalog.ts --write desktop/akselCatalogData.generated.cjs",
     "aksel:audit": "tsx --tsconfig tsconfig.node.json scripts/aksel-audit.ts"
   },
   "dependencies": {

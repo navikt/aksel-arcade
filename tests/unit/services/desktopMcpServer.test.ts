@@ -233,7 +233,8 @@ describe('desktopMcpServer', () => {
     })
 
     expect(response.status).toBe(200)
-    await expect(response.json()).resolves.toEqual({
+    const initializePayload = await response.json()
+    expect(initializePayload).toMatchObject({
       jsonrpc: '2.0',
       id: 1,
       result: {
@@ -246,8 +247,12 @@ describe('desktopMcpServer', () => {
           name: 'aksel-arcade',
           version: '0.0.0',
         },
+        instructions: expect.stringContaining('Desktop Arcade is a live sandbox'),
       },
     })
+    expect(initializePayload.result.instructions).toContain('goToPage')
+    expect(initializePayload.result.instructions).toContain('import-free')
+    expect(initializePayload.result.instructions).toContain('arcade://desktop/authoring-guide')
   })
 
   it('lists only the v1 MCP tools and stable direct resources', async () => {
@@ -304,6 +309,8 @@ describe('desktopMcpServer', () => {
       'arcade://desktop/operating-guide',
       'arcade://desktop/authoring-guide',
       'arcade://desktop/capabilities',
+      'arcade://desktop/apply-changes-operations',
+      'arcade://aksel/catalog',
       'arcade://project/manifest',
       'arcade://project/preview-context',
       'arcade://project/diagnostics',
@@ -352,7 +359,7 @@ describe('desktopMcpServer', () => {
           ok: true,
           uri: 'arcade://desktop/authoring-guide',
           mimeType: 'text/markdown',
-          text: expect.stringContaining('# Desktop Arcade MCP authoring guide'),
+          text: expect.stringContaining('# Desktop Arcade authoring guide'),
         },
       },
     })
@@ -1110,6 +1117,10 @@ describe('desktopMcpServer', () => {
             operationTypes: ['create_page', 'select_active_page'],
             timestamp: '2026-06-16T12:00:00.000Z',
           },
+          nextSteps: [
+            'Read arcade://project/diagnostics to confirm the batch is healthy.',
+            'Run capture_preview_evidence({ pageId }) to inspect the rendered result.',
+          ],
         },
       },
     })
@@ -1275,12 +1286,15 @@ describe('desktopMcpServer', () => {
       }),
     ])
     expect(authoringGuidePayload.result.contents[0].text).toContain(
-      'Arcade source is import-free JSX and Hooks'
+      'Source is **import-free**'
     )
-    expect(authoringGuidePayload.result.contents[0].text).toContain('`Global config`')
+    expect(authoringGuidePayload.result.contents[0].text).toContain('Global config')
     expect(authoringGuidePayload.result.contents[0].text).toContain(
       '`{{pageRef:name}}` placeholders'
     )
+    expect(authoringGuidePayload.result.contents[0].text).toContain('goToPage')
+    expect(authoringGuidePayload.result.contents[0].text).toContain('arcade://aksel/catalog')
+    expect(authoringGuidePayload.result.contents[0].text).toContain('https://aksel.nav.no/llm.md')
 
     const capabilitiesResponse = await postJson(state.url, {
       jsonrpc: '2.0',
@@ -1428,6 +1442,156 @@ describe('desktopMcpServer', () => {
     )
     expect(capabilities.v1Omissions).toContain('No prompts surface.')
     expect(capabilities.contractNote).toContain('current implementation status')
+  })
+
+  it('serves the on-demand Aksel catalog index and per-component snippet resources', async () => {
+    const server = createManagedServer({ port: 0 })
+    const state = await server.start()
+
+    const catalogResponse = await postJson(state.url, {
+      jsonrpc: '2.0',
+      id: 90,
+      method: 'resources/read',
+      params: {
+        uri: 'arcade://aksel/catalog',
+      },
+    })
+    expect(catalogResponse.status).toBe(200)
+    const catalogPayload = await catalogResponse.json()
+    expect(catalogPayload.result.contents[0].mimeType).toBe('application/json')
+    const catalog = JSON.parse(catalogPayload.result.contents[0].text)
+    expect(typeof catalog.akselVersion).toBe('string')
+    expect(catalog.akselVersion).not.toBe('unknown')
+    expect(catalog.componentResourceUriTemplate).toBe('arcade://aksel/components/{name}')
+    expect(Array.isArray(catalog.components)).toBe(true)
+    expect(catalog.components.length).toBeGreaterThan(0)
+    const buttonIndex = catalog.components.find(
+      (component: { name: string }) => component.name === 'Button'
+    )
+    expect(buttonIndex).toMatchObject({
+      name: 'Button',
+      resourceUri: 'arcade://aksel/components/Button',
+    })
+
+    const componentResponse = await postJson(state.url, {
+      jsonrpc: '2.0',
+      id: 91,
+      method: 'resources/read',
+      params: {
+        uri: 'arcade://aksel/components/Button',
+      },
+    })
+    expect(componentResponse.status).toBe(200)
+    const componentPayload = await componentResponse.json()
+    expect(componentPayload.result.contents[0].mimeType).toBe('application/json')
+    const component = JSON.parse(componentPayload.result.contents[0].text)
+    expect(component.akselVersion).toBe(catalog.akselVersion)
+    expect(component.component.name).toBe('Button')
+    expect(typeof component.component.snippet.jsx).toBe('string')
+    expect(component.component.snippet.jsx).not.toMatch(/\bimport\b/)
+    expect(component.component.snippet.jsx).not.toContain('${')
+    expect(component.component.snippet.jsx).not.toMatch(/\{\{[\w]+\}\}/)
+
+    const caseInsensitiveResponse = await postJson(state.url, {
+      jsonrpc: '2.0',
+      id: 92,
+      method: 'resources/read',
+      params: {
+        uri: 'arcade://aksel/components/button',
+      },
+    })
+    const caseInsensitivePayload = await caseInsensitiveResponse.json()
+    expect(JSON.parse(caseInsensitivePayload.result.contents[0].text).component.name).toBe('Button')
+
+    const spacedIndex = catalog.components.find((component: { name: string }) =>
+      component.name.includes(' ')
+    )
+    if (spacedIndex) {
+      const spacedResponse = await postJson(state.url, {
+        jsonrpc: '2.0',
+        id: 94,
+        method: 'resources/read',
+        params: {
+          uri: spacedIndex.resourceUri,
+        },
+      })
+      expect(spacedResponse.status).toBe(200)
+      const spacedPayload = await spacedResponse.json()
+      expect(spacedPayload.error).toBeUndefined()
+      expect(JSON.parse(spacedPayload.result.contents[0].text).component.name).toBe(
+        spacedIndex.name
+      )
+    }
+
+    const unknownComponentResponse = await postJson(state.url, {
+      jsonrpc: '2.0',
+      id: 93,
+      method: 'resources/read',
+      params: {
+        uri: 'arcade://aksel/components/NotARealComponent',
+      },
+    })
+    const unknownComponentPayload = await unknownComponentResponse.json()
+    expect(unknownComponentPayload.error).toMatchObject({
+      code: -32002,
+      data: {
+        code: 'resource-not-found',
+        resourceUri: 'arcade://aksel/components/NotARealComponent',
+      },
+    })
+    expect(unknownComponentPayload.error.message).toContain('arcade://aksel/catalog')
+  })
+
+  it('serves the apply_changes operations reference and advertises Aksel snippet resources', async () => {
+    const server = createManagedServer({ port: 0 })
+    const state = await server.start()
+
+    const operationsResponse = await postJson(state.url, {
+      jsonrpc: '2.0',
+      id: 94,
+      method: 'resources/read',
+      params: {
+        uri: 'arcade://desktop/apply-changes-operations',
+      },
+    })
+    expect(operationsResponse.status).toBe(200)
+    const operationsPayload = await operationsResponse.json()
+    expect(operationsPayload.result.contents[0].mimeType).toBe('text/markdown')
+    const operationsText = operationsPayload.result.contents[0].text
+    expect(operationsText).toContain('# apply_changes operations reference')
+    for (const operationType of [
+      'replace_source',
+      'create_page',
+      'rename_page',
+      'delete_page',
+      'set_start_page',
+      'select_active_page',
+      'set_preview_context',
+      'rename_project',
+    ]) {
+      expect(operationsText).toContain(`\`${operationType}\``)
+    }
+    expect(operationsText).toContain('earlier in the same batch')
+    expect(operationsText).toContain('`pageId`')
+    expect(operationsText).toContain('`tempPageRef`')
+
+    const capabilitiesResponse = await postJson(state.url, {
+      jsonrpc: '2.0',
+      id: 95,
+      method: 'resources/read',
+      params: {
+        uri: 'arcade://desktop/capabilities',
+      },
+    })
+    const capabilities = JSON.parse((await capabilitiesResponse.json()).result.contents[0].text)
+    expect(capabilities.applyChangesOperationsReferenceUri).toBe(
+      'arcade://desktop/apply-changes-operations'
+    )
+    expect(capabilities.akselSnippetResources).toMatchObject({
+      catalogUri: 'arcade://aksel/catalog',
+      componentUriTemplate: 'arcade://aksel/components/{name}',
+    })
+    expect(typeof capabilities.akselSnippetResources.akselVersion).toBe('string')
   })
 
   it('returns clear JSON-RPC errors for unknown resources and rejects unsupported resource fields', async () => {
