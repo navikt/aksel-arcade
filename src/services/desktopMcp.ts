@@ -54,6 +54,20 @@ export const formatDesktopMcpLastActivity = (
   return `Last activity: ${activity.toolName}${operationSuffix} at ${activity.timestamp}`
 }
 
+export const formatDesktopMcpVsCodeConfig = (serverName: string, url: string): string =>
+  JSON.stringify(
+    {
+      servers: {
+        [serverName]: {
+          type: 'http',
+          url,
+        },
+      },
+    },
+    null,
+    2
+  )
+
 const isDesktopMcpServerState = (value: unknown): value is DesktopMcpServerState => {
   if (!isRecord(value)) {
     return false

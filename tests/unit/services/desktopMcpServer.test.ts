@@ -197,7 +197,7 @@ describe('desktopMcpServer', () => {
   })
 
   it('exports the fixed Desktop Arcade MCP configuration', () => {
-    expect(DESKTOP_MCP_SERVER_NAME).toBe('desktop-arcade')
+    expect(DESKTOP_MCP_SERVER_NAME).toBe('aksel-arcade')
     expect(DESKTOP_MCP_SERVER_VERSION).toBe('0.0.0')
     expect(DESKTOP_MCP_TRANSPORT_LABEL).toBe('HTTP (MCP Streamable HTTP)')
     expect(DESKTOP_MCP_PORT).toBe(3846)
@@ -243,7 +243,7 @@ describe('desktopMcpServer', () => {
           resources: {},
         },
         serverInfo: {
-          name: 'desktop-arcade',
+          name: 'aksel-arcade',
           version: '0.0.0',
         },
       },
@@ -1301,7 +1301,7 @@ describe('desktopMcpServer', () => {
 
     const capabilities = JSON.parse(capabilitiesPayload.result.contents[0].text)
     expect(capabilities).toMatchObject({
-      serverName: 'desktop-arcade',
+      serverName: 'aksel-arcade',
       serverVersion: '0.0.0',
       endpoint: 'http://127.0.0.1:3846/mcp',
       transport: 'HTTP (MCP Streamable HTTP)',
@@ -1411,7 +1411,7 @@ describe('desktopMcpServer', () => {
     )
     expect(capabilities.verificationBoundaries).toMatchObject({
       mcpVerifiable: expect.arrayContaining([
-        'No token/header is required for the desktop-arcade MCP endpoint.',
+        'No token/header is required for the aksel-arcade MCP endpoint.',
         'Business failures stay structured and redacted in MCP tool/resource responses.',
         'Unknown browser Origins are rejected and GET/SSE entrypoints stay unsupported.',
       ]),

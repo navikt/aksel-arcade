@@ -5,6 +5,7 @@ import {
   DESKTOP_MCP_LAST_ACTIVITY_PLACEHOLDER,
   formatDesktopMcpAvailability,
   formatDesktopMcpLastActivity,
+  formatDesktopMcpVsCodeConfig,
   type DesktopMcpServerState,
 } from '@/services/desktopMcp'
 
@@ -64,14 +65,13 @@ export const DesktopMcpSettingsGroup = ({
       <Box paddingInline="space-12" paddingBlock="space-8" role="none">
         <VStack gap="space-4">
           <Detail role="status" aria-live="polite">
-            {statusText}
+            <strong>{statusText}</strong>
           </Detail>
           {isAvailable && mcpState && (
             <>
               <Detail>Server name: {mcpState.serverName}</Detail>
               <Detail>Type: {mcpState.transportLabel}</Detail>
               <Detail>URL: {mcpState.url}</Detail>
-              <Detail>{mcpState.authDescription}</Detail>
             </>
           )}
           {mcpState && !isAvailable && (
@@ -107,19 +107,19 @@ export const DesktopMcpSettingsGroup = ({
             icon={<FilesIcon aria-hidden />}
             onSelect={(event) => {
               event.preventDefault()
-              void copyValue(mcpState.transportLabel, 'type')
+              void copyValue(mcpState.url, 'MCP URL')
             }}
           >
-            Copy transport type
+            Copy MCP URL
           </ActionMenu.Item>
           <ActionMenu.Item
             icon={<FilesIcon aria-hidden />}
             onSelect={(event) => {
               event.preventDefault()
-              void copyValue(mcpState.url, 'MCP URL')
+              void copyValue(formatDesktopMcpVsCodeConfig(mcpState.serverName, mcpState.url), 'VS Code JSON')
             }}
           >
-            Copy MCP URL
+            Copy VSCode json
           </ActionMenu.Item>
         </>
       )}

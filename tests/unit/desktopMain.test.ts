@@ -73,7 +73,7 @@ const runDesktopMain = async ({ isPackaged, env = {} }: RunDesktopMainOptions) =
   }
   const desktopMcpServer = {
     getState: vi.fn(() => ({
-      serverName: 'desktop-arcade',
+      serverName: 'aksel-arcade',
       transportLabel: 'HTTP (MCP Streamable HTTP)',
       url: 'http://127.0.0.1:3846/mcp',
       requiresAuth: false,
