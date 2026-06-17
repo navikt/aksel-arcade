@@ -2,6 +2,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { createRequire } from 'node:module'
 import { describe, expect, it } from 'vitest'
+import { getNewAuthoringPolicy } from '../../src/data/akselAuthoringPolicy'
 import {
   akselComponentResourceUri,
   buildMcpAkselCatalog,
@@ -26,6 +27,15 @@ describe('akselMcpCatalog builder', () => {
     expect(typeof catalog.akselVersion).toBe('string')
     expect(catalog.akselVersion).not.toBe('unknown')
     expect(catalog.components.length).toBeGreaterThan(0)
+    expect(catalog.components.every((component) => !('keywords' in component))).toBe(true)
+    expect(catalog.componentAliases).toMatchObject({
+      RadioGroup: 'Radio',
+    })
+    expect(catalog.hiddenRootReplacements).toMatchObject({
+      Alert: getNewAuthoringPolicy('Alert'),
+      Modal: getNewAuthoringPolicy('Modal'),
+      Dropdown: getNewAuthoringPolicy('Dropdown'),
+    })
 
     const button = catalog.components.find((component) => component.name === 'Button')
     expect(button).toMatchObject({

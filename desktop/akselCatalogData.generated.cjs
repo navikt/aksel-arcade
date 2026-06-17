@@ -4342,5 +4342,30 @@ module.exports = {
         "jsx": "<FormProgress totalSteps={3} activeStep={1}>\n  <FormProgress.Step>Start</FormProgress.Step>\n  <FormProgress.Step>Details</FormProgress.Step>\n  <FormProgress.Step>Submit</FormProgress.Step>\n</FormProgress>"
       }
     }
+  },
+  "componentAliases": {
+    "RadioGroup": "Radio"
+  },
+  "hiddenRootReplacements": {
+    "Alert": {
+      "reason": "deprecated",
+      "replacements": [
+        "InlineMessage",
+        "LocalAlert",
+        "GlobalAlert"
+      ]
+    },
+    "Modal": {
+      "reason": "replaced",
+      "replacements": [
+        "Dialog"
+      ]
+    },
+    "Dropdown": {
+      "reason": "replaced",
+      "replacements": [
+        "ActionMenu"
+      ]
+    }
   }
 }

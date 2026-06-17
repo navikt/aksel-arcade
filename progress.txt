@@ -3903,3 +3903,27 @@ Verification:
 - CI=1 npm test -- --run
 - npm run build
 - Browser smoke check at `http://127.0.0.1:4173/aksel-arcade/` with the app shell and sandbox preview rendered and no browser-console errors/warnings
+
+
+2026-06-17 - Issue #302: Make Aksel component resolution forgiving while keeping the catalog index lean
+
+Selected `#302` as the highest-priority `ready-for-agent` slice from `#300`-`#302` after reading `#304`, `CONTEXT.md`, and the existing `progress.txt` notes, because component-name dead ends break the core Desktop MCP authoring loop more directly than the docs-only stateful-flow slice (`#300`) or the legacy agentBridge cleanup slice (`#301`).
+
+Implemented:
+- Extended `scripts/lib/akselMcpCatalog.ts` and regenerated `desktop/akselCatalogData.generated.cjs` so the committed MCP artifact now carries resolver metadata for known aliases and hidden-root replacements without adding per-entry keyword bloat to the public `arcade://aksel/catalog` index.
+- Updated `desktop/mcpServer.cjs` so `arcade://aksel/components/{name}` now:
+  - returns the canonical snippet payload for exact and alias hits (`RadioGroup` now resolves to `Radio`);
+  - returns sanctioned replacement breadcrumbs for intentionally hidden roots (`Alert` -> `InlineMessage` / `LocalAlert` / `GlobalAlert`, `Modal` -> `Dialog`, `Dropdown` -> `ActionMenu`);
+  - returns a structured `did-you-mean` near-match list for unknown names instead of a bare resource-not-found error.
+- Added the one-line authoring-guide nudge to read `arcade://aksel/catalog` before guessing a component name.
+- Added regression coverage in `tests/unit/akselMcpCatalog.test.ts`, `tests/unit/services/desktopMcpServer.test.ts`, and `tests/e2e/desktop-mcp-aksel-resources.spec.ts` for alias resolution, hidden-root replacements, near-match suggestions, and the new authoring-guide wording.
+
+Verification:
+- npm run typecheck
+- npm run lint
+- npm run test -- --run
+- Browser smoke check at `http://127.0.0.1:4173/aksel-arcade/` with the app shell rendered and no browser-console errors
+- Ephemeral MCP runtime spot-check via `createDesktopMcpServer({ port: 0 })` covering exact (`Button`), alias (`RadioGroup`), hidden-root (`Alert`), and suggestion (`Buton`) resolution paths
+
+Next note:
+- A separate Desktop Arcade process was already listening on the fixed MCP port `127.0.0.1:3846`, so a shared-port Playwright Desktop MCP E2E can talk to the wrong local app unless that exact stale listener is cleared first. The resolver logic itself was verified against a fresh port-0 MCP server instance.

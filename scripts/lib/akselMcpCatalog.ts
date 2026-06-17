@@ -4,7 +4,11 @@ import {
   type AkselCatalogEntry,
   type AkselCatalogProp,
 } from '@/data/akselCatalog'
-import { filterNewAuthoringEntries } from '@/data/akselAuthoringPolicy'
+import {
+  filterNewAuthoringEntries,
+  getNewAuthoringPolicy,
+  listHiddenNewAuthoringRoots,
+} from '@/data/akselAuthoringPolicy'
 
 /**
  * Builds the version-matched Aksel snippet data that the Desktop Arcade MCP
@@ -22,6 +26,9 @@ const AKSEL_COMPONENT_RESOURCE_URI_PREFIX = 'arcade://aksel/components/'
 
 const SNIPPET_TABSTOP_PATTERN = /\$\{(\d+):([^}]+)\}/g
 const COLLISION_TOKEN_PATTERN = /\{\{[\w]+\}\}/g
+const MCP_COMPONENT_ALIASES = Object.freeze({
+  RadioGroup: 'Radio',
+})
 
 export interface McpAkselComponentProp {
   name: string
@@ -56,10 +63,17 @@ export interface McpAkselComponentIndexEntry {
   resourceUri: string
 }
 
+export interface McpAkselHiddenRootReplacement {
+  reason: 'deprecated' | 'replaced'
+  replacements: string[]
+}
+
 export interface McpAkselCatalog {
   akselVersion: string
   components: McpAkselComponentIndexEntry[]
   componentsByName: Record<string, McpAkselComponentDetail>
+  componentAliases: Record<string, string>
+  hiddenRootReplacements: Record<string, McpAkselHiddenRootReplacement>
 }
 
 export const akselComponentResourceUri = (name: string): string =>
@@ -118,6 +132,31 @@ export const listMcpAuthoringEntries = (): AkselCatalogEntry[] =>
     })
   )
 
+const buildComponentAliases = (
+  entries: readonly AkselCatalogEntry[]
+): Record<string, string> => {
+  const availableNames = new Set(entries.map((entry) => entry.name))
+
+  return Object.entries(MCP_COMPONENT_ALIASES).reduce<Record<string, string>>((map, [alias, target]) => {
+    if (availableNames.has(target)) {
+      map[alias] = target
+    }
+    return map
+  }, {})
+}
+
+const buildHiddenRootReplacements = (): Record<string, McpAkselHiddenRootReplacement> =>
+  listHiddenNewAuthoringRoots().reduce<Record<string, McpAkselHiddenRootReplacement>>((map, rootName) => {
+    const policy = getNewAuthoringPolicy(rootName)
+    if (policy) {
+      map[rootName] = {
+        reason: policy.reason,
+        replacements: [...policy.replacements],
+      }
+    }
+    return map
+  }, {})
+
 export const buildMcpAkselCatalog = (): McpAkselCatalog => {
   const entries = listMcpAuthoringEntries()
 
@@ -138,6 +177,8 @@ export const buildMcpAkselCatalog = (): McpAkselCatalog => {
     akselVersion: AKSEL_CATALOG_VERSION,
     components,
     componentsByName,
+    componentAliases: buildComponentAliases(entries),
+    hiddenRootReplacements: buildHiddenRootReplacements(),
   }
 }
 
