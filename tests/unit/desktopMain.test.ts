@@ -67,10 +67,6 @@ const runDesktopMain = async ({ isPackaged, env = {} }: RunDesktopMainOptions) =
     registerSchemesAsPrivileged: vi.fn(),
     handle: vi.fn(),
   }
-  const agentLoopbackTransport = {
-    startSession: vi.fn(),
-    stopSession: vi.fn(() => Promise.resolve()),
-  }
   const desktopMcpServer = {
     getState: vi.fn(() => ({
       serverName: 'aksel-arcade',
@@ -96,11 +92,6 @@ const runDesktopMain = async ({ isPackaged, env = {} }: RunDesktopMainOptions) =
       require: (request: string) => {
         if (request === 'electron') {
           return { app, BrowserWindow: MockBrowserWindow, ipcMain, net, protocol }
-        }
-        if (request === './agentLoopbackTransport.cjs') {
-          return {
-            createAgentLoopbackJsonRpcTransport: () => agentLoopbackTransport,
-          }
         }
         if (request === './mcpServer.cjs') {
           return {

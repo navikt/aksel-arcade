@@ -208,6 +208,54 @@ describe('desktopMcpProjectResources', () => {
     expect(runtimeIssue).not.toHaveProperty('pageId')
   })
 
+  it('surfaces sandbox render failures through arcade://project/diagnostics as structured runtime issues', () => {
+    const result = readDesktopMcpProjectResource(
+      { uri: DESKTOP_MCP_PROJECT_DIAGNOSTICS_URI },
+      {
+        project: createProject(),
+        theme: 'dark',
+        diagnostics: createDiagnostics({
+          compileError: null,
+          runtimeError: {
+            message: 'Agent render exploded',
+            componentStack: '\n    at App',
+            stack: 'Error: Agent render exploded',
+            pageId: 'page01',
+          },
+        }),
+      }
+    )
+
+    expect(result.ok).toBe(true)
+    if (!result.ok) {
+      throw new Error(result.message)
+    }
+
+    const diagnostics = JSON.parse(result.text) as {
+      status: string
+      issues: Array<{
+        kind: string
+        pageId?: string
+        pageName?: string
+        message?: string
+        details?: string
+      }>
+    }
+
+    expect(diagnostics.status).toBe('error')
+    expect(diagnostics.issues).toContainEqual(
+      expect.objectContaining({
+        kind: 'runtime-error',
+        pageId: 'page01',
+        pageName: 'Start',
+        message: 'Agent render exploded',
+      })
+    )
+    expect(diagnostics.issues.find((issue) => issue.kind === 'runtime-error')?.details).toContain(
+      'App'
+    )
+  })
+
   it('returns preview context and pure source text for project resources', () => {
     const project = createProject()
     const context = {

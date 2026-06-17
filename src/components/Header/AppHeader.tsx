@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useId, useRef, useState, type KeyboardEvent } from 'react'
+import { useEffect, useId, useRef, useState, type KeyboardEvent } from 'react'
 import {
   Heading,
   Detail,
@@ -38,10 +38,6 @@ import {
 import type { UseShareLinkOptions } from '@/hooks/useShareLink'
 import { WEB_ARCADE_CAPABILITIES, type ShellCapabilities } from '@/services/shellCapabilities'
 import './AppHeader.css'
-
-const AgentSessionMenu = lazy(() =>
-  import('./AgentSessionMenu').then((module) => ({ default: module.AgentSessionMenu }))
-)
 
 // Aksel Logo Mark SVG - 24x24px with brand-blue color
 const AkselLogoMark = () => (
@@ -103,8 +99,6 @@ export const AppHeader = ({
     previewFullscreen,
   } = useSettings()
   const canUseShareUrl = shellCapabilities.shareUrl.enabled
-  const canUseAgentSessions = shellCapabilities.agentSessions.enabled
-
   const handleExport = () => {
     exportProject(currentProject)
   }
@@ -315,11 +309,6 @@ export const AppHeader = ({
               shareOptions={shareOptions}
               ownerVisible={!previewFullscreen}
             />
-          )}
-          {canUseAgentSessions && (
-            <Suspense fallback={null}>
-              <AgentSessionMenu />
-            </Suspense>
           )}
           <ActionMenu>
             <ActionMenu.Trigger>

@@ -63,7 +63,6 @@ import {
   type ShareDecodeError,
 } from '@/utils/shareDecoding'
 import { appendSandboxConsoleMessage } from '@/services/previewDiagnostics'
-import { notifyAgentSessionProjectReplaced } from '@/services/agentSessionLifecycle'
 import type { DecodedWebShareProject } from '@/utils/sharePayload'
 
 interface ShareHydrationState {
@@ -328,7 +327,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     preferences: WebArcadeWorkingCopyPreferences
   ) => {
     const normalizedProject = normalizeProjectSelection(newProject)
-    notifyAgentSessionProjectReplaced()
     setProjectState(normalizedProject)
     setEditorState(createDefaultEditorState())
     setPreviewState(createDefaultPreviewState(normalizedProject.viewportSize))
@@ -408,8 +406,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       'Load form summary page template? This will replace your current code.'
     )
     if (confirmed) {
-      // Clear any potential storage conflicts by updating project cleanly
-      notifyAgentSessionProjectReplaced()
       setProjectState((prev) => ({
         ...updateActivePageSource(prev, {
           jsx: FORM_SUMMARY_JSX_CODE,
@@ -425,7 +421,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const loadHooksDemo = () => {
     const confirmed = window.confirm('Load Hooks demo? This will replace your current code.')
     if (confirmed) {
-      notifyAgentSessionProjectReplaced()
       setProjectState((prev) => ({
         ...updateActivePageSource(prev, {
           jsx: HOOKS_DEMO_JSX_CODE,

@@ -3975,3 +3975,24 @@ Verification:
 - npm run lint
 - CI=1 npm test -- --run
 - Browser smoke check at `http://127.0.0.1:4173/aksel-arcade/` with the app shell + preview rendered and no browser-console warnings/errors
+
+
+2026-06-18 - Issue #301: Remove the legacy in-app Agent bridge
+
+Selected `#301` after reading `#304`, `CONTEXT.md`, and the existing `progress.txt` notes because the remaining work here was a cleanup-only slice: delete the unused in-app Agent-session bridge stack while keeping the Desktop MCP path and its diagnostics coverage intact.
+
+Implemented:
+- Removed the legacy Agent-session runtime files from the renderer and Desktop host (`src/services/agentBridge.ts`, `src/hooks/useAgentSession.ts`, `src/components/Header/AgentSessionMenu.tsx`, the lifecycle/transport helpers, `desktop/agentLoopbackTransport.cjs`, and `desktop/agentHandoffRedaction.cjs`) and stripped their wiring from `desktop/main.cjs`, `desktop/preload.cjs`, `src/services/shellCapabilities.ts`, `src/components/Header/AppHeader.tsx`, and `src/hooks/useProject.tsx`.
+- Deleted the obsolete bridge/transport/parity regressions, rewrote `tests/integration/project-controls-layout.test.tsx` down to the remaining non-agent layout/import/fullscreen coverage, and trimmed `tests/integration/share-popover.test.tsx` plus `tests/unit/desktopMain.test.ts` / `tests/unit/services/shellCapabilities.test.ts` to the new no-Agent surface.
+- Added the replacement regression in `tests/unit/services/desktopMcpProjectResources.test.ts` so sandbox render failures still surface through structured `arcade://project/diagnostics` output after the bridge removal.
+- Removed the stale parity-test sentence from `docs/adr/0017-self-teaching-mcp-entry-point.md`; `README.md` did not need an issue-301 change because its current Agent wording already describes the MCP-only direction.
+
+Verification:
+- npm run typecheck
+- npm run lint
+- CI=1 npm test -- --run
+- npm run build
+- Browser smoke check at `http://127.0.0.1:4173/aksel-arcade/` with the app shell + preview rendered, no Agent control in the header, and no browser-console warnings/errors
+
+Next note:
+- Treat the in-app Agent-session bridge as intentionally removed. Follow-up work should extend the Desktop MCP resources/guides/tests directly instead of reintroducing renderer-to-main Agent transport helpers or parity coverage.

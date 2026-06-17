@@ -1,11 +1,5 @@
-import type {
-  DesktopAgentSessionEndReason,
-  DesktopAgentTransportEndpoint,
-  DesktopAgentTransportSession,
-} from './desktopAgentSessionCoordinator'
 import type { DesktopMcpApplyChangesHandler } from './desktopMcpApplyChangesProtocol'
 import type { DesktopMcpPreviewCaptureHandler } from './desktopMcpPreviewCaptureProtocol'
-import type { DesktopAgentTransportRequestHandler } from './desktopAgentTransportProtocol'
 import type { DesktopMcpProjectResourceReadHandler } from './desktopMcpProjectResourceProtocol'
 
 export type ArcadeShellSurface = 'web' | 'desktop'
@@ -22,21 +16,12 @@ export interface ProjectPackageCapabilities extends ShellCapabilityToggle {
 export interface ShellCapabilities {
   surface: ArcadeShellSurface
   shareUrl: ShellCapabilityToggle
-  agentSessions: ShellCapabilityToggle
   projectPackages: ProjectPackageCapabilities
 }
 
 export interface DesktopArcadePreloadApi {
   getShellCapabilities: () => Promise<unknown>
   getDesktopMcpServerState?: () => Promise<unknown>
-  startAgentTransportSession?: (
-    session: DesktopAgentTransportSession
-  ) => Promise<DesktopAgentTransportEndpoint>
-  stopAgentTransportSession?: (
-    sessionId: string,
-    reason: DesktopAgentSessionEndReason
-  ) => Promise<unknown>
-  setAgentTransportRequestHandler?: (handler: DesktopAgentTransportRequestHandler | null) => void
   setDesktopMcpProjectResourceReadHandler?: (
     handler: DesktopMcpProjectResourceReadHandler | null
   ) => void
@@ -49,7 +34,6 @@ export interface DesktopArcadePreloadApi {
 export const WEB_ARCADE_CAPABILITIES: ShellCapabilities = Object.freeze({
   surface: 'web',
   shareUrl: Object.freeze({ enabled: true }),
-  agentSessions: Object.freeze({ enabled: false }),
   projectPackages: Object.freeze({
     enabled: true,
     defaultExtension: '.akselarcade',
@@ -60,7 +44,6 @@ export const WEB_ARCADE_CAPABILITIES: ShellCapabilities = Object.freeze({
 export const DESKTOP_ARCADE_CAPABILITIES: ShellCapabilities = Object.freeze({
   surface: 'desktop',
   shareUrl: Object.freeze({ enabled: false }),
-  agentSessions: Object.freeze({ enabled: false }),
   projectPackages: Object.freeze({
     enabled: true,
     defaultExtension: '.akselarcade',
@@ -96,9 +79,6 @@ export const getDesktopPreloadApi = (): DesktopArcadePreloadApi | undefined => {
     !isRecord(api) ||
     typeof api.getShellCapabilities !== 'function' ||
     !hasOptionalFunction(api, 'getDesktopMcpServerState') ||
-    !hasOptionalFunction(api, 'startAgentTransportSession') ||
-    !hasOptionalFunction(api, 'stopAgentTransportSession') ||
-    !hasOptionalFunction(api, 'setAgentTransportRequestHandler') ||
     !hasOptionalFunction(api, 'setDesktopMcpProjectResourceReadHandler') ||
     !hasOptionalFunction(api, 'setDesktopMcpApplyChangesHandler') ||
     !hasOptionalFunction(api, 'setDesktopMcpPreviewCaptureHandler')
@@ -194,7 +174,6 @@ const isShellCapabilitiesPayload = (value: unknown): value is ShellCapabilities 
   const expected = SHELL_CAPABILITY_SETS[value.surface]
   return (
     hasCapabilityToggle(value.shareUrl, expected.shareUrl.enabled) &&
-    hasCapabilityToggle(value.agentSessions, expected.agentSessions.enabled) &&
     hasProjectPackageCapabilities(value.projectPackages, expected.projectPackages)
   )
 }
