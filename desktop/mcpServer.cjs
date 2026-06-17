@@ -1075,7 +1075,7 @@ const routeToolsCallRequest = async (
         id: payload.id,
         result: resourceResult.ok
           ? createToolExecutionSuccessResult(
-              `Read Desktop Arcade MCP resource ${resourceResult.uri} (${resourceResult.mimeType}).`,
+              resourceResult.text,
               {
                 ok: true,
                 uri: resourceResult.uri,

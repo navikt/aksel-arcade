@@ -427,15 +427,43 @@
     }
 
     function handleSandboxSubmitNavigation(event) {
-      event.preventDefault();
-      event.stopPropagation();
-      blockSandboxNavigation(
-        'Blocked form submission inside the Preview sandbox. Handle form state in React and navigate with goToPage("pageNN") for Arcade page flow.'
-      );
+      if (event.defaultPrevented) {
+        return;
+      }
+
+      const originalPreventDefault = event.preventDefault;
+      let appPreventedDefault = false;
+      let submitGuardPreventingDefault = true;
+
+      const preventDefaultWithSubmitGuard = function (...args) {
+        if (!submitGuardPreventingDefault) {
+          appPreventedDefault = true;
+        }
+
+        return originalPreventDefault.apply(event, args);
+      };
+      event.preventDefault = preventDefaultWithSubmitGuard;
+
+      originalPreventDefault.call(event);
+      submitGuardPreventingDefault = false;
+
+      window.setTimeout(() => {
+        if (event.preventDefault === preventDefaultWithSubmitGuard) {
+          event.preventDefault = originalPreventDefault;
+        }
+
+        if (appPreventedDefault) {
+          return;
+        }
+
+        blockSandboxNavigation(
+          'Blocked form submission inside the Preview sandbox. Handle form state in React and navigate with goToPage("pageNN") for Arcade page flow.'
+        );
+      }, 0);
     }
 
     document.addEventListener('click', handleSandboxClickNavigation, true);
-    document.addEventListener('submit', handleSandboxSubmitNavigation, true);
+    document.addEventListener('submit', handleSandboxSubmitNavigation);
 
     function flushPendingNavigation() {
       if (!pendingNavigationPageId) {
@@ -475,7 +503,10 @@
 
     function announceSandboxReady() {
       const sendReadyMessage = () => postMessageToParent(window.parent, {
-        type: 'SANDBOX_READY'
+        type: 'SANDBOX_READY',
+        payload: {
+          href: window.location.href
+        }
       }, window.location);
 
       if (document.readyState === 'complete') {

@@ -370,7 +370,7 @@ describe('desktopMcpServer', () => {
         content: [
           {
             type: 'text',
-            text: 'Read Desktop Arcade MCP resource arcade://desktop/start-here (text/markdown).',
+            text: expect.stringContaining('# Desktop Arcade MCP start-here'),
           },
         ],
         structuredContent: {

@@ -180,26 +180,40 @@ test.describe('Desktop MCP apply_changes page lifecycle', () => {
       await waitForDefaultPreview(page)
 
       const manifest = await readJsonMcpResource('arcade://project/manifest')
-      const entryPage =
-        manifest.pages.find((page: { id: string }) => page.id === manifest.activePageId) ??
-        manifest.pages[0]
 
       const applyChangesPayload = await callApplyChanges({
-        summary: 'Install a raw navigation guard repro',
+        summary: 'Install a raw navigation guard repro on a non-start page',
         expectedProjectRevision: manifest.projectRevision,
         operations: [
           {
-            type: 'replace_source',
-            resourceUri: entryPage.source.jsx.uri,
-            content: `export default function RawNavigationPage() {
+            type: 'create_page',
+            newPageRef: 'rawNavigationRepro',
+            name: 'Raw navigation guard',
+            jsxCode: `export default function RawNavigationPage() {
+  const [submitted, setSubmitted] = useState(false)
+
   return (
     <main>
       <h1>Raw navigation guard</h1>
+      <button onClick={() => { window.location.href = "?pageId=page98" }}>
+        Bad programmatic navigation
+      </button>
+      <form onSubmit={(event) => {
+        event.preventDefault()
+        setSubmitted(true)
+      }}>
+        <button type="submit">Submit handled form</button>
+      </form>
+      {submitted ? <p>Form handler ran</p> : null}
       <a href="?pageId=page99">Bad raw navigation</a>
       <p>Still rendered after blocked navigation</p>
     </main>
   )
 }`,
+          },
+          {
+            type: 'select_active_page',
+            tempPageRef: 'rawNavigationRepro',
           },
         ],
       })
@@ -218,6 +232,12 @@ test.describe('Desktop MCP apply_changes page lifecycle', () => {
       await expect(
         previewFrame.getByRole('heading', { name: 'Raw navigation guard' })
       ).toBeVisible({ timeout: 15_000 })
+
+      await previewFrame.getByRole('button', { name: 'Bad programmatic navigation' }).click()
+      await expect(previewFrame.getByRole('heading', { name: 'Raw navigation guard' })).toBeVisible()
+
+      await previewFrame.getByRole('button', { name: 'Submit handled form' }).click()
+      await expect(previewFrame.getByText('Form handler ran')).toBeVisible()
 
       await previewFrame.getByRole('link', { name: 'Bad raw navigation' }).click()
 
