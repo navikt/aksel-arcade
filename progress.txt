@@ -3781,3 +3781,32 @@ Verification:
 Next note:
 
 - If we ever want to remove the hidden `read_resource` bridge, treat that as an explicit compatibility change with a migration plan instead of a silent contract break under the same Desktop MCP v1 surface.
+
+### 2026-06-17 - PR #293: self-teaching Desktop Arcade MCP + spaced-component URI fix
+
+Implemented:
+
+- Made the Desktop Arcade MCP server self-teaching so a zero-knowledge agent learns the Arcade mechanics on connect and pulls Aksel component docs/snippets on demand, without preloading them or narrowing what it thinks Arcade is for:
+  - Added always-on `initialize.result.instructions` covering only the mechanics it cannot infer (import-free authoring, `goToPage` navigation, app-assigned page ids + `{{pageRef}}` ordering, the apply -> diagnostics -> capture loop), pointing to the authoring guide.
+  - Added version-matched, on-demand Aksel snippet resources generated from `src/data/akselCatalog.ts` (single source of truth): `arcade://aksel/catalog` (compact index, v8.11.0, 59 components) and `arcade://aksel/components/{name}` (runnable, import-free snippet + props).
+  - Added `arcade://desktop/apply-changes-operations` per-operation field-matrix reference to remove the schema-mismatch friction agents hit, and rewrote the authoring guide with open framing and wiring-only snippets.
+  - Generated `desktop/akselCatalogData.generated.cjs` via `npm run aksel:refresh-mcp-catalog`, wired into `desktop:build`; added unit/drift/parity/e2e tests and ADR 0017.
+
+Review fix (caught during PR review):
+
+- Fixed two catalog components whose names contain a space ("Chips Toggle", "Chips Removable"). They advertised `resourceUri` values with a raw space, but the component dispatch pattern only accepted `[A-Za-z0-9.]`, so reading those exact advertised URIs fell through to `resource-not-found` and the case-insensitive fallback never ran (2 of 59 components unreachable).
+- Percent-encode component names when building `resourceUri` (`Chips Toggle` -> `arcade://aksel/components/Chips%20Toggle`), widened the dispatch pattern to accept the encoded (and literal-space) form, and decode the captured name before lookup (safe against malformed escapes).
+- Added regression guards: a builder test asserting every advertised `resourceUri` round-trips and matches the dispatch pattern, and an HTTP-level test that reads a spaced-name component through its exact advertised URI and expects success.
+
+Verification:
+
+- npm run type-check
+- npm run lint
+- CI=1 npm test (573 passed)
+- npm run desktop:build
+- Live in-process MCP server smoke check (initialize instructions, listed resources, catalog v8.11.0/59 components, clean Button snippet, spaced-component read, unknown-component resource-not-found)
+- All PR CI checks green (CodeQL, Analyze actions/javascript-typescript, Plan Desktop packaging, Package macOS DMGs, Package Windows NSIS); squash-merged.
+
+Next note:
+
+- The Aksel snippet resources are derived from `src/data/akselCatalog.ts`; after any catalog/Aksel-version bump, re-run `npm run aksel:refresh-mcp-catalog` (also runs during `desktop:build`) so the committed `desktop/akselCatalogData.generated.cjs` stays in sync, or the drift test will fail.
