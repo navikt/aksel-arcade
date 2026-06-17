@@ -387,6 +387,9 @@ describe('desktopMcpServer', () => {
       'page state belongs there'
     )
     expect(readResourcePayload.result.structuredContent.text).toContain('top-level hook bindings')
+    expect(readResourcePayload.result.structuredContent.text).toContain(
+      'They do not share React state; build a stateful flow as one page'
+    )
   })
 
   it('returns 202 for initialized notifications and keeps unsupported MCP surfaces undiscoverable', async () => {
@@ -1362,6 +1365,16 @@ describe('desktopMcpServer', () => {
     expect(authoringGuidePayload.result.contents[0].text).toContain(
       'its `hooks` tab stays at module scope rather than becoming a page component'
     )
+    expect(authoringGuidePayload.result.contents[0].text).toContain('Sandbox constraints')
+    expect(authoringGuidePayload.result.contents[0].text).toContain('localStorage')
+    expect(authoringGuidePayload.result.contents[0].text).toContain('sessionStorage')
+    expect(authoringGuidePayload.result.contents[0].text).toContain('fetch')
+    expect(authoringGuidePayload.result.contents[0].text).toContain(
+      'reserve multi-page navigation for genuinely distinct screens'
+    )
+    expect(authoringGuidePayload.result.contents[0].text).toContain('FormProgress')
+    expect(authoringGuidePayload.result.contents[0].text).toContain('Stepper')
+    expect(authoringGuidePayload.result.contents[0].text).toContain('FormSummary')
     // The object-literal-wrapped page ({(() => {...})()}) breaks the whole preview and must
     // never be presented as a usable snippet — only as the explicit anti-pattern warning.
     expect(authoringGuidePayload.result.contents[0].text).not.toContain('\n{(() => {')

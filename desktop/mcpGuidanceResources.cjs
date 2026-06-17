@@ -39,6 +39,7 @@ const createMcpGuidanceResourceText = (uri) => {
         '- **Page ids are app-assigned.** Within one `apply_changes` batch, link pages with `{{pageRef:name}}` placeholders targeting any `create_page.newPageRef` declared in that batch.',
         '- **Use real Aksel components and props** — do not hand-roll raw HTML or guess prop names. Pull per-component usage on demand (see on-demand references); do not preload it.',
         '- **Global config** is shared code in scope for every page; it never renders as a page on its own.',
+        '- **Pages are independent screens.** They do not share React state; build a stateful flow as one page.',
         '- **Capture is ephemeral:** `capture_preview_evidence` renders in an isolated throwaway frame, so in-capture interactions and `goToPage` never change the human-visible Active page or durable source — never try to "restore" the Active page after a capture.',
         '',
         '## On-demand references (optional — fetch only when you need the depth)',
