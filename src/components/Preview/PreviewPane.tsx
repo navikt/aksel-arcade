@@ -105,13 +105,16 @@ export const PreviewPane = ({
   }
 
   const visibleCompileError =
-    previewState.status === 'transpiling' || !isErrorRelevantToCurrentView(compileError)
-      ? null
-      : compileError
+    previewState.status === 'transpiling' ? null : compileError
   const visibleRuntimeError =
     previewState.status === 'transpiling' || !isErrorRelevantToCurrentView(runtimeError)
       ? null
       : runtimeError
+
+  const compileErrorPageName =
+    visibleCompileError?.pageId && visibleCompileError.pageId !== project.activePageId
+      ? (project.source.pages.find((page) => page.id === visibleCompileError.pageId)?.name ?? null)
+      : null
 
   // Transpile code when JSX or hooks code changes (debounced to avoid errors while typing)
   useEffect(() => {
@@ -376,6 +379,7 @@ export const PreviewPane = ({
                 {visibleCompileError &&
                   visibleCompileError.line !== null &&
                   ` (line ${(visibleCompileError.line || 0) + 1})`}
+                {compileErrorPageName && ` in "${compileErrorPageName}"`}
               </strong>
               <pre className="preview-pane__error-message">
                 {(visibleCompileError || visibleRuntimeError)?.message}

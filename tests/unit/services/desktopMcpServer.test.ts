@@ -1361,6 +1361,10 @@ describe('desktopMcpServer', () => {
     expect(authoringGuidePayload.result.contents[0].text).toContain('goToPage')
     expect(authoringGuidePayload.result.contents[0].text).toContain('arcade://aksel/catalog')
     expect(authoringGuidePayload.result.contents[0].text).toContain('https://aksel.nav.no/llm.md')
+    expect(authoringGuidePayload.result.contents[0].text).toContain('two source tabs')
+    // The object-literal-wrapped page ({(() => {...})()}) breaks the whole preview and must
+    // never be presented as a usable snippet — only as the explicit anti-pattern warning.
+    expect(authoringGuidePayload.result.contents[0].text).not.toContain('\n{(() => {')
 
     const capabilitiesResponse = await postJson(state.url, {
       jsonrpc: '2.0',

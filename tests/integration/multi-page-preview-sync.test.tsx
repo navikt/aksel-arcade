@@ -394,6 +394,32 @@ describe('Multi-page preview sync', () => {
     })
   })
 
+  it('surfaces a compile error from another page even when a different page is active', async () => {
+    let project = createStoredMultiPageProject()
+    // "Details" (page02) has broken JSX; page01 stays active and valid. A compile
+    // error fails the whole combined module, so it must be visible from any page.
+    project = updatePageSource(project, 'page02', {
+      jsx: '{(() => (<Box>broken</Box>))()',
+      hooks: '',
+    })
+    project = setActivePage(project, 'page01')
+    saveProject(project, {
+      preferences: {
+        ...DEFAULT_WEB_ARCADE_WORKING_COPY_PREFERENCES,
+        multiPageEnabled: true,
+        pagePanelOpen: true,
+        selectedEditTarget: 'page',
+      },
+    })
+    renderHarness()
+
+    const errorHeading = await screen.findByText(/Compile Error/i, undefined, { timeout: 5000 })
+    expect(screen.getByTestId('active-page-id').textContent).toBe('page01')
+    // The overlay names the offending page since the user is viewing a different one.
+    expect(errorHeading.textContent).toContain('Details')
+    expect(screen.getByTestId('diagnostics-compile-error').textContent).not.toBe('')
+  })
+
   it('does not surface a visible compile error while the user is still in the first edit step', async () => {
     const project = createStoredMultiPageProject()
     saveProject(project, {
