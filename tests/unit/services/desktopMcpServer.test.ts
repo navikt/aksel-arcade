@@ -1634,13 +1634,39 @@ describe('desktopMcpServer', () => {
       },
     ])
 
+    const hiddenDescendantResponse = await postJson(state.url, {
+      jsonrpc: '2.0',
+      id: 95,
+      method: 'resources/read',
+      params: {
+        uri: 'arcade://aksel/components/Dropdown.Menu',
+      },
+    })
+    expect(hiddenDescendantResponse.status).toBe(200)
+    const hiddenDescendantPayload = await hiddenDescendantResponse.json()
+    const hiddenDescendantResolution = JSON.parse(
+      hiddenDescendantPayload.result.contents[0].text
+    ).resolution
+    expect(hiddenDescendantResolution).toMatchObject({
+      kind: 'replacement',
+      requestedName: 'Dropdown.Menu',
+      hiddenRootName: 'Dropdown',
+      reason: 'replaced',
+    })
+    expect(hiddenDescendantResolution.replacements).toEqual([
+      {
+        name: 'ActionMenu',
+        resourceUri: 'arcade://aksel/components/ActionMenu',
+      },
+    ])
+
     const spacedIndex = catalog.components.find((component: { name: string }) =>
       component.name.includes(' ')
     )
     if (spacedIndex) {
       const spacedResponse = await postJson(state.url, {
         jsonrpc: '2.0',
-        id: 95,
+        id: 96,
         method: 'resources/read',
         params: {
           uri: spacedIndex.resourceUri,
@@ -1656,7 +1682,7 @@ describe('desktopMcpServer', () => {
 
     const unknownComponentResponse = await postJson(state.url, {
       jsonrpc: '2.0',
-      id: 96,
+      id: 97,
       method: 'resources/read',
       params: {
         uri: 'arcade://aksel/components/Buton',

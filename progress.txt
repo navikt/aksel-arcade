@@ -3927,3 +3927,16 @@ Verification:
 
 Next note:
 - A separate Desktop Arcade process was already listening on the fixed MCP port `127.0.0.1:3846`, so a shared-port Playwright Desktop MCP E2E can talk to the wrong local app unless that exact stale listener is cleared first. The resolver logic itself was verified against a fresh port-0 MCP server instance.
+
+
+2026-06-17 - PR #307 review follow-up
+
+Fixed one PR-scoped review issue before merge:
+- Updated `desktop/mcpServer.cjs` so hidden-root replacement breadcrumbs are resolved by root name, not only by the full requested component name. Requests such as `Dropdown.Menu` and `Modal.Header` now return the sanctioned replacement payload for `Dropdown` / `Modal` instead of falling back to generic near-match suggestions.
+- Extended `tests/unit/services/desktopMcpServer.test.ts` and `tests/e2e/desktop-mcp-aksel-resources.spec.ts` with descendant-name coverage for `Dropdown.Menu` resolving to `ActionMenu`.
+
+Verification:
+- npm run typecheck
+- npm run lint
+- npm run test -- --run
+- Ephemeral MCP runtime probe via `createDesktopMcpServer({ port: 0 })` confirming `arcade://aksel/components/Dropdown.Menu` returns a replacement resolution with `ActionMenu`

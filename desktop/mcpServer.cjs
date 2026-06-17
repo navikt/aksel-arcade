@@ -199,8 +199,21 @@ const findAkselComponentDetail = (name) =>
 const findAkselComponentAlias = (name) =>
   findCaseInsensitiveCatalogValue(AKSEL_CATALOG_DATA.componentAliases, name)
 
-const findAkselHiddenRootReplacement = (name) =>
-  findCaseInsensitiveCatalogValue(AKSEL_CATALOG_DATA.hiddenRootReplacements, name)
+const getAkselComponentRootName = (name) => name.split('.')[0] ?? name
+
+const findAkselHiddenRootReplacement = (name) => {
+  const exactMatch = findCaseInsensitiveCatalogValue(AKSEL_CATALOG_DATA.hiddenRootReplacements, name)
+  if (exactMatch) {
+    return exactMatch
+  }
+
+  const rootName = getAkselComponentRootName(name)
+  if (rootName === name) {
+    return null
+  }
+
+  return findCaseInsensitiveCatalogValue(AKSEL_CATALOG_DATA.hiddenRootReplacements, rootName)
+}
 
 const normalizeAkselComponentName = (name) => name.toLowerCase().replace(/[^a-z0-9]/g, '')
 
