@@ -15,49 +15,46 @@ const FIXED_TIMESTAMP = '2026-06-16T12:00:00.000Z'
 
 const createProject = ({
   includeSecondPage = false,
+  pageCount,
   startPageId = 'page01',
   activePageId = 'page01',
 }: {
   includeSecondPage?: boolean
+  pageCount?: number
   startPageId?: ArcadePageId
   activePageId?: ArcadePageId
-} = {}): Project => ({
-  id: 'project-1',
-  name: 'Desktop MCP project',
-  source: {
-    globalConfig: createArcadeSourceFile('export const Shared = () => null', ''),
-    pages: [
-      createArcadePage(
-        'page01',
-        'Page 1',
-        createArcadeSourceFile(
-          'export default function PageOne() {\n  return <div>Hello</div>\n}',
-          'const pageOneReady = true'
-        )
-      ),
-      ...(includeSecondPage
-        ? [
-            createArcadePage(
-              'page02',
-              'Page 2',
-              createArcadeSourceFile(
-                'export default function PageTwo() {\n  return <div>Second</div>\n}',
-                'const pageTwoReady = true'
-              )
-            ),
-          ]
-        : []),
-    ],
-    startPageId,
-    nextPageNumber: includeSecondPage ? 3 : 2,
-  },
-  activePageId,
-  viewportSize: 'LG',
-  panelLayout: 'editor-left',
-  version: '2.0.0',
-  createdAt: '2026-06-16T08:00:00.000Z',
-  lastModified: '2026-06-16T08:00:00.000Z',
-})
+} = {}): Project => {
+  const resolvedPageCount = pageCount ?? (includeSecondPage ? 2 : 1)
+  const pages = Array.from({ length: resolvedPageCount }, (_, index) => {
+    const pageNumber = index + 1
+    const pageId = `page${String(pageNumber).padStart(2, '0')}` as ArcadePageId
+    return createArcadePage(
+      pageId,
+      `Page ${pageNumber}`,
+      createArcadeSourceFile(
+        `export default function Page${pageNumber}() {\n  return <div>${pageNumber === 1 ? 'Hello' : `Page ${pageNumber}`}</div>\n}`,
+        `const page${pageNumber}Ready = true`
+      )
+    )
+  })
+
+  return {
+    id: 'project-1',
+    name: 'Desktop MCP project',
+    source: {
+      globalConfig: createArcadeSourceFile('export const Shared = () => null', ''),
+      pages,
+      startPageId,
+      nextPageNumber: resolvedPageCount + 1,
+    },
+    activePageId,
+    viewportSize: 'LG',
+    panelLayout: 'editor-left',
+    version: '2.0.0',
+    createdAt: '2026-06-16T08:00:00.000Z',
+    lastModified: '2026-06-16T08:00:00.000Z',
+  }
+}
 
 const createDiagnostics = (): PreviewDiagnostics => ({
   status: 'idle',
@@ -148,6 +145,22 @@ describe('desktopMcpApplyChanges', () => {
           name: 'Renamed project',
         },
       ],
+      postChangeSummary: {
+        pageCount: 1,
+        startPageId: 'page01',
+        activePageId: 'page01',
+        pages: [
+          {
+            id: 'page01',
+            name: 'Page 1',
+            sourceResources: {
+              jsxResourceUri: createDesktopMcpProjectPageSourceUri('page01', 'jsx'),
+              hooksResourceUri: createDesktopMcpProjectPageSourceUri('page01', 'hooks'),
+            },
+          },
+        ],
+        warnings: [],
+      },
       safeActivity: {
         toolName: 'apply_changes',
         operationTypes: ['replace_source', 'set_preview_context', 'rename_project'],
@@ -172,7 +185,7 @@ describe('desktopMcpApplyChanges', () => {
             type: 'create_page',
             newPageRef: 'landing',
             jsxCode:
-              'export default function LandingPage() {\n  return <a href="{{pageRef:landing}}">Stay on landing</a>\n}',
+              'export default function LandingPage() {\n  return <Button onClick={() => goToPage("{{pageRef:landing}}")}>Stay on landing</Button>\n}',
             hooksCode: 'export const useLanding = () => true',
           },
           {
@@ -184,7 +197,7 @@ describe('desktopMcpApplyChanges', () => {
             type: 'replace_source',
             resourceUri: createDesktopMcpProjectPageSourceUri('page01', 'jsx'),
             content:
-              'export default function PageOne() {\n  return <a href="{{pageRef:landing}}">Open landing</a>\n}',
+              'export default function PageOne() {\n  return <Button onClick={() => goToPage("{{pageRef:landing}}")}>Open landing</Button>\n}',
           },
           {
             type: 'set_start_page',
@@ -215,14 +228,14 @@ describe('desktopMcpApplyChanges', () => {
       id: 'page02',
       name: 'Landing',
       source: {
-        jsx: 'export default function LandingPage() {\n  return <a href="page02">Stay on landing</a>\n}',
+        jsx: 'export default function LandingPage() {\n  return <Button onClick={() => goToPage("page02")}>Stay on landing</Button>\n}',
         hooks: 'export const useLanding = () => true',
       },
     })
     expect(result.nextProject.source.startPageId).toBe('page02')
     expect(result.nextProject.activePageId).toBe('page02')
     expect(result.nextProject.source.pages[0]?.source.jsx).toBe(
-      'export default function PageOne() {\n  return <a href="page02">Open landing</a>\n}'
+      'export default function PageOne() {\n  return <Button onClick={() => goToPage("page02")}>Open landing</Button>\n}'
     )
     expect(result.nextProject.lastModified).toBe(FIXED_TIMESTAMP)
     expect(result.nextDiagnostics.status).toBe('transpiling')
@@ -281,6 +294,30 @@ describe('desktopMcpApplyChanges', () => {
           pageId: 'page02',
         },
       ],
+      postChangeSummary: {
+        pageCount: 2,
+        startPageId: 'page02',
+        activePageId: 'page02',
+        pages: [
+          {
+            id: 'page01',
+            name: 'Page 1',
+            sourceResources: {
+              jsxResourceUri: createDesktopMcpProjectPageSourceUri('page01', 'jsx'),
+              hooksResourceUri: createDesktopMcpProjectPageSourceUri('page01', 'hooks'),
+            },
+          },
+          {
+            id: 'page02',
+            name: 'Landing',
+            sourceResources: {
+              jsxResourceUri: createDesktopMcpProjectPageSourceUri('page02', 'jsx'),
+              hooksResourceUri: createDesktopMcpProjectPageSourceUri('page02', 'hooks'),
+            },
+          },
+        ],
+        warnings: [],
+      },
       tempPageRefMappings: {
         landing: {
           pageId: 'page02',
@@ -302,6 +339,169 @@ describe('desktopMcpApplyChanges', () => {
         timestamp: FIXED_TIMESTAMP,
       },
     })
+  })
+
+  it('replaces a messy project with a scoped 3-page flow by reusing pages before creating missing pages', () => {
+    const originalProject = createProject({ pageCount: 4 })
+
+    const result = prepareDesktopMcpApplyChanges(
+        {
+          summary: 'Replace the project with a three-step form',
+          operations: [
+            {
+              type: 'replace_source',
+              resourceUri: createDesktopMcpProjectPageSourceUri('page01', 'jsx'),
+              content:
+                'export default function StepOne() {\n  return <Button onClick={() => goToPage("page02")}>Next</Button>\n}',
+            },
+            {
+              type: 'rename_page',
+              pageId: 'page01',
+              name: 'Step 1',
+            },
+            {
+              type: 'replace_source',
+              resourceUri: createDesktopMcpProjectPageSourceUri('page02', 'jsx'),
+              content:
+                'export default function StepTwo() {\n  return <Button onClick={() => goToPage("{{pageRef:step3}}")}>Next</Button>\n}',
+            },
+            {
+              type: 'rename_page',
+              pageId: 'page02',
+              name: 'Step 2',
+            },
+            {
+              type: 'create_page',
+              newPageRef: 'step3',
+              name: 'Step 3',
+              jsxCode:
+                'export default function StepThree() {\n  return <Button onClick={() => goToPage("page01")}>Start over</Button>\n}',
+            },
+            {
+              type: 'delete_page',
+              pageId: 'page03',
+            },
+            {
+              type: 'delete_page',
+              pageId: 'page04',
+            },
+            {
+              type: 'set_start_page',
+              pageId: 'page01',
+            },
+            {
+              type: 'select_active_page',
+              pageId: 'page01',
+            },
+          ],
+          assertions: {
+            pageCount: 3,
+            startPage: 'first',
+            activePage: 'first',
+            forbidImports: true,
+          },
+        },
+        {
+          project: originalProject,
+          theme: 'dark',
+          diagnostics: createDiagnostics(),
+        },
+        FIXED_TIMESTAMP
+      )
+
+      expect(result.ok).toBe(true)
+      if (!result.ok) {
+        throw new Error(result.message)
+      }
+
+      expect(result.nextProject.source.pages.map((page) => page.id)).toEqual([
+        'page01',
+        'page02',
+        'page05',
+      ])
+      expect(result.nextProject.source.pages.map((page) => page.name)).toEqual([
+        'Step 1',
+        'Step 2',
+        'Step 3',
+      ])
+      expect(result.nextProject.source.pages[1]?.source.jsx).toContain('goToPage("page05")')
+      expect(result.nextProject.source.startPageId).toBe('page01')
+      expect(result.nextProject.activePageId).toBe('page01')
+      expect(result.result.postChangeSummary).toMatchObject({
+        pageCount: 3,
+        startPageId: 'page01',
+        activePageId: 'page01',
+        pages: [
+          { id: 'page01', name: 'Step 1' },
+          { id: 'page02', name: 'Step 2' },
+          { id: 'page05', name: 'Step 3' },
+        ],
+        warnings: [],
+      })
+  })
+
+  it('rejects final-state assertions before persistence', () => {
+      const result = prepareDesktopMcpApplyChanges(
+        {
+          summary: 'Leave too many pages',
+          operations: [
+            {
+              type: 'rename_project',
+              name: 'Still messy',
+            },
+          ],
+          assertions: {
+            pageCount: 3,
+          },
+        },
+        {
+          project: createProject({ pageCount: 4 }),
+          theme: 'dark',
+          diagnostics: createDiagnostics(),
+        },
+        FIXED_TIMESTAMP
+      )
+
+    expect(result).toEqual({
+        ok: false,
+        code: 'assertion-failed',
+        message: 'apply_changes assertion failed: expected 3 pages, but the project now has 4.',
+        manifestResourceUri: DESKTOP_MCP_PROJECT_MANIFEST_URI,
+      })
+  })
+
+  it('rejects importful final source when forbidImports is asserted', () => {
+    const result = prepareDesktopMcpApplyChanges(
+        {
+          summary: 'Write importful source',
+          operations: [
+            {
+              type: 'replace_source',
+              resourceUri: createDesktopMcpProjectPageSourceUri('page01', 'jsx'),
+              content:
+                'import { Button } from "@navikt/ds-react"\nexport default function PageOne() {\n  return <Button>Bad</Button>\n}',
+            },
+          ],
+          assertions: {
+            forbidImports: true,
+          },
+        },
+        {
+          project: createProject(),
+          theme: 'dark',
+          diagnostics: createDiagnostics(),
+        },
+        FIXED_TIMESTAMP
+      )
+
+    expect(result).toEqual({
+        ok: false,
+        code: 'assertion-failed',
+        message:
+          'apply_changes assertion failed: forbidImports found an import statement in page01 JSX. Arcade source must be import-free.',
+        manifestResourceUri: DESKTOP_MCP_PROJECT_MANIFEST_URI,
+        resourceUri: createDesktopMcpProjectPageSourceUri('page01', 'jsx'),
+      })
   })
 
   it('fails stale project revisions before applying anything', () => {
@@ -381,7 +581,7 @@ describe('desktopMcpApplyChanges', () => {
             type: 'replace_source',
             resourceUri: createDesktopMcpProjectPageSourceUri('page01', 'jsx'),
             content:
-              'export default function PageOne() {\n  return <a href="{{pageRef:missing}}">Broken</a>\n}',
+              'export default function PageOne() {\n  return <Button onClick={() => goToPage("{{pageRef:missing}}")}>Broken</Button>\n}',
           },
         ],
       },
@@ -397,7 +597,7 @@ describe('desktopMcpApplyChanges', () => {
       ok: false,
       code: 'invalid-operation-target',
       message:
-        'apply_changes replace_source operation 0 content contains unresolved {{pageRef:missing}} placeholder. Declare create_page.newPageRef "missing" earlier in the same apply_changes batch.',
+        'apply_changes replace_source operation 0 content contains unresolved {{pageRef:missing}} placeholder. Declare create_page.newPageRef "missing" in the same apply_changes batch.',
       manifestResourceUri: DESKTOP_MCP_PROJECT_MANIFEST_URI,
     })
     expect(project.source.pages).toHaveLength(1)
@@ -453,7 +653,7 @@ describe('desktopMcpApplyChanges', () => {
             type: 'replace_source',
             resourceUri: createDesktopMcpProjectPageSourceUri('page01', 'jsx'),
             content:
-              'export default function PageOne() {\n  return <a href="{{pageRef:landing}}">Broken</a>\n}',
+              'export default function PageOne() {\n  return <Button onClick={() => goToPage("{{pageRef:landing}}")}>Broken</Button>\n}',
           },
         ],
       },

@@ -76,6 +76,13 @@ interface ApplyChangesSuccess {
   changedResources: string[]
   nextRecommendedResources: string[]
   operationResults: Array<Record<string, unknown>>
+  postChangeSummary: {
+    pageCount: number
+    startPageId: string
+    activePageId: string
+    pages: Array<Record<string, unknown>>
+    warnings: string[]
+  }
   tempPageRefMappings?: Record<
     string,
     {
@@ -102,6 +109,7 @@ interface ApplyChangesFailure {
     | 'invalid-operation-target'
     | 'invalid-project-name'
     | 'payload-too-large'
+    | 'assertion-failed'
     | 'persistence-failed'
   message: string
   manifestResourceUri?: string
@@ -255,7 +263,7 @@ describe('desktopMcpServer', () => {
     expect(initializePayload.result.instructions).toContain('arcade://desktop/authoring-guide')
   })
 
-  it('lists only the v1 MCP tools and stable direct resources', async () => {
+  it('lists the v1 MCP tools and stable direct resources', async () => {
     const server = createManagedServer({ port: 0 })
     const state = await server.start()
 
@@ -277,8 +285,14 @@ describe('desktopMcpServer', () => {
       result: {
         tools: [
           {
-            name: 'capture_preview_evidence',
+           name: 'read_resource',
             inputSchema: {
+             additionalProperties: false,
+           },
+         },
+         {
+           name: 'capture_preview_evidence',
+           inputSchema: {
               additionalProperties: false,
             },
           },
@@ -306,6 +320,9 @@ describe('desktopMcpServer', () => {
 
     expect(resourcesResponse.status).toBe(200)
     expect(resourcesPayload.result.resources.map((resource: { uri: string }) => resource.uri)).toEqual([
+      'arcade://desktop/start-here',
+      'arcade://desktop/workflows/replace-project',
+      'arcade://desktop/workflows/multi-page-navigation',
       'arcade://desktop/operating-guide',
       'arcade://desktop/authoring-guide',
       'arcade://desktop/capabilities',
@@ -317,7 +334,7 @@ describe('desktopMcpServer', () => {
     ])
   })
 
-  it('keeps the legacy read_resource alias callable without re-listing it in the v1 tool surface', async () => {
+  it('lists read_resource for tool-only hosts and reads stable resources through it', async () => {
     const server = createManagedServer({ port: 0 })
     const state = await server.start()
 
@@ -329,6 +346,7 @@ describe('desktopMcpServer', () => {
     expect(toolsResponse.status).toBe(200)
     const toolsPayload = await toolsResponse.json()
     expect(toolsPayload.result.tools.map((tool: { name: string }) => tool.name)).toEqual([
+      'read_resource',
       'capture_preview_evidence',
       'apply_changes',
     ])
@@ -340,7 +358,7 @@ describe('desktopMcpServer', () => {
       params: {
         name: 'read_resource',
         arguments: {
-          uri: 'arcade://desktop/authoring-guide',
+          uri: 'arcade://desktop/start-here',
         },
       },
     })
@@ -352,14 +370,14 @@ describe('desktopMcpServer', () => {
         content: [
           {
             type: 'text',
-            text: 'Read Desktop Arcade MCP resource arcade://desktop/authoring-guide (text/markdown).',
+            text: 'Read Desktop Arcade MCP resource arcade://desktop/start-here (text/markdown).',
           },
         ],
         structuredContent: {
           ok: true,
-          uri: 'arcade://desktop/authoring-guide',
+          uri: 'arcade://desktop/start-here',
           mimeType: 'text/markdown',
-          text: expect.stringContaining('# Desktop Arcade authoring guide'),
+          text: expect.stringContaining('# Desktop Arcade MCP start-here'),
         },
       },
     })
@@ -1013,6 +1031,30 @@ describe('desktopMcpServer', () => {
             pageId: 'page02',
           },
         ],
+        postChangeSummary: {
+          pageCount: 2,
+          startPageId: 'page01',
+          activePageId: 'page02',
+          pages: [
+            {
+              id: 'page01',
+              name: 'Page 1',
+              sourceResources: {
+                jsxResourceUri: 'arcade://project/source/pages/page01/jsx',
+                hooksResourceUri: 'arcade://project/source/pages/page01/hooks',
+              },
+            },
+            {
+              id: 'page02',
+              name: 'Landing',
+              sourceResources: {
+                jsxResourceUri: 'arcade://project/source/pages/page02/jsx',
+                hooksResourceUri: 'arcade://project/source/pages/page02/hooks',
+              },
+            },
+          ],
+          warnings: [],
+        },
         tempPageRefMappings: {
           landing: {
             pageId: 'page02',
@@ -1103,6 +1145,30 @@ describe('desktopMcpServer', () => {
               pageId: 'page02',
             },
           ],
+          postChangeSummary: {
+            pageCount: 2,
+            startPageId: 'page01',
+            activePageId: 'page02',
+            pages: [
+              {
+                id: 'page01',
+                name: 'Page 1',
+                sourceResources: {
+                  jsxResourceUri: 'arcade://project/source/pages/page01/jsx',
+                  hooksResourceUri: 'arcade://project/source/pages/page01/hooks',
+                },
+              },
+              {
+                id: 'page02',
+                name: 'Landing',
+                sourceResources: {
+                  jsxResourceUri: 'arcade://project/source/pages/page02/jsx',
+                  hooksResourceUri: 'arcade://project/source/pages/page02/hooks',
+                },
+              },
+            ],
+            warnings: [],
+          },
           tempPageRefMappings: {
             landing: {
               pageId: 'page02',
@@ -1239,7 +1305,7 @@ describe('desktopMcpServer', () => {
       'read `arcade://project/manifest`'
     )
     expect(operatingGuidePayload.result.contents[0].text).toContain(
-      '`create_page.newPageRef`, later `tempPageRef` targets, and `{{pageRef:name}}` placeholders'
+      '`create_page.newPageRef`, later lifecycle `tempPageRef` targets, and `{{pageRef:name}}` placeholders'
     )
     expect(operatingGuidePayload.result.contents[0].text).toContain(
       '`capture_preview_evidence({ pageId })` is the normal autonomous inspection path'
@@ -1248,10 +1314,10 @@ describe('desktopMcpServer', () => {
       'Start with `tools/list`, `resources/list`, and `resources/read`'
     )
     expect(operatingGuidePayload.result.contents[0].text).toContain(
-      'Tool-only hosts can exercise the two listed v1 tools, but the published discovery surface cannot complete the resource-read portions of the checklist without those resource methods'
+      'tool-only clients can call `read_resource({ uri })` for the same resources'
     )
     expect(operatingGuidePayload.result.contents[0].text).toContain(
-      '`arcade://desktop/capabilities` is the shortest single place to inspect the published v1 contract'
+      '`arcade://desktop/capabilities` is the shortest single place to inspect the published contract'
     )
     expect(operatingGuidePayload.result.contents[0].text).toContain(
       'If `apply_changes` returns `project-unavailable`, wait for an active Desktop Arcade window'
@@ -1322,8 +1388,8 @@ describe('desktopMcpServer', () => {
       requiresAuth: false,
       authDescription: 'No token/header required.',
       discoveryAdvice: {
-        preferredFirstResourceUri: 'arcade://desktop/capabilities',
-        preferredDiscoveryMethods: ['tools/list', 'resources/list', 'resources/read'],
+        preferredFirstResourceUri: 'arcade://desktop/start-here',
+        preferredDiscoveryMethods: ['tools/list', 'resources/list', 'resources/read', 'read_resource'],
       },
       smokeChecklistRequirements: {
         requiresClientResourceReads: true,
@@ -1418,10 +1484,10 @@ describe('desktopMcpServer', () => {
         'available after a successful capture until the capture expires',
     })
     expect(capabilities.discoveryAdvice.note).toContain(
-      'Use tools/list plus resources/list/resources/read to discover the published v1 surface.'
+      'In tool-only clients, call read_resource({ uri }) for the same resources.'
     )
     expect(capabilities.smokeChecklistRequirements.note).toContain(
-      'Tool-only hosts can call capture_preview_evidence and apply_changes, but the published v1 discovery surface cannot complete the stable-resource, diagnostics, or evidence-resource read checks without those resource methods.'
+      'Tool-only hosts can call read_resource for stable resources, diagnostics, source, Aksel snippets, and capture-produced evidence resources.'
     )
     expect(capabilities.verificationBoundaries).toMatchObject({
       mcpVerifiable: expect.arrayContaining([
@@ -1571,7 +1637,8 @@ describe('desktopMcpServer', () => {
     ]) {
       expect(operationsText).toContain(`\`${operationType}\``)
     }
-    expect(operationsText).toContain('earlier in the same batch')
+    expect(operationsText).toContain('may target any matching')
+    expect(operationsText).toContain('Final-state assertions')
     expect(operationsText).toContain('`pageId`')
     expect(operationsText).toContain('`tempPageRef`')
 

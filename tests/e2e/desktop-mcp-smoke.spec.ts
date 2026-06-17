@@ -7,6 +7,9 @@ const desktopRendererUrl = 'aksel-arcade://app/index.html'
 const desktopMcpUrl = 'http://127.0.0.1:3846/mcp'
 
 const stableResourceUris = [
+  'arcade://desktop/start-here',
+  'arcade://desktop/workflows/replace-project',
+  'arcade://desktop/workflows/multi-page-navigation',
   'arcade://desktop/operating-guide',
   'arcade://desktop/authoring-guide',
   'arcade://desktop/capabilities',
@@ -143,6 +146,7 @@ test.describe('Desktop MCP v1 smoke flow', () => {
 
       const toolsPayload = await listTools()
       expect(toolsPayload.result.tools.map((tool: { name: string }) => tool.name)).toEqual([
+        'read_resource',
         'capture_preview_evidence',
         'apply_changes',
       ])
@@ -154,8 +158,8 @@ test.describe('Desktop MCP v1 smoke flow', () => {
 
       const operatingGuide = await readMcpResource(3, 'arcade://desktop/operating-guide')
       expect(operatingGuide.text).toContain('`resources/read`')
+      expect(operatingGuide.text).toContain('`read_resource({ uri })`')
       expect(operatingGuide.text).toContain('`capture_preview_evidence({ pageId })`')
-      expect(operatingGuide.text).not.toContain('read_resource')
 
       const authoringGuide = await readMcpResource(4, 'arcade://desktop/authoring-guide')
       expect(authoringGuide.text).toContain('Global config')
@@ -171,7 +175,7 @@ test.describe('Desktop MCP v1 smoke flow', () => {
         requiresAuth: false,
         authDescription: 'No token/header required.',
       })
-      expect(capabilities.toolNames).toEqual(['capture_preview_evidence', 'apply_changes'])
+      expect(capabilities.toolNames).toEqual(['read_resource', 'capture_preview_evidence', 'apply_changes'])
       expect(capabilities.stableResourceUris).toEqual(stableResourceUris)
       expect(capabilities.v1Omissions).toContain('No Web Arcade MCP endpoint.')
 
@@ -239,7 +243,7 @@ test.describe('Desktop MCP v1 smoke flow', () => {
     <main>
       <h1>Smoke entry</h1>
       <p>Desktop MCP updated the visible page.</p>
-      <a href="{{pageRef:details}}">Open details page</a>
+      <Button onClick={() => goToPage("{{pageRef:details}}")}>Open details page</Button>
     </main>
   )
 }`,
@@ -262,7 +266,7 @@ test.describe('Desktop MCP v1 smoke flow', () => {
       )
 
       const entryPageJsxAfter = await readMcpResource(12, entryPageJsxUri)
-      expect(entryPageJsxAfter.text).toContain(`href="${newPage.pageId}"`)
+      expect(entryPageJsxAfter.text).toContain(`goToPage("${newPage.pageId}")`)
       const newPageJsx = await readMcpResource(13, newPage.sourceResources.jsxResourceUri)
       expect(newPageJsx.text).toContain('Smoke path ready')
       const newPageHooks = await readMcpResource(14, newPage.sourceResources.hooksResourceUri)

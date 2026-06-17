@@ -342,6 +342,7 @@ const parseDesktopMcpApplyChangesRequest = (payload) => {
       ? { expectedProjectRevision: payload.expectedProjectRevision }
       : {}),
     operations: payload.operations,
+    ...(isRecord(payload.assertions) ? { assertions: payload.assertions } : {}),
   }
 }
 

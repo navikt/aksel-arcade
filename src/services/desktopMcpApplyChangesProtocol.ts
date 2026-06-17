@@ -10,6 +10,13 @@ export interface DesktopMcpApplyChangesTempPageRefMapping {
   sourceResources: DesktopMcpApplyChangesSourceResources
 }
 
+export interface DesktopMcpApplyChangesAssertions {
+  pageCount?: number
+  startPage?: ArcadePageId | 'first'
+  activePage?: ArcadePageId | 'first'
+  forbidImports?: boolean
+}
+
 interface DesktopMcpApplyChangesPageTarget {
   pageId?: ArcadePageId
   tempPageRef?: string
@@ -55,6 +62,7 @@ export interface DesktopMcpApplyChangesRequest {
   summary: string
   expectedProjectRevision?: string
   operations: DesktopMcpApplyChangesOperation[]
+  assertions?: DesktopMcpApplyChangesAssertions
 }
 
 export type DesktopMcpApplyChangesErrorCode =
@@ -63,6 +71,7 @@ export type DesktopMcpApplyChangesErrorCode =
   | 'invalid-operation'
   | 'invalid-operation-target'
   | 'invalid-project-name'
+  | 'assertion-failed'
   | 'payload-too-large'
   | 'persistence-failed'
 
@@ -119,6 +128,20 @@ export type DesktopMcpApplyChangesOperationResult =
       name: string
     }
 
+export interface DesktopMcpApplyChangesPageSummary {
+  id: ArcadePageId
+  name: string
+  sourceResources: DesktopMcpApplyChangesSourceResources
+}
+
+export interface DesktopMcpApplyChangesPostChangeSummary {
+  pageCount: number
+  startPageId: ArcadePageId
+  activePageId: ArcadePageId
+  pages: DesktopMcpApplyChangesPageSummary[]
+  warnings: string[]
+}
+
 export interface DesktopMcpApplyChangesSuccess {
   ok: true
   summary: string
@@ -126,6 +149,7 @@ export interface DesktopMcpApplyChangesSuccess {
   changedResources: string[]
   nextRecommendedResources: string[]
   operationResults: DesktopMcpApplyChangesOperationResult[]
+  postChangeSummary: DesktopMcpApplyChangesPostChangeSummary
   tempPageRefMappings?: Record<string, DesktopMcpApplyChangesTempPageRefMapping>
   safeActivity: DesktopMcpLastActivity
 }

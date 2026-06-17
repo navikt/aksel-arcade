@@ -98,7 +98,7 @@ test.describe('Desktop MCP apply_changes page lifecycle', () => {
             type: 'create_page',
             newPageRef: 'landing',
             jsxCode:
-              'export default function LandingPage() {\n  return <div><h1>Landing</h1><a href="{{pageRef:landing}}">Stay on landing</a></div>\n}',
+              'export default function LandingPage() {\n  return <div><h1>Landing</h1><Button onClick={() => goToPage("{{pageRef:landing}}")}>Stay on landing</Button></div>\n}',
           },
           {
             type: 'rename_page',
@@ -109,7 +109,7 @@ test.describe('Desktop MCP apply_changes page lifecycle', () => {
             type: 'replace_source',
             resourceUri: pageOneJsxUri,
             content:
-              'export default function PageOne() {\n  return <a href="{{pageRef:landing}}">Open landing</a>\n}',
+              'export default function PageOne() {\n  return <Button onClick={() => goToPage("{{pageRef:landing}}")}>Open landing</Button>\n}',
           },
           {
             type: 'set_start_page',
@@ -148,10 +148,10 @@ test.describe('Desktop MCP apply_changes page lifecycle', () => {
       )
 
       const updatedPageOneSource = await readMcpResource(pageOneJsxUri)
-      expect(updatedPageOneSource.text).toContain(`href="${landingPageId}"`)
+      expect(updatedPageOneSource.text).toContain(`goToPage("${landingPageId}")`)
 
       const updatedPageTwoSource = await readMcpResource(pageTwoJsxUri)
-      expect(updatedPageTwoSource.text).toContain(`href="${landingPageId}"`)
+      expect(updatedPageTwoSource.text).toContain(`goToPage("${landingPageId}")`)
 
       await expect(
         page.frameLocator('[data-testid="preview-iframe"]').getByRole('heading', { name: 'Landing' })
@@ -159,6 +159,73 @@ test.describe('Desktop MCP apply_changes page lifecycle', () => {
 
       const diagnostics = await waitForDiagnosticsIdle()
       expect(diagnostics.status).toBe('idle')
+    } finally {
+      await app.close()
+    }
+  })
+
+  test('blocks raw browser navigation without unloading the visible preview sandbox', async () => {
+    test.setTimeout(120_000)
+
+    const app: ElectronApplication = await electron.launch({
+      args: ['desktop/main.cjs'],
+      env: {
+        ...process.env,
+        AKSEL_ARCADE_RENDERER_URL: desktopRendererUrl,
+      },
+    })
+
+    try {
+      const page = await app.firstWindow()
+      await waitForDefaultPreview(page)
+
+      const manifest = await readJsonMcpResource('arcade://project/manifest')
+      const entryPage =
+        manifest.pages.find((page: { id: string }) => page.id === manifest.activePageId) ??
+        manifest.pages[0]
+
+      const applyChangesPayload = await callApplyChanges({
+        summary: 'Install a raw navigation guard repro',
+        expectedProjectRevision: manifest.projectRevision,
+        operations: [
+          {
+            type: 'replace_source',
+            resourceUri: entryPage.source.jsx.uri,
+            content: `export default function RawNavigationPage() {
+  return (
+    <main>
+      <h1>Raw navigation guard</h1>
+      <a href="?pageId=page99">Bad raw navigation</a>
+      <p>Still rendered after blocked navigation</p>
+    </main>
+  )
+}`,
+          },
+        ],
+      })
+
+      expect(applyChangesPayload).toMatchObject({
+        result: {
+          structuredContent: {
+            ok: true,
+          },
+        },
+      })
+      const diagnostics = await waitForDiagnosticsIdle()
+      expect(diagnostics.status).toBe('idle')
+
+      const previewFrame = page.frameLocator('[data-testid="preview-iframe"]')
+      await expect(
+        previewFrame.getByRole('heading', { name: 'Raw navigation guard' })
+      ).toBeVisible({ timeout: 15_000 })
+
+      await previewFrame.getByRole('link', { name: 'Bad raw navigation' }).click()
+
+      await expect(page.getByText('Blocked browser navigation to "?pageId=page99"')).toBeVisible({
+        timeout: 15_000,
+      })
+      await expect(previewFrame.getByRole('heading', { name: 'Raw navigation guard' })).toBeVisible()
+      await expect(previewFrame.getByText('Still rendered after blocked navigation')).toBeVisible()
     } finally {
       await app.close()
     }

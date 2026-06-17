@@ -381,6 +381,62 @@
       return runtime.goToPage(pageId);
     }
 
+    function isBarePageIdTarget(target) {
+      return /^page\d+$/.test(target);
+    }
+
+    function blockSandboxNavigation(message) {
+      console.warn(message);
+      sendError('RUNTIME_ERROR', {
+        message,
+        componentStack: null,
+        stack: '',
+        pageId: getCurrentPreviewPageId()
+      });
+    }
+
+    function handleSandboxClickNavigation(event) {
+      const anchor = event.target?.closest?.('a[href]');
+      if (!anchor) {
+        return;
+      }
+
+      const rawHref = anchor.getAttribute('href')?.trim() || '';
+      if (!rawHref || rawHref.startsWith('#')) {
+        event.preventDefault();
+        return;
+      }
+
+      event.preventDefault();
+      event.stopPropagation();
+
+      if (isBarePageIdTarget(rawHref)) {
+        if (navigatePreviewToPage(rawHref)) {
+          return;
+        }
+
+        blockSandboxNavigation(
+          `Blocked Arcade page navigation to unknown page "${rawHref}". Re-read the manifest and use goToPage("pageNN") or a bare page id that exists.`
+        );
+        return;
+      }
+
+      blockSandboxNavigation(
+        `Blocked browser navigation to "${rawHref}" inside the Preview sandbox. Use goToPage("pageNN") or an Aksel Link/LinkCard with a bare page id for Arcade page flow.`
+      );
+    }
+
+    function handleSandboxSubmitNavigation(event) {
+      event.preventDefault();
+      event.stopPropagation();
+      blockSandboxNavigation(
+        'Blocked form submission inside the Preview sandbox. Handle form state in React and navigate with goToPage("pageNN") for Arcade page flow.'
+      );
+    }
+
+    document.addEventListener('click', handleSandboxClickNavigation, true);
+    document.addEventListener('submit', handleSandboxSubmitNavigation, true);
+
     function flushPendingNavigation() {
       if (!pendingNavigationPageId) {
         return false;

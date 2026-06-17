@@ -45,4 +45,14 @@ describe('sandbox security boundaries', () => {
     expect(sandboxHtml).toContain('event.origin === window.location.origin')
     expect(sandboxHtml).toContain("window.location.protocol === 'file:' && event.origin === 'null'")
   })
+
+  it('blocks browser navigation in sandbox before raw links or forms can unload the iframe', () => {
+    const sandboxHtml = readProjectFile('public/sandbox.html')
+
+    expect(sandboxHtml).toContain("document.addEventListener('click', handleSandboxClickNavigation, true)")
+    expect(sandboxHtml).toContain("document.addEventListener('submit', handleSandboxSubmitNavigation, true)")
+    expect(sandboxHtml).toContain('Blocked browser navigation to')
+    expect(sandboxHtml).toContain('Blocked form submission inside the Preview sandbox')
+    expect(sandboxHtml).toContain('navigatePreviewToPage(rawHref)')
+  })
 })

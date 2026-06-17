@@ -5,6 +5,8 @@ import {
   DESKTOP_MCP_PROJECT_DIAGNOSTICS_URI,
   DESKTOP_MCP_PROJECT_MANIFEST_URI,
   DESKTOP_MCP_PROJECT_PREVIEW_CONTEXT_URI,
+  DESKTOP_MCP_PROJECT_SOURCE_GLOBAL_HOOKS_URI,
+  DESKTOP_MCP_PROJECT_SOURCE_GLOBAL_JSX_URI,
   createDesktopMcpProjectPageSourceUri,
   createDesktopMcpProjectRevision,
 } from '@/services/desktopMcpProjectResources'
@@ -38,6 +40,7 @@ import type {
 const MAX_PROJECT_NAME_LENGTH = 100
 const PAGE_REF_PLACEHOLDER_PATTERN = /\{\{pageRef:([^}]+)\}\}/g
 const TEMP_PAGE_REF_PATTERN = /^[^{}\s]+$/
+const STATIC_IMPORT_STATEMENT_PATTERN = /^\s*import\b/m
 
 interface DesktopMcpApplyChangesContext {
   project: Project
@@ -55,6 +58,11 @@ interface PlannedCreatedPage {
 interface PlannedCreatedPages {
   byIndex: Map<number, PlannedCreatedPage>
   tempPageRefs: Map<string, PlannedCreatedPage>
+}
+
+interface UsedPageRefPlaceholder {
+  tempPageRef: string
+  pageId: ArcadePageId
 }
 
 export interface PreparedDesktopMcpApplyChangesSuccess {
@@ -102,6 +110,7 @@ export const prepareDesktopMcpApplyChanges = (
 
   const operationResults: DesktopMcpApplyChangesOperationResult[] = []
   const changedResources = new Set<string>([DESKTOP_MCP_PROJECT_MANIFEST_URI])
+  const usedPageRefPlaceholders = new Map<ArcadePageId, UsedPageRefPlaceholder>()
   let nextProject = context.project
   let nextTheme = context.theme
   let previewRefreshRequired = false
@@ -120,6 +129,7 @@ export const prepareDesktopMcpApplyChanges = (
           currentIndex: index,
           project: nextProject,
           plannedCreatedPages: plannedCreatedPages.value,
+          usedPageRefPlaceholders,
         })
         if (!rewrittenContent.ok) {
           return rewrittenContent.failure
@@ -162,6 +172,7 @@ export const prepareDesktopMcpApplyChanges = (
           currentIndex: index,
           project: nextProject,
           plannedCreatedPages: plannedCreatedPages.value,
+          usedPageRefPlaceholders,
         })
         if (!rewrittenJsx.ok) {
           return rewrittenJsx.failure
@@ -173,6 +184,7 @@ export const prepareDesktopMcpApplyChanges = (
           currentIndex: index,
           project: nextProject,
           plannedCreatedPages: plannedCreatedPages.value,
+          usedPageRefPlaceholders,
         })
         if (!rewrittenHooks.ok) {
           return rewrittenHooks.failure
@@ -359,6 +371,18 @@ export const prepareDesktopMcpApplyChanges = (
     )
   }
 
+  for (const placeholder of usedPageRefPlaceholders.values()) {
+    if (!getPageById(nextProject.source, placeholder.pageId)) {
+      return createApplyChangesFailure(
+        'invalid-operation-target',
+        `apply_changes resolved {{pageRef:${placeholder.tempPageRef}}} to Arcade page "${placeholder.pageId}", but that page was deleted before the batch finished.`,
+        {
+          manifestResourceUri: DESKTOP_MCP_PROJECT_MANIFEST_URI,
+        }
+      )
+    }
+  }
+
   if (!getPageById(nextProject.source, nextProject.source.startPageId)) {
     return createApplyChangesFailure(
       'invalid-operation',
@@ -377,6 +401,11 @@ export const prepareDesktopMcpApplyChanges = (
     ...nextProject,
     lastModified: timestamp,
   })
+
+  const assertionFailure = validateApplyChangesAssertions(request.assertions, nextProject)
+  if (assertionFailure) {
+    return assertionFailure
+  }
 
   const sizeStatus = validateProjectSize(nextProject)
   if (!sizeStatus.valid) {
@@ -413,6 +442,7 @@ export const prepareDesktopMcpApplyChanges = (
       changedResources: changedResourceList,
       nextRecommendedResources,
       operationResults,
+      postChangeSummary: createPostChangeSummary(nextProject),
       ...(tempPageRefMappings ? { tempPageRefMappings } : {}),
       safeActivity: {
         toolName: 'apply_changes',
@@ -671,12 +701,14 @@ const rewritePageRefPlaceholders = ({
   currentIndex,
   project,
   plannedCreatedPages,
+  usedPageRefPlaceholders,
 }: {
   content: string
   contextLabel: string
   currentIndex: number
   project: Project
   plannedCreatedPages: PlannedCreatedPages
+  usedPageRefPlaceholders: Map<ArcadePageId, UsedPageRefPlaceholder>
 }):
   | {
       ok: true
@@ -706,7 +738,7 @@ const rewritePageRefPlaceholders = ({
     if (!plannedPage) {
       failure = createApplyChangesFailure(
         'invalid-operation-target',
-        `${contextLabel} contains unresolved ${fullMatch} placeholder. Declare create_page.newPageRef "${normalizedTempPageRef.value}" earlier in the same apply_changes batch.`,
+        `${contextLabel} contains unresolved ${fullMatch} placeholder. Declare create_page.newPageRef "${normalizedTempPageRef.value}" in the same apply_changes batch.`,
         {
           manifestResourceUri: DESKTOP_MCP_PROJECT_MANIFEST_URI,
         }
@@ -714,18 +746,7 @@ const rewritePageRefPlaceholders = ({
       return fullMatch
     }
 
-    if (plannedPage.index > currentIndex) {
-      failure = createApplyChangesFailure(
-        'invalid-operation-target',
-        `${contextLabel} contains ${fullMatch} before create_page declares "${normalizedTempPageRef.value}". Move the create_page earlier in the batch.`,
-        {
-          manifestResourceUri: DESKTOP_MCP_PROJECT_MANIFEST_URI,
-        }
-      )
-      return fullMatch
-    }
-
-    if (plannedPage.index !== currentIndex && !getPageById(project.source, plannedPage.pageId)) {
+    if (plannedPage.index < currentIndex && !getPageById(project.source, plannedPage.pageId)) {
       failure = createApplyChangesFailure(
         'invalid-operation-target',
         `${contextLabel} contains ${fullMatch} placeholder, but Arcade page "${plannedPage.pageId}" is no longer available at that step.`,
@@ -736,6 +757,10 @@ const rewritePageRefPlaceholders = ({
       return fullMatch
     }
 
+    usedPageRefPlaceholders.set(plannedPage.pageId, {
+      tempPageRef: normalizedTempPageRef.value,
+      pageId: plannedPage.pageId,
+    })
     return plannedPage.pageId
   })
 
@@ -767,6 +792,7 @@ const normalizePageName = ({
       ok: true
       value: string
     }
+
   | {
       ok: false
       failure: DesktopMcpApplyChangesFailure
@@ -804,6 +830,128 @@ const normalizePageName = ({
     value: normalizedName,
   }
 }
+
+const validateApplyChangesAssertions = (
+  assertions: DesktopMcpApplyChangesRequest['assertions'] | undefined,
+  project: Project
+): DesktopMcpApplyChangesFailure | null => {
+  if (!assertions) {
+    return null
+  }
+
+  if (assertions.pageCount !== undefined && project.source.pages.length !== assertions.pageCount) {
+    return createApplyChangesFailure(
+      'assertion-failed',
+      `apply_changes assertion failed: expected ${assertions.pageCount} pages, but the project now has ${project.source.pages.length}.`,
+      {
+        manifestResourceUri: DESKTOP_MCP_PROJECT_MANIFEST_URI,
+      }
+    )
+  }
+
+  const expectedStartPageId = resolveAssertionPageTarget(assertions.startPage, project)
+  if (expectedStartPageId && project.source.startPageId !== expectedStartPageId) {
+    return createApplyChangesFailure(
+      'assertion-failed',
+      `apply_changes assertion failed: expected Start page "${expectedStartPageId}", but the Start page is "${project.source.startPageId}".`,
+      {
+        manifestResourceUri: DESKTOP_MCP_PROJECT_MANIFEST_URI,
+      }
+    )
+  }
+
+  const expectedActivePageId = resolveAssertionPageTarget(assertions.activePage, project)
+  if (expectedActivePageId && project.activePageId !== expectedActivePageId) {
+    return createApplyChangesFailure(
+      'assertion-failed',
+      `apply_changes assertion failed: expected Active page "${expectedActivePageId}", but the Active page is "${project.activePageId}".`,
+      {
+        manifestResourceUri: DESKTOP_MCP_PROJECT_MANIFEST_URI,
+      }
+    )
+  }
+
+  if (assertions.forbidImports) {
+    const importSource = findFirstStaticImportSource(project)
+    if (importSource) {
+      return createApplyChangesFailure(
+        'assertion-failed',
+        `apply_changes assertion failed: forbidImports found an import statement in ${importSource.label}. Arcade source must be import-free.`,
+        {
+          manifestResourceUri: DESKTOP_MCP_PROJECT_MANIFEST_URI,
+          resourceUri: importSource.resourceUri,
+        }
+      )
+    }
+  }
+
+  return null
+}
+
+const resolveAssertionPageTarget = (
+  target: ArcadePageId | 'first' | undefined,
+  project: Project
+): ArcadePageId | null => {
+  if (!target) {
+    return null
+  }
+
+  if (target === 'first') {
+    return project.source.pages[0]?.id ?? null
+  }
+
+  return target
+}
+
+const findFirstStaticImportSource = (
+  project: Project
+): { label: string; resourceUri: string } | null => {
+  const sources = [
+    {
+      label: 'Global config JSX',
+      resourceUri: DESKTOP_MCP_PROJECT_SOURCE_GLOBAL_JSX_URI,
+      content: project.source.globalConfig.jsx,
+    },
+    {
+      label: 'Global config Hooks',
+      resourceUri: DESKTOP_MCP_PROJECT_SOURCE_GLOBAL_HOOKS_URI,
+      content: project.source.globalConfig.hooks,
+    },
+    ...project.source.pages.flatMap((page) => [
+      {
+        label: `${page.id} JSX`,
+        resourceUri: createDesktopMcpProjectPageSourceUri(page.id, 'jsx'),
+        content: page.source.jsx,
+      },
+      {
+        label: `${page.id} Hooks`,
+        resourceUri: createDesktopMcpProjectPageSourceUri(page.id, 'hooks'),
+        content: page.source.hooks,
+      },
+    ]),
+  ]
+
+  return sources.find((source) => STATIC_IMPORT_STATEMENT_PATTERN.test(source.content)) ?? null
+}
+
+const createPostChangeSummary = (
+  project: Project
+): DesktopMcpApplyChangesSuccess['postChangeSummary'] => ({
+  pageCount: project.source.pages.length,
+  startPageId: project.source.startPageId,
+  activePageId: project.activePageId,
+  pages: project.source.pages.map((page) => ({
+    id: page.id,
+    name: page.name,
+    sourceResources: createPageSourceResources(page.id),
+  })),
+  warnings:
+    project.source.pages.length > 5
+      ? [
+          `Project now has ${project.source.pages.length} pages. If the user asked for a smaller replacement, delete extra pages before finishing.`,
+        ]
+      : [],
+})
 
 const normalizeTempPageRefField = (
   tempPageRef: string,

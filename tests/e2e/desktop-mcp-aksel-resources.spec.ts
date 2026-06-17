@@ -99,7 +99,8 @@ test.describe('Desktop MCP on-demand Aksel resources', () => {
       expect(operations.mimeType).toBe('text/markdown')
       expect(operations.text).toContain('`create_page`')
       expect(operations.text).toContain('`replace_source`')
-      expect(operations.text).toContain('earlier in the same batch')
+      expect(operations.text).toContain('may target any matching')
+      expect(operations.text).toContain('Final-state assertions')
     } finally {
       await app.close()
     }
