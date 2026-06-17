@@ -413,7 +413,7 @@ const ARCADE_AUTHORING_GUIDANCE_SUMMARY =
 
 const ARCADE_AUTHORING_GUIDANCE_RULES = [
   'For static pages, write a bare JSX root such as <Page>...</Page>; do not wrap static source in a component unless needed.',
-  'When local JavaScript is needed before returning JSX, wrap the page in an IIFE expression; use the Hooks tab for reusable hooks.',
+  'When non-hook local JavaScript is needed before returning JSX, use a bare IIFE expression `(() => { ... })()` and never wrap the JSX source in braces; put state and hook calls in the Hooks tab so they hoist into the page component.',
   'Arcade source is import-free: convert normal Aksel examples by removing imports and relying on injected React, Aksel components, Aksel icons, and supported hooks.',
   'Aksel component props are safe and expected in Arcade source; do not replace Aksel components with prop-free native HTML or CSS because of a generic diagnostics error.',
   'Use Aksel layout and content components first: Page, Page.Block, Box, VStack, HStack, HGrid, Heading, BodyLong, BodyShort, GuidePanel, List, Accordion, Checkbox, Button, Link, Tag, and Aksel icons when they match the UI.',

@@ -3843,3 +3843,22 @@ Verification:
 Next note:
 
 - Desktop MCP E2E still requires a single owner of fixed port `127.0.0.1:3846`. During validation, an older `/Applications/Aksel Arcade.app` process was still listening on that port and made the first E2E run talk to the wrong MCP server; clearing that exact stale listener made the targeted Desktop MCP suite pass.
+
+
+2026-06-17 - Arcade preview: surface cross-page compile errors + fix authoring-guide IIFE
+
+Root-caused an MCP agent test failure: the agent built a 3-page form whose every page JSX was wrapped as `{(() => { ...hooks...; return (<Page/>) })()}` (an object-literal-wrapped IIFE, with hook calls inlined in JSX). That fails to compile (`Unexpected token`), and the broken preview was invisible/stale. Two real defects, neither "fixing the app to accept bad code":
+
+1. The Desktop MCP authoring guide itself taught the broken pattern. The agent copied it.
+2. PreviewPane hid compile errors whenever the active page != the error's page, so a project-wide compile failure showed the stale default project (or white siblings) with no error.
+
+Implemented:
+- desktop/mcpServer.cjs authoring-guide: documented the two-source-per-page contract (`jsx` is inlined into `return ( ... )`, so it must be a JSX element/parenthesized expression and is NEVER wrapped in `{ ... }`; state and hook calls go in the `hooks` tab and are hoisted into the page component). Replaced the `{(() => {...})()}` snippet with a Hooks-tab + plain-JSX example and a bare `(() => {...})()` for non-hook local JS, plus an explicit anti-pattern warning.
+- src/services/agentBridge.ts: aligned the parallel IIFE rule (bare IIFE, never wrap JSX in braces, hooks in the Hooks tab).
+- src/components/Preview/PreviewPane.tsx: compile errors now always surface (they break the whole combined module); runtime errors stay gated by the active page. Overlay now names the offending page (`Compile Error (line N) in "<page>"`) when it differs from the active page.
+
+Verification:
+- npm run type-check
+- npm run lint
+- CI=1 npx vitest run (578 passed, incl. new multi-page-preview-sync regression + desktopMcpServer guide guard)
+- Browser smoke check at http://localhost:5173/aksel-arcade/: with the agent's broken project on page02 active, the overlay now shows "Compile Error (line 1) in \"Step 1\"" instead of a stale/white preview.
