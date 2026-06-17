@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { collectPreviewDiagnostics } from '@/services/previewDiagnostics'
 import {
   DEFAULT_DESKTOP_MCP_PREVIEW_CAPTURE_LAYERS,
+  DESKTOP_MCP_PREVIEW_CAPTURE_EPHEMERAL_NOTE,
   finalizeDesktopMcpPreviewCapture,
   prepareDesktopMcpPreviewCapture,
   type DesktopMcpSandboxCaptureSuccess,
@@ -98,6 +99,12 @@ describe('desktopMcpPreviewCapture', () => {
         tagName: 'div',
       },
     })
+
+    expect(result.page).not.toHaveProperty('navigatedToId')
+    expect(manifest.page).not.toHaveProperty('navigatedToId')
+    expect(manifest.capture.ephemeral).toBe(true)
+    expect(manifest.capture.ephemeralNote).toBe(DESKTOP_MCP_PREVIEW_CAPTURE_EPHEMERAL_NOTE)
+    expect(result.summary).not.toContain('Interactions navigated to')
   })
 
   it('publishes only the selected layer resources when a caller narrows the request', () => {
@@ -199,7 +206,11 @@ describe('desktopMcpPreviewCapture', () => {
     expect(result).toMatchObject({
       ok: true,
       summary:
-        'Captured Page 1 (page01) in dark MD preview with screenshot, accessibility, DOM/layout/style and frame evidence after 2 interactions (viewport).',
+        'Captured Page 1 (page01) in dark MD preview with screenshot, accessibility, DOM/layout/style and frame evidence after 2 interactions (viewport). Interactions navigated to page02 (page02); this is an isolated render, so the Active page is unchanged.',
+      page: {
+        id: 'page01',
+        navigatedToId: 'page02',
+      },
       interactions: {
         executed: [
           {
@@ -215,6 +226,13 @@ describe('desktopMcpPreviewCapture', () => {
     if (!result.ok) {
       throw new Error('Expected finalized preview capture to succeed.')
     }
+
+    const frameResource = JSON.parse(
+      findResourceText(result.resources, 'arcade://preview/captures/capture-interactions/frame')
+    )
+    expect(frameResource.page.navigatedToId).toBe('page02')
+    expect(frameResource.capture.ephemeral).toBe(true)
+    expect(frameResource.capture.ephemeralNote).toBe(DESKTOP_MCP_PREVIEW_CAPTURE_EPHEMERAL_NOTE)
 
     const manifest = JSON.parse(findResourceText(result.resources, result.manifestResourceUri))
     expect(manifest.interactions).toEqual({
@@ -238,6 +256,8 @@ describe('desktopMcpPreviewCapture', () => {
         },
       },
     })
+    expect(manifest.page.navigatedToId).toBe(manifest.interactions.finalState.pageId)
+    expect(manifest.capture.ephemeral).toBe(true)
     expect(manifest.capture.interactionLimits).toEqual({
       maxSteps: 10,
       maxTotalTimeMs: 10000,

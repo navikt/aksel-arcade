@@ -52,6 +52,8 @@ export interface DesktopMcpPreviewCaptureSuccess {
   page: {
     id: ArcadePageId
     name: string
+    navigatedToId?: ArcadePageId
+    navigatedToName?: string
   }
   requestedLayers: DesktopMcpPreviewCaptureLayer[]
   producedLayers: DesktopMcpPreviewCaptureLayer[]

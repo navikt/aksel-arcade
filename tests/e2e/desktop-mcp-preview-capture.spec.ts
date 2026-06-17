@@ -500,12 +500,21 @@ test.describe('Desktop MCP preview capture', () => {
       const navigationFrame = JSON.parse(
         (await readMcpResource(navigationCapture.layerResources.frame)).text
       )
-      expect(navigationFrame.page).toEqual({ id: entryPageId, name: entryPageName })
+      expect(navigationFrame.page).toEqual({
+        id: entryPageId,
+        name: entryPageName,
+        navigatedToId: detailsPageId,
+        navigatedToName: 'Details',
+      })
+      expect(navigationFrame.capture.ephemeral).toBe(true)
       expect(navigationFrame.capture.requestedLayers).toEqual(['frame'])
       const navigationManifest = JSON.parse(
         (await readMcpResource(navigationCapture.manifestResourceUri)).text
       )
       expect(navigationManifest.interactions.finalState.pageId).toBe(detailsPageId)
+      expect(navigationManifest.page.navigatedToId).toBe(
+        navigationManifest.interactions.finalState.pageId
+      )
 
       const scrollCapture = expectToolSuccess<{
         layerResources: { frame: string }
