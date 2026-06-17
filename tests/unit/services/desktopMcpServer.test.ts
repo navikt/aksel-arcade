@@ -1375,6 +1375,9 @@ describe('desktopMcpServer', () => {
     expect(authoringGuidePayload.result.contents[0].text).toContain('FormProgress')
     expect(authoringGuidePayload.result.contents[0].text).toContain('Stepper')
     expect(authoringGuidePayload.result.contents[0].text).toContain('FormSummary')
+    expect(authoringGuidePayload.result.contents[0].text).toContain(
+      'instead of rendering both at once'
+    )
     // The object-literal-wrapped page ({(() => {...})()}) breaks the whole preview and must
     // never be presented as a usable snippet — only as the explicit anti-pattern warning.
     expect(authoringGuidePayload.result.contents[0].text).not.toContain('\n{(() => {')

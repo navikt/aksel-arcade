@@ -3961,3 +3961,17 @@ Verification:
 
 Next note:
 - `#301` should stay a separate cleanup-only pass. If that removal work later touches the MCP guidance surfaces, keep the new single-page stateful-flow phrasing aligned between `arcade://desktop/start-here`, `arcade://desktop/authoring-guide`, and the reconciled `docs/prd/0030-multi-page-support.md` text instead of broadening this slice again.
+
+
+2026-06-18 - PR #308 review follow-up
+
+Fixed one PR-scoped review issue before merge:
+- Tightened the new single-page step-flow example in `desktop/mcpServer.cjs` so it no longer renders a standalone `Stepper` under `FormProgress`. The guide now wires `FormProgress` itself with `onStepChange={setActiveStep}` and explicitly tells agents to swap the compact `FormProgress` block for `Stepper` only when they want that alternate presentation, instead of rendering both at once.
+- Extended `tests/unit/services/desktopMcpServer.test.ts` with a regression assertion for the new "instead of rendering both at once" guidance, so the served authoring-guide text keeps the example non-duplicative and non-misleading.
+
+Verification:
+- CI=1 npm test -- --run tests/unit/services/desktopMcpServer.test.ts
+- npm run typecheck
+- npm run lint
+- CI=1 npm test -- --run
+- Browser smoke check at `http://127.0.0.1:4173/aksel-arcade/` with the app shell + preview rendered and no browser-console warnings/errors
