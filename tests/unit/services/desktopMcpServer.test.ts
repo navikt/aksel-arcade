@@ -1350,6 +1350,9 @@ describe('desktopMcpServer', () => {
     )
     expect(authoringGuidePayload.result.contents[0].text).toContain('goToPage')
     expect(authoringGuidePayload.result.contents[0].text).toContain('arcade://aksel/catalog')
+    expect(authoringGuidePayload.result.contents[0].text).toContain(
+      'Read `arcade://aksel/catalog` before guessing a component name'
+    )
     expect(authoringGuidePayload.result.contents[0].text).toContain('https://aksel.nav.no/llm.md')
     expect(authoringGuidePayload.result.contents[0].text).toContain('two source tabs')
     expect(authoringGuidePayload.result.contents[0].text).toContain(
@@ -1554,6 +1557,12 @@ describe('desktopMcpServer', () => {
     const component = JSON.parse(componentPayload.result.contents[0].text)
     expect(component.akselVersion).toBe(catalog.akselVersion)
     expect(component.component.name).toBe('Button')
+    expect(component.resolution).toMatchObject({
+      kind: 'exact',
+      requestedName: 'Button',
+      matchedName: 'Button',
+      resourceUri: 'arcade://aksel/components/Button',
+    })
     expect(component.usage).toContain('page Hooks tab')
     expect(component.usage).toContain('Global config `hooks` is only for defining shared custom hooks')
     expect(component.usage).not.toContain('page Hooks (or Global config)')
@@ -1573,13 +1582,91 @@ describe('desktopMcpServer', () => {
     const caseInsensitivePayload = await caseInsensitiveResponse.json()
     expect(JSON.parse(caseInsensitivePayload.result.contents[0].text).component.name).toBe('Button')
 
+    const aliasResponse = await postJson(state.url, {
+      jsonrpc: '2.0',
+      id: 93,
+      method: 'resources/read',
+      params: {
+        uri: 'arcade://aksel/components/RadioGroup',
+      },
+    })
+    expect(aliasResponse.status).toBe(200)
+    const aliasPayload = await aliasResponse.json()
+    const aliasComponent = JSON.parse(aliasPayload.result.contents[0].text)
+    expect(aliasComponent.component.name).toBe('Radio')
+    expect(aliasComponent.resolution).toMatchObject({
+      kind: 'alias',
+      requestedName: 'RadioGroup',
+      aliasName: 'RadioGroup',
+      matchedName: 'Radio',
+      resourceUri: 'arcade://aksel/components/Radio',
+    })
+
+    const hiddenRootResponse = await postJson(state.url, {
+      jsonrpc: '2.0',
+      id: 94,
+      method: 'resources/read',
+      params: {
+        uri: 'arcade://aksel/components/Alert',
+      },
+    })
+    expect(hiddenRootResponse.status).toBe(200)
+    const hiddenRootPayload = await hiddenRootResponse.json()
+    const hiddenRootResolution = JSON.parse(hiddenRootPayload.result.contents[0].text).resolution
+    expect(hiddenRootResolution).toMatchObject({
+      kind: 'replacement',
+      requestedName: 'Alert',
+      hiddenRootName: 'Alert',
+      reason: 'deprecated',
+    })
+    expect(hiddenRootResolution.replacements).toEqual([
+      {
+        name: 'InlineMessage',
+        resourceUri: 'arcade://aksel/components/InlineMessage',
+      },
+      {
+        name: 'LocalAlert',
+        resourceUri: 'arcade://aksel/components/LocalAlert',
+      },
+      {
+        name: 'GlobalAlert',
+        resourceUri: 'arcade://aksel/components/GlobalAlert',
+      },
+    ])
+
+    const hiddenDescendantResponse = await postJson(state.url, {
+      jsonrpc: '2.0',
+      id: 95,
+      method: 'resources/read',
+      params: {
+        uri: 'arcade://aksel/components/Dropdown.Menu',
+      },
+    })
+    expect(hiddenDescendantResponse.status).toBe(200)
+    const hiddenDescendantPayload = await hiddenDescendantResponse.json()
+    const hiddenDescendantResolution = JSON.parse(
+      hiddenDescendantPayload.result.contents[0].text
+    ).resolution
+    expect(hiddenDescendantResolution).toMatchObject({
+      kind: 'replacement',
+      requestedName: 'Dropdown.Menu',
+      hiddenRootName: 'Dropdown',
+      reason: 'replaced',
+    })
+    expect(hiddenDescendantResolution.replacements).toEqual([
+      {
+        name: 'ActionMenu',
+        resourceUri: 'arcade://aksel/components/ActionMenu',
+      },
+    ])
+
     const spacedIndex = catalog.components.find((component: { name: string }) =>
       component.name.includes(' ')
     )
     if (spacedIndex) {
       const spacedResponse = await postJson(state.url, {
         jsonrpc: '2.0',
-        id: 94,
+        id: 96,
         method: 'resources/read',
         params: {
           uri: spacedIndex.resourceUri,
@@ -1595,21 +1682,30 @@ describe('desktopMcpServer', () => {
 
     const unknownComponentResponse = await postJson(state.url, {
       jsonrpc: '2.0',
-      id: 93,
+      id: 97,
       method: 'resources/read',
       params: {
-        uri: 'arcade://aksel/components/NotARealComponent',
+        uri: 'arcade://aksel/components/Buton',
       },
     })
+    expect(unknownComponentResponse.status).toBe(200)
     const unknownComponentPayload = await unknownComponentResponse.json()
-    expect(unknownComponentPayload.error).toMatchObject({
-      code: -32002,
-      data: {
-        code: 'resource-not-found',
-        resourceUri: 'arcade://aksel/components/NotARealComponent',
-      },
+    const unknownComponentResolution = JSON.parse(
+      unknownComponentPayload.result.contents[0].text
+    ).resolution
+    expect(unknownComponentResolution).toMatchObject({
+      kind: 'did-you-mean',
+      requestedName: 'Buton',
     })
-    expect(unknownComponentPayload.error.message).toContain('arcade://aksel/catalog')
+    expect(unknownComponentResolution.message).toContain('arcade://aksel/catalog')
+    expect(unknownComponentResolution.suggestions).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          name: 'Button',
+          resourceUri: 'arcade://aksel/components/Button',
+        }),
+      ])
+    )
   })
 
   it('serves the apply_changes operations reference and advertises Aksel snippet resources', async () => {

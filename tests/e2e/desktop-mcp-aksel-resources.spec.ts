@@ -91,11 +91,62 @@ test.describe('Desktop MCP on-demand Aksel resources', () => {
       const component = await readJsonMcpResource(3, buttonIndex.resourceUri)
       expect(component.akselVersion).toBe(catalog.akselVersion)
       expect(component.component.name).toBe('Button')
+      expect(component.resolution).toMatchObject({
+        kind: 'exact',
+        matchedName: 'Button',
+      })
       expect(component.component.snippet.jsx).not.toMatch(/\bimport\b/)
       expect(component.component.snippet.jsx).not.toContain('${')
       expect(component.component.snippet.jsx).not.toMatch(/\{\{[\w]+\}\}/)
 
-      const operations = await readMcpResource(4, 'arcade://desktop/apply-changes-operations')
+      const alias = await readJsonMcpResource(4, 'arcade://aksel/components/RadioGroup')
+      expect(alias.component.name).toBe('Radio')
+      expect(alias.resolution).toMatchObject({
+        kind: 'alias',
+        requestedName: 'RadioGroup',
+        matchedName: 'Radio',
+      })
+
+      const hiddenRoot = await readJsonMcpResource(5, 'arcade://aksel/components/Alert')
+      expect(hiddenRoot.resolution).toMatchObject({
+        kind: 'replacement',
+        hiddenRootName: 'Alert',
+        reason: 'deprecated',
+      })
+      expect(hiddenRoot.resolution.replacements).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ name: 'InlineMessage' }),
+          expect.objectContaining({ name: 'LocalAlert' }),
+          expect.objectContaining({ name: 'GlobalAlert' }),
+        ])
+      )
+
+      const hiddenDescendant = await readJsonMcpResource(6, 'arcade://aksel/components/Dropdown.Menu')
+      expect(hiddenDescendant.resolution).toMatchObject({
+        kind: 'replacement',
+        requestedName: 'Dropdown.Menu',
+        hiddenRootName: 'Dropdown',
+        reason: 'replaced',
+      })
+      expect(hiddenDescendant.resolution.replacements).toEqual([
+        expect.objectContaining({ name: 'ActionMenu' }),
+      ])
+
+      const suggestions = await readJsonMcpResource(7, 'arcade://aksel/components/Buton')
+      expect(suggestions.resolution).toMatchObject({
+        kind: 'did-you-mean',
+        requestedName: 'Buton',
+      })
+      expect(suggestions.resolution.suggestions).toEqual(
+        expect.arrayContaining([expect.objectContaining({ name: 'Button' })])
+      )
+
+      const authoringGuide = await readMcpResource(8, 'arcade://desktop/authoring-guide')
+      expect(authoringGuide.text).toContain(
+        'Read `arcade://aksel/catalog` before guessing a component name'
+      )
+
+      const operations = await readMcpResource(9, 'arcade://desktop/apply-changes-operations')
       expect(operations.mimeType).toBe('text/markdown')
       expect(operations.text).toContain('`create_page`')
       expect(operations.text).toContain('`replace_source`')

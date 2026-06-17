@@ -103,6 +103,7 @@ const AKSEL_COMPONENT_RESOURCE_URI_PREFIX = 'arcade://aksel/components/'
 const AKSEL_COMPONENT_RESOURCE_URI_TEMPLATE = `${AKSEL_COMPONENT_RESOURCE_URI_PREFIX}{name}`
 const AKSEL_COMPONENT_RESOURCE_URI_PATTERN = /^arcade:\/\/aksel\/components\/([A-Za-z0-9.%\- ]+)$/
 const APPLY_CHANGES_OPERATIONS_RESOURCE_URI = 'arcade://desktop/apply-changes-operations'
+const MAX_AKSEL_COMPONENT_SUGGESTIONS = 5
 
 const APPLY_CHANGES_NEXT_STEPS = Object.freeze([
   'Read arcade://project/diagnostics to confirm the batch is healthy.',
@@ -129,6 +130,16 @@ const DESKTOP_MCP_INSTRUCTIONS = [
 // `npm run aksel:refresh-mcp-catalog`. Served on demand through the
 // arcade://aksel/catalog and arcade://aksel/components/{name} resources so the
 // agent never loads component data into context until it reaches for a component.
+const isObjectRecord = (value) => value !== null && typeof value === 'object' && !Array.isArray(value)
+
+const createEmptyAkselCatalogData = () => ({
+  akselVersion: 'unknown',
+  components: [],
+  componentsByName: {},
+  componentAliases: {},
+  hiddenRootReplacements: {},
+})
+
 const loadAkselCatalogData = () => {
   try {
     const data = require('./akselCatalogData.generated.cjs')
@@ -140,13 +151,21 @@ const loadAkselCatalogData = () => {
       data.componentsByName &&
       typeof data.componentsByName === 'object'
     ) {
-      return data
+      return {
+        akselVersion: data.akselVersion,
+        components: data.components,
+        componentsByName: data.componentsByName,
+        componentAliases: isObjectRecord(data.componentAliases) ? data.componentAliases : {},
+        hiddenRootReplacements: isObjectRecord(data.hiddenRootReplacements)
+          ? data.hiddenRootReplacements
+          : {},
+      }
     }
   } catch {
     // Artifact is generated at build time; fall back to an empty catalog in
     // environments where it has not been generated yet.
   }
-  return { akselVersion: 'unknown', components: [], componentsByName: {} }
+  return createEmptyAkselCatalogData()
 }
 
 const AKSEL_CATALOG_DATA = loadAkselCatalogData()
@@ -164,14 +183,159 @@ const decodeAkselComponentName = (rawName) => {
   }
 }
 
-const findAkselComponentDetail = (name) => {
-  const byName = AKSEL_CATALOG_DATA.componentsByName
-  if (Object.prototype.hasOwnProperty.call(byName, name)) {
-    return byName[name]
+const findCaseInsensitiveCatalogValue = (record, name) => {
+  if (Object.prototype.hasOwnProperty.call(record, name)) {
+    return { key: name, value: record[name] }
   }
+
   const lowered = name.toLowerCase()
-  const matchKey = Object.keys(byName).find((key) => key.toLowerCase() === lowered)
-  return matchKey ? byName[matchKey] : null
+  const matchKey = Object.keys(record).find((key) => key.toLowerCase() === lowered)
+  return matchKey ? { key: matchKey, value: record[matchKey] } : null
+}
+
+const findAkselComponentDetail = (name) =>
+  findCaseInsensitiveCatalogValue(AKSEL_CATALOG_DATA.componentsByName, name)
+
+const findAkselComponentAlias = (name) =>
+  findCaseInsensitiveCatalogValue(AKSEL_CATALOG_DATA.componentAliases, name)
+
+const getAkselComponentRootName = (name) => name.split('.')[0] ?? name
+
+const findAkselHiddenRootReplacement = (name) => {
+  const exactMatch = findCaseInsensitiveCatalogValue(AKSEL_CATALOG_DATA.hiddenRootReplacements, name)
+  if (exactMatch) {
+    return exactMatch
+  }
+
+  const rootName = getAkselComponentRootName(name)
+  if (rootName === name) {
+    return null
+  }
+
+  return findCaseInsensitiveCatalogValue(AKSEL_CATALOG_DATA.hiddenRootReplacements, rootName)
+}
+
+const normalizeAkselComponentName = (name) => name.toLowerCase().replace(/[^a-z0-9]/g, '')
+
+const calculateEditDistance = (source, target) => {
+  if (source === target) {
+    return 0
+  }
+  if (source.length === 0) {
+    return target.length
+  }
+  if (target.length === 0) {
+    return source.length
+  }
+
+  const previousRow = Array.from({ length: target.length + 1 }, (_, index) => index)
+  for (let sourceIndex = 0; sourceIndex < source.length; sourceIndex += 1) {
+    let nextDiagonal = sourceIndex
+    previousRow[0] = sourceIndex + 1
+    for (let targetIndex = 0; targetIndex < target.length; targetIndex += 1) {
+      const oldValue = previousRow[targetIndex + 1]
+      const substitutionCost = source[sourceIndex] === target[targetIndex] ? 0 : 1
+      previousRow[targetIndex + 1] = Math.min(
+        previousRow[targetIndex + 1] + 1,
+        previousRow[targetIndex] + 1,
+        nextDiagonal + substitutionCost
+      )
+      nextDiagonal = oldValue
+    }
+  }
+  return previousRow[target.length]
+}
+
+const listAkselComponentSuggestions = (requestedName) => {
+  const requestedLowered = requestedName.toLowerCase()
+  const requestedNormalized = normalizeAkselComponentName(requestedName)
+  const ranked = AKSEL_CATALOG_DATA.components.map((component) => {
+    const candidateName = component.name
+    const candidateLowered = candidateName.toLowerCase()
+    const candidateNormalized = normalizeAkselComponentName(candidateName)
+    let score = calculateEditDistance(
+      requestedNormalized || requestedLowered,
+      candidateNormalized || candidateLowered
+    )
+
+    if (
+      requestedNormalized &&
+      (candidateNormalized.startsWith(requestedNormalized) ||
+        requestedNormalized.startsWith(candidateNormalized))
+    ) {
+      score -= 2
+    }
+    if (
+      requestedNormalized &&
+      (candidateNormalized.includes(requestedNormalized) ||
+        requestedNormalized.includes(candidateNormalized))
+    ) {
+      score -= 1
+    }
+    if (
+      candidateLowered.includes(requestedLowered) ||
+      requestedLowered.includes(candidateLowered)
+    ) {
+      score -= 1
+    }
+
+    return { name: candidateName, score }
+  })
+
+  return ranked
+    .sort((left, right) => left.score - right.score || left.name.localeCompare(right.name))
+    .slice(0, MAX_AKSEL_COMPONENT_SUGGESTIONS)
+    .map((entry) => entry.name)
+}
+
+const createAkselComponentLink = (name) => ({
+  name,
+  resourceUri: `${AKSEL_COMPONENT_RESOURCE_URI_PREFIX}${encodeURIComponent(name)}`,
+})
+
+const resolveAkselComponentRequest = (requestedName) => {
+  const exactMatch = findAkselComponentDetail(requestedName)
+  if (exactMatch) {
+    return {
+      kind: 'exact',
+      requestedName,
+      matchedName: exactMatch.key,
+      resourceUri: createAkselComponentLink(exactMatch.key).resourceUri,
+      component: exactMatch.value,
+    }
+  }
+
+  const aliasMatch = findAkselComponentAlias(requestedName)
+  if (aliasMatch) {
+    const aliasedComponent = findAkselComponentDetail(aliasMatch.value)
+    if (aliasedComponent) {
+      return {
+        kind: 'alias',
+        requestedName,
+        aliasName: aliasMatch.key,
+        matchedName: aliasedComponent.key,
+        resourceUri: createAkselComponentLink(aliasedComponent.key).resourceUri,
+        component: aliasedComponent.value,
+      }
+    }
+  }
+
+  const hiddenRootMatch = findAkselHiddenRootReplacement(requestedName)
+  if (hiddenRootMatch) {
+    return {
+      kind: 'replacement',
+      requestedName,
+      hiddenRootName: hiddenRootMatch.key,
+      reason: hiddenRootMatch.value.reason,
+      replacements: hiddenRootMatch.value.replacements.map(createAkselComponentLink),
+    }
+  }
+
+  return {
+    kind: 'did-you-mean',
+    requestedName,
+    suggestions: listAkselComponentSuggestions(requestedName).map(createAkselComponentLink),
+  }
 }
 
 const MCP_TOOL_DEFINITIONS = Object.freeze([
@@ -1255,21 +1419,11 @@ const readDesktopResource = async (uri, { previewCaptureStore, readProjectResour
   if (isAkselComponentResourceUri(uri)) {
     const match = uri.match(AKSEL_COMPONENT_RESOURCE_URI_PATTERN)
     const requestedName = decodeAkselComponentName(match ? match[1] : '')
-    const detail = findAkselComponentDetail(requestedName)
-    if (!detail) {
-      return {
-        ok: false,
-        code: 'resource-not-found',
-        resourceUri: uri,
-        message: `Unknown Aksel component "${requestedName}". Read ${AKSEL_CATALOG_RESOURCE_URI} for the available components and their snippet-resource URIs.`,
-      }
-    }
-
     return {
       ok: true,
       uri,
       mimeType: 'application/json',
-      text: createAkselComponentResourceText(detail),
+      text: createAkselComponentResourceText(resolveAkselComponentRequest(requestedName)),
     }
   }
 
@@ -1947,13 +2101,71 @@ const createToolExecutionErrorResult = (toolName, code, message, extras = {}) =>
   },
 })
 
-const createAkselComponentResourceText = (detail) =>
-  JSON.stringify({
-    akselVersion: AKSEL_CATALOG_DATA.akselVersion,
-    usage:
-      'Import-free, version-matched Arcade snippet. Paste the JSX into a page; if `hooks` is present, put it in the page Hooks tab. Global config `hooks` is only for defining shared custom hooks, helpers, constants, and components, never for top-level hook calls. Do not add import statements.',
-    component: detail,
-  })
+const AKSEL_COMPONENT_USAGE =
+  'Import-free, version-matched Arcade snippet. Paste the JSX into a page; if `hooks` is present, put it in the page Hooks tab. Global config `hooks` is only for defining shared custom hooks, helpers, constants, and components, never for top-level hook calls. Do not add import statements.'
+
+const createAkselComponentResourceText = (resolution) => {
+  switch (resolution.kind) {
+    case 'exact':
+      return JSON.stringify({
+        akselVersion: AKSEL_CATALOG_DATA.akselVersion,
+        usage: AKSEL_COMPONENT_USAGE,
+        resolution: {
+          kind: 'exact',
+          requestedName: resolution.requestedName,
+          matchedName: resolution.matchedName,
+          resourceUri: resolution.resourceUri,
+        },
+        component: resolution.component,
+      })
+    case 'alias':
+      return JSON.stringify({
+        akselVersion: AKSEL_CATALOG_DATA.akselVersion,
+        usage: AKSEL_COMPONENT_USAGE,
+        resolution: {
+          kind: 'alias',
+          requestedName: resolution.requestedName,
+          aliasName: resolution.aliasName,
+          matchedName: resolution.matchedName,
+          resourceUri: resolution.resourceUri,
+          message: `${resolution.requestedName} resolves to the ${resolution.matchedName} snippet in Arcade. Use ${resolution.matchedName} for the runnable example.`,
+        },
+        component: resolution.component,
+      })
+    case 'replacement':
+      return JSON.stringify({
+        akselVersion: AKSEL_CATALOG_DATA.akselVersion,
+        resolution: {
+          kind: 'replacement',
+          requestedName: resolution.requestedName,
+          hiddenRootName: resolution.hiddenRootName,
+          reason: resolution.reason,
+          message: `${resolution.hiddenRootName} is intentionally hidden from new authoring. Use one of these sanctioned replacements instead.`,
+          replacements: resolution.replacements,
+        },
+      })
+    case 'did-you-mean':
+      return JSON.stringify({
+        akselVersion: AKSEL_CATALOG_DATA.akselVersion,
+        resolution: {
+          kind: 'did-you-mean',
+          requestedName: resolution.requestedName,
+          message: `Unknown Aksel component "${resolution.requestedName}". Read ${AKSEL_CATALOG_RESOURCE_URI} first, then try one of these near matches.`,
+          suggestions: resolution.suggestions,
+        },
+      })
+    default:
+      return JSON.stringify({
+        akselVersion: AKSEL_CATALOG_DATA.akselVersion,
+        resolution: {
+          kind: 'did-you-mean',
+          requestedName: resolution.requestedName,
+          message: `Unknown Aksel component "${resolution.requestedName}". Read ${AKSEL_CATALOG_RESOURCE_URI} first.`,
+          suggestions: [],
+        },
+      })
+  }
+}
 
 const createDesktopStableResourceText = (uri) => {
   const guidanceText = createMcpGuidanceResourceText(uri)
@@ -2003,7 +2215,7 @@ const createDesktopStableResourceText = (uri) => {
         '- `apply_changes` operations are heterogeneous; see `arcade://desktop/apply-changes-operations` for the per-operation fields.',
         '',
         '## Getting Aksel component usage (on demand — fetch only the components you need)',
-        'Do not guess props or hand-roll HTML. When you reach for a component, pull its usage one component at a time, in this priority order:',
+        'Read `arcade://aksel/catalog` before guessing a component name, then pull usage one component at a time in this priority order:',
         `1. **\`${AKSEL_CATALOG_RESOURCE_URI}\`** — a compact index of the components available here, each with its own \`${AKSEL_COMPONENT_RESOURCE_URI_TEMPLATE}\` snippet resource. These snippets are import-free, version-matched to this Arcade runtime (Aksel ${AKSEL_CATALOG_DATA.akselVersion}), and guaranteed to run. Prefer this path.`,
         '2. **`https://aksel.nav.no/llm.md`** — the public docs index; fetch the individual component `.md` article when you need more than the snippet.',
         '3. **Aksel MCP tools** (`aksel_find_docs`, `aksel_get_component_info`, `aksel_find_icons`, `aksel_get_token_details`) — use them only if your client already has that server connected.',
