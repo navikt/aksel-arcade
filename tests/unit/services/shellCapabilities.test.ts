@@ -14,11 +14,10 @@ describe('shellCapabilities', () => {
     delete window.__AKSEL_ARCADE_DESKTOP__
   })
 
-  it('defines Web Arcade capabilities with Share URL enabled and Agent sessions disabled', () => {
+  it('defines Web Arcade capabilities with Share URL enabled', () => {
     expect(WEB_ARCADE_CAPABILITIES).toMatchObject({
       surface: 'web',
       shareUrl: { enabled: true },
-      agentSessions: { enabled: false },
       projectPackages: {
         enabled: true,
         defaultExtension: '.akselarcade',
@@ -27,11 +26,10 @@ describe('shellCapabilities', () => {
     })
   })
 
-  it('defines Desktop Arcade capabilities with the legacy Agent-session UI disabled and Share URL disabled', () => {
+  it('defines Desktop Arcade capabilities with Share URL disabled', () => {
     expect(DESKTOP_ARCADE_CAPABILITIES).toMatchObject({
       surface: 'desktop',
       shareUrl: { enabled: false },
-      agentSessions: { enabled: false },
       projectPackages: {
         enabled: true,
         defaultExtension: '.akselarcade',
