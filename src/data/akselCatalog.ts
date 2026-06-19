@@ -372,6 +372,53 @@ const AKSEL_CONTEXTUAL_AUTOCOMPLETE_RULES: AkselContextualAutocompleteRule[] = [
     exclusive: true,
   },
   {
+    parent: 'InfoCard',
+    children: [
+      {
+        name: 'InfoCard.Header',
+        insertion: {
+          jsx:
+            '<InfoCard.Header icon={<InformationSquareIcon aria-hidden />}>\n' +
+            '  <InfoCard.Title>Fremhevet informasjon</InfoCard.Title>\n' +
+            '</InfoCard.Header>',
+        },
+      },
+      {
+        name: 'InfoCard.Content',
+        insertion: {
+          jsx:
+            '<InfoCard.Content>\n' +
+            '  InfoCard brukes for å fremheve informasjon på en side, uten at det er like\n' +
+            '  kritisk som en alert.\n' +
+            '</InfoCard.Content>',
+        },
+      },
+      {
+        name: 'InfoCard.Message',
+        insertion: {
+          jsx:
+            '<InfoCard.Message icon={<InformationSquareIcon aria-hidden />}>\n' +
+            '  Fremhevet informasjon som ikke krever handling, ofte bare en kort melding du\n' +
+            '  ønsker å fremheve for brukeren.\n' +
+            '</InfoCard.Message>',
+        },
+      },
+    ],
+    exclusive: true,
+  },
+  {
+    parent: 'InfoCard.Header',
+    children: [
+      {
+        name: 'InfoCard.Title',
+        insertion: {
+          jsx: '<InfoCard.Title>Fremhevet informasjon</InfoCard.Title>',
+        },
+      },
+    ],
+    exclusive: true,
+  },
+  {
     parent: 'ActionMenu',
     children: [{ name: 'ActionMenu.Trigger' }, { name: 'ActionMenu.Content' }],
     exclusive: true,
@@ -3087,6 +3134,76 @@ export const AKSEL_CATALOG: AkselCatalogEntry[] = [
         '  </LocalAlert.Content>\n' +
         '</LocalAlert>',
       description: 'Visible local warning message.',
+    },
+  },
+  {
+    id: 'infocard',
+    name: 'InfoCard',
+    group: 'component',
+    status: 'current',
+    package: '@navikt/ds-react',
+    importName: 'InfoCard',
+    importGuidance:
+      "import { InfoCard } from '@navikt/ds-react';\n" +
+      "import { InformationSquareIcon } from '@navikt/aksel-icons';",
+    docs: `${COMPONENT_DOCS_BASE}/infocard`,
+    description: 'Highlighted information card with icon, title, and supporting text.',
+    keywords: ['info card', 'infocard', 'information', 'highlight', 'fremhevet', 'card'],
+    props: [
+      {
+        name: 'children',
+        type: 'ReactNode',
+        required: true,
+        description: 'Component content.',
+      },
+      {
+        name: 'size',
+        type: '"medium" | "small"',
+        values: ['medium', 'small'],
+        valueKind: 'enum',
+        default: 'medium',
+        description: 'Changes the size.',
+      },
+      {
+        name: 'data-color',
+        type:
+          '"neutral" | "accent" | "info" | "success" | "warning" | "danger" | "brand-magenta" | "brand-beige" | "brand-blue" | "meta-purple" | "meta-lime"',
+        values: dataColorValues,
+        valueKind: 'data-color',
+        description: 'Overrides inherited color.',
+      },
+      {
+        name: 'as',
+        type: '"div" | "section"',
+        values: ['div', 'section'],
+        valueKind: 'enum',
+        default: 'div',
+        description:
+          'Changes the HTML element used for the root element. Provide aria-label or aria-labelledby when using section.',
+      },
+      {
+        name: 'className',
+        type: 'string',
+        description: 'Custom CSS class name.',
+      },
+      {
+        name: 'ref',
+        type: 'Ref<HTMLDivElement>',
+        description: 'Ref to the root element.',
+      },
+    ],
+    snippet: {
+      code:
+        '<InfoCard data-color="info">\n' +
+        '  <InfoCard.Header icon={<InformationSquareIcon aria-hidden />}>\n' +
+        '    <InfoCard.Title>Fremhevet informasjon</InfoCard.Title>\n' +
+        '  </InfoCard.Header>\n' +
+        '  <InfoCard.Content>\n' +
+        '    InfoCard brukes for å fremheve informasjon på en side, uten at det er like\n' +
+        '    kritisk som en alert.\n' +
+        '  </InfoCard.Content>\n' +
+        '</InfoCard>',
+      description: 'Highlighted information card with icon, title, and supporting text.',
     },
   },
   {

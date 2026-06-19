@@ -316,6 +316,13 @@ module.exports = {
       "resourceUri": "arcade://aksel/components/LocalAlert"
     },
     {
+      "name": "InfoCard",
+      "group": "component",
+      "status": "current",
+      "purpose": "Highlighted information card with icon, title, and supporting text.",
+      "resourceUri": "arcade://aksel/components/InfoCard"
+    },
+    {
       "name": "Dialog",
       "group": "component",
       "status": "current",
@@ -3669,6 +3676,80 @@ module.exports = {
       ],
       "snippet": {
         "jsx": "<LocalAlert status=\"warning\">\n  <LocalAlert.Header>\n    <LocalAlert.Title>Missing supporting documents</LocalAlert.Title>\n  </LocalAlert.Header>\n  <LocalAlert.Content>\n    Upload the latest payslip before you send the application.\n  </LocalAlert.Content>\n</LocalAlert>"
+      }
+    },
+    "InfoCard": {
+      "name": "InfoCard",
+      "group": "component",
+      "status": "current",
+      "description": "Highlighted information card with icon, title, and supporting text.",
+      "docs": "https://aksel.nav.no/komponenter/core/infocard",
+      "keywords": [
+        "info card",
+        "infocard",
+        "information",
+        "highlight",
+        "fremhevet",
+        "card"
+      ],
+      "props": [
+        {
+          "name": "children",
+          "type": "ReactNode",
+          "required": true,
+          "description": "Component content."
+        },
+        {
+          "name": "size",
+          "type": "\"medium\" | \"small\"",
+          "values": [
+            "medium",
+            "small"
+          ],
+          "default": "medium",
+          "description": "Changes the size."
+        },
+        {
+          "name": "data-color",
+          "type": "\"neutral\" | \"accent\" | \"info\" | \"success\" | \"warning\" | \"danger\" | \"brand-magenta\" | \"brand-beige\" | \"brand-blue\" | \"meta-purple\" | \"meta-lime\"",
+          "values": [
+            "neutral",
+            "accent",
+            "success",
+            "warning",
+            "danger",
+            "info",
+            "brand-magenta",
+            "brand-beige",
+            "brand-blue",
+            "meta-lime",
+            "meta-purple"
+          ],
+          "description": "Overrides inherited color."
+        },
+        {
+          "name": "as",
+          "type": "\"div\" | \"section\"",
+          "values": [
+            "div",
+            "section"
+          ],
+          "default": "div",
+          "description": "Changes the HTML element used for the root element. Provide aria-label or aria-labelledby when using section."
+        },
+        {
+          "name": "className",
+          "type": "string",
+          "description": "Custom CSS class name."
+        },
+        {
+          "name": "ref",
+          "type": "Ref<HTMLDivElement>",
+          "description": "Ref to the root element."
+        }
+      ],
+      "snippet": {
+        "jsx": "<InfoCard data-color=\"info\">\n  <InfoCard.Header icon={<InformationSquareIcon aria-hidden />}>\n    <InfoCard.Title>Fremhevet informasjon</InfoCard.Title>\n  </InfoCard.Header>\n  <InfoCard.Content>\n    InfoCard brukes for å fremheve informasjon på en side, uten at det er like\n    kritisk som en alert.\n  </InfoCard.Content>\n</InfoCard>"
       }
     },
     "Dialog": {

@@ -15,6 +15,7 @@ import {
   type AkselAutocompleteEntry,
   type AkselAutocompleteProp,
 } from '@/data/akselAutocompleteData'
+import { AKSEL_AUTOCOMPLETE_LOCAL_ENTRIES } from '@/data/akselAutocompleteLocalEntries'
 import { insertionNeedsEditorApply } from '@/services/componentInsertion'
 import type { ArcadePage } from '@/types/project'
 import type { ComponentInsertion } from '@/types/snippets'
@@ -43,10 +44,12 @@ const catalogCompletionEntries = catalogEntries
   .map((entry) => ({ ...entry, source: 'catalog' as const }))
 const catalogEntryNames = new Set(catalogCompletionEntries.map((entry) => entry.name))
 const catalogImportNames = new Set(catalogCompletionEntries.map((entry) => entry.importName))
-const docsEntries = AKSEL_AUTOCOMPLETE_ENTRIES.map((entry) => ({
-  ...entry,
-  source: 'docs' as const,
-}))
+const docsEntries = [...AKSEL_AUTOCOMPLETE_ENTRIES, ...AKSEL_AUTOCOMPLETE_LOCAL_ENTRIES].map(
+  (entry) => ({
+    ...entry,
+    source: 'docs' as const,
+  })
+)
 const iconEntries = catalogEntries
   .filter((entry) => entry.group === 'icon')
   .map((entry) => ({ ...entry, source: 'catalog' as const }))
