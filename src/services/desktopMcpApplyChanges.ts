@@ -26,6 +26,7 @@ import {
   setStartPage,
   updateSourceForTarget,
 } from '@/services/projectSource'
+import { resolveAlertMigration } from '@/data/akselAuthoringPolicy'
 import { validateProjectSize } from '@/services/storage'
 import type {
   DesktopMcpApplyChangesFailure,
@@ -41,6 +42,16 @@ const MAX_PROJECT_NAME_LENGTH = 100
 const PAGE_REF_PLACEHOLDER_PATTERN = /\{\{pageRef:([^}]+)\}\}/g
 const TEMP_PAGE_REF_PATTERN = /^[^{}\s]+$/
 const STATIC_IMPORT_STATEMENT_PATTERN = /^\s*import\b/m
+const ALERT_TAG_PATTERN = /<Alert(?=[\s/>])/g
+const DEPRECATED_ALERT_PROP_NAMES = new Set([
+  'closeButton',
+  'contentMaxWidth',
+  'data-color',
+  'fullWidth',
+  'inline',
+  'onClose',
+  'variant',
+])
 
 interface DesktopMcpApplyChangesContext {
   project: Project
@@ -65,6 +76,20 @@ interface UsedPageRefPlaceholder {
   pageId: ArcadePageId
 }
 
+interface ParsedJsxAttributeToken {
+  name: string | null
+  raw: string
+  valueRaw?: string
+}
+
+interface ParsedAlertElement {
+  attrText: string
+  contentStart: number
+  contentEnd: number
+  end: number
+  selfClosing: boolean
+}
+
 export interface PreparedDesktopMcpApplyChangesSuccess {
   ok: true
   nextProject: Project
@@ -77,6 +102,400 @@ export interface PreparedDesktopMcpApplyChangesSuccess {
 export type PreparedDesktopMcpApplyChangesResult =
   | PreparedDesktopMcpApplyChangesSuccess
   | DesktopMcpApplyChangesFailure
+
+const readBalancedJsxBraces = (text: string, startIndex: number): number | null => {
+  let depth = 0
+  let activeQuote: '"' | "'" | '`' | null = null
+
+  for (let index = startIndex; index < text.length; index += 1) {
+    const character = text[index]
+
+    if (activeQuote) {
+      if (character === '\\') {
+        index += 1
+        continue
+      }
+      if (character === activeQuote) {
+        activeQuote = null
+      }
+      continue
+    }
+
+    if (character === '"' || character === "'" || character === '`') {
+      activeQuote = character
+      continue
+    }
+
+    if (character === '{') {
+      depth += 1
+      continue
+    }
+
+    if (character === '}') {
+      depth -= 1
+      if (depth === 0) {
+        return index + 1
+      }
+    }
+  }
+
+  return null
+}
+
+const parseJsxAttributeTokens = (attrText: string): ParsedJsxAttributeToken[] => {
+  const tokens: ParsedJsxAttributeToken[] = []
+  let index = 0
+
+  while (index < attrText.length) {
+    while (index < attrText.length && /\s/.test(attrText[index] ?? '')) {
+      index += 1
+    }
+    if (index >= attrText.length) {
+      break
+    }
+
+    if (attrText[index] === '{') {
+      const end = readBalancedJsxBraces(attrText, index)
+      if (!end) {
+        break
+      }
+      tokens.push({
+        name: null,
+        raw: attrText.slice(index, end),
+      })
+      index = end
+      continue
+    }
+
+    const nameStart = index
+    while (index < attrText.length && !/[\s=]/.test(attrText[index] ?? '')) {
+      index += 1
+    }
+    const name = attrText.slice(nameStart, index)
+    while (index < attrText.length && /\s/.test(attrText[index] ?? '')) {
+      index += 1
+    }
+
+    if (attrText[index] !== '=') {
+      tokens.push({
+        name,
+        raw: attrText.slice(nameStart, index),
+      })
+      continue
+    }
+
+    index += 1
+    while (index < attrText.length && /\s/.test(attrText[index] ?? '')) {
+      index += 1
+    }
+    const valueStart = index
+    const opener = attrText[index]
+
+    if (opener === '"' || opener === "'") {
+      index += 1
+      while (index < attrText.length) {
+        const character = attrText[index]
+        if (character === '\\') {
+          index += 2
+          continue
+        }
+        index += 1
+        if (character === opener) {
+          break
+        }
+      }
+    } else if (opener === '{') {
+      const end = readBalancedJsxBraces(attrText, index)
+      if (!end) {
+        break
+      }
+      index = end
+    } else {
+      while (index < attrText.length && !/\s/.test(attrText[index] ?? '')) {
+        index += 1
+      }
+    }
+
+    tokens.push({
+      name,
+      raw: attrText.slice(nameStart, index),
+      valueRaw: attrText.slice(valueStart, index),
+    })
+  }
+
+  return tokens
+}
+
+const parseStaticBooleanJsxValue = (valueRaw?: string): boolean | undefined => {
+  if (valueRaw === undefined) {
+    return true
+  }
+
+  const trimmedValue = valueRaw.trim()
+  if (
+    trimmedValue === 'true' ||
+    trimmedValue === '"true"' ||
+    trimmedValue === "'true'" ||
+    trimmedValue === '{true}'
+  ) {
+    return true
+  }
+  if (
+    trimmedValue === 'false' ||
+    trimmedValue === '"false"' ||
+    trimmedValue === "'false'" ||
+    trimmedValue === '{false}'
+  ) {
+    return false
+  }
+  return undefined
+}
+
+const parseStaticStringJsxValue = (valueRaw?: string): string | undefined => {
+  if (!valueRaw) {
+    return undefined
+  }
+
+  const trimmedValue = valueRaw.trim()
+  const directMatch = trimmedValue.match(/^(['"])([\s\S]*)\1$/)
+  if (directMatch) {
+    return directMatch[2]
+  }
+
+  const expressionMatch = trimmedValue.match(/^\{\s*(['"])([\s\S]*)\1\s*\}$/)
+  if (expressionMatch) {
+    return expressionMatch[2]
+  }
+
+  return undefined
+}
+
+const findJsxAttributeToken = (tokens: readonly ParsedJsxAttributeToken[], name: string) =>
+  tokens.find((token) => token.name === name)
+
+const buildJsxAttributeString = (tokens: readonly ParsedJsxAttributeToken[], extraAttributes: string[]): string => {
+  const parts = tokens
+    .map((token) => token.raw.trim())
+    .filter((part) => part.length > 0)
+    .concat(extraAttributes)
+
+  return parts.length > 0 ? ` ${parts.join(' ')}` : ''
+}
+
+const indentMultilineBlock = (text: string, prefix: string): string =>
+  text
+    .split('\n')
+    .map((line) => `${prefix}${line}`)
+    .join('\n')
+
+const readAlertOpeningTag = (content: string, start: number): ParsedAlertElement | null => {
+  let braceDepth = 0
+  let activeQuote: '"' | "'" | '`' | null = null
+  let index = start + '<Alert'.length
+
+  while (index < content.length) {
+    const character = content[index]
+
+    if (activeQuote) {
+      if (character === '\\') {
+        index += 2
+        continue
+      }
+      if (character === activeQuote) {
+        activeQuote = null
+      }
+      index += 1
+      continue
+    }
+
+    if (character === '"' || character === "'" || character === '`') {
+      activeQuote = character
+      index += 1
+      continue
+    }
+
+    if (character === '{') {
+      braceDepth += 1
+      index += 1
+      continue
+    }
+
+    if (character === '}') {
+      braceDepth = Math.max(0, braceDepth - 1)
+      index += 1
+      continue
+    }
+
+    if (character === '>' && braceDepth === 0) {
+      const rawAttrText = content.slice(start + '<Alert'.length, index)
+      const selfClosing = /\/\s*$/.test(rawAttrText)
+      return {
+        attrText: selfClosing ? rawAttrText.replace(/\/\s*$/, '') : rawAttrText,
+        contentStart: index + 1,
+        contentEnd: index + 1,
+        end: index + 1,
+        selfClosing,
+      }
+    }
+
+    index += 1
+  }
+
+  return null
+}
+
+const findMatchingAlertCloseTag = (
+  content: string,
+  contentStart: number
+): { contentEnd: number; end: number } | null => {
+  let depth = 1
+  let searchIndex = contentStart
+
+  while (searchIndex < content.length) {
+    ALERT_TAG_PATTERN.lastIndex = searchIndex
+    const nextOpenMatch = ALERT_TAG_PATTERN.exec(content)
+    const nextOpenIndex = nextOpenMatch?.index ?? -1
+    const nextCloseIndex = content.indexOf('</Alert>', searchIndex)
+
+    if (nextCloseIndex === -1) {
+      return null
+    }
+
+    if (nextOpenIndex !== -1 && nextOpenIndex < nextCloseIndex) {
+      const nestedAlert = readAlertOpeningTag(content, nextOpenIndex)
+      if (!nestedAlert) {
+        return null
+      }
+      if (!nestedAlert.selfClosing) {
+        depth += 1
+      }
+      searchIndex = nestedAlert.end
+      continue
+    }
+
+    depth -= 1
+    if (depth === 0) {
+      return {
+        contentEnd: nextCloseIndex,
+        end: nextCloseIndex + '</Alert>'.length,
+      }
+    }
+    searchIndex = nextCloseIndex + '</Alert>'.length
+  }
+
+  return null
+}
+
+const buildDismissibleAlertChildren = (
+  target: 'LocalAlert' | 'GlobalAlert',
+  children: string,
+  onCloseRaw?: string
+): string => {
+  const closeButton = onCloseRaw
+    ? `<${target}.CloseButton onClick=${onCloseRaw} />`
+    : `<${target}.CloseButton />`
+  const trimmedChildren = children.trim()
+  const headerBlock = `\n  <${target}.Header>\n    ${closeButton}\n  </${target}.Header>`
+
+  if (trimmedChildren.length === 0) {
+    return `${headerBlock}\n`
+  }
+
+  return `${headerBlock}\n${indentMultilineBlock(trimmedChildren, '  ')}\n`
+}
+
+const rewriteAlertComponentUsages = (content: string): string => {
+  let rewritten = ''
+  let cursor = 0
+
+  while (true) {
+    ALERT_TAG_PATTERN.lastIndex = cursor
+    const match = ALERT_TAG_PATTERN.exec(content)
+    if (!match) {
+      rewritten += content.slice(cursor)
+      return rewritten
+    }
+
+    const start = match.index
+    const openingTag = readAlertOpeningTag(content, start)
+    if (!openingTag) {
+      rewritten += content.slice(cursor)
+      return rewritten
+    }
+
+    rewritten += content.slice(cursor, start)
+
+    const tokens = parseJsxAttributeTokens(openingTag.attrText)
+    const variantToken = findJsxAttributeToken(tokens, 'variant')
+    const inlineToken = findJsxAttributeToken(tokens, 'inline')
+    const fullWidthToken = findJsxAttributeToken(tokens, 'fullWidth')
+    const closeButtonToken = findJsxAttributeToken(tokens, 'closeButton')
+    const onCloseRaw = findJsxAttributeToken(tokens, 'onClose')?.valueRaw
+    const variant = variantToken ? parseStaticStringJsxValue(variantToken.valueRaw) : undefined
+    const inline = inlineToken ? parseStaticBooleanJsxValue(inlineToken.valueRaw) : false
+    const fullWidth = fullWidthToken ? parseStaticBooleanJsxValue(fullWidthToken.valueRaw) : false
+    const closeButton = closeButtonToken
+      ? parseStaticBooleanJsxValue(closeButtonToken.valueRaw)
+      : false
+    const hasDynamicMigrationProp =
+      (!!variantToken && variant === undefined) ||
+      (!!inlineToken && inline === undefined) ||
+      (!!fullWidthToken && fullWidth === undefined) ||
+      (!!closeButtonToken && closeButton === undefined)
+    const migration = hasDynamicMigrationProp
+      ? undefined
+      : resolveAlertMigration({
+          variant,
+          inline,
+          fullWidth,
+          closeButton,
+        })
+
+    const remainingTokens = tokens.filter(
+      (token) => token.name === null || !DEPRECATED_ALERT_PROP_NAMES.has(token.name)
+    )
+
+    if (openingTag.selfClosing) {
+      if (!migration) {
+        rewritten += content.slice(start, openingTag.end)
+      } else {
+        const attributes = buildJsxAttributeString(remainingTokens, [
+          `${migration.targetProp}="${migration.targetValue}"`,
+        ])
+        rewritten += `<${migration.target}${attributes} />`
+      }
+      cursor = openingTag.end
+      continue
+    }
+
+    const closingTag = findMatchingAlertCloseTag(content, openingTag.contentStart)
+    if (!closingTag) {
+      rewritten += content.slice(start)
+      return rewritten
+    }
+
+    const rewrittenChildren = rewriteAlertComponentUsages(
+      content.slice(openingTag.contentStart, closingTag.contentEnd)
+    )
+
+    if (!migration) {
+      rewritten += `${content.slice(start, openingTag.contentStart)}${rewrittenChildren}</Alert>`
+      cursor = closingTag.end
+      continue
+    }
+
+    const attributes = buildJsxAttributeString(remainingTokens, [
+      `${migration.targetProp}="${migration.targetValue}"`,
+    ])
+    const replacementChildren =
+      migration.preservesCloseButton && closeButton && (migration.target === 'LocalAlert' || migration.target === 'GlobalAlert')
+        ? buildDismissibleAlertChildren(migration.target, rewrittenChildren, onCloseRaw)
+        : rewrittenChildren
+
+    rewritten += `<${migration.target}${attributes}>${replacementChildren}</${migration.target}>`
+    cursor = closingTag.end
+  }
+}
 
 export const prepareDesktopMcpApplyChanges = (
   request: DesktopMcpApplyChangesRequest,
@@ -136,7 +555,7 @@ export const prepareDesktopMcpApplyChanges = (
         }
 
         nextProject = updateSourceForTarget(nextProject, resolvedSource.target, {
-          [resolvedSource.sourceKind]: rewrittenContent.content,
+          [resolvedSource.sourceKind]: rewriteAlertComponentUsages(rewrittenContent.content),
         })
         previewRefreshRequired = true
         changedResources.add(operation.resourceUri)
@@ -199,7 +618,10 @@ export const prepareDesktopMcpApplyChanges = (
               createArcadePage(
                 plannedPage.pageId,
                 pageName.value,
-                createArcadeSourceFile(rewrittenJsx.content, rewrittenHooks.content)
+                createArcadeSourceFile(
+                  rewriteAlertComponentUsages(rewrittenJsx.content),
+                  rewriteAlertComponentUsages(rewrittenHooks.content)
+                )
               ),
             ],
             nextPageNumber: nextProject.source.nextPageNumber + 1,

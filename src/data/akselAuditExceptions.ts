@@ -76,7 +76,7 @@ export const ACCEPTED_CATALOG_EXCEPTIONS: AcceptedCatalogException[] = [
     affects: ['components', 'snippets', 'replacement-policy'],
     matchKinds: ['catalog-stale'],
     reason:
-      'Alert stays cataloged as a legacy compatibility surface for older Arcade projects even though new authoring must stay on InlineMessage, LocalAlert, or GlobalAlert.',
+      'Alert stays cataloged as a legacy compatibility surface for older Arcade projects even though new authoring must stay on InfoCard, InlineMessage, LocalAlert, or GlobalAlert.',
   },
   {
     id: 'boxnew-safe-alias',

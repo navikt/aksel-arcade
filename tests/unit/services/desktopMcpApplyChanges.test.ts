@@ -169,6 +169,98 @@ describe('desktopMcpApplyChanges', () => {
     })
   })
 
+  it('rewrites deprecated Alert usage to the sanctioned replacement components', () => {
+    const result = prepareDesktopMcpApplyChanges(
+      {
+        summary: 'Rewrite deprecated Alert usage',
+        operations: [
+          {
+            type: 'replace_source',
+            resourceUri: createDesktopMcpProjectPageSourceUri('page01', 'jsx'),
+            content: `export default function PageOne() {
+  return (
+    <VStack gap="space-16">
+      <Alert variant="info">Informational</Alert>
+      <Alert inline variant="warning">Inline warning</Alert>
+      <Alert variant="success">Saved</Alert>
+      <Alert fullWidth variant="info">Maintenance banner</Alert>
+    </VStack>
+  )
+}`,
+          },
+        ],
+      },
+      {
+        project: createProject(),
+        theme: 'dark',
+        diagnostics: createDiagnostics(),
+      },
+      FIXED_TIMESTAMP
+    )
+
+    expect(result.ok).toBe(true)
+    if (!result.ok) {
+      throw new Error(result.message)
+    }
+
+    const rewrittenSource = result.nextProject.source.pages[0]?.source.jsx ?? ''
+    expect(rewrittenSource).toContain('<InfoCard data-color="info">Informational</InfoCard>')
+    expect(rewrittenSource).toContain(
+      '<InlineMessage status="warning">Inline warning</InlineMessage>'
+    )
+    expect(rewrittenSource).toContain('<LocalAlert status="success">Saved</LocalAlert>')
+    expect(rewrittenSource).toContain(
+      '<GlobalAlert status="announcement">Maintenance banner</GlobalAlert>'
+    )
+    expect(rewrittenSource).not.toContain('<Alert')
+  })
+
+  it('preserves dismissible behavior on close-capable Alert replacements', () => {
+    const result = prepareDesktopMcpApplyChanges(
+      {
+        summary: 'Rewrite dismissible Alert usage',
+        operations: [
+          {
+            type: 'replace_source',
+            resourceUri: createDesktopMcpProjectPageSourceUri('page01', 'jsx'),
+            content: `export default function PageOne() {
+  return (
+    <VStack gap="space-16">
+      <Alert variant="error" closeButton onClose={() => setErrorOpen(false)}>
+        Something failed
+      </Alert>
+      <Alert fullWidth variant="warning" closeButton onClose={dismissBanner}>
+        Scheduled downtime
+      </Alert>
+    </VStack>
+  )
+}`,
+          },
+        ],
+      },
+      {
+        project: createProject(),
+        theme: 'dark',
+        diagnostics: createDiagnostics(),
+      },
+      FIXED_TIMESTAMP
+    )
+
+    expect(result.ok).toBe(true)
+    if (!result.ok) {
+      throw new Error(result.message)
+    }
+
+    const rewrittenSource = result.nextProject.source.pages[0]?.source.jsx ?? ''
+    expect(rewrittenSource).toContain('<LocalAlert status="error">')
+    expect(rewrittenSource).toContain(
+      '<LocalAlert.CloseButton onClick={() => setErrorOpen(false)} />'
+    )
+    expect(rewrittenSource).toContain('<GlobalAlert status="warning">')
+    expect(rewrittenSource).toContain('<GlobalAlert.CloseButton onClick={dismissBanner} />')
+    expect(rewrittenSource).not.toContain('<Alert')
+  })
+
   it('creates, renames, links, and selects pages atomically with temp refs and placeholder rewriting', () => {
     const originalProject = createProject()
     const originalRevision = createDesktopMcpProjectRevision({

@@ -295,6 +295,13 @@ module.exports = {
       "resourceUri": "arcade://aksel/components/TextField"
     },
     {
+      "name": "InfoCard",
+      "group": "component",
+      "status": "current",
+      "purpose": "Highlight important information without using an alert shell.",
+      "resourceUri": "arcade://aksel/components/InfoCard"
+    },
+    {
       "name": "InlineMessage",
       "group": "component",
       "status": "current",
@@ -3543,6 +3550,64 @@ module.exports = {
         "jsx": "<TextField label=\"Label\" />"
       }
     },
+    "InfoCard": {
+      "name": "InfoCard",
+      "group": "component",
+      "status": "current",
+      "description": "Highlight important information without using an alert shell.",
+      "docs": "https://aksel.nav.no/komponenter/core/infocard",
+      "keywords": [
+        "info card",
+        "highlight",
+        "information",
+        "message",
+        "panel",
+        "info"
+      ],
+      "props": [
+        {
+          "name": "data-color",
+          "type": "\"neutral\" | \"accent\" | \"info\" | \"success\" | \"warning\" | \"danger\" | \"brand-magenta\" | \"brand-beige\" | \"brand-blue\" | \"meta-purple\" | \"meta-lime\"",
+          "values": [
+            "neutral",
+            "accent",
+            "info",
+            "success",
+            "warning",
+            "danger",
+            "brand-magenta",
+            "brand-beige",
+            "brand-blue",
+            "meta-purple",
+            "meta-lime"
+          ],
+          "description": "InfoCard color."
+        },
+        {
+          "name": "size",
+          "type": "\"medium\" | \"small\"",
+          "values": [
+            "medium",
+            "small"
+          ],
+          "default": "medium",
+          "description": "InfoCard size."
+        },
+        {
+          "name": "as",
+          "type": "\"div\" | \"section\"",
+          "values": [
+            "div",
+            "section"
+          ],
+          "default": "div",
+          "description": "HTML element for the card root."
+        }
+      ],
+      "snippet": {
+        "jsx": "<InfoCard data-color=\"info\">\n  <InfoCard.Header>\n    <InfoCard.Title>Highlighted information</InfoCard.Title>\n  </InfoCard.Header>\n  <InfoCard.Content>\n    Use InfoCard to surface important information that does not require urgent action.\n  </InfoCard.Content>\n</InfoCard>"
+      }
+    },
     "InlineMessage": {
       "name": "InlineMessage",
       "group": "component",
@@ -4431,9 +4496,133 @@ module.exports = {
     "Alert": {
       "reason": "deprecated",
       "replacements": [
+        "InfoCard",
         "InlineMessage",
         "LocalAlert",
         "GlobalAlert"
+      ],
+      "migrationRules": [
+        {
+          "when": "Alert with fullWidth",
+          "target": "GlobalAlert",
+          "match": {
+            "fullWidth": true,
+            "variants": [
+              "info",
+              "success",
+              "warning",
+              "error"
+            ]
+          },
+          "propMappings": [
+            {
+              "sourceProp": "variant",
+              "targetProp": "status",
+              "valueMap": {
+                "info": "announcement",
+                "success": "success",
+                "warning": "warning",
+                "error": "error"
+              }
+            }
+          ],
+          "preservesCloseButton": true,
+          "note": "Use GlobalAlert for page-wide banners. variant=\"info\" becomes status=\"announcement\"."
+        },
+        {
+          "when": "Alert with closeButton but without fullWidth",
+          "target": "LocalAlert",
+          "match": {
+            "closeButton": true,
+            "variants": [
+              "info",
+              "success",
+              "warning",
+              "error"
+            ]
+          },
+          "propMappings": [
+            {
+              "sourceProp": "variant",
+              "targetProp": "status",
+              "valueMap": {
+                "info": "announcement",
+                "success": "success",
+                "warning": "warning",
+                "error": "error"
+              }
+            }
+          ],
+          "preservesCloseButton": true,
+          "note": "Dismissible local alerts stay on the close-capable LocalAlert branch. variant=\"info\" becomes status=\"announcement\"."
+        },
+        {
+          "when": "Alert with inline",
+          "target": "InlineMessage",
+          "match": {
+            "inline": true,
+            "variants": [
+              "info",
+              "success",
+              "warning",
+              "error"
+            ]
+          },
+          "propMappings": [
+            {
+              "sourceProp": "variant",
+              "targetProp": "status",
+              "valueMap": {
+                "info": "info",
+                "success": "success",
+                "warning": "warning",
+                "error": "error"
+              }
+            }
+          ]
+        },
+        {
+          "when": "Alert variant=\"info\"",
+          "target": "InfoCard",
+          "match": {
+            "variants": [
+              "info"
+            ]
+          },
+          "propMappings": [
+            {
+              "sourceProp": "variant",
+              "targetProp": "data-color",
+              "valueMap": {
+                "info": "info"
+              }
+            }
+          ],
+          "note": "Use InfoCard for non-inline informational alerts that do not need the close-capable alert shell."
+        },
+        {
+          "when": "Alert variant=\"success\" | \"warning\" | \"error\"",
+          "target": "LocalAlert",
+          "match": {
+            "variants": [
+              "success",
+              "warning",
+              "error"
+            ]
+          },
+          "propMappings": [
+            {
+              "sourceProp": "variant",
+              "targetProp": "status",
+              "valueMap": {
+                "info": "announcement",
+                "success": "success",
+                "warning": "warning",
+                "error": "error"
+              }
+            }
+          ]
+        }
       ]
     },
     "Modal": {
