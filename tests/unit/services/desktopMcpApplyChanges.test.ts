@@ -367,6 +367,39 @@ describe('desktopMcpApplyChanges', () => {
     expect(rewrittenSource).not.toContain('<LocalAlert')
   })
 
+  it('skips migration when boolean-like props are passed as quoted strings', () => {
+    const result = prepareDesktopMcpApplyChanges(
+      {
+        summary: 'Leave quoted boolean Alert props untouched',
+        operations: [
+          {
+            type: 'replace_source',
+            resourceUri: createDesktopMcpProjectPageSourceUri('page01', 'jsx'),
+            content: `export default function PageOne() {
+  return <Alert inline="false" variant="warning">Oops</Alert>
+}`,
+          },
+        ],
+      },
+      {
+        project: createProject(),
+        theme: 'dark',
+        diagnostics: createDiagnostics(),
+      },
+      FIXED_TIMESTAMP
+    )
+
+    expect(result.ok).toBe(true)
+    if (!result.ok) {
+      throw new Error(result.message)
+    }
+
+    const rewrittenSource = result.nextProject.source.pages[0]?.source.jsx ?? ''
+    expect(rewrittenSource).toContain('<Alert inline="false" variant="warning">Oops</Alert>')
+    expect(rewrittenSource).not.toContain('<InlineMessage')
+    expect(rewrittenSource).not.toContain('<LocalAlert')
+  })
+
   it('does not rewrite Alert markup inside string, template, or regex literals', () => {
     const result = prepareDesktopMcpApplyChanges(
       {

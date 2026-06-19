@@ -146,20 +146,10 @@ const parseStaticBooleanJsxValue = (valueRaw?: string): boolean | undefined => {
   }
 
   const trimmedValue = valueRaw.trim()
-  if (
-    trimmedValue === 'true' ||
-    trimmedValue === '"true"' ||
-    trimmedValue === "'true'" ||
-    trimmedValue === '{true}'
-  ) {
+  if (trimmedValue === 'true' || trimmedValue === '{true}') {
     return true
   }
-  if (
-    trimmedValue === 'false' ||
-    trimmedValue === '"false"' ||
-    trimmedValue === "'false'" ||
-    trimmedValue === '{false}'
-  ) {
+  if (trimmedValue === 'false' || trimmedValue === '{false}') {
     return false
   }
   return undefined

@@ -295,13 +295,6 @@ module.exports = {
       "resourceUri": "arcade://aksel/components/TextField"
     },
     {
-      "name": "InfoCard",
-      "group": "component",
-      "status": "current",
-      "purpose": "Highlight important information without using an alert shell.",
-      "resourceUri": "arcade://aksel/components/InfoCard"
-    },
-    {
       "name": "InlineMessage",
       "group": "component",
       "status": "current",
@@ -3548,64 +3541,6 @@ module.exports = {
       ],
       "snippet": {
         "jsx": "<TextField label=\"Label\" />"
-      }
-    },
-    "InfoCard": {
-      "name": "InfoCard",
-      "group": "component",
-      "status": "current",
-      "description": "Highlight important information without using an alert shell.",
-      "docs": "https://aksel.nav.no/komponenter/core/infocard",
-      "keywords": [
-        "info card",
-        "highlight",
-        "information",
-        "message",
-        "panel",
-        "info"
-      ],
-      "props": [
-        {
-          "name": "data-color",
-          "type": "\"neutral\" | \"accent\" | \"info\" | \"success\" | \"warning\" | \"danger\" | \"brand-magenta\" | \"brand-beige\" | \"brand-blue\" | \"meta-purple\" | \"meta-lime\"",
-          "values": [
-            "neutral",
-            "accent",
-            "info",
-            "success",
-            "warning",
-            "danger",
-            "brand-magenta",
-            "brand-beige",
-            "brand-blue",
-            "meta-purple",
-            "meta-lime"
-          ],
-          "description": "InfoCard color."
-        },
-        {
-          "name": "size",
-          "type": "\"medium\" | \"small\"",
-          "values": [
-            "medium",
-            "small"
-          ],
-          "default": "medium",
-          "description": "InfoCard size."
-        },
-        {
-          "name": "as",
-          "type": "\"div\" | \"section\"",
-          "values": [
-            "div",
-            "section"
-          ],
-          "default": "div",
-          "description": "HTML element for the card root."
-        }
-      ],
-      "snippet": {
-        "jsx": "<InfoCard data-color=\"info\">\n  <InfoCard.Header>\n    <InfoCard.Title>Highlighted information</InfoCard.Title>\n  </InfoCard.Header>\n  <InfoCard.Content>\n    Use InfoCard to surface important information that does not require urgent action.\n  </InfoCard.Content>\n</InfoCard>"
       }
     },
     "InlineMessage": {

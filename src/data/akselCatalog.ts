@@ -3012,68 +3012,6 @@ export const AKSEL_CATALOG: AkselCatalogEntry[] = [
     },
   },
   {
-    id: 'infocard',
-    name: 'InfoCard',
-    group: 'component',
-    status: 'current',
-    package: '@navikt/ds-react',
-    importName: 'InfoCard',
-    importGuidance: "import { InfoCard } from '@navikt/ds-react';",
-    docs: `${COMPONENT_DOCS_BASE}/infocard`,
-    description: 'Highlight important information without using an alert shell.',
-    keywords: ['info card', 'highlight', 'information', 'message', 'panel', 'info'],
-    props: [
-      {
-        name: 'data-color',
-        type:
-          '"neutral" | "accent" | "info" | "success" | "warning" | "danger" | "brand-magenta" | "brand-beige" | "brand-blue" | "meta-purple" | "meta-lime"',
-        values: [
-          'neutral',
-          'accent',
-          'info',
-          'success',
-          'warning',
-          'danger',
-          'brand-magenta',
-          'brand-beige',
-          'brand-blue',
-          'meta-purple',
-          'meta-lime',
-        ],
-        valueKind: 'enum',
-        description: 'InfoCard color.',
-      },
-      {
-        name: 'size',
-        type: '"medium" | "small"',
-        values: ['medium', 'small'],
-        valueKind: 'enum',
-        default: 'medium',
-        description: 'InfoCard size.',
-      },
-      {
-        name: 'as',
-        type: '"div" | "section"',
-        values: ['div', 'section'],
-        valueKind: 'enum',
-        default: 'div',
-        description: 'HTML element for the card root.',
-      },
-    ],
-    snippet: {
-      code:
-        '<InfoCard data-color="info">\n' +
-        '  <InfoCard.Header>\n' +
-        '    <InfoCard.Title>Highlighted information</InfoCard.Title>\n' +
-        '  </InfoCard.Header>\n' +
-        '  <InfoCard.Content>\n' +
-        '    Use InfoCard to surface important information that does not require urgent action.\n' +
-        '  </InfoCard.Content>\n' +
-        '</InfoCard>',
-      description: 'Visible informational card.',
-    },
-  },
-  {
     id: 'inlinemessage',
     name: 'InlineMessage',
     group: 'component',
