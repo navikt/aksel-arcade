@@ -8,6 +8,9 @@ import {
   filterNewAuthoringEntries,
   getNewAuthoringPolicy,
   listHiddenNewAuthoringRoots,
+  type HiddenNewAuthoringMigrationMatch,
+  type HiddenNewAuthoringMigrationRule,
+  type HiddenNewAuthoringPropMapping,
 } from '@/data/akselAuthoringPolicy'
 
 /**
@@ -66,6 +69,16 @@ export interface McpAkselComponentIndexEntry {
 export interface McpAkselHiddenRootReplacement {
   reason: 'deprecated' | 'replaced'
   replacements: string[]
+  migrationRules?: McpAkselHiddenRootMigrationRule[]
+}
+
+export type McpAkselHiddenRootMigrationMatch = HiddenNewAuthoringMigrationMatch
+
+export type McpAkselHiddenRootPropMapping = HiddenNewAuthoringPropMapping
+
+export interface McpAkselHiddenRootMigrationRule extends Omit<HiddenNewAuthoringMigrationRule, 'match' | 'propMappings'> {
+  match?: McpAkselHiddenRootMigrationMatch
+  propMappings?: McpAkselHiddenRootPropMapping[]
 }
 
 export interface McpAkselCatalog {
@@ -152,6 +165,35 @@ const buildHiddenRootReplacements = (): Record<string, McpAkselHiddenRootReplace
       map[rootName] = {
         reason: policy.reason,
         replacements: [...policy.replacements],
+        ...(policy.migrationRules
+          ? {
+              migrationRules: policy.migrationRules.map((rule): McpAkselHiddenRootMigrationRule => ({
+                when: rule.when,
+                target: rule.target,
+                ...(rule.match
+                  ? {
+                      match: {
+                        ...(rule.match.fullWidth ? { fullWidth: true } : {}),
+                        ...(rule.match.closeButton ? { closeButton: true } : {}),
+                        ...(rule.match.inline ? { inline: true } : {}),
+                        ...(rule.match.variants ? { variants: [...rule.match.variants] } : {}),
+                      },
+                    }
+                  : {}),
+                ...(rule.propMappings
+                  ? {
+                      propMappings: rule.propMappings.map((mapping): McpAkselHiddenRootPropMapping => ({
+                        sourceProp: mapping.sourceProp,
+                        targetProp: mapping.targetProp,
+                        valueMap: { ...mapping.valueMap },
+                      })),
+                    }
+                  : {}),
+                ...(rule.preservesCloseButton ? { preservesCloseButton: true } : {}),
+                ...(rule.note ? { note: rule.note } : {}),
+              })),
+            }
+          : {}),
       }
     }
     return map

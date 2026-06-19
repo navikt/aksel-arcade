@@ -1,6 +1,7 @@
 import type { ArcadePageId, Project, ProjectSourceTarget, ThemeMode } from '@/types/project'
 import type { PreviewDiagnostics } from '@/services/previewDiagnostics'
 import { clonePreviewDiagnostics } from '@/services/previewDiagnostics'
+import { parser as javascriptParser } from '@lezer/javascript'
 import {
   DESKTOP_MCP_PROJECT_DIAGNOSTICS_URI,
   DESKTOP_MCP_PROJECT_MANIFEST_URI,
@@ -26,6 +27,7 @@ import {
   setStartPage,
   updateSourceForTarget,
 } from '@/services/projectSource'
+import { resolveAlertMigration } from '@/data/akselAuthoringPolicy'
 import { validateProjectSize } from '@/services/storage'
 import type {
   DesktopMcpApplyChangesFailure,
@@ -41,6 +43,15 @@ const MAX_PROJECT_NAME_LENGTH = 100
 const PAGE_REF_PLACEHOLDER_PATTERN = /\{\{pageRef:([^}]+)\}\}/g
 const TEMP_PAGE_REF_PATTERN = /^[^{}\s]+$/
 const STATIC_IMPORT_STATEMENT_PATTERN = /^\s*import\b/m
+const DEPRECATED_ALERT_PROP_NAMES = new Set([
+  'closeButton',
+  'contentMaxWidth',
+  'data-color',
+  'fullWidth',
+  'inline',
+  'onClose',
+  'variant',
+])
 
 interface DesktopMcpApplyChangesContext {
   project: Project
@@ -65,6 +76,24 @@ interface UsedPageRefPlaceholder {
   pageId: ArcadePageId
 }
 
+interface ParsedJsxAttributeToken {
+  name: string | null
+  raw: string
+  valueRaw?: string
+}
+
+interface ParsedJsxSyntaxNode {
+  from: number
+  to: number
+  type: {
+    name: string
+  }
+  firstChild: ParsedJsxSyntaxNode | null
+  nextSibling: ParsedJsxSyntaxNode | null
+}
+
+type SourceOverrideKey = `${string}:${DesktopMcpProjectSourceKind}`
+
 export interface PreparedDesktopMcpApplyChangesSuccess {
   ok: true
   nextProject: Project
@@ -77,6 +106,395 @@ export interface PreparedDesktopMcpApplyChangesSuccess {
 export type PreparedDesktopMcpApplyChangesResult =
   | PreparedDesktopMcpApplyChangesSuccess
   | DesktopMcpApplyChangesFailure
+
+const parseJsxAttributeTokens = (
+  content: string,
+  tagNode: ParsedJsxSyntaxNode
+): ParsedJsxAttributeToken[] => {
+  const tokens: ParsedJsxAttributeToken[] = []
+
+  for (let child = tagNode.firstChild; child; child = child.nextSibling) {
+    if (child.type.name === 'JSXAttribute') {
+      const identifierNode = findFirstChildByType(child, 'JSXIdentifier')
+      if (!identifierNode) {
+        continue
+      }
+
+      const equalsNode = findFirstChildByType(child, 'Equals')
+      tokens.push({
+        name: content.slice(identifierNode.from, identifierNode.to),
+        raw: content.slice(child.from, child.to),
+        valueRaw: equalsNode ? content.slice(equalsNode.to, child.to) : undefined,
+      })
+      continue
+    }
+
+    if (child.type.name === 'JSXSpreadAttribute') {
+      tokens.push({
+        name: null,
+        raw: content.slice(child.from, child.to),
+      })
+    }
+  }
+
+  return tokens
+}
+
+const parseStaticBooleanJsxValue = (valueRaw?: string): boolean | undefined => {
+  if (valueRaw === undefined) {
+    return true
+  }
+
+  const trimmedValue = valueRaw.trim()
+  if (trimmedValue === 'true' || trimmedValue === '{true}') {
+    return true
+  }
+  if (trimmedValue === 'false' || trimmedValue === '{false}') {
+    return false
+  }
+  return undefined
+}
+
+const parseStaticStringJsxValue = (valueRaw?: string): string | undefined => {
+  if (!valueRaw) {
+    return undefined
+  }
+
+  const trimmedValue = valueRaw.trim()
+  const directMatch = trimmedValue.match(/^(['"])([\s\S]*)\1$/)
+  if (directMatch) {
+    return directMatch[2]
+  }
+
+  const expressionMatch = trimmedValue.match(/^\{\s*(['"])([\s\S]*)\1\s*\}$/)
+  if (expressionMatch) {
+    return expressionMatch[2]
+  }
+
+  return undefined
+}
+
+const findJsxAttributeToken = (tokens: readonly ParsedJsxAttributeToken[], name: string) =>
+  tokens.find((token) => token.name === name)
+
+const buildJsxAttributeString = (tokens: readonly ParsedJsxAttributeToken[], extraAttributes: string[]): string => {
+  const parts = tokens
+    .map((token) => token.raw.trim())
+    .filter((part) => part.length > 0)
+    .concat(extraAttributes)
+
+  return parts.length > 0 ? ` ${parts.join(' ')}` : ''
+}
+
+const indentMultilineBlock = (text: string, prefix: string): string =>
+  text
+    .split('\n')
+    .map((line) => `${prefix}${line}`)
+    .join('\n')
+
+const createSourceOverrideKey = (
+  target: ProjectSourceTarget,
+  sourceKind: DesktopMcpProjectSourceKind
+): SourceOverrideKey =>
+  `${target.type === 'global-config' ? 'global-config' : target.pageId}:${sourceKind}`
+
+const sourceDefinesCustomAlert = (source: string): boolean => {
+  if (!source.includes('Alert')) {
+    return false
+  }
+
+  const tree = JSX_TYPESCRIPT_PARSER.parse(source)
+  const hasAlertDefinition = (node: ParsedJsxSyntaxNode): boolean => {
+    if (
+      node.type.name === 'FunctionDeclaration' ||
+      node.type.name === 'ClassDeclaration' ||
+      node.type.name === 'VariableDeclaration'
+    ) {
+      for (let child = node.firstChild; child; child = child.nextSibling) {
+        if (child.type.name === 'VariableDefinition' && source.slice(child.from, child.to) === 'Alert') {
+          return true
+        }
+      }
+    }
+
+    for (let child = node.firstChild; child; child = child.nextSibling) {
+      if (hasAlertDefinition(child)) {
+        return true
+      }
+    }
+
+    return false
+  }
+
+  return hasAlertDefinition(tree.topNode as ParsedJsxSyntaxNode)
+}
+
+const hasScopedCustomAlertDefinition = ({
+  project,
+  target,
+  finalSourceOverrides,
+}: {
+  project: Project
+  target: ProjectSourceTarget
+  finalSourceOverrides: ReadonlyMap<SourceOverrideKey, string>
+}): boolean => {
+  const getScopedSourceText = (
+    scopedTarget: ProjectSourceTarget,
+    sourceKind: DesktopMcpProjectSourceKind
+  ): string => {
+    const override = finalSourceOverrides.get(createSourceOverrideKey(scopedTarget, sourceKind))
+    if (override !== undefined) {
+      return override
+    }
+
+    if (scopedTarget.type === 'global-config') {
+      return project.source.globalConfig[sourceKind]
+    }
+
+    const page = getPageById(project.source, scopedTarget.pageId)
+    return page?.source[sourceKind] ?? ''
+  }
+
+  const scopedSources = [
+    getScopedSourceText({ type: 'global-config' }, 'jsx'),
+    getScopedSourceText({ type: 'global-config' }, 'hooks'),
+  ]
+
+  if (target.type === 'page') {
+    scopedSources.push(getScopedSourceText(target, 'jsx'))
+    scopedSources.push(getScopedSourceText(target, 'hooks'))
+  }
+
+  return scopedSources.some((source) => sourceDefinesCustomAlert(source))
+}
+
+const collectFinalSourceOverrides = (
+  operations: readonly DesktopMcpApplyChangesOperation[],
+  plannedCreatedPages: PlannedCreatedPages
+): Map<SourceOverrideKey, string> => {
+  const overrides = new Map<SourceOverrideKey, string>()
+
+  for (const [index, operation] of operations.entries()) {
+    if (operation.type === 'replace_source') {
+      const parsedSource = parseDesktopMcpProjectSourceUri(operation.resourceUri)
+      if (!parsedSource) {
+        continue
+      }
+
+      overrides.set(
+        createSourceOverrideKey(parsedSource.target, parsedSource.sourceKind),
+        operation.content
+      )
+      continue
+    }
+
+    if (operation.type === 'create_page') {
+      const plannedPage = plannedCreatedPages.byIndex.get(index)
+      if (!plannedPage) {
+        continue
+      }
+
+      overrides.set(
+        createSourceOverrideKey({ type: 'page', pageId: plannedPage.pageId }, 'jsx'),
+        operation.jsxCode ?? ''
+      )
+      overrides.set(
+        createSourceOverrideKey({ type: 'page', pageId: plannedPage.pageId }, 'hooks'),
+        operation.hooksCode ?? ''
+      )
+    }
+  }
+
+  return overrides
+}
+
+const JSX_TYPESCRIPT_PARSER = javascriptParser.configure({ dialect: 'jsx ts' })
+
+const findFirstChildByType = (
+  node: ParsedJsxSyntaxNode,
+  typeName: string
+): ParsedJsxSyntaxNode | null => {
+  for (let child = node.firstChild; child; child = child.nextSibling) {
+    if (child.type.name === typeName) {
+      return child
+    }
+  }
+
+  return null
+}
+
+const getJsxTagName = (content: string, tagNode: ParsedJsxSyntaxNode | null): string | undefined => {
+  if (!tagNode) {
+    return undefined
+  }
+
+  const identifierNode = findFirstChildByType(tagNode, 'JSXIdentifier')
+  return identifierNode ? content.slice(identifierNode.from, identifierNode.to) : undefined
+}
+
+const isSameSyntaxNode = (left: ParsedJsxSyntaxNode, right: ParsedJsxSyntaxNode): boolean =>
+  left.from === right.from && left.to === right.to && left.type.name === right.type.name
+
+const buildDismissibleAlertChildren = (
+  target: 'LocalAlert' | 'GlobalAlert',
+  children: string,
+  onCloseRaw?: string
+): string => {
+  const closeButton = onCloseRaw
+    ? `<${target}.CloseButton onClick=${onCloseRaw} />`
+    : `<${target}.CloseButton />`
+  const trimmedChildren = children.trim()
+  const headerBlock = `\n  <${target}.Header>\n    ${closeButton}\n  </${target}.Header>`
+
+  if (trimmedChildren.length === 0) {
+    return `${headerBlock}\n`
+  }
+
+  return `${headerBlock}\n${indentMultilineBlock(trimmedChildren, '  ')}\n`
+}
+
+const rewriteAlertComponentUsages = (content: string, options?: { allowAlertMigration?: boolean }): string => {
+  if (options?.allowAlertMigration === false) {
+    return content
+  }
+
+  const tree = JSX_TYPESCRIPT_PARSER.parse(content)
+
+  const rewriteNode = (node: ParsedJsxSyntaxNode): string => {
+    if (node.type.name === 'JSXElement') {
+      const selfClosingTag = findFirstChildByType(node, 'JSXSelfClosingTag')
+      if (selfClosingTag && getJsxTagName(content, selfClosingTag) === 'Alert') {
+        return rewriteAlertElement({
+          content,
+          node,
+          openingNode: selfClosingTag,
+        })
+      }
+
+      const openingTag = findFirstChildByType(node, 'JSXOpenTag')
+      const closingTag = findFirstChildByType(node, 'JSXCloseTag')
+      if (openingTag && closingTag && getJsxTagName(content, openingTag) === 'Alert') {
+        return rewriteAlertElement({
+          content,
+          node,
+          openingNode: openingTag,
+          closingNode: closingTag,
+        })
+      }
+    }
+
+    if (!node.firstChild) {
+      return content.slice(node.from, node.to)
+    }
+
+    let rewritten = ''
+    let cursor = node.from
+    for (
+      let child: ParsedJsxSyntaxNode | null = node.firstChild;
+      child;
+      child = child.nextSibling
+    ) {
+      rewritten += content.slice(cursor, child.from)
+      rewritten += rewriteNode(child)
+      cursor = child.to
+    }
+    rewritten += content.slice(cursor, node.to)
+    return rewritten
+  }
+
+  return rewriteNode(tree.topNode as ParsedJsxSyntaxNode)
+}
+
+const rewriteAlertElement = ({
+  content,
+  node,
+  openingNode,
+  closingNode,
+}: {
+  content: string
+  node: ParsedJsxSyntaxNode
+  openingNode: ParsedJsxSyntaxNode
+  closingNode?: ParsedJsxSyntaxNode
+}): string => {
+  const tokens = parseJsxAttributeTokens(content, openingNode)
+  const variantToken = findJsxAttributeToken(tokens, 'variant')
+  const inlineToken = findJsxAttributeToken(tokens, 'inline')
+  const fullWidthToken = findJsxAttributeToken(tokens, 'fullWidth')
+  const closeButtonToken = findJsxAttributeToken(tokens, 'closeButton')
+  const onCloseRaw = findJsxAttributeToken(tokens, 'onClose')?.valueRaw
+  const hasSpreadAttribute = tokens.some((token) => token.name === null)
+  const variant = variantToken ? parseStaticStringJsxValue(variantToken.valueRaw) : undefined
+  const inline = inlineToken ? parseStaticBooleanJsxValue(inlineToken.valueRaw) : false
+  const fullWidth = fullWidthToken ? parseStaticBooleanJsxValue(fullWidthToken.valueRaw) : false
+  const closeButton = closeButtonToken
+    ? parseStaticBooleanJsxValue(closeButtonToken.valueRaw)
+    : false
+  const hasDynamicMigrationProp =
+    hasSpreadAttribute ||
+    (!!variantToken && variant === undefined) ||
+    (!!inlineToken && inline === undefined) ||
+    (!!fullWidthToken && fullWidth === undefined) ||
+    (!!closeButtonToken && closeButton === undefined)
+  const migration = hasDynamicMigrationProp
+    ? undefined
+    : resolveAlertMigration({
+        variant,
+        inline,
+        fullWidth,
+        closeButton,
+      })
+
+  const remainingTokens = tokens.filter(
+    (token) => token.name === null || !DEPRECATED_ALERT_PROP_NAMES.has(token.name)
+  )
+
+  if (openingNode.type.name === 'JSXSelfClosingTag' || !closingNode) {
+    if (!migration) {
+      return content.slice(node.from, node.to)
+    }
+
+    const attributes = buildJsxAttributeString(remainingTokens, [
+      `${migration.targetProp}="${migration.targetValue}"`,
+    ])
+    if (
+      migration.preservesCloseButton &&
+      closeButton &&
+      (migration.target === 'LocalAlert' || migration.target === 'GlobalAlert')
+    ) {
+      const replacementChildren = buildDismissibleAlertChildren(migration.target, '', onCloseRaw)
+      return `<${migration.target}${attributes}>${replacementChildren}</${migration.target}>`
+    }
+
+    return `<${migration.target}${attributes} />`
+  }
+
+  let rewrittenChildren = ''
+  let cursor = openingNode.to
+  for (
+    let child = openingNode.nextSibling;
+    child && !isSameSyntaxNode(child, closingNode);
+    child = child.nextSibling
+  ) {
+    rewrittenChildren += content.slice(cursor, child.from)
+    rewrittenChildren += rewriteAlertComponentUsages(content.slice(child.from, child.to))
+    cursor = child.to
+  }
+  rewrittenChildren += content.slice(cursor, closingNode.from)
+
+  if (!migration) {
+    return `${content.slice(node.from, openingNode.to)}${rewrittenChildren}${content.slice(closingNode.from, node.to)}`
+  }
+
+  const attributes = buildJsxAttributeString(remainingTokens, [
+    `${migration.targetProp}="${migration.targetValue}"`,
+  ])
+  const replacementChildren =
+    migration.preservesCloseButton && closeButton && (migration.target === 'LocalAlert' || migration.target === 'GlobalAlert')
+      ? buildDismissibleAlertChildren(migration.target, rewrittenChildren, onCloseRaw)
+      : rewrittenChildren
+
+  return `<${migration.target}${attributes}>${replacementChildren}</${migration.target}>`
+}
 
 export const prepareDesktopMcpApplyChanges = (
   request: DesktopMcpApplyChangesRequest,
@@ -107,6 +525,10 @@ export const prepareDesktopMcpApplyChanges = (
   if (!plannedCreatedPages.ok) {
     return plannedCreatedPages.failure
   }
+  const finalSourceOverrides = collectFinalSourceOverrides(
+    request.operations,
+    plannedCreatedPages.value
+  )
 
   const operationResults: DesktopMcpApplyChangesOperationResult[] = []
   const changedResources = new Set<string>([DESKTOP_MCP_PROJECT_MANIFEST_URI])
@@ -135,8 +557,16 @@ export const prepareDesktopMcpApplyChanges = (
           return rewrittenContent.failure
         }
 
+        const allowAlertMigration = !hasScopedCustomAlertDefinition({
+          project: nextProject,
+          target: resolvedSource.target,
+          finalSourceOverrides,
+        })
+
         nextProject = updateSourceForTarget(nextProject, resolvedSource.target, {
-          [resolvedSource.sourceKind]: rewrittenContent.content,
+          [resolvedSource.sourceKind]: rewriteAlertComponentUsages(rewrittenContent.content, {
+            allowAlertMigration,
+          }),
         })
         previewRefreshRequired = true
         changedResources.add(operation.resourceUri)
@@ -190,6 +620,12 @@ export const prepareDesktopMcpApplyChanges = (
           return rewrittenHooks.failure
         }
 
+        const allowAlertMigration = !hasScopedCustomAlertDefinition({
+          project: nextProject,
+          target: { type: 'page', pageId: plannedPage.pageId },
+          finalSourceOverrides,
+        })
+
         nextProject = {
           ...nextProject,
           source: {
@@ -199,7 +635,14 @@ export const prepareDesktopMcpApplyChanges = (
               createArcadePage(
                 plannedPage.pageId,
                 pageName.value,
-                createArcadeSourceFile(rewrittenJsx.content, rewrittenHooks.content)
+                createArcadeSourceFile(
+                  rewriteAlertComponentUsages(rewrittenJsx.content, {
+                    allowAlertMigration,
+                  }),
+                  rewriteAlertComponentUsages(rewrittenHooks.content, {
+                    allowAlertMigration,
+                  })
+                )
               ),
             ],
             nextPageNumber: nextProject.source.nextPageNumber + 1,

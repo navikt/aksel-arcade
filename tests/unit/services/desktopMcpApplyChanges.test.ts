@@ -169,6 +169,430 @@ describe('desktopMcpApplyChanges', () => {
     })
   })
 
+  it('rewrites deprecated Alert usage to the sanctioned replacement components', () => {
+    const result = prepareDesktopMcpApplyChanges(
+      {
+        summary: 'Rewrite deprecated Alert usage',
+        operations: [
+          {
+            type: 'replace_source',
+            resourceUri: createDesktopMcpProjectPageSourceUri('page01', 'jsx'),
+            content: `export default function PageOne() {
+  return (
+    <VStack gap="space-16">
+      <Alert variant="info">Informational</Alert>
+      <Alert inline variant="warning">Inline warning</Alert>
+      <Alert variant="success">Saved</Alert>
+      <Alert fullWidth variant="info">Maintenance banner</Alert>
+    </VStack>
+  )
+}`,
+          },
+        ],
+      },
+      {
+        project: createProject(),
+        theme: 'dark',
+        diagnostics: createDiagnostics(),
+      },
+      FIXED_TIMESTAMP
+    )
+
+    expect(result.ok).toBe(true)
+    if (!result.ok) {
+      throw new Error(result.message)
+    }
+
+    const rewrittenSource = result.nextProject.source.pages[0]?.source.jsx ?? ''
+    expect(rewrittenSource).toContain('<InfoCard data-color="info">Informational</InfoCard>')
+    expect(rewrittenSource).toContain(
+      '<InlineMessage status="warning">Inline warning</InlineMessage>'
+    )
+    expect(rewrittenSource).toContain('<LocalAlert status="success">Saved</LocalAlert>')
+    expect(rewrittenSource).toContain(
+      '<GlobalAlert status="announcement">Maintenance banner</GlobalAlert>'
+    )
+    expect(rewrittenSource).not.toContain('<Alert')
+  })
+
+  it('preserves dismissible behavior on close-capable Alert replacements', () => {
+    const result = prepareDesktopMcpApplyChanges(
+      {
+        summary: 'Rewrite dismissible Alert usage',
+        operations: [
+          {
+            type: 'replace_source',
+            resourceUri: createDesktopMcpProjectPageSourceUri('page01', 'jsx'),
+            content: `export default function PageOne() {
+  return (
+    <VStack gap="space-16">
+      <Alert variant="error" closeButton onClose={() => setErrorOpen(false)}>
+        Something failed
+      </Alert>
+      <Alert fullWidth variant="warning" closeButton onClose={dismissBanner}>
+        Scheduled downtime
+      </Alert>
+    </VStack>
+  )
+}`,
+          },
+        ],
+      },
+      {
+        project: createProject(),
+        theme: 'dark',
+        diagnostics: createDiagnostics(),
+      },
+      FIXED_TIMESTAMP
+    )
+
+    expect(result.ok).toBe(true)
+    if (!result.ok) {
+      throw new Error(result.message)
+    }
+
+    const rewrittenSource = result.nextProject.source.pages[0]?.source.jsx ?? ''
+    expect(rewrittenSource).toContain('<LocalAlert status="error">')
+    expect(rewrittenSource).toContain(
+      '<LocalAlert.CloseButton onClick={() => setErrorOpen(false)} />'
+    )
+    expect(rewrittenSource).toContain('<GlobalAlert status="warning">')
+    expect(rewrittenSource).toContain('<GlobalAlert.CloseButton onClick={dismissBanner} />')
+    expect(rewrittenSource).not.toContain('<Alert')
+  })
+
+  it('preserves dismissible behavior for self-closing Alert replacements', () => {
+    const result = prepareDesktopMcpApplyChanges(
+      {
+        summary: 'Rewrite self-closing dismissible Alert usage',
+        operations: [
+          {
+            type: 'replace_source',
+            resourceUri: createDesktopMcpProjectPageSourceUri('page01', 'jsx'),
+            content: `export default function PageOne() {
+  return <Alert variant="error" closeButton onClose={dismissError} />
+}`,
+          },
+        ],
+      },
+      {
+        project: createProject(),
+        theme: 'dark',
+        diagnostics: createDiagnostics(),
+      },
+      FIXED_TIMESTAMP
+    )
+
+    expect(result.ok).toBe(true)
+    if (!result.ok) {
+      throw new Error(result.message)
+    }
+
+    const rewrittenSource = result.nextProject.source.pages[0]?.source.jsx ?? ''
+    expect(rewrittenSource).toContain('<LocalAlert status="error">')
+    expect(rewrittenSource).toContain('<LocalAlert.CloseButton onClick={dismissError} />')
+    expect(rewrittenSource).toContain('</LocalAlert>')
+    expect(rewrittenSource).not.toContain('<Alert')
+  })
+
+  it('preserves complex onClose expressions when rewriting dismissible Alerts', () => {
+    const result = prepareDesktopMcpApplyChanges(
+      {
+        summary: 'Rewrite dismissible Alert with regex in onClose',
+        operations: [
+          {
+            type: 'replace_source',
+            resourceUri: createDesktopMcpProjectPageSourceUri('page01', 'jsx'),
+            content: `export default function PageOne() {
+  return (
+    <Alert variant="error" closeButton onClose={() => /}/.test(value) ? dismiss() : null}>
+      Oops
+    </Alert>
+  )
+}`,
+          },
+        ],
+      },
+      {
+        project: createProject(),
+        theme: 'dark',
+        diagnostics: createDiagnostics(),
+      },
+      FIXED_TIMESTAMP
+    )
+
+    expect(result.ok).toBe(true)
+    if (!result.ok) {
+      throw new Error(result.message)
+    }
+
+    const rewrittenSource = result.nextProject.source.pages[0]?.source.jsx ?? ''
+    expect(rewrittenSource).toContain('<LocalAlert status="error">')
+    expect(rewrittenSource).toContain(
+      '<LocalAlert.CloseButton onClick={() => /}/.test(value) ? dismiss() : null} />'
+    )
+    expect(rewrittenSource).toContain('Oops')
+  })
+
+  it('prefers InlineMessage for inline Alerts even when closeButton is present', () => {
+    const result = prepareDesktopMcpApplyChanges(
+      {
+        summary: 'Rewrite inline Alert with closeButton',
+        operations: [
+          {
+            type: 'replace_source',
+            resourceUri: createDesktopMcpProjectPageSourceUri('page01', 'jsx'),
+            content: `export default function PageOne() {
+  return <Alert inline variant="warning" closeButton onClose={dismiss}>Oops</Alert>
+}`,
+          },
+        ],
+      },
+      {
+        project: createProject(),
+        theme: 'dark',
+        diagnostics: createDiagnostics(),
+      },
+      FIXED_TIMESTAMP
+    )
+
+    expect(result.ok).toBe(true)
+    if (!result.ok) {
+      throw new Error(result.message)
+    }
+
+    const rewrittenSource = result.nextProject.source.pages[0]?.source.jsx ?? ''
+    expect(rewrittenSource).toContain('<InlineMessage status="warning">Oops</InlineMessage>')
+    expect(rewrittenSource).not.toContain('CloseButton')
+    expect(rewrittenSource).not.toContain('<LocalAlert')
+  })
+
+  it('skips migration when boolean-like props are passed as quoted strings', () => {
+    const result = prepareDesktopMcpApplyChanges(
+      {
+        summary: 'Leave quoted boolean Alert props untouched',
+        operations: [
+          {
+            type: 'replace_source',
+            resourceUri: createDesktopMcpProjectPageSourceUri('page01', 'jsx'),
+            content: `export default function PageOne() {
+  return <Alert inline="false" variant="warning">Oops</Alert>
+}`,
+          },
+        ],
+      },
+      {
+        project: createProject(),
+        theme: 'dark',
+        diagnostics: createDiagnostics(),
+      },
+      FIXED_TIMESTAMP
+    )
+
+    expect(result.ok).toBe(true)
+    if (!result.ok) {
+      throw new Error(result.message)
+    }
+
+    const rewrittenSource = result.nextProject.source.pages[0]?.source.jsx ?? ''
+    expect(rewrittenSource).toContain('<Alert inline="false" variant="warning">Oops</Alert>')
+    expect(rewrittenSource).not.toContain('<InlineMessage')
+    expect(rewrittenSource).not.toContain('<LocalAlert')
+  })
+
+  it('does not rewrite Alert markup inside string, template, or regex literals', () => {
+    const result = prepareDesktopMcpApplyChanges(
+      {
+        summary: 'Leave non-JSX Alert markup untouched',
+        operations: [
+          {
+            type: 'replace_source',
+            resourceUri: createDesktopMcpProjectPageSourceUri('page01', 'jsx'),
+            content: `export default function PageOne() {
+  const quoted = "<Alert variant=\\"info\\">Informational</Alert>"
+  const templated = \`<Alert variant="warning">Template warning</Alert>\`
+  const matcher = /<Alert variant="error">Regex error<\\/Alert>/
+  return <Alert variant="success">Saved</Alert>
+}`,
+          },
+        ],
+      },
+      {
+        project: createProject(),
+        theme: 'dark',
+        diagnostics: createDiagnostics(),
+      },
+      FIXED_TIMESTAMP
+    )
+
+    expect(result.ok).toBe(true)
+    if (!result.ok) {
+      throw new Error(result.message)
+    }
+
+    const rewrittenSource = result.nextProject.source.pages[0]?.source.jsx ?? ''
+    expect(rewrittenSource).toContain(
+      'const quoted = "<Alert variant=\\"info\\">Informational</Alert>"'
+    )
+    expect(rewrittenSource).toContain(
+      'const templated = `<Alert variant="warning">Template warning</Alert>`'
+    )
+    expect(rewrittenSource).toContain(
+      'const matcher = /<Alert variant="error">Regex error<\\/Alert>/'
+    )
+    expect(rewrittenSource).toContain('<LocalAlert status="success">Saved</LocalAlert>')
+  })
+
+  it('skips automatic Alert migration when spread attributes are present', () => {
+    const result = prepareDesktopMcpApplyChanges(
+      {
+        summary: 'Leave spread-based Alert usage untouched',
+        operations: [
+          {
+            type: 'replace_source',
+            resourceUri: createDesktopMcpProjectPageSourceUri('page01', 'jsx'),
+            content: `export default function PageOne() {
+  return <Alert {...{ closeButton: true, onClose: dismiss }} variant="error">Oops</Alert>
+}`,
+          },
+        ],
+      },
+      {
+        project: createProject(),
+        theme: 'dark',
+        diagnostics: createDiagnostics(),
+      },
+      FIXED_TIMESTAMP
+    )
+
+    expect(result.ok).toBe(true)
+    if (!result.ok) {
+      throw new Error(result.message)
+    }
+
+    const rewrittenSource = result.nextProject.source.pages[0]?.source.jsx ?? ''
+    expect(rewrittenSource).toContain(
+      '<Alert {...{ closeButton: true, onClose: dismiss }} variant="error">Oops</Alert>'
+    )
+    expect(rewrittenSource).not.toContain('<LocalAlert')
+  })
+
+  it('skips automatic Alert migration when the project defines a custom Alert component', () => {
+    const projectWithCustomAlert = createProject()
+    projectWithCustomAlert.source.globalConfig = createArcadeSourceFile(
+      projectWithCustomAlert.source.globalConfig.jsx,
+      'const Alert: React.FC<{ children: React.ReactNode }> = ({ children }) => <aside>{children}</aside>'
+    )
+
+    const result = prepareDesktopMcpApplyChanges(
+      {
+        summary: 'Leave custom Alert usage untouched',
+        operations: [
+          {
+            type: 'replace_source',
+            resourceUri: createDesktopMcpProjectPageSourceUri('page01', 'jsx'),
+            content: `export default function PageOne() {
+  return <Alert variant="error">Oops</Alert>
+}`,
+          },
+        ],
+      },
+      {
+        project: projectWithCustomAlert,
+        theme: 'dark',
+        diagnostics: createDiagnostics(),
+      },
+      FIXED_TIMESTAMP
+    )
+
+    expect(result.ok).toBe(true)
+    if (!result.ok) {
+      throw new Error(result.message)
+    }
+
+    const rewrittenSource = result.nextProject.source.pages[0]?.source.jsx ?? ''
+    expect(rewrittenSource).toContain('<Alert variant="error">Oops</Alert>')
+    expect(rewrittenSource).not.toContain('<LocalAlert')
+  })
+
+  it('still migrates page Alert usage when a custom Alert exists only on another page', () => {
+    const projectWithSecondPageAlert = createProject({ includeSecondPage: true })
+    projectWithSecondPageAlert.source.pages[1] = createArcadePage(
+      'page02',
+      'Page 2',
+      createArcadeSourceFile(
+        projectWithSecondPageAlert.source.pages[1]?.source.jsx ?? '',
+        'const Alert = ({ children }) => <aside>{children}</aside>'
+      )
+    )
+
+    const result = prepareDesktopMcpApplyChanges(
+      {
+        summary: 'Migrate deprecated Alert on page one',
+        operations: [
+          {
+            type: 'replace_source',
+            resourceUri: createDesktopMcpProjectPageSourceUri('page01', 'jsx'),
+            content: `export default function PageOne() {
+  return <Alert variant="error">Oops</Alert>
+}`,
+          },
+        ],
+      },
+      {
+        project: projectWithSecondPageAlert,
+        theme: 'dark',
+        diagnostics: createDiagnostics(),
+      },
+      FIXED_TIMESTAMP
+    )
+
+    expect(result.ok).toBe(true)
+    if (!result.ok) {
+      throw new Error(result.message)
+    }
+
+    const rewrittenSource = result.nextProject.source.pages[0]?.source.jsx ?? ''
+    expect(rewrittenSource).toContain('<LocalAlert status="error">Oops</LocalAlert>')
+  })
+
+  it('treats later scoped custom Alert definitions as blocking earlier rewrites in the same batch', () => {
+    const result = prepareDesktopMcpApplyChanges(
+      {
+        summary: 'Respect later custom Alert definitions',
+        operations: [
+          {
+            type: 'replace_source',
+            resourceUri: createDesktopMcpProjectPageSourceUri('page01', 'jsx'),
+            content: `export default function PageOne() {
+  return <Alert variant="error">Oops</Alert>
+}`,
+          },
+          {
+            type: 'replace_source',
+            resourceUri: createDesktopMcpProjectPageSourceUri('page01', 'hooks'),
+            content: 'const Alert = ({ children }) => <aside>{children}</aside>',
+          },
+        ],
+      },
+      {
+        project: createProject(),
+        theme: 'dark',
+        diagnostics: createDiagnostics(),
+      },
+      FIXED_TIMESTAMP
+    )
+
+    expect(result.ok).toBe(true)
+    if (!result.ok) {
+      throw new Error(result.message)
+    }
+
+    const rewrittenSource = result.nextProject.source.pages[0]?.source.jsx ?? ''
+    expect(rewrittenSource).toContain('<Alert variant="error">Oops</Alert>')
+    expect(rewrittenSource).not.toContain('<LocalAlert')
+  })
+
   it('creates, renames, links, and selects pages atomically with temp refs and placeholder rewriting', () => {
     const originalProject = createProject()
     const originalRevision = createDesktopMcpProjectRevision({

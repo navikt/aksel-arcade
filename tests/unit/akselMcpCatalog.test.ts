@@ -38,11 +38,11 @@ describe('akselMcpCatalog builder', () => {
     })
 
     const button = catalog.components.find((component) => component.name === 'Button')
+    const infoCard = catalog.components.find((component) => component.name === 'InfoCard')
     expect(button).toMatchObject({
       name: 'Button',
       resourceUri: akselComponentResourceUri('Button'),
     })
-    const infoCard = catalog.components.find((component) => component.name === 'InfoCard')
     expect(infoCard).toMatchObject({
       name: 'InfoCard',
       resourceUri: akselComponentResourceUri('InfoCard'),

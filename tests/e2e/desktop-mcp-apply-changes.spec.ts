@@ -153,12 +153,83 @@ test.describe('Desktop MCP apply_changes page lifecycle', () => {
       const updatedPageTwoSource = await readMcpResource(pageTwoJsxUri)
       expect(updatedPageTwoSource.text).toContain(`goToPage("${landingPageId}")`)
 
+      const diagnostics = await waitForDiagnosticsIdle()
+      expect(diagnostics.status).toBe('idle')
+
       await expect(
         page.frameLocator('[data-testid="preview-iframe"]').getByRole('heading', { name: 'Landing' })
       ).toBeVisible({ timeout: 15_000 })
+    } finally {
+      await app.close()
+    }
+  })
+
+  test('rewrites deprecated Alert usage through MCP apply_changes before persistence', async () => {
+    test.setTimeout(120_000)
+
+    const app: ElectronApplication = await electron.launch({
+      args: ['desktop/main.cjs'],
+      env: {
+        ...process.env,
+        AKSEL_ARCADE_RENDERER_URL: desktopRendererUrl,
+      },
+    })
+
+    try {
+      const page = await app.firstWindow()
+      await waitForDefaultPreview(page)
+
+      const manifest = await readJsonMcpResource('arcade://project/manifest')
+      const entryPage =
+        manifest.pages.find((page: { id: string }) => page.id === manifest.activePageId) ??
+        manifest.pages[0]
+      const pageOneJsxUri = entryPage.source.jsx.uri
+
+      const applyChangesPayload = await callApplyChanges({
+        summary: 'Rewrite legacy Alert usage to current Aksel components',
+        expectedProjectRevision: manifest.projectRevision,
+        operations: [
+          {
+            type: 'replace_source',
+            resourceUri: pageOneJsxUri,
+            content: `<VStack gap="space-16">
+  <Alert variant="info">Informational</Alert>
+  <Alert inline variant="warning">Inline warning</Alert>
+  <Alert variant="success">Saved</Alert>
+  <Alert fullWidth variant="info">Maintenance banner</Alert>
+  <Alert variant="error" closeButton onClose={() => {}}>Dismissible</Alert>
+</VStack>`,
+          },
+        ],
+      })
+
+      expect(applyChangesPayload).toMatchObject({
+        result: {
+          structuredContent: {
+            ok: true,
+          },
+        },
+      })
+
+      const updatedSource = await readMcpResource(pageOneJsxUri)
+      expect(updatedSource.text).toContain('<InfoCard data-color="info">Informational</InfoCard>')
+      expect(updatedSource.text).toContain(
+        '<InlineMessage status="warning">Inline warning</InlineMessage>'
+      )
+      expect(updatedSource.text).toContain('<LocalAlert status="success">Saved</LocalAlert>')
+      expect(updatedSource.text).toContain(
+        '<GlobalAlert status="announcement">Maintenance banner</GlobalAlert>'
+      )
+      expect(updatedSource.text).toContain('<LocalAlert.CloseButton onClick={() => {}} />')
+      expect(updatedSource.text).not.toContain('<Alert')
 
       const diagnostics = await waitForDiagnosticsIdle()
       expect(diagnostics.status).toBe('idle')
+
+      const previewFrame = page.frameLocator('[data-testid="preview-iframe"]')
+      await expect(previewFrame.getByText('Informational')).toBeVisible({ timeout: 15_000 })
+      await expect(previewFrame.getByText('Inline warning')).toBeVisible()
+      await expect(previewFrame.getByText('Maintenance banner')).toBeVisible()
     } finally {
       await app.close()
     }

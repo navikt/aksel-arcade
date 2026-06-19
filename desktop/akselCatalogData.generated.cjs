@@ -4431,9 +4431,133 @@ module.exports = {
     "Alert": {
       "reason": "deprecated",
       "replacements": [
+        "InfoCard",
         "InlineMessage",
         "LocalAlert",
         "GlobalAlert"
+      ],
+      "migrationRules": [
+        {
+          "when": "Alert with fullWidth",
+          "target": "GlobalAlert",
+          "match": {
+            "fullWidth": true,
+            "variants": [
+              "info",
+              "success",
+              "warning",
+              "error"
+            ]
+          },
+          "propMappings": [
+            {
+              "sourceProp": "variant",
+              "targetProp": "status",
+              "valueMap": {
+                "info": "announcement",
+                "success": "success",
+                "warning": "warning",
+                "error": "error"
+              }
+            }
+          ],
+          "preservesCloseButton": true,
+          "note": "Use GlobalAlert for page-wide banners. variant=\"info\" becomes status=\"announcement\"."
+        },
+        {
+          "when": "Alert with inline",
+          "target": "InlineMessage",
+          "match": {
+            "inline": true,
+            "variants": [
+              "info",
+              "success",
+              "warning",
+              "error"
+            ]
+          },
+          "propMappings": [
+            {
+              "sourceProp": "variant",
+              "targetProp": "status",
+              "valueMap": {
+                "info": "info",
+                "success": "success",
+                "warning": "warning",
+                "error": "error"
+              }
+            }
+          ]
+        },
+        {
+          "when": "Alert with closeButton but without fullWidth or inline",
+          "target": "LocalAlert",
+          "match": {
+            "closeButton": true,
+            "variants": [
+              "info",
+              "success",
+              "warning",
+              "error"
+            ]
+          },
+          "propMappings": [
+            {
+              "sourceProp": "variant",
+              "targetProp": "status",
+              "valueMap": {
+                "info": "announcement",
+                "success": "success",
+                "warning": "warning",
+                "error": "error"
+              }
+            }
+          ],
+          "preservesCloseButton": true,
+          "note": "Dismissible local alerts stay on the close-capable LocalAlert branch. variant=\"info\" becomes status=\"announcement\"."
+        },
+        {
+          "when": "Alert variant=\"info\"",
+          "target": "InfoCard",
+          "match": {
+            "variants": [
+              "info"
+            ]
+          },
+          "propMappings": [
+            {
+              "sourceProp": "variant",
+              "targetProp": "data-color",
+              "valueMap": {
+                "info": "info"
+              }
+            }
+          ],
+          "note": "Use InfoCard for non-inline informational alerts that do not need the close-capable alert shell."
+        },
+        {
+          "when": "Alert variant=\"success\" | \"warning\" | \"error\"",
+          "target": "LocalAlert",
+          "match": {
+            "variants": [
+              "success",
+              "warning",
+              "error"
+            ]
+          },
+          "propMappings": [
+            {
+              "sourceProp": "variant",
+              "targetProp": "status",
+              "valueMap": {
+                "info": "announcement",
+                "success": "success",
+                "warning": "warning",
+                "error": "error"
+              }
+            }
+          ]
+        }
       ]
     },
     "Modal": {

@@ -1356,6 +1356,7 @@ describe('desktopMcpServer', () => {
     expect(authoringGuidePayload.result.contents[0].text).toContain(
       'Read `arcade://aksel/catalog` before guessing a component name'
     )
+    expect(authoringGuidePayload.result.contents[0].text).toContain('`Alert` is deprecated')
     expect(authoringGuidePayload.result.contents[0].text).toContain('https://aksel.nav.no/llm.md')
     expect(authoringGuidePayload.result.contents[0].text).toContain('two source tabs')
     expect(authoringGuidePayload.result.contents[0].text).toContain(
@@ -1637,6 +1638,10 @@ describe('desktopMcpServer', () => {
     })
     expect(hiddenRootResolution.replacements).toEqual([
       {
+        name: 'InfoCard',
+        resourceUri: 'arcade://aksel/components/InfoCard',
+      },
+      {
         name: 'InlineMessage',
         resourceUri: 'arcade://aksel/components/InlineMessage',
       },
@@ -1649,6 +1654,24 @@ describe('desktopMcpServer', () => {
         resourceUri: 'arcade://aksel/components/GlobalAlert',
       },
     ])
+    expect(hiddenRootResolution.migrationRules).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          when: 'Alert with fullWidth',
+          target: {
+            name: 'GlobalAlert',
+            resourceUri: 'arcade://aksel/components/GlobalAlert',
+          },
+        }),
+        expect.objectContaining({
+          when: 'Alert variant="info"',
+          target: {
+            name: 'InfoCard',
+            resourceUri: 'arcade://aksel/components/InfoCard',
+          },
+        }),
+      ])
+    )
 
     const hiddenDescendantResponse = await postJson(state.url, {
       jsonrpc: '2.0',

@@ -119,7 +119,7 @@ const DESKTOP_MCP_INSTRUCTIONS = [
   'Start by reading arcade://desktop/start-here — it is self-sufficient: one read plus arcade://project/manifest is enough to author. If your MCP host exposes only tools, call read_resource({ uri: "arcade://desktop/start-here" }).',
   'Source is import-free: React, Aksel components, Aksel icons, and hooks are injected globals — never add import statements.',
   'Each Arcade page (and Global config) has two source tabs: jsx and hooks. The jsx source is inlined into return ( … ), so it must be a single JSX element/expression and must never be wrapped in { … }; put page-level top-level hook bindings such as const [value, setValue] = useState(...) in the page Hooks tab, and treat Global config hooks as module scope where you define shared custom hooks, helpers, constants, and components and never call hooks at the top level.',
-  'Use real Aksel components and props; do not hand-roll raw HTML or guess prop names. Per-component usage and runnable, version-matched snippets are available on demand — do not load them until you reach for a given component.',
+  'Use real Aksel components and props; do not hand-roll raw HTML or guess prop names. If an Aksel component resource resolves to a replacement payload, follow the sanctioned replacement instead of authoring the hidden/deprecated component. Per-component usage and runnable, version-matched snippets are available on demand — do not load them until you reach for a given component.',
   'Navigate between pages with goToPage("pageNN"), or an Aksel Link/LinkCard whose href/to is a bare page id; the current page id is injected read-only as currentPageId. There is no router and no <a href> navigation.',
   'Page ids are assigned by the app. Within one apply_changes batch, link pages with {{pageRef:name}} placeholders targeting any create_page.newPageRef declared in that batch.',
   'Working loop: apply_changes, then read arcade://project/diagnostics, then capture_preview_evidence to inspect. Capture is an isolated throwaway render — it never changes the durable Active page.',
@@ -293,6 +293,23 @@ const createAkselComponentLink = (name) => ({
   resourceUri: `${AKSEL_COMPONENT_RESOURCE_URI_PREFIX}${encodeURIComponent(name)}`,
 })
 
+const createAkselMigrationRule = (rule) => ({
+  when: rule.when,
+  target: createAkselComponentLink(rule.target),
+  ...(rule.match ? { match: rule.match } : {}),
+  ...(rule.propMappings
+    ? {
+        propMappings: rule.propMappings.map((mapping) => ({
+          sourceProp: mapping.sourceProp,
+          targetProp: mapping.targetProp,
+          valueMap: { ...mapping.valueMap },
+        })),
+      }
+    : {}),
+  ...(rule.preservesCloseButton ? { preservesCloseButton: true } : {}),
+  ...(rule.note ? { note: rule.note } : {}),
+})
+
 const resolveAkselComponentRequest = (requestedName) => {
   const exactMatch = findAkselComponentDetail(requestedName)
   if (exactMatch) {
@@ -328,6 +345,11 @@ const resolveAkselComponentRequest = (requestedName) => {
       hiddenRootName: hiddenRootMatch.key,
       reason: hiddenRootMatch.value.reason,
       replacements: hiddenRootMatch.value.replacements.map(createAkselComponentLink),
+      ...(Array.isArray(hiddenRootMatch.value.migrationRules)
+        ? {
+            migrationRules: hiddenRootMatch.value.migrationRules.map(createAkselMigrationRule),
+          }
+        : {}),
     }
   }
 
@@ -2140,8 +2162,13 @@ const createAkselComponentResourceText = (resolution) => {
           requestedName: resolution.requestedName,
           hiddenRootName: resolution.hiddenRootName,
           reason: resolution.reason,
-          message: `${resolution.hiddenRootName} is intentionally hidden from new authoring. Use one of these sanctioned replacements instead.`,
+          message: Array.isArray(resolution.migrationRules)
+            ? `${resolution.hiddenRootName} is intentionally hidden from new authoring. Use the migration guidance below to choose the sanctioned replacement.`
+            : `${resolution.hiddenRootName} is intentionally hidden from new authoring. Use one of these sanctioned replacements instead.`,
           replacements: resolution.replacements,
+          ...(Array.isArray(resolution.migrationRules)
+            ? { migrationRules: resolution.migrationRules }
+            : {}),
         },
       })
     case 'did-you-mean':
@@ -2220,6 +2247,7 @@ const createDesktopStableResourceText = (uri) => {
         `1. **\`${AKSEL_CATALOG_RESOURCE_URI}\`** — a compact index of the components available here, each with its own \`${AKSEL_COMPONENT_RESOURCE_URI_TEMPLATE}\` snippet resource. These snippets are import-free, version-matched to this Arcade runtime (Aksel ${AKSEL_CATALOG_DATA.akselVersion}), and guaranteed to run. Prefer this path.`,
         '2. **`https://aksel.nav.no/llm.md`** — the public docs index; fetch the individual component `.md` article when you need more than the snippet.',
         '3. **Aksel MCP tools** (`aksel_find_docs`, `aksel_get_component_info`, `aksel_find_icons`, `aksel_get_token_details`) — use them only if your client already has that server connected.',
+        '- `Alert` is deprecated. If old code or a guessed component name lands on `Alert`, translate it instead of writing `Alert` back into Arcade: `fullWidth -> GlobalAlert`, `closeButton` local alerts -> LocalAlert, `inline -> InlineMessage`, `variant="info" -> InfoCard`, `variant="success" | "warning" | "error" -> LocalAlert`. `Alert variant="info" fullWidth` becomes `GlobalAlert status="announcement"`.',
         '',
         '## Mechanic snippets (illustrate wiring, not a use case)',
         'These show how Arcade plumbing fits together. They are intentionally generic — put whatever content the task needs inside.',

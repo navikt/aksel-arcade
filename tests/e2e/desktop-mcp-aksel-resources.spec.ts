@@ -115,9 +115,22 @@ test.describe('Desktop MCP on-demand Aksel resources', () => {
       })
       expect(hiddenRoot.resolution.replacements).toEqual(
         expect.arrayContaining([
+          expect.objectContaining({ name: 'InfoCard' }),
           expect.objectContaining({ name: 'InlineMessage' }),
           expect.objectContaining({ name: 'LocalAlert' }),
           expect.objectContaining({ name: 'GlobalAlert' }),
+        ])
+      )
+      expect(hiddenRoot.resolution.migrationRules).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            when: 'Alert with fullWidth',
+            target: expect.objectContaining({ name: 'GlobalAlert' }),
+          }),
+          expect.objectContaining({
+            when: 'Alert variant="info"',
+            target: expect.objectContaining({ name: 'InfoCard' }),
+          }),
         ])
       )
 
@@ -145,6 +158,7 @@ test.describe('Desktop MCP on-demand Aksel resources', () => {
       expect(authoringGuide.text).toContain(
         'Read `arcade://aksel/catalog` before guessing a component name'
       )
+      expect(authoringGuide.text).toContain('`Alert` is deprecated')
 
       const operations = await readMcpResource(9, 'arcade://desktop/apply-changes-operations')
       expect(operations.mimeType).toBe('text/markdown')

@@ -493,8 +493,8 @@ describe('Aksel catalog starter path', () => {
     const componentEntries = listCatalogEntries({ groups: ['component'], statuses: ['current'] })
     const paletteComponents = getComponentsByCategory('component')
     const inlineMessageEntry = getCatalogComponent('InlineMessage')
-    const globalAlertEntry = getCatalogComponent('GlobalAlert')
     const infoCardEntry = getCatalogComponent('InfoCard')
+    const globalAlertEntry = getCatalogComponent('GlobalAlert')
     const localAlertEntry = getCatalogComponent('LocalAlert')
     const dialogEntry = getCatalogComponent('Dialog')
     const fieldsetEntry = getCatalogComponent('Fieldset')
@@ -508,8 +508,8 @@ describe('Aksel catalog starter path', () => {
     expect(componentEntries.map((entry) => entry.name)).toEqual(
       expect.arrayContaining([
         'InlineMessage',
-        'GlobalAlert',
         'InfoCard',
+        'GlobalAlert',
         'LocalAlert',
         'Dialog',
         'Fieldset',
@@ -523,8 +523,8 @@ describe('Aksel catalog starter path', () => {
     expect(inlineMessageEntry?.snippet.code).toBe(
       '<InlineMessage status="success">Draft saved at 14:35</InlineMessage>'
     )
-    expect(globalAlertEntry?.snippet.code).toContain('<GlobalAlert status="announcement">')
     expect(infoCardEntry?.snippet.code).toContain('<InfoCard data-color="info">')
+    expect(globalAlertEntry?.snippet.code).toContain('<GlobalAlert status="announcement">')
     expect(infoCardEntry?.snippet.code).toContain(
       '<InfoCard.Header icon={<InformationSquareIcon aria-hidden />}>'
     )
