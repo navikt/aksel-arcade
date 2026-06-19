@@ -4530,7 +4530,32 @@ module.exports = {
           "note": "Use GlobalAlert for page-wide banners. variant=\"info\" becomes status=\"announcement\"."
         },
         {
-          "when": "Alert with closeButton but without fullWidth",
+          "when": "Alert with inline",
+          "target": "InlineMessage",
+          "match": {
+            "inline": true,
+            "variants": [
+              "info",
+              "success",
+              "warning",
+              "error"
+            ]
+          },
+          "propMappings": [
+            {
+              "sourceProp": "variant",
+              "targetProp": "status",
+              "valueMap": {
+                "info": "info",
+                "success": "success",
+                "warning": "warning",
+                "error": "error"
+              }
+            }
+          ]
+        },
+        {
+          "when": "Alert with closeButton but without fullWidth or inline",
           "target": "LocalAlert",
           "match": {
             "closeButton": true,
@@ -4555,31 +4580,6 @@ module.exports = {
           ],
           "preservesCloseButton": true,
           "note": "Dismissible local alerts stay on the close-capable LocalAlert branch. variant=\"info\" becomes status=\"announcement\"."
-        },
-        {
-          "when": "Alert with inline",
-          "target": "InlineMessage",
-          "match": {
-            "inline": true,
-            "variants": [
-              "info",
-              "success",
-              "warning",
-              "error"
-            ]
-          },
-          "propMappings": [
-            {
-              "sourceProp": "variant",
-              "targetProp": "status",
-              "valueMap": {
-                "info": "info",
-                "success": "success",
-                "warning": "warning",
-                "error": "error"
-              }
-            }
-          ]
         },
         {
           "when": "Alert variant=\"info\"",

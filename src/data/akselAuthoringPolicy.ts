@@ -56,23 +56,6 @@ const ALERT_MIGRATION_RULES = Object.freeze([
     note: 'Use GlobalAlert for page-wide banners. variant="info" becomes status="announcement".',
   }),
   Object.freeze<HiddenNewAuthoringMigrationRule>({
-    when: 'Alert with closeButton but without fullWidth',
-    target: 'LocalAlert',
-    match: Object.freeze({
-      closeButton: true,
-      variants: Object.freeze(['info', 'success', 'warning', 'error']),
-    }),
-    propMappings: Object.freeze([
-      Object.freeze({
-        sourceProp: 'variant',
-        targetProp: 'status',
-        valueMap: ALERT_VARIANT_TO_STATUS,
-      }),
-    ]),
-    preservesCloseButton: true,
-    note: 'Dismissible local alerts stay on the close-capable LocalAlert branch. variant="info" becomes status="announcement".',
-  }),
-  Object.freeze<HiddenNewAuthoringMigrationRule>({
     when: 'Alert with inline',
     target: 'InlineMessage',
     match: Object.freeze({
@@ -91,6 +74,23 @@ const ALERT_MIGRATION_RULES = Object.freeze([
         }),
       }),
     ]),
+  }),
+  Object.freeze<HiddenNewAuthoringMigrationRule>({
+    when: 'Alert with closeButton but without fullWidth or inline',
+    target: 'LocalAlert',
+    match: Object.freeze({
+      closeButton: true,
+      variants: Object.freeze(['info', 'success', 'warning', 'error']),
+    }),
+    propMappings: Object.freeze([
+      Object.freeze({
+        sourceProp: 'variant',
+        targetProp: 'status',
+        valueMap: ALERT_VARIANT_TO_STATUS,
+      }),
+    ]),
+    preservesCloseButton: true,
+    note: 'Dismissible local alerts stay on the close-capable LocalAlert branch. variant="info" becomes status="announcement".',
   }),
   Object.freeze<HiddenNewAuthoringMigrationRule>({
     when: 'Alert variant="info"',

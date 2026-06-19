@@ -1,6 +1,7 @@
 import type { ArcadePageId, Project, ProjectSourceTarget, ThemeMode } from '@/types/project'
 import type { PreviewDiagnostics } from '@/services/previewDiagnostics'
 import { clonePreviewDiagnostics } from '@/services/previewDiagnostics'
+import { parser as javascriptParser } from '@lezer/javascript'
 import {
   DESKTOP_MCP_PROJECT_DIAGNOSTICS_URI,
   DESKTOP_MCP_PROJECT_MANIFEST_URI,
@@ -42,7 +43,6 @@ const MAX_PROJECT_NAME_LENGTH = 100
 const PAGE_REF_PLACEHOLDER_PATTERN = /\{\{pageRef:([^}]+)\}\}/g
 const TEMP_PAGE_REF_PATTERN = /^[^{}\s]+$/
 const STATIC_IMPORT_STATEMENT_PATTERN = /^\s*import\b/m
-const ALERT_TAG_PATTERN = /<Alert(?=[\s/>])/g
 const DEPRECATED_ALERT_PROP_NAMES = new Set([
   'closeButton',
   'contentMaxWidth',
@@ -82,13 +82,17 @@ interface ParsedJsxAttributeToken {
   valueRaw?: string
 }
 
-interface ParsedAlertElement {
-  attrText: string
-  contentStart: number
-  contentEnd: number
-  end: number
-  selfClosing: boolean
+interface ParsedJsxSyntaxNode {
+  from: number
+  to: number
+  type: {
+    name: string
+  }
+  firstChild: ParsedJsxSyntaxNode | null
+  nextSibling: ParsedJsxSyntaxNode | null
 }
+
+type SourceOverrideKey = `${string}:${DesktopMcpProjectSourceKind}`
 
 export interface PreparedDesktopMcpApplyChangesSuccess {
   ok: true
@@ -103,124 +107,34 @@ export type PreparedDesktopMcpApplyChangesResult =
   | PreparedDesktopMcpApplyChangesSuccess
   | DesktopMcpApplyChangesFailure
 
-const readBalancedJsxBraces = (text: string, startIndex: number): number | null => {
-  let depth = 0
-  let activeQuote: '"' | "'" | '`' | null = null
+const parseJsxAttributeTokens = (
+  content: string,
+  tagNode: ParsedJsxSyntaxNode
+): ParsedJsxAttributeToken[] => {
+  const tokens: ParsedJsxAttributeToken[] = []
 
-  for (let index = startIndex; index < text.length; index += 1) {
-    const character = text[index]
-
-    if (activeQuote) {
-      if (character === '\\') {
-        index += 1
+  for (let child = tagNode.firstChild; child; child = child.nextSibling) {
+    if (child.type.name === 'JSXAttribute') {
+      const identifierNode = findFirstChildByType(child, 'JSXIdentifier')
+      if (!identifierNode) {
         continue
       }
-      if (character === activeQuote) {
-        activeQuote = null
-      }
+
+      const equalsNode = findFirstChildByType(child, 'Equals')
+      tokens.push({
+        name: content.slice(identifierNode.from, identifierNode.to),
+        raw: content.slice(child.from, child.to),
+        valueRaw: equalsNode ? content.slice(equalsNode.to, child.to) : undefined,
+      })
       continue
     }
 
-    if (character === '"' || character === "'" || character === '`') {
-      activeQuote = character
-      continue
-    }
-
-    if (character === '{') {
-      depth += 1
-      continue
-    }
-
-    if (character === '}') {
-      depth -= 1
-      if (depth === 0) {
-        return index + 1
-      }
-    }
-  }
-
-  return null
-}
-
-const parseJsxAttributeTokens = (attrText: string): ParsedJsxAttributeToken[] => {
-  const tokens: ParsedJsxAttributeToken[] = []
-  let index = 0
-
-  while (index < attrText.length) {
-    while (index < attrText.length && /\s/.test(attrText[index] ?? '')) {
-      index += 1
-    }
-    if (index >= attrText.length) {
-      break
-    }
-
-    if (attrText[index] === '{') {
-      const end = readBalancedJsxBraces(attrText, index)
-      if (!end) {
-        break
-      }
+    if (child.type.name === 'JSXSpreadAttribute') {
       tokens.push({
         name: null,
-        raw: attrText.slice(index, end),
+        raw: content.slice(child.from, child.to),
       })
-      index = end
-      continue
     }
-
-    const nameStart = index
-    while (index < attrText.length && !/[\s=]/.test(attrText[index] ?? '')) {
-      index += 1
-    }
-    const name = attrText.slice(nameStart, index)
-    while (index < attrText.length && /\s/.test(attrText[index] ?? '')) {
-      index += 1
-    }
-
-    if (attrText[index] !== '=') {
-      tokens.push({
-        name,
-        raw: attrText.slice(nameStart, index),
-      })
-      continue
-    }
-
-    index += 1
-    while (index < attrText.length && /\s/.test(attrText[index] ?? '')) {
-      index += 1
-    }
-    const valueStart = index
-    const opener = attrText[index]
-
-    if (opener === '"' || opener === "'") {
-      index += 1
-      while (index < attrText.length) {
-        const character = attrText[index]
-        if (character === '\\') {
-          index += 2
-          continue
-        }
-        index += 1
-        if (character === opener) {
-          break
-        }
-      }
-    } else if (opener === '{') {
-      const end = readBalancedJsxBraces(attrText, index)
-      if (!end) {
-        break
-      }
-      index = end
-    } else {
-      while (index < attrText.length && !/\s/.test(attrText[index] ?? '')) {
-        index += 1
-      }
-    }
-
-    tokens.push({
-      name,
-      raw: attrText.slice(nameStart, index),
-      valueRaw: attrText.slice(valueStart, index),
-    })
   }
 
   return tokens
@@ -288,103 +202,148 @@ const indentMultilineBlock = (text: string, prefix: string): string =>
     .map((line) => `${prefix}${line}`)
     .join('\n')
 
-const readAlertOpeningTag = (content: string, start: number): ParsedAlertElement | null => {
-  let braceDepth = 0
-  let activeQuote: '"' | "'" | '`' | null = null
-  let index = start + '<Alert'.length
+const createSourceOverrideKey = (
+  target: ProjectSourceTarget,
+  sourceKind: DesktopMcpProjectSourceKind
+): SourceOverrideKey =>
+  `${target.type === 'global-config' ? 'global-config' : target.pageId}:${sourceKind}`
 
-  while (index < content.length) {
-    const character = content[index]
+const sourceDefinesCustomAlert = (source: string): boolean => {
+  if (!source.includes('Alert')) {
+    return false
+  }
 
-    if (activeQuote) {
-      if (character === '\\') {
-        index += 2
+  const tree = JSX_TYPESCRIPT_PARSER.parse(source)
+  const hasAlertDefinition = (node: ParsedJsxSyntaxNode): boolean => {
+    if (
+      node.type.name === 'FunctionDeclaration' ||
+      node.type.name === 'ClassDeclaration' ||
+      node.type.name === 'VariableDeclaration'
+    ) {
+      for (let child = node.firstChild; child; child = child.nextSibling) {
+        if (child.type.name === 'VariableDefinition' && source.slice(child.from, child.to) === 'Alert') {
+          return true
+        }
+      }
+    }
+
+    for (let child = node.firstChild; child; child = child.nextSibling) {
+      if (hasAlertDefinition(child)) {
+        return true
+      }
+    }
+
+    return false
+  }
+
+  return hasAlertDefinition(tree.topNode as ParsedJsxSyntaxNode)
+}
+
+const hasScopedCustomAlertDefinition = ({
+  project,
+  target,
+  finalSourceOverrides,
+}: {
+  project: Project
+  target: ProjectSourceTarget
+  finalSourceOverrides: ReadonlyMap<SourceOverrideKey, string>
+}): boolean => {
+  const getScopedSourceText = (
+    scopedTarget: ProjectSourceTarget,
+    sourceKind: DesktopMcpProjectSourceKind
+  ): string => {
+    const override = finalSourceOverrides.get(createSourceOverrideKey(scopedTarget, sourceKind))
+    if (override !== undefined) {
+      return override
+    }
+
+    if (scopedTarget.type === 'global-config') {
+      return project.source.globalConfig[sourceKind]
+    }
+
+    const page = getPageById(project.source, scopedTarget.pageId)
+    return page?.source[sourceKind] ?? ''
+  }
+
+  const scopedSources = [
+    getScopedSourceText({ type: 'global-config' }, 'jsx'),
+    getScopedSourceText({ type: 'global-config' }, 'hooks'),
+  ]
+
+  if (target.type === 'page') {
+    scopedSources.push(getScopedSourceText(target, 'jsx'))
+    scopedSources.push(getScopedSourceText(target, 'hooks'))
+  }
+
+  return scopedSources.some((source) => sourceDefinesCustomAlert(source))
+}
+
+const collectFinalSourceOverrides = (
+  operations: readonly DesktopMcpApplyChangesOperation[],
+  plannedCreatedPages: PlannedCreatedPages
+): Map<SourceOverrideKey, string> => {
+  const overrides = new Map<SourceOverrideKey, string>()
+
+  for (const [index, operation] of operations.entries()) {
+    if (operation.type === 'replace_source') {
+      const parsedSource = parseDesktopMcpProjectSourceUri(operation.resourceUri)
+      if (!parsedSource) {
         continue
       }
-      if (character === activeQuote) {
-        activeQuote = null
+
+      overrides.set(
+        createSourceOverrideKey(parsedSource.target, parsedSource.sourceKind),
+        operation.content
+      )
+      continue
+    }
+
+    if (operation.type === 'create_page') {
+      const plannedPage = plannedCreatedPages.byIndex.get(index)
+      if (!plannedPage) {
+        continue
       }
-      index += 1
-      continue
-    }
 
-    if (character === '"' || character === "'" || character === '`') {
-      activeQuote = character
-      index += 1
-      continue
+      overrides.set(
+        createSourceOverrideKey({ type: 'page', pageId: plannedPage.pageId }, 'jsx'),
+        operation.jsxCode ?? ''
+      )
+      overrides.set(
+        createSourceOverrideKey({ type: 'page', pageId: plannedPage.pageId }, 'hooks'),
+        operation.hooksCode ?? ''
+      )
     }
+  }
 
-    if (character === '{') {
-      braceDepth += 1
-      index += 1
-      continue
+  return overrides
+}
+
+const JSX_TYPESCRIPT_PARSER = javascriptParser.configure({ dialect: 'jsx ts' })
+
+const findFirstChildByType = (
+  node: ParsedJsxSyntaxNode,
+  typeName: string
+): ParsedJsxSyntaxNode | null => {
+  for (let child = node.firstChild; child; child = child.nextSibling) {
+    if (child.type.name === typeName) {
+      return child
     }
-
-    if (character === '}') {
-      braceDepth = Math.max(0, braceDepth - 1)
-      index += 1
-      continue
-    }
-
-    if (character === '>' && braceDepth === 0) {
-      const rawAttrText = content.slice(start + '<Alert'.length, index)
-      const selfClosing = /\/\s*$/.test(rawAttrText)
-      return {
-        attrText: selfClosing ? rawAttrText.replace(/\/\s*$/, '') : rawAttrText,
-        contentStart: index + 1,
-        contentEnd: index + 1,
-        end: index + 1,
-        selfClosing,
-      }
-    }
-
-    index += 1
   }
 
   return null
 }
 
-const findMatchingAlertCloseTag = (
-  content: string,
-  contentStart: number
-): { contentEnd: number; end: number } | null => {
-  let depth = 1
-  let searchIndex = contentStart
-
-  while (searchIndex < content.length) {
-    ALERT_TAG_PATTERN.lastIndex = searchIndex
-    const nextOpenMatch = ALERT_TAG_PATTERN.exec(content)
-    const nextOpenIndex = nextOpenMatch?.index ?? -1
-    const nextCloseIndex = content.indexOf('</Alert>', searchIndex)
-
-    if (nextCloseIndex === -1) {
-      return null
-    }
-
-    if (nextOpenIndex !== -1 && nextOpenIndex < nextCloseIndex) {
-      const nestedAlert = readAlertOpeningTag(content, nextOpenIndex)
-      if (!nestedAlert) {
-        return null
-      }
-      if (!nestedAlert.selfClosing) {
-        depth += 1
-      }
-      searchIndex = nestedAlert.end
-      continue
-    }
-
-    depth -= 1
-    if (depth === 0) {
-      return {
-        contentEnd: nextCloseIndex,
-        end: nextCloseIndex + '</Alert>'.length,
-      }
-    }
-    searchIndex = nextCloseIndex + '</Alert>'.length
+const getJsxTagName = (content: string, tagNode: ParsedJsxSyntaxNode | null): string | undefined => {
+  if (!tagNode) {
+    return undefined
   }
 
-  return null
+  const identifierNode = findFirstChildByType(tagNode, 'JSXIdentifier')
+  return identifierNode ? content.slice(identifierNode.from, identifierNode.to) : undefined
 }
+
+const isSameSyntaxNode = (left: ParsedJsxSyntaxNode, right: ParsedJsxSyntaxNode): boolean =>
+  left.from === right.from && left.to === right.to && left.type.name === right.type.name
 
 const buildDismissibleAlertChildren = (
   target: 'LocalAlert' | 'GlobalAlert',
@@ -404,97 +363,147 @@ const buildDismissibleAlertChildren = (
   return `${headerBlock}\n${indentMultilineBlock(trimmedChildren, '  ')}\n`
 }
 
-const rewriteAlertComponentUsages = (content: string): string => {
-  let rewritten = ''
-  let cursor = 0
+const rewriteAlertComponentUsages = (content: string, options?: { allowAlertMigration?: boolean }): string => {
+  if (options?.allowAlertMigration === false) {
+    return content
+  }
 
-  while (true) {
-    ALERT_TAG_PATTERN.lastIndex = cursor
-    const match = ALERT_TAG_PATTERN.exec(content)
-    if (!match) {
-      rewritten += content.slice(cursor)
-      return rewritten
-    }
+  const tree = JSX_TYPESCRIPT_PARSER.parse(content)
 
-    const start = match.index
-    const openingTag = readAlertOpeningTag(content, start)
-    if (!openingTag) {
-      rewritten += content.slice(cursor)
-      return rewritten
-    }
-
-    rewritten += content.slice(cursor, start)
-
-    const tokens = parseJsxAttributeTokens(openingTag.attrText)
-    const variantToken = findJsxAttributeToken(tokens, 'variant')
-    const inlineToken = findJsxAttributeToken(tokens, 'inline')
-    const fullWidthToken = findJsxAttributeToken(tokens, 'fullWidth')
-    const closeButtonToken = findJsxAttributeToken(tokens, 'closeButton')
-    const onCloseRaw = findJsxAttributeToken(tokens, 'onClose')?.valueRaw
-    const variant = variantToken ? parseStaticStringJsxValue(variantToken.valueRaw) : undefined
-    const inline = inlineToken ? parseStaticBooleanJsxValue(inlineToken.valueRaw) : false
-    const fullWidth = fullWidthToken ? parseStaticBooleanJsxValue(fullWidthToken.valueRaw) : false
-    const closeButton = closeButtonToken
-      ? parseStaticBooleanJsxValue(closeButtonToken.valueRaw)
-      : false
-    const hasDynamicMigrationProp =
-      (!!variantToken && variant === undefined) ||
-      (!!inlineToken && inline === undefined) ||
-      (!!fullWidthToken && fullWidth === undefined) ||
-      (!!closeButtonToken && closeButton === undefined)
-    const migration = hasDynamicMigrationProp
-      ? undefined
-      : resolveAlertMigration({
-          variant,
-          inline,
-          fullWidth,
-          closeButton,
+  const rewriteNode = (node: ParsedJsxSyntaxNode): string => {
+    if (node.type.name === 'JSXElement') {
+      const selfClosingTag = findFirstChildByType(node, 'JSXSelfClosingTag')
+      if (selfClosingTag && getJsxTagName(content, selfClosingTag) === 'Alert') {
+        return rewriteAlertElement({
+          content,
+          node,
+          openingNode: selfClosingTag,
         })
-
-    const remainingTokens = tokens.filter(
-      (token) => token.name === null || !DEPRECATED_ALERT_PROP_NAMES.has(token.name)
-    )
-
-    if (openingTag.selfClosing) {
-      if (!migration) {
-        rewritten += content.slice(start, openingTag.end)
-      } else {
-        const attributes = buildJsxAttributeString(remainingTokens, [
-          `${migration.targetProp}="${migration.targetValue}"`,
-        ])
-        rewritten += `<${migration.target}${attributes} />`
       }
-      cursor = openingTag.end
-      continue
+
+      const openingTag = findFirstChildByType(node, 'JSXOpenTag')
+      const closingTag = findFirstChildByType(node, 'JSXCloseTag')
+      if (openingTag && closingTag && getJsxTagName(content, openingTag) === 'Alert') {
+        return rewriteAlertElement({
+          content,
+          node,
+          openingNode: openingTag,
+          closingNode: closingTag,
+        })
+      }
     }
 
-    const closingTag = findMatchingAlertCloseTag(content, openingTag.contentStart)
-    if (!closingTag) {
-      rewritten += content.slice(start)
-      return rewritten
+    if (!node.firstChild) {
+      return content.slice(node.from, node.to)
     }
 
-    const rewrittenChildren = rewriteAlertComponentUsages(
-      content.slice(openingTag.contentStart, closingTag.contentEnd)
-    )
+    let rewritten = ''
+    let cursor = node.from
+    for (
+      let child: ParsedJsxSyntaxNode | null = node.firstChild;
+      child;
+      child = child.nextSibling
+    ) {
+      rewritten += content.slice(cursor, child.from)
+      rewritten += rewriteNode(child)
+      cursor = child.to
+    }
+    rewritten += content.slice(cursor, node.to)
+    return rewritten
+  }
 
+  return rewriteNode(tree.topNode as ParsedJsxSyntaxNode)
+}
+
+const rewriteAlertElement = ({
+  content,
+  node,
+  openingNode,
+  closingNode,
+}: {
+  content: string
+  node: ParsedJsxSyntaxNode
+  openingNode: ParsedJsxSyntaxNode
+  closingNode?: ParsedJsxSyntaxNode
+}): string => {
+  const tokens = parseJsxAttributeTokens(content, openingNode)
+  const variantToken = findJsxAttributeToken(tokens, 'variant')
+  const inlineToken = findJsxAttributeToken(tokens, 'inline')
+  const fullWidthToken = findJsxAttributeToken(tokens, 'fullWidth')
+  const closeButtonToken = findJsxAttributeToken(tokens, 'closeButton')
+  const onCloseRaw = findJsxAttributeToken(tokens, 'onClose')?.valueRaw
+  const hasSpreadAttribute = tokens.some((token) => token.name === null)
+  const variant = variantToken ? parseStaticStringJsxValue(variantToken.valueRaw) : undefined
+  const inline = inlineToken ? parseStaticBooleanJsxValue(inlineToken.valueRaw) : false
+  const fullWidth = fullWidthToken ? parseStaticBooleanJsxValue(fullWidthToken.valueRaw) : false
+  const closeButton = closeButtonToken
+    ? parseStaticBooleanJsxValue(closeButtonToken.valueRaw)
+    : false
+  const hasDynamicMigrationProp =
+    hasSpreadAttribute ||
+    (!!variantToken && variant === undefined) ||
+    (!!inlineToken && inline === undefined) ||
+    (!!fullWidthToken && fullWidth === undefined) ||
+    (!!closeButtonToken && closeButton === undefined)
+  const migration = hasDynamicMigrationProp
+    ? undefined
+    : resolveAlertMigration({
+        variant,
+        inline,
+        fullWidth,
+        closeButton,
+      })
+
+  const remainingTokens = tokens.filter(
+    (token) => token.name === null || !DEPRECATED_ALERT_PROP_NAMES.has(token.name)
+  )
+
+  if (openingNode.type.name === 'JSXSelfClosingTag' || !closingNode) {
     if (!migration) {
-      rewritten += `${content.slice(start, openingTag.contentStart)}${rewrittenChildren}</Alert>`
-      cursor = closingTag.end
-      continue
+      return content.slice(node.from, node.to)
     }
 
     const attributes = buildJsxAttributeString(remainingTokens, [
       `${migration.targetProp}="${migration.targetValue}"`,
     ])
-    const replacementChildren =
-      migration.preservesCloseButton && closeButton && (migration.target === 'LocalAlert' || migration.target === 'GlobalAlert')
-        ? buildDismissibleAlertChildren(migration.target, rewrittenChildren, onCloseRaw)
-        : rewrittenChildren
+    if (
+      migration.preservesCloseButton &&
+      closeButton &&
+      (migration.target === 'LocalAlert' || migration.target === 'GlobalAlert')
+    ) {
+      const replacementChildren = buildDismissibleAlertChildren(migration.target, '', onCloseRaw)
+      return `<${migration.target}${attributes}>${replacementChildren}</${migration.target}>`
+    }
 
-    rewritten += `<${migration.target}${attributes}>${replacementChildren}</${migration.target}>`
-    cursor = closingTag.end
+    return `<${migration.target}${attributes} />`
   }
+
+  let rewrittenChildren = ''
+  let cursor = openingNode.to
+  for (
+    let child = openingNode.nextSibling;
+    child && !isSameSyntaxNode(child, closingNode);
+    child = child.nextSibling
+  ) {
+    rewrittenChildren += content.slice(cursor, child.from)
+    rewrittenChildren += rewriteAlertComponentUsages(content.slice(child.from, child.to))
+    cursor = child.to
+  }
+  rewrittenChildren += content.slice(cursor, closingNode.from)
+
+  if (!migration) {
+    return `${content.slice(node.from, openingNode.to)}${rewrittenChildren}${content.slice(closingNode.from, node.to)}`
+  }
+
+  const attributes = buildJsxAttributeString(remainingTokens, [
+    `${migration.targetProp}="${migration.targetValue}"`,
+  ])
+  const replacementChildren =
+    migration.preservesCloseButton && closeButton && (migration.target === 'LocalAlert' || migration.target === 'GlobalAlert')
+      ? buildDismissibleAlertChildren(migration.target, rewrittenChildren, onCloseRaw)
+      : rewrittenChildren
+
+  return `<${migration.target}${attributes}>${replacementChildren}</${migration.target}>`
 }
 
 export const prepareDesktopMcpApplyChanges = (
@@ -526,6 +535,10 @@ export const prepareDesktopMcpApplyChanges = (
   if (!plannedCreatedPages.ok) {
     return plannedCreatedPages.failure
   }
+  const finalSourceOverrides = collectFinalSourceOverrides(
+    request.operations,
+    plannedCreatedPages.value
+  )
 
   const operationResults: DesktopMcpApplyChangesOperationResult[] = []
   const changedResources = new Set<string>([DESKTOP_MCP_PROJECT_MANIFEST_URI])
@@ -554,8 +567,16 @@ export const prepareDesktopMcpApplyChanges = (
           return rewrittenContent.failure
         }
 
+        const allowAlertMigration = !hasScopedCustomAlertDefinition({
+          project: nextProject,
+          target: resolvedSource.target,
+          finalSourceOverrides,
+        })
+
         nextProject = updateSourceForTarget(nextProject, resolvedSource.target, {
-          [resolvedSource.sourceKind]: rewriteAlertComponentUsages(rewrittenContent.content),
+          [resolvedSource.sourceKind]: rewriteAlertComponentUsages(rewrittenContent.content, {
+            allowAlertMigration,
+          }),
         })
         previewRefreshRequired = true
         changedResources.add(operation.resourceUri)
@@ -609,6 +630,12 @@ export const prepareDesktopMcpApplyChanges = (
           return rewrittenHooks.failure
         }
 
+        const allowAlertMigration = !hasScopedCustomAlertDefinition({
+          project: nextProject,
+          target: { type: 'page', pageId: plannedPage.pageId },
+          finalSourceOverrides,
+        })
+
         nextProject = {
           ...nextProject,
           source: {
@@ -619,8 +646,12 @@ export const prepareDesktopMcpApplyChanges = (
                 plannedPage.pageId,
                 pageName.value,
                 createArcadeSourceFile(
-                  rewriteAlertComponentUsages(rewrittenJsx.content),
-                  rewriteAlertComponentUsages(rewrittenHooks.content)
+                  rewriteAlertComponentUsages(rewrittenJsx.content, {
+                    allowAlertMigration,
+                  }),
+                  rewriteAlertComponentUsages(rewrittenHooks.content, {
+                    allowAlertMigration,
+                  })
                 )
               ),
             ],
