@@ -494,6 +494,7 @@ describe('Aksel catalog starter path', () => {
     const paletteComponents = getComponentsByCategory('component')
     const inlineMessageEntry = getCatalogComponent('InlineMessage')
     const globalAlertEntry = getCatalogComponent('GlobalAlert')
+    const infoCardEntry = getCatalogComponent('InfoCard')
     const localAlertEntry = getCatalogComponent('LocalAlert')
     const dialogEntry = getCatalogComponent('Dialog')
     const fieldsetEntry = getCatalogComponent('Fieldset')
@@ -508,6 +509,7 @@ describe('Aksel catalog starter path', () => {
       expect.arrayContaining([
         'InlineMessage',
         'GlobalAlert',
+        'InfoCard',
         'LocalAlert',
         'Dialog',
         'Fieldset',
@@ -522,6 +524,10 @@ describe('Aksel catalog starter path', () => {
       '<InlineMessage status="success">Draft saved at 14:35</InlineMessage>'
     )
     expect(globalAlertEntry?.snippet.code).toContain('<GlobalAlert status="announcement">')
+    expect(infoCardEntry?.snippet.code).toContain('<InfoCard data-color="info">')
+    expect(infoCardEntry?.snippet.code).toContain(
+      '<InfoCard.Header icon={<InformationSquareIcon aria-hidden />}>'
+    )
     expect(localAlertEntry?.snippet.code).toContain('<LocalAlert status="warning">')
     expect(dialogEntry?.snippet.code).toBe('<ReviewDialog{{dialogSuffix}} />')
     expect(dialogEntry?.snippet.hooksCode).toContain(
@@ -555,11 +561,19 @@ describe('Aksel catalog starter path', () => {
     expect(paletteComponents.find((component) => component.name === 'InlineMessage')?.snippet).toBe(
       '<InlineMessage status="success">Draft saved at 14:35</InlineMessage>'
     )
+    expect(
+      paletteComponents.find((component) => component.name === 'InfoCard')?.snippet
+    ).toContain('<InfoCard.Header icon={<InformationSquareIcon aria-hidden />}>')
+    expect(getCatalogPropValues('InfoCard', 'data-color')).toContain('info')
+    expect(getCatalogPropValues('InfoCard', 'size')).toContain('small')
     expect(searchComponents('modal replacement')).toContainEqual(
       expect.objectContaining({ name: 'Dialog' })
     )
     expect(searchComponents('attachment')).toContainEqual(
       expect.objectContaining({ name: 'FileUpload' })
+    )
+    expect(searchComponents('fremhevet')).toContainEqual(
+      expect.objectContaining({ name: 'InfoCard' })
     )
   })
 

@@ -42,6 +42,14 @@ describe('akselMcpCatalog builder', () => {
       name: 'Button',
       resourceUri: akselComponentResourceUri('Button'),
     })
+    const infoCard = catalog.components.find((component) => component.name === 'InfoCard')
+    expect(infoCard).toMatchObject({
+      name: 'InfoCard',
+      resourceUri: akselComponentResourceUri('InfoCard'),
+    })
+    expect(catalog.componentsByName.InfoCard?.snippet.jsx).toContain(
+      '<InfoCard data-color="info">'
+    )
 
     for (const indexEntry of catalog.components) {
       const detail = catalog.componentsByName[indexEntry.name]
@@ -76,6 +84,7 @@ describe('akselMcpCatalog builder', () => {
     const names = listMcpAuthoringEntries().map((entry) => entry.name)
 
     expect(names).toContain('Button')
+    expect(names).toContain('InfoCard')
     expect(names).toContain('Page')
     expect(names).not.toContain('Modal')
     expect(names).not.toContain('Alert')

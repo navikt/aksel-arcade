@@ -393,6 +393,12 @@ describe('Aksel-aware autocomplete contract', () => {
       'Page-wide alert banner for important updates.'
     )
     expect(applyFor('<Global', 'GlobalAlert')).toContain('GlobalAlert status="announcement">')
+    expect(optionFor('<Info', 'InfoCard')?.detail).toBe(
+      'Highlighted information card with icon, title, and supporting text.'
+    )
+    expect(applyFor('<Info', 'InfoCard')).toContain(
+      'InfoCard.Header icon={<InformationSquareIcon aria-hidden />}>'
+    )
     expect(optionFor('<Local', 'LocalAlert')?.detail).toBe(
       'Section-level alert for nearby feedback.'
     )
@@ -794,6 +800,12 @@ describe('Aksel-aware autocomplete contract', () => {
       'ExpansionCard.Title',
       'ExpansionCard.Description',
     ])
+    expect(labelsFor('<InfoCard>\n  <')).toEqual([
+      'InfoCard.Header',
+      'InfoCard.Content',
+      'InfoCard.Message',
+    ])
+    expect(labelsFor('<InfoCard>\n  <InfoCard.Header>\n    <')).toEqual(['InfoCard.Title'])
     expect(labelsFor('<Process>\n  <')).toEqual(['Process.Event'])
     expect(labelsFor('<Stepper>\n  <')).toEqual(['Stepper.Step'])
     expect(labelsFor('<Tabs>\n  <')).toEqual(['Tabs.List', 'Tabs.Panel'])
@@ -809,6 +821,9 @@ describe('Aksel-aware autocomplete contract', () => {
     expect(labelsFor('<ExpansionCard>\n  <ExpansionCard.Header>\n    <T')).toContain(
       'ExpansionCard.Title'
     )
+    expect(labelsFor('<InfoCard>\n  <H')).toContain('InfoCard.Header')
+    expect(labelsFor('<InfoCard>\n  <M')).toContain('InfoCard.Message')
+    expect(labelsFor('<InfoCard>\n  <InfoCard.Header>\n    <T')).toContain('InfoCard.Title')
     expect(labelsFor('<Process>\n  <E')).toContain('Process.Event')
     expect(labelsFor('<Stepper>\n  <S')).toContain('Stepper.Step')
     expect(labelsFor('<Tabs>\n  <Tabs.List>\n    <T')).toContain('Tabs.Tab')
@@ -844,6 +859,18 @@ describe('Aksel-aware autocomplete contract', () => {
     )
     expect(applyFor('<ExpansionCard>\n  <', 'ExpansionCard.Header')).toContain(
       'ExpansionCard.Title>Payment for June</ExpansionCard.Title>'
+    )
+    expect(applyFor('<InfoCard>\n  <', 'InfoCard.Header')).toContain(
+      'InfoCard.Title>Fremhevet informasjon</InfoCard.Title>'
+    )
+    expect(applyFor('<InfoCard>\n  <', 'InfoCard.Content')).toContain(
+      'InfoCard brukes for å fremheve informasjon på en side'
+    )
+    expect(applyFor('<InfoCard>\n  <', 'InfoCard.Message')).toContain(
+      'InfoCard.Message icon={<InformationSquareIcon aria-hidden />}>'
+    )
+    expect(applyFor('<InfoCard>\n  <InfoCard.Header>\n    <', 'InfoCard.Title')).toBe(
+      'InfoCard.Title>Fremhevet informasjon</InfoCard.Title>'
     )
     expect(applyFor('<Process>\n  <', 'Process.Event')).toContain(
       'Process.Event\n  status="active"'
@@ -952,6 +979,7 @@ describe('Aksel-aware autocomplete contract', () => {
     expect(labelsFor('<Accordion s')).toContain('size')
     expect(labelsFor('<DataGrid c')).toContain('columns')
     expect(labelsFor('<Combobox l')).toContain('label')
+    expect(labelsFor('<InfoCard.Message i')).toContain('icon')
     expect(labelsFor('<PlusIcon aria-')).toContain('aria-hidden')
   })
 
@@ -983,6 +1011,9 @@ describe('Aksel-aware autocomplete contract', () => {
     const labels = labelsFor('<Button variant="secondary-')
 
     expect(labels).toContain('secondary-neutral')
+    expect(labelsFor('<InfoCard size="s')).toContain('small')
+    expect(labelsFor('<InfoCard as="s')).toContain('section')
+    expect(labelsFor('<InfoCard.Title as="h')).toContain('h3')
   })
 
   it('suggests v8 spacing token values for layout spacing props', () => {
@@ -1017,6 +1048,7 @@ describe('Aksel-aware autocomplete contract', () => {
     expect(labels).toContain('brand-magenta')
     expect(labels).toContain('brand-beige')
     expect(labels).toContain('brand-blue')
+    expect(labelsFor('<InfoCard data-color="meta-')).toContain('meta-purple')
   })
 
   it('suggests SVG prop values for icons', () => {
@@ -1027,6 +1059,7 @@ describe('Aksel-aware autocomplete contract', () => {
   it('suggests icons for icon prop expression values', () => {
     expect(labelsFor('<Button icon={Pl')).toContain('PlusIcon')
     expect(labelsFor('<Button icon={<Pl')).toContain('PlusIcon')
+    expect(labelsFor('<InfoCard.Message icon={In')).toContain('InformationSquareIcon')
     expect(applyFor('<Button icon={<DogH', 'DogHarnessIcon')).toBe(
       'DogHarnessIcon title="a11y-title" fontSize="1.5rem" />}'
     )

@@ -218,6 +218,32 @@ describe('ComponentPalette', () => {
     )
   })
 
+  it('shows InfoCard in Add-menu search with the curated compound snippet', async () => {
+    const user = userEvent.setup()
+    const onInsertComponent = vi.fn()
+
+    await act(async () => {
+      render(<ComponentPalette open onClose={vi.fn()} onInsertComponent={onInsertComponent} />)
+    })
+
+    await user.type(screen.getByRole('textbox', { name: /search components/i }), 'InfoCard')
+    await user.click(screen.getByRole('link', { name: 'InfoCard' }))
+
+    expect(onInsertComponent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: 'InfoCard',
+        snippet: expect.stringContaining(
+          '<InfoCard.Header icon={<InformationSquareIcon aria-hidden />}>'
+        ),
+        insertion: expect.objectContaining({
+          jsx: expect.stringContaining(
+            '<InfoCard.Header icon={<InformationSquareIcon aria-hidden />}>'
+          ),
+        }),
+      })
+    )
+  })
+
   it('shows separate Chips Toggle and Chips Removable Add-menu entries from the shared catalog', async () => {
     const user = userEvent.setup()
     const onInsertComponent = vi.fn()
