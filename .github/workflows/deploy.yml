@@ -27,29 +27,29 @@ jobs:
           set -euo pipefail
           git fetch --force --tags origin
           VERSION="$(
-            node - <<'NODE'
-            const { execSync } = require("node:child_process");
-            const {
-              readReleaseCandidateState,
-              resolveStableDesktopVersion,
-            } = require("./scripts/desktop-release-plan.cjs");
+          node - <<'NODE'
+          const { execSync } = require("node:child_process");
+          const {
+            readReleaseCandidateState,
+            resolveStableDesktopVersion,
+          } = require("./scripts/desktop-release-plan.cjs");
 
-            const releaseTags = execSync('git tag --list "desktop-v*"', {
-              encoding: "utf8",
-              stdio: ["ignore", "pipe", "ignore"],
-            })
-              .trim()
-              .split(/\r?\n/)
-              .filter(Boolean);
-            const { targetVersion } = readReleaseCandidateState();
+          const releaseTags = execSync('git tag --list "desktop-v*"', {
+            encoding: "utf8",
+            stdio: ["ignore", "pipe", "ignore"],
+          })
+            .trim()
+            .split(/\r?\n/)
+            .filter(Boolean);
+          const { targetVersion } = readReleaseCandidateState();
 
-            process.stdout.write(
-              resolveStableDesktopVersion({
-                releaseTags,
-                targetVersion,
-              }),
-            );
-            NODE
+          process.stdout.write(
+            resolveStableDesktopVersion({
+              releaseTags,
+              targetVersion,
+            }),
+          );
+          NODE
           )"
           echo "AKSEL_ARCADE_DESKTOP_VERSION=${VERSION}" >> "$GITHUB_ENV"
 
