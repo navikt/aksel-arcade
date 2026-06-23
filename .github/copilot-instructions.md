@@ -113,4 +113,14 @@ The user is testing UX, not debugging technical failures. It is YOUR responsibil
 
 If verification fails, fix the issues and verify again before responding to the user.
 
+## Release workflow policy
+
+- Default ordinary feature work to the protected `release-candidate` branch. Branch from `release-candidate`, open PRs back to `release-candidate`, and treat that branch as the normal integration line.
+- Touch `master` only when the user explicitly asks for a **Release promotion** or a **Hotfix**.
+- The current RC target version lives in `.github/release-candidate.json`. Agents and release automation should treat that file as the source of truth for the active RC cycle.
+- Desktop-impacting merges to `release-candidate` are intended to publish signed Desktop release candidates. Merges to `master` are intended to publish the public Desktop release and the stable GitHub Pages site.
+- Agents may merge to `master` only on explicit user instruction and only after the required checks pass.
+- Hotfixes start from `master` and must be carried back into `release-candidate` after the public patch release work is merged.
+- See `docs/desktop-release.md` for the full runbook, bootstrap checklist, and copy-paste user request examples.
+
 <!-- MANUAL ADDITIONS END -->

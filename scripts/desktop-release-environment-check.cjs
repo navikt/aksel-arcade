@@ -5,7 +5,12 @@ const { spawnSync } = require("node:child_process");
 
 const DEFAULT_REPOSITORY = "navikt/aksel-arcade";
 const ENVIRONMENT_NAME = "desktop-release";
-const PROTECTED_BRANCH = "master";
+const STABLE_BRANCH = "master";
+const RELEASE_CANDIDATE_BRANCH = "release-candidate";
+const REQUIRED_BRANCH_NAMES = Object.freeze([
+  RELEASE_CANDIDATE_BRANCH,
+  STABLE_BRANCH,
+]);
 const INSUFFICIENT_PERMISSION_EXIT_CODE = 2;
 
 const REQUIRED_SECRET_NAMES = Object.freeze([
@@ -67,7 +72,7 @@ function getMissingSecretNames(secrets) {
   );
 }
 
-function hasMasterOnlyBranchPolicy(environment, branchPolicies) {
+function hasExpectedBranchPolicies(environment, branchPolicies) {
   const deploymentBranchPolicy = environment?.deployment_branch_policy;
 
   if (
@@ -78,11 +83,15 @@ function hasMasterOnlyBranchPolicy(environment, branchPolicies) {
   }
 
   const policies = getBranchPolicies(branchPolicies);
+  const branchNames = policies
+    .filter((policy) => policy?.type === "branch")
+    .map((policy) => policy?.name)
+    .filter((name) => typeof name === "string")
+    .sort();
 
   return (
-    policies.length === 1 &&
-    policies[0]?.name === PROTECTED_BRANCH &&
-    policies[0]?.type === "branch"
+    branchNames.length === REQUIRED_BRANCH_NAMES.length &&
+    branchNames.every((name, index) => name === [...REQUIRED_BRANCH_NAMES].sort()[index])
   );
 }
 
@@ -94,10 +103,23 @@ function createCheck(id, ok, message) {
   };
 }
 
+function createBranchProtectionCheck(branchName, branchMetadata) {
+  const protectedBranch = branchMetadata?.protected === true;
+
+  return createCheck(
+    `${branchName}-branch-protected`,
+    protectedBranch,
+    protectedBranch
+      ? `\`${branchName}\` is protected before Desktop release credentials can be used.`
+      : `\`${branchName}\` is not protected before Desktop release credentials can be used.`,
+  );
+}
+
 function createDesktopReleaseEnvironmentReadiness({
   environment = null,
   branchPolicies = null,
-  masterBranch = null,
+  stableBranch = null,
+  releaseCandidateBranch = null,
   secrets = null,
   secretsAccessError = null,
 } = {}) {
@@ -117,8 +139,7 @@ function createDesktopReleaseEnvironmentReadiness({
 
   if (environmentExists) {
     const noManualApproval = hasNoManualApproval(environment);
-    const masterBranchProtected = masterBranch?.protected === true;
-    const masterOnlyBranchPolicy = hasMasterOnlyBranchPolicy(
+    const expectedBranchPolicies = hasExpectedBranchPolicies(
       environment,
       branchPolicies,
     );
@@ -131,19 +152,17 @@ function createDesktopReleaseEnvironmentReadiness({
           ? "Environment has no wait timer or required reviewers."
           : "Environment has a wait timer or required reviewers configured.",
       ),
-      createCheck(
-        "master-branch-protected",
-        masterBranchProtected,
-        masterBranchProtected
-          ? "`master` is protected before Desktop release credentials can be used."
-          : "`master` is not protected before Desktop release credentials can be used.",
+      createBranchProtectionCheck(STABLE_BRANCH, stableBranch),
+      createBranchProtectionCheck(
+        RELEASE_CANDIDATE_BRANCH,
+        releaseCandidateBranch,
       ),
       createCheck(
-        "master-only-branch-policy",
-        masterOnlyBranchPolicy,
-        masterOnlyBranchPolicy
-          ? "Environment branch policy allows only the `master` branch."
-          : "Environment branch policy must allow only the `master` branch.",
+        "expected-branch-policies",
+        expectedBranchPolicies,
+        expectedBranchPolicies
+          ? "Environment branch policy allows only the `release-candidate` and `master` branches."
+          : "Environment branch policy must allow only the `release-candidate` and `master` branches.",
       ),
       createCheck(
         "secret-names-readable",
@@ -250,6 +269,20 @@ function requireGhApiJson(path) {
   return result.data;
 }
 
+function readBranch(repository, branchName) {
+  const result = runGhApiJson(`repos/${repository}/branches/${branchName}`);
+
+  if (!result.ok) {
+    if (result.status === 404) {
+      return null;
+    }
+
+    throw new Error(result.message);
+  }
+
+  return result.data;
+}
+
 function getRepositoryFromEnv(env = process.env) {
   return (
     env.DESKTOP_RELEASE_REPOSITORY ?? env.GITHUB_REPOSITORY ?? DEFAULT_REPOSITORY
@@ -265,7 +298,8 @@ function readDesktopReleaseEnvironmentState(repository) {
       return {
         environment: null,
         branchPolicies: null,
-        masterBranch: null,
+        stableBranch: null,
+        releaseCandidateBranch: null,
         secrets: null,
         secretsAccessError: null,
       };
@@ -282,9 +316,8 @@ function readDesktopReleaseEnvironmentState(repository) {
     branchPolicies: requireGhApiJson(
       `${environmentPath}/deployment-branch-policies`,
     ),
-    masterBranch: requireGhApiJson(
-      `repos/${repository}/branches/${PROTECTED_BRANCH}`,
-    ),
+    stableBranch: readBranch(repository, STABLE_BRANCH),
+    releaseCandidateBranch: readBranch(repository, RELEASE_CANDIDATE_BRANCH),
     secrets: secretsResult.ok ? secretsResult.data : null,
     secretsAccessError: secretsResult.ok
       ? null
@@ -320,11 +353,13 @@ if (require.main === module) {
 module.exports = {
   ENVIRONMENT_NAME,
   INSUFFICIENT_PERMISSION_EXIT_CODE,
-  PROTECTED_BRANCH,
+  RELEASE_CANDIDATE_BRANCH,
+  REQUIRED_BRANCH_NAMES,
   REQUIRED_SECRET_NAMES,
+  STABLE_BRANCH,
   createDesktopReleaseEnvironmentReadiness,
   formatDesktopReleaseEnvironmentReadiness,
   getMissingSecretNames,
-  hasMasterOnlyBranchPolicy,
+  hasExpectedBranchPolicies,
   hasNoManualApproval,
 };

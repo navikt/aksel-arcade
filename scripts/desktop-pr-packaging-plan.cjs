@@ -3,9 +3,11 @@
 
 const { appendFileSync, readFileSync } = require("node:fs");
 const {
-  FIRST_DESKTOP_VERSION,
   VERSION_ENV_VAR,
-  createDesktopReleasePlan,
+  createVersionInjection,
+  getDesktopImpactingFiles,
+  parseTargetVersion,
+  readReleaseCandidateState,
 } = require("./desktop-release-plan.cjs");
 
 const UNSIGNED_PACKAGE_PLATFORMS = Object.freeze([
@@ -16,14 +18,6 @@ const UNSIGNED_PACKAGE_PLATFORMS = Object.freeze([
     expectedArtifacts: Object.freeze([
       "release/desktop/Aksel-Arcade-${version}-mac-arm64.dmg",
       "release/desktop/Aksel-Arcade-${version}-mac-x64.dmg",
-    ]),
-  }),
-  Object.freeze({
-    id: "windows",
-    runner: "windows-latest",
-    command: "npm run desktop:package:win",
-    expectedArtifacts: Object.freeze([
-      "release/desktop/Aksel-Arcade-${version}-windows-x64.exe",
     ]),
   }),
 ]);
@@ -57,48 +51,43 @@ function createPlatformPlan(platform, desktopVersion) {
     runner: platform.runner,
     command: platform.command,
     expectedArtifacts: platform.expectedArtifacts.map((artifact) =>
-      artifact.replace("${version}", desktopVersion)
+      artifact.replace("${version}", desktopVersion),
     ),
   };
 }
 
 function createDesktopPrPackagingPlan({
   changedFiles = [],
-  eventName = "pull_request",
-  refName = "master",
-  releaseTags = [],
+  targetVersion,
 } = {}) {
-  const releasePlan = createDesktopReleasePlan({
-    changedFiles,
-    eventName,
-    refName,
-    releaseTags,
-  });
-  const packageRequired = releasePlan.desktopImpacting;
-  const desktopVersion = releasePlan.nextDesktopVersion ?? FIRST_DESKTOP_VERSION;
+  const desktopImpactingFiles = getDesktopImpactingFiles(changedFiles);
+  const packageRequired = desktopImpactingFiles.length > 0;
+  const desktopVersion = parseTargetVersion(targetVersion).version;
 
   return {
     packageRequired,
-    desktopImpactingFiles: releasePlan.desktopImpactingFiles,
+    desktopImpactingFiles,
     desktopVersion,
-    versionEnvironment: {
-      [VERSION_ENV_VAR]: desktopVersion,
-    },
+    versionEnvironment: createVersionInjection(desktopVersion).environment,
     platforms: packageRequired
       ? UNSIGNED_PACKAGE_PLATFORMS.map((platform) =>
-          createPlatformPlan(platform, desktopVersion)
+          createPlatformPlan(platform, desktopVersion),
         )
       : [],
-    releasePlanReason: releasePlan.reason,
+    releasePlanReason: packageRequired
+      ? "desktop-impacting-change"
+      : "no-desktop-impacting-change",
   };
 }
 
 function createDesktopPrPackagingPlanFromEnv(env = process.env) {
+  const { targetVersion } = readReleaseCandidateState(
+    env.DESKTOP_RELEASE_STATE_FILE,
+  );
+
   return createDesktopPrPackagingPlan({
     changedFiles: readChangedFilesFromEnv(env),
-    eventName: env.GITHUB_EVENT_NAME ?? "pull_request",
-    refName: env.GITHUB_BASE_REF ?? env.GITHUB_REF_NAME ?? "master",
-    releaseTags: [],
+    targetVersion,
   });
 }
 

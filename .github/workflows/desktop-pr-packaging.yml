@@ -34,29 +34,16 @@ jobs:
         run: npm run desktop:pr-package-plan
         env:
           DESKTOP_RELEASE_CHANGED_FILES_FILE: changed-files.txt
+          DESKTOP_RELEASE_STATE_FILE: .github/release-candidate.json
 
   package:
-    name: Package ${{ matrix.name }}
+    name: Package macOS DMGs
     needs: plan
     if: needs.plan.outputs.package-required == 'true'
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - name: macOS DMGs
-            os: macos-latest
-            platform: mac
-            package-command: npm run desktop:package:mac
-          - name: Windows NSIS
-            os: windows-latest
-            platform: windows
-            package-command: npm run desktop:package:win
+    runs-on: macos-latest
     env:
       AKSEL_ARCADE_DESKTOP_VERSION: ${{ needs.plan.outputs.desktop-version }}
       CSC_IDENTITY_AUTO_DISCOVERY: 'false'
-      CSC_LINK: ''
-      CSC_KEY_PASSWORD: ''
       MAC_CERTIFICATE_P12_BASE64: ''
       MAC_CERTIFICATE_PASSWORD: ''
       APPLE_API_KEY_BASE64: ''
@@ -77,30 +64,15 @@ jobs:
         run: npm ci
 
       - name: Package unsigned Desktop installers
-        run: ${{ matrix.package-command }}
+        run: npm run desktop:package:mac
 
       - name: Validate Desktop install artifacts
         shell: bash
-        env:
-          DESKTOP_PR_PACKAGE_PLATFORM: ${{ matrix.platform }}
         run: |
-          case "$DESKTOP_PR_PACKAGE_PLATFORM" in
-            mac)
-              expected=(
-                "release/desktop/Aksel-Arcade-${AKSEL_ARCADE_DESKTOP_VERSION}-mac-arm64.dmg"
-                "release/desktop/Aksel-Arcade-${AKSEL_ARCADE_DESKTOP_VERSION}-mac-x64.dmg"
-              )
-              ;;
-            windows)
-              expected=(
-                "release/desktop/Aksel-Arcade-${AKSEL_ARCADE_DESKTOP_VERSION}-windows-x64.exe"
-              )
-              ;;
-            *)
-              echo "Unknown Desktop packaging platform: $DESKTOP_PR_PACKAGE_PLATFORM" >&2
-              exit 1
-              ;;
-          esac
+          expected=(
+            "release/desktop/Aksel-Arcade-${AKSEL_ARCADE_DESKTOP_VERSION}-mac-arm64.dmg"
+            "release/desktop/Aksel-Arcade-${AKSEL_ARCADE_DESKTOP_VERSION}-mac-x64.dmg"
+          )
 
           for artifact in "${expected[@]}"; do
             if [[ ! -f "$artifact" ]]; then

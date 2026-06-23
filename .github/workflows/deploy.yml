@@ -24,8 +24,34 @@ jobs:
 
       - name: Determine app version
         run: |
-          VERSION=$(git tag --list "desktop-v*" --sort=-version:refname | head -1 | sed 's/desktop-v//')
-          echo "AKSEL_ARCADE_DESKTOP_VERSION=${VERSION:-dev}" >> "$GITHUB_ENV"
+          set -euo pipefail
+          git fetch --force --tags origin
+          VERSION="$(
+            node - <<'NODE'
+            const { execSync } = require("node:child_process");
+            const {
+              readReleaseCandidateState,
+              resolveStableDesktopVersion,
+            } = require("./scripts/desktop-release-plan.cjs");
+
+            const releaseTags = execSync('git tag --list "desktop-v*"', {
+              encoding: "utf8",
+              stdio: ["ignore", "pipe", "ignore"],
+            })
+              .trim()
+              .split(/\r?\n/)
+              .filter(Boolean);
+            const { targetVersion } = readReleaseCandidateState();
+
+            process.stdout.write(
+              resolveStableDesktopVersion({
+                releaseTags,
+                targetVersion,
+              }),
+            );
+            NODE
+          )"
+          echo "AKSEL_ARCADE_DESKTOP_VERSION=${VERSION}" >> "$GITHUB_ENV"
 
       - name: Setup Node
         uses: actions/setup-node@v4

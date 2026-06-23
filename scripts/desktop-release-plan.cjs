@@ -1,12 +1,19 @@
 #!/usr/bin/env node
 "use strict";
 
+const fs = require("node:fs");
+
 const FIRST_DESKTOP_VERSION = "0.1.0";
-const PROTECTED_BRANCH = "master";
+const STABLE_BRANCH = "master";
+const RELEASE_CANDIDATE_BRANCH = "release-candidate";
+const DEFAULT_RELEASE_CANDIDATE_STATE_FILE = ".github/release-candidate.json";
 const VERSION_ENV_VAR = "AKSEL_ARCADE_DESKTOP_VERSION";
-const DESKTOP_TAG_PATTERN = /^desktop-v(\d+)\.(\d+)\.(\d+)$/;
+const TARGET_VERSION_PATTERN = /^\d+\.\d+\.\d+$/;
+const PUBLIC_DESKTOP_TAG_PATTERN = /^desktop-v(\d+)\.(\d+)\.(\d+)$/;
+const RC_DESKTOP_TAG_PATTERN = /^desktop-v(\d+)\.(\d+)\.(\d+)-rc\.(\d+)$/;
 
 const EXACT_DESKTOP_IMPACTING_PATHS = new Set([
+  ".github/release-candidate.json",
   "electron-builder.config.cjs",
   "index.html",
   "package-lock.json",
@@ -15,6 +22,7 @@ const EXACT_DESKTOP_IMPACTING_PATHS = new Set([
   "vite.desktop.config.ts",
   "docs/desktop-release.md",
   "docs/adr/0009-desktop-arcade-release-pipeline.md",
+  "docs/adr/0019-two-line-desktop-release-flow.md",
 ]);
 
 const DESKTOP_IMPACTING_PREFIXES = [
@@ -39,7 +47,7 @@ function normalizePath(filePath) {
 
 function normalizeRefName(refName) {
   if (typeof refName !== "string" || refName.trim() === "") {
-    return PROTECTED_BRANCH;
+    return STABLE_BRANCH;
   }
 
   return refName.trim().replace(/^refs\/heads\//, "");
@@ -85,12 +93,49 @@ function getDesktopImpactingFiles(changedFiles) {
     .filter((filePath) => isDesktopImpactingPath(filePath));
 }
 
-function parseDesktopReleaseTag(tag) {
+function parseTargetVersion(version, label = "Desktop release targetVersion") {
+  if (typeof version !== "string" || !TARGET_VERSION_PATTERN.test(version.trim())) {
+    throw new Error(`${label} must be a plain SemVer version like 0.2.0.`);
+  }
+
+  const [major, minor, patch] = version.trim().split(".").map(Number);
+
+  return {
+    version: `${major}.${minor}.${patch}`,
+    major,
+    minor,
+    patch,
+  };
+}
+
+function compareVersions(left, right) {
+  return (
+    left.major - right.major ||
+    left.minor - right.minor ||
+    left.patch - right.patch
+  );
+}
+
+function formatVersion(version) {
+  return `${version.major}.${version.minor}.${version.patch}`;
+}
+
+function incrementPatchVersion(version) {
+  const parsedVersion = parseTargetVersion(version);
+
+  return formatVersion({
+    major: parsedVersion.major,
+    minor: parsedVersion.minor,
+    patch: parsedVersion.patch + 1,
+  });
+}
+
+function parsePublicDesktopReleaseTag(tag) {
   if (typeof tag !== "string") {
     return null;
   }
 
-  const match = DESKTOP_TAG_PATTERN.exec(tag.trim());
+  const match = PUBLIC_DESKTOP_TAG_PATTERN.exec(tag.trim());
 
   if (!match) {
     return null;
@@ -100,17 +145,40 @@ function parseDesktopReleaseTag(tag) {
 
   return {
     tag: tag.trim(),
+    version: `${major}.${minor}.${patch}`,
     major: Number(major),
     minor: Number(minor),
     patch: Number(patch),
   };
 }
 
-function compareDesktopReleaseTags(left, right) {
+function parseDesktopReleaseCandidateTag(tag) {
+  if (typeof tag !== "string") {
+    return null;
+  }
+
+  const match = RC_DESKTOP_TAG_PATTERN.exec(tag.trim());
+
+  if (!match) {
+    return null;
+  }
+
+  const [, major, minor, patch, rcNumber] = match;
+
+  return {
+    tag: tag.trim(),
+    targetVersion: `${major}.${minor}.${patch}`,
+    version: `${major}.${minor}.${patch}-rc.${rcNumber}`,
+    major: Number(major),
+    minor: Number(minor),
+    patch: Number(patch),
+    rcNumber: Number(rcNumber),
+  };
+}
+
+function compareDesktopReleaseCandidateTags(left, right) {
   return (
-    left.major - right.major ||
-    left.minor - right.minor ||
-    left.patch - right.patch
+    compareVersions(left, right) || left.rcNumber - right.rcNumber
   );
 }
 
@@ -120,20 +188,36 @@ function findLatestDesktopReleaseTag(tags) {
   }
 
   return tags
-    .map((tag) => parseDesktopReleaseTag(tag))
+    .map((tag) => parsePublicDesktopReleaseTag(tag))
     .filter((tag) => tag !== null)
-    .sort(compareDesktopReleaseTags)
+    .sort(compareVersions)
+    .at(-1) ?? null;
+}
+
+function findLatestReleaseCandidateTag(tags, targetVersion) {
+  if (!Array.isArray(tags)) {
+    return null;
+  }
+
+  const normalizedTargetVersion = parseTargetVersion(targetVersion).version;
+
+  return tags
+    .map((tag) => parseDesktopReleaseCandidateTag(tag))
+    .filter(
+      (tag) => tag !== null && tag.targetVersion === normalizedTargetVersion,
+    )
+    .sort(compareDesktopReleaseCandidateTags)
     .at(-1) ?? null;
 }
 
 function computeNextDesktopVersion(tags) {
-  const latestTag = findLatestDesktopReleaseTag(tags);
+  const latestPublicReleaseTag = findLatestDesktopReleaseTag(tags);
 
-  if (!latestTag) {
+  if (!latestPublicReleaseTag) {
     return FIRST_DESKTOP_VERSION;
   }
 
-  return `${latestTag.major}.${latestTag.minor}.${latestTag.patch + 1}`;
+  return incrementPatchVersion(latestPublicReleaseTag.version);
 }
 
 function createVersionInjection(version) {
@@ -145,11 +229,43 @@ function createVersionInjection(version) {
   };
 }
 
+function parseReleaseCandidateState(rawState) {
+  let parsedState;
+
+  try {
+    parsedState = JSON.parse(rawState);
+  } catch (error) {
+    throw new Error(
+      `Desktop release candidate state must be valid JSON: ${error.message}`,
+    );
+  }
+
+  if (!parsedState || typeof parsedState !== "object") {
+    throw new Error("Desktop release candidate state must be a JSON object.");
+  }
+
+  const targetVersion = parseTargetVersion(
+    parsedState.targetVersion,
+    "Desktop release candidate targetVersion",
+  ).version;
+
+  return {
+    targetVersion,
+  };
+}
+
+function readReleaseCandidateState(
+  filePath = DEFAULT_RELEASE_CANDIDATE_STATE_FILE,
+) {
+  return parseReleaseCandidateState(fs.readFileSync(filePath, "utf8"));
+}
+
 function validateManualRecoveryDispatch({
   eventName = "push",
-  refName = PROTECTED_BRANCH,
-  refOnProtectedMaster = false,
-  protectedBranch = PROTECTED_BRANCH,
+  refName = STABLE_BRANCH,
+  refOnProtectedBranch = false,
+  stableBranch = STABLE_BRANCH,
+  releaseCandidateBranch = RELEASE_CANDIDATE_BRANCH,
 } = {}) {
   if (eventName !== "workflow_dispatch") {
     return {
@@ -159,19 +275,22 @@ function validateManualRecoveryDispatch({
     };
   }
 
-  if (normalizeRefName(refName) !== protectedBranch) {
+  const normalizedRefName = normalizeRefName(refName);
+  const allowedBranches = new Set([stableBranch, releaseCandidateBranch]);
+
+  if (!allowedBranches.has(normalizedRefName)) {
     return {
       accepted: false,
       manualRecovery: true,
-      rejectionReason: `Manual Desktop release recovery must be dispatched from protected ${protectedBranch}.`,
+      rejectionReason: `Manual Desktop release recovery must be dispatched from protected ${releaseCandidateBranch} or ${stableBranch}.`,
     };
   }
 
-  if (refOnProtectedMaster !== true) {
+  if (refOnProtectedBranch !== true) {
     return {
       accepted: false,
       manualRecovery: true,
-      rejectionReason: `Manual Desktop release recovery requires a commit that is already on protected ${protectedBranch}.`,
+      rejectionReason: `Manual Desktop release recovery requires a commit that is already on protected ${normalizedRefName}.`,
     };
   }
 
@@ -182,107 +301,258 @@ function validateManualRecoveryDispatch({
   };
 }
 
+function resolveStableDesktopVersion({
+  releaseTags = [],
+  targetVersion,
+} = {}) {
+  const latestPublicReleaseTag = findLatestDesktopReleaseTag(releaseTags);
+  const normalizedTargetVersion = parseTargetVersion(targetVersion).version;
+
+  if (
+    !latestPublicReleaseTag ||
+    compareVersions(
+      parseTargetVersion(normalizedTargetVersion),
+      latestPublicReleaseTag,
+    ) > 0
+  ) {
+    return normalizedTargetVersion;
+  }
+
+  return incrementPatchVersion(latestPublicReleaseTag.version);
+}
+
+function createNoReleasePlan({
+  eventName,
+  stableBranch,
+  releaseCandidateBranch,
+  refName,
+  reason,
+  releaseChannel,
+  targetVersion,
+  desktopImpactingFiles,
+  latestPublicDesktopReleaseTag,
+  latestReleaseCandidateTag,
+  currentRefDesktopReleaseTag,
+  rejected = false,
+  rejectionReason = null,
+} = {}) {
+  return {
+    eventName,
+    stableBranch,
+    releaseCandidateBranch,
+    refName,
+    releaseChannel,
+    prerelease: releaseChannel === "candidate",
+    targetVersion,
+    releaseRequired: false,
+    rejected,
+    rejectionReason,
+    reason,
+    desktopImpacting: desktopImpactingFiles.length > 0,
+    desktopImpactingFiles,
+    latestPublicDesktopReleaseTag,
+    latestReleaseCandidateTag,
+    currentRefDesktopReleaseTag,
+    desktopVersion: null,
+    desktopTag: null,
+    versionInjection: null,
+  };
+}
+
 function createDesktopReleasePlan({
   changedFiles = [],
   eventName = "push",
-  refName = PROTECTED_BRANCH,
-  refOnProtectedMaster = false,
-  protectedBranch = PROTECTED_BRANCH,
+  refName = STABLE_BRANCH,
+  refOnProtectedBranch = false,
+  stableBranch = STABLE_BRANCH,
+  releaseCandidateBranch = RELEASE_CANDIDATE_BRANCH,
   releaseTags = [],
   currentRefReleaseTags = [],
+  targetVersion,
 } = {}) {
   const normalizedRefName = normalizeRefName(refName);
+  const normalizedTargetVersion = parseTargetVersion(targetVersion).version;
   const desktopImpactingFiles = getDesktopImpactingFiles(changedFiles);
+  const latestPublicDesktopReleaseTag = findLatestDesktopReleaseTag(releaseTags);
+  const latestReleaseCandidateTag = findLatestReleaseCandidateTag(
+    releaseTags,
+    normalizedTargetVersion,
+  );
   const manualRecovery = validateManualRecoveryDispatch({
     eventName,
     refName: normalizedRefName,
-    refOnProtectedMaster,
-    protectedBranch,
+    refOnProtectedBranch,
+    stableBranch,
+    releaseCandidateBranch,
   });
 
   if (!manualRecovery.accepted) {
-    return {
+    return createNoReleasePlan({
       eventName,
-      protectedBranch,
+      stableBranch,
+      releaseCandidateBranch,
       refName: normalizedRefName,
-      releaseRequired: false,
+      reason: "manual-recovery-ref-not-on-protected-branch",
+      releaseChannel: null,
+      targetVersion: normalizedTargetVersion,
+      desktopImpactingFiles,
+      latestPublicDesktopReleaseTag: latestPublicDesktopReleaseTag?.tag ?? null,
+      latestReleaseCandidateTag: latestReleaseCandidateTag?.tag ?? null,
+      currentRefDesktopReleaseTag: null,
       rejected: true,
       rejectionReason: manualRecovery.rejectionReason,
-      reason: "manual-recovery-ref-not-on-protected-master",
-      desktopImpacting: desktopImpactingFiles.length > 0,
-      desktopImpactingFiles,
-      latestDesktopReleaseTag: null,
-      currentRefDesktopReleaseTag: null,
-      nextDesktopVersion: null,
-      versionInjection: null,
-    };
+    });
   }
 
-  if (eventName === "push" && normalizedRefName !== protectedBranch) {
-    return {
+  if (
+    normalizedRefName !== stableBranch &&
+    normalizedRefName !== releaseCandidateBranch
+  ) {
+    return createNoReleasePlan({
       eventName,
-      protectedBranch,
+      stableBranch,
+      releaseCandidateBranch,
       refName: normalizedRefName,
-      releaseRequired: false,
-      rejected: false,
-      rejectionReason: null,
-      reason: "not-protected-master",
-      desktopImpacting: desktopImpactingFiles.length > 0,
+      reason: "not-release-branch",
+      releaseChannel: null,
+      targetVersion: normalizedTargetVersion,
       desktopImpactingFiles,
-      latestDesktopReleaseTag: null,
+      latestPublicDesktopReleaseTag: latestPublicDesktopReleaseTag?.tag ?? null,
+      latestReleaseCandidateTag: latestReleaseCandidateTag?.tag ?? null,
       currentRefDesktopReleaseTag: null,
-      nextDesktopVersion: null,
-      versionInjection: null,
-    };
+    });
   }
 
-  const latestDesktopReleaseTag = findLatestDesktopReleaseTag(releaseTags);
+  const releaseChannel =
+    normalizedRefName === releaseCandidateBranch ? "candidate" : "stable";
   const currentRefDesktopReleaseTag =
-    findLatestDesktopReleaseTag(currentRefReleaseTags);
+    releaseChannel === "candidate"
+      ? findLatestReleaseCandidateTag(
+          currentRefReleaseTags,
+          normalizedTargetVersion,
+        )?.tag ?? null
+      : findLatestDesktopReleaseTag(currentRefReleaseTags)?.tag ?? null;
+
   if (currentRefDesktopReleaseTag) {
-    return {
+    return createNoReleasePlan({
       eventName,
-      protectedBranch,
+      stableBranch,
+      releaseCandidateBranch,
       refName: normalizedRefName,
-      releaseRequired: false,
-      rejected: false,
-      rejectionReason: null,
       reason: "current-ref-already-released",
-      desktopImpacting: desktopImpactingFiles.length > 0,
+      releaseChannel,
+      targetVersion: normalizedTargetVersion,
       desktopImpactingFiles,
-      latestDesktopReleaseTag: latestDesktopReleaseTag?.tag ?? null,
-      currentRefDesktopReleaseTag: currentRefDesktopReleaseTag.tag,
-      nextDesktopVersion: null,
-      versionInjection: null,
-    };
+      latestPublicDesktopReleaseTag: latestPublicDesktopReleaseTag?.tag ?? null,
+      latestReleaseCandidateTag: latestReleaseCandidateTag?.tag ?? null,
+      currentRefDesktopReleaseTag,
+    });
   }
 
   const releaseRequired =
     manualRecovery.manualRecovery || desktopImpactingFiles.length > 0;
-  const nextDesktopVersion = releaseRequired
-    ? computeNextDesktopVersion(releaseTags)
-    : null;
+  if (!releaseRequired) {
+    return createNoReleasePlan({
+      eventName,
+      stableBranch,
+      releaseCandidateBranch,
+      refName: normalizedRefName,
+      reason: "no-desktop-impacting-change",
+      releaseChannel,
+      targetVersion: normalizedTargetVersion,
+      desktopImpactingFiles,
+      latestPublicDesktopReleaseTag: latestPublicDesktopReleaseTag?.tag ?? null,
+      latestReleaseCandidateTag: latestReleaseCandidateTag?.tag ?? null,
+      currentRefDesktopReleaseTag: null,
+    });
+  }
+
+  if (
+    releaseChannel === "candidate" &&
+    latestPublicDesktopReleaseTag &&
+    compareVersions(
+      parseTargetVersion(normalizedTargetVersion),
+      latestPublicDesktopReleaseTag,
+    ) <= 0
+  ) {
+    return createNoReleasePlan({
+      eventName,
+      stableBranch,
+      releaseCandidateBranch,
+      refName: normalizedRefName,
+      reason: "target-version-already-released",
+      releaseChannel,
+      targetVersion: normalizedTargetVersion,
+      desktopImpactingFiles,
+      latestPublicDesktopReleaseTag: latestPublicDesktopReleaseTag.tag,
+      latestReleaseCandidateTag: latestReleaseCandidateTag?.tag ?? null,
+      currentRefDesktopReleaseTag: null,
+    });
+  }
+
+  if (releaseChannel === "candidate") {
+    const nextRcNumber = (latestReleaseCandidateTag?.rcNumber ?? 0) + 1;
+    const desktopVersion = `${normalizedTargetVersion}-rc.${nextRcNumber}`;
+
+    return {
+      eventName,
+      stableBranch,
+      releaseCandidateBranch,
+      refName: normalizedRefName,
+      releaseChannel,
+      prerelease: true,
+      targetVersion: normalizedTargetVersion,
+      releaseRequired: true,
+      rejected: false,
+      rejectionReason: null,
+      reason: manualRecovery.manualRecovery
+        ? "manual-recovery"
+        : "desktop-impacting-change",
+      desktopImpacting: desktopImpactingFiles.length > 0,
+      desktopImpactingFiles,
+      latestPublicDesktopReleaseTag: latestPublicDesktopReleaseTag?.tag ?? null,
+      latestReleaseCandidateTag: latestReleaseCandidateTag?.tag ?? null,
+      currentRefDesktopReleaseTag: null,
+      desktopVersion,
+      desktopTag: `desktop-v${desktopVersion}`,
+      versionInjection: createVersionInjection(desktopVersion),
+    };
+  }
+
+  const desktopVersion = resolveStableDesktopVersion({
+    releaseTags,
+    targetVersion: normalizedTargetVersion,
+  });
+  const stableReason = manualRecovery.manualRecovery
+    ? "manual-recovery"
+    : latestPublicDesktopReleaseTag &&
+        compareVersions(
+          parseTargetVersion(normalizedTargetVersion),
+          latestPublicDesktopReleaseTag,
+        ) <= 0
+      ? "hotfix"
+      : "release-promotion";
 
   return {
     eventName,
-    protectedBranch,
+    stableBranch,
+    releaseCandidateBranch,
     refName: normalizedRefName,
-    releaseRequired,
+    releaseChannel,
+    prerelease: false,
+    targetVersion: normalizedTargetVersion,
+    releaseRequired: true,
     rejected: false,
     rejectionReason: null,
-    reason: releaseRequired
-      ? manualRecovery.manualRecovery
-        ? "manual-recovery"
-        : "desktop-impacting-change"
-      : "no-desktop-impacting-change",
+    reason: stableReason,
     desktopImpacting: desktopImpactingFiles.length > 0,
     desktopImpactingFiles,
-    latestDesktopReleaseTag: latestDesktopReleaseTag?.tag ?? null,
+    latestPublicDesktopReleaseTag: latestPublicDesktopReleaseTag?.tag ?? null,
+    latestReleaseCandidateTag: latestReleaseCandidateTag?.tag ?? null,
     currentRefDesktopReleaseTag: null,
-    nextDesktopVersion,
-    versionInjection: nextDesktopVersion
-      ? createVersionInjection(nextDesktopVersion)
-      : null,
+    desktopVersion,
+    desktopTag: `desktop-v${desktopVersion}`,
+    versionInjection: createVersionInjection(desktopVersion),
   };
 }
 
@@ -306,16 +576,23 @@ function parseBoolean(value) {
 }
 
 function createDesktopReleasePlanFromEnv(env = process.env) {
+  const { targetVersion } = readReleaseCandidateState(
+    env.DESKTOP_RELEASE_STATE_FILE ?? DEFAULT_RELEASE_CANDIDATE_STATE_FILE,
+  );
+
   return createDesktopReleasePlan({
     changedFiles: splitList(env.DESKTOP_RELEASE_CHANGED_FILES),
     eventName: env.GITHUB_EVENT_NAME ?? "push",
-    refName: env.GITHUB_REF_NAME ?? env.GITHUB_REF ?? PROTECTED_BRANCH,
-    refOnProtectedMaster: parseBoolean(
-      env.DESKTOP_RELEASE_REF_ON_PROTECTED_MASTER,
+    refName: env.GITHUB_REF_NAME ?? env.GITHUB_REF ?? STABLE_BRANCH,
+    refOnProtectedBranch: parseBoolean(
+      env.DESKTOP_RELEASE_REF_ON_PROTECTED_BRANCH,
     ),
-    protectedBranch: env.DESKTOP_RELEASE_PROTECTED_BRANCH ?? PROTECTED_BRANCH,
+    stableBranch: env.DESKTOP_RELEASE_STABLE_BRANCH ?? STABLE_BRANCH,
+    releaseCandidateBranch:
+      env.DESKTOP_RELEASE_CANDIDATE_BRANCH ?? RELEASE_CANDIDATE_BRANCH,
     releaseTags: splitList(env.DESKTOP_RELEASE_TAGS),
     currentRefReleaseTags: splitList(env.DESKTOP_RELEASE_CURRENT_REF_TAGS),
+    targetVersion,
   });
 }
 
@@ -330,16 +607,25 @@ if (require.main === module) {
 }
 
 module.exports = {
+  DEFAULT_RELEASE_CANDIDATE_STATE_FILE,
   FIRST_DESKTOP_VERSION,
-  PROTECTED_BRANCH,
+  RELEASE_CANDIDATE_BRANCH,
+  STABLE_BRANCH,
   VERSION_ENV_VAR,
   computeNextDesktopVersion,
   createDesktopReleasePlan,
   createDesktopReleasePlanFromEnv,
   createVersionInjection,
   findLatestDesktopReleaseTag,
+  findLatestReleaseCandidateTag,
   getDesktopImpactingFiles,
+  incrementPatchVersion,
   isDesktopImpactingPath,
-  parseDesktopReleaseTag,
+  parseDesktopReleaseCandidateTag,
+  parsePublicDesktopReleaseTag,
+  parseReleaseCandidateState,
+  parseTargetVersion,
+  readReleaseCandidateState,
+  resolveStableDesktopVersion,
   validateManualRecoveryDispatch,
 };
