@@ -3,11 +3,12 @@ name: Desktop release
 on:
   push:
     branches:
+      - release-candidate
       - master
   workflow_dispatch:
     inputs:
       recovery_sha:
-        description: Full commit SHA already reachable from protected master.
+        description: Full commit SHA already reachable from protected release-candidate or master.
         required: true
         type: string
 
@@ -15,11 +16,12 @@ permissions:
   contents: read
 
 concurrency:
-  group: desktop-release
+  group: desktop-release-${{ github.ref_name }}
   cancel-in-progress: false
 
 env:
-  DESKTOP_RELEASE_PROTECTED_BRANCH: master
+  DESKTOP_RELEASE_CANDIDATE_BRANCH: release-candidate
+  DESKTOP_RELEASE_STABLE_BRANCH: master
 
 jobs:
   plan:
@@ -30,6 +32,9 @@ jobs:
     outputs:
       release-required: ${{ steps.desktop-plan.outputs.release-required }}
       reason: ${{ steps.desktop-plan.outputs.reason }}
+      release-channel: ${{ steps.desktop-plan.outputs.release-channel }}
+      prerelease: ${{ steps.desktop-plan.outputs.prerelease }}
+      target-version: ${{ steps.desktop-plan.outputs.target-version }}
       desktop-version: ${{ steps.desktop-plan.outputs.desktop-version }}
       desktop-tag: ${{ steps.desktop-plan.outputs.desktop-tag }}
       release-source: ${{ steps.release-source.outputs.release-source }}
@@ -60,26 +65,29 @@ jobs:
 
           echo "release-source=$release_source" >> "$GITHUB_OUTPUT"
 
-      - name: Fetch protected master and Desktop tags
+      - name: Fetch release branch and Desktop tags
+        env:
+          RELEASE_BRANCH: ${{ github.ref_name }}
         run: |
           set -euo pipefail
-          git fetch --force --tags origin "refs/heads/${DESKTOP_RELEASE_PROTECTED_BRANCH}:refs/remotes/origin/${DESKTOP_RELEASE_PROTECTED_BRANCH}"
+          git fetch --force --tags origin "refs/heads/${RELEASE_BRANCH}:refs/remotes/origin/${RELEASE_BRANCH}"
 
       - name: Verify recovery commit is protected
         id: protected-ref
         env:
+          RELEASE_BRANCH: ${{ github.ref_name }}
           RELEASE_SOURCE: ${{ steps.release-source.outputs.release-source }}
         run: |
           set -euo pipefail
 
-          ref_on_protected_master=false
+          ref_on_protected_branch=false
           if [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" ]] &&
             git cat-file -e "${RELEASE_SOURCE}^{commit}" 2>/dev/null &&
-            git merge-base --is-ancestor "$RELEASE_SOURCE" "origin/${DESKTOP_RELEASE_PROTECTED_BRANCH}"; then
-            ref_on_protected_master=true
+            git merge-base --is-ancestor "$RELEASE_SOURCE" "origin/${RELEASE_BRANCH}"; then
+            ref_on_protected_branch=true
           fi
 
-          echo "ref-on-protected-master=$ref_on_protected_master" >> "$GITHUB_OUTPUT"
+          echo "ref-on-protected-branch=$ref_on_protected_branch" >> "$GITHUB_OUTPUT"
 
       - name: Collect changed files
         env:
@@ -109,6 +117,13 @@ jobs:
             echo "desktop/release-diff-fallback" > changed-files.txt
           fi
 
+      - name: Read release candidate state from release source
+        env:
+          RELEASE_SOURCE: ${{ steps.release-source.outputs.release-source }}
+        run: |
+          set -euo pipefail
+          git show "${RELEASE_SOURCE}:.github/release-candidate.json" > release-candidate-state.json
+
       - name: Collect Desktop release tags
         env:
           GH_TOKEN: ${{ github.token }}
@@ -135,9 +150,10 @@ jobs:
         run: npm run desktop:release-workflow-plan
         env:
           DESKTOP_RELEASE_CHANGED_FILES_FILE: changed-files.txt
+          DESKTOP_RELEASE_STATE_FILE: release-candidate-state.json
           DESKTOP_RELEASE_TAGS_FILE: desktop-tags.txt
           DESKTOP_RELEASE_CURRENT_REF_TAGS_FILE: current-ref-release-tags.txt
-          DESKTOP_RELEASE_REF_ON_PROTECTED_MASTER: ${{ steps.protected-ref.outputs.ref-on-protected-master }}
+          DESKTOP_RELEASE_REF_ON_PROTECTED_BRANCH: ${{ steps.protected-ref.outputs.ref-on-protected-branch }}
 
   package-macos:
     name: Package signed macOS installers
@@ -164,6 +180,7 @@ jobs:
       - name: Checkout verified release source
         shell: bash
         env:
+          RELEASE_BRANCH: ${{ github.ref_name }}
           RELEASE_SOURCE: ${{ needs.plan.outputs.release-source }}
         run: |
           set -euo pipefail
@@ -173,11 +190,11 @@ jobs:
             exit 1
           fi
 
-          git fetch --force origin "refs/heads/${DESKTOP_RELEASE_PROTECTED_BRANCH}:refs/remotes/origin/${DESKTOP_RELEASE_PROTECTED_BRANCH}"
+          git fetch --force origin "refs/heads/${RELEASE_BRANCH}:refs/remotes/origin/${RELEASE_BRANCH}"
 
           if ! git cat-file -e "${RELEASE_SOURCE}^{commit}" 2>/dev/null ||
-            ! git merge-base --is-ancestor "$RELEASE_SOURCE" "origin/${DESKTOP_RELEASE_PROTECTED_BRANCH}"; then
-            echo "Desktop release source is not reachable from protected ${DESKTOP_RELEASE_PROTECTED_BRANCH}." >&2
+            ! git merge-base --is-ancestor "$RELEASE_SOURCE" "origin/${RELEASE_BRANCH}"; then
+            echo "Desktop release source is not reachable from protected ${RELEASE_BRANCH}." >&2
             exit 1
           fi
 
@@ -205,88 +222,19 @@ jobs:
             release/desktop/Aksel-Arcade-${{ needs.plan.outputs.desktop-version }}-mac-arm64.dmg
             release/desktop/Aksel-Arcade-${{ needs.plan.outputs.desktop-version }}-mac-x64.dmg
 
-  package-windows:
-    name: Package Windows installer
-    needs: plan
-    if: needs.plan.outputs.release-required == 'true'
-    runs-on: windows-latest
-    permissions:
-      contents: read
-    env:
-      AKSEL_ARCADE_DESKTOP_VERSION: ${{ needs.plan.outputs.desktop-version }}
-      CSC_IDENTITY_AUTO_DISCOVERY: 'false'
-      CSC_LINK: ''
-      CSC_KEY_PASSWORD: ''
-    steps:
-      - name: Checkout trusted workflow ref
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Checkout verified release source
-        shell: bash
-        env:
-          RELEASE_SOURCE: ${{ needs.plan.outputs.release-source }}
-        run: |
-          set -euo pipefail
-
-          if [[ ! "$RELEASE_SOURCE" =~ ^[0-9a-fA-F]{40}$ ]]; then
-            echo "Desktop release source must be a full 40-character commit SHA." >&2
-            exit 1
-          fi
-
-          git fetch --force origin "refs/heads/${DESKTOP_RELEASE_PROTECTED_BRANCH}:refs/remotes/origin/${DESKTOP_RELEASE_PROTECTED_BRANCH}"
-
-          if ! git cat-file -e "${RELEASE_SOURCE}^{commit}" 2>/dev/null ||
-            ! git merge-base --is-ancestor "$RELEASE_SOURCE" "origin/${DESKTOP_RELEASE_PROTECTED_BRANCH}"; then
-            echo "Desktop release source is not reachable from protected ${DESKTOP_RELEASE_PROTECTED_BRANCH}." >&2
-            exit 1
-          fi
-
-          git checkout --detach "$RELEASE_SOURCE"
-
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Package Windows installer
-        run: npm run desktop:package:win
-
-      - name: Validate Windows installer
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          artifact="release/desktop/Aksel-Arcade-${AKSEL_ARCADE_DESKTOP_VERSION}-windows-x64.exe"
-          if [[ ! -s "$artifact" ]]; then
-            echo "Missing expected Windows Desktop release artifact: $artifact" >&2
-            exit 1
-          fi
-
-      - name: Upload Windows installer
-        uses: actions/upload-artifact@v4
-        with:
-          name: desktop-release-windows
-          if-no-files-found: error
-          retention-days: 1
-          path: release/desktop/Aksel-Arcade-${{ needs.plan.outputs.desktop-version }}-windows-x64.exe
-
   publish:
     name: Publish Desktop release
     needs:
       - plan
       - package-macos
-      - package-windows
     if: needs.plan.outputs.release-required == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: write
     env:
+      DESKTOP_PRERELEASE: ${{ needs.plan.outputs.prerelease }}
+      DESKTOP_RELEASE_CHANNEL: ${{ needs.plan.outputs.release-channel }}
+      DESKTOP_TARGET_VERSION: ${{ needs.plan.outputs.target-version }}
       GH_TOKEN: ${{ github.token }}
       DESKTOP_VERSION: ${{ needs.plan.outputs.desktop-version }}
       DESKTOP_TAG: ${{ needs.plan.outputs.desktop-tag }}
@@ -307,7 +255,6 @@ jobs:
           expected=(
             "Aksel-Arcade-${DESKTOP_VERSION}-mac-arm64.dmg"
             "Aksel-Arcade-${DESKTOP_VERSION}-mac-x64.dmg"
-            "Aksel-Arcade-${DESKTOP_VERSION}-windows-x64.exe"
           )
 
           printf "%s\n" "${expected[@]}" | sort > expected-assets.txt
@@ -333,11 +280,18 @@ jobs:
 
           {
             cat generated-notes.md
+            if [[ "$DESKTOP_PRERELEASE" == "true" ]]; then
+              cat <<GUIDE
+
+          ## Release candidate
+
+          This is a release candidate for Desktop Arcade ${DESKTOP_TARGET_VERSION}.
+          GUIDE
+            fi
             cat <<GUIDE
 
           ## Download guide
 
-          - **Windows x64**: Download \`Aksel-Arcade-${DESKTOP_VERSION}-windows-x64.exe\` and run the installer.
           - **macOS Apple Silicon**: Download \`Aksel-Arcade-${DESKTOP_VERSION}-mac-arm64.dmg\`.
           - **macOS Intel**: Download \`Aksel-Arcade-${DESKTOP_VERSION}-mac-x64.dmg\`.
           GUIDE
@@ -369,6 +323,12 @@ jobs:
               gh api --method DELETE "repos/${GITHUB_REPOSITORY}/git/refs/tags/${DESKTOP_TAG}" >/dev/null 2>&1 || true
           fi
 
+          if [[ "$DESKTOP_PRERELEASE" == "true" ]]; then
+            prerelease_flag=(-F prerelease=true)
+          else
+            prerelease_flag=(-F prerelease=false)
+          fi
+
           release_id="$(
             gh api --method POST "repos/${GITHUB_REPOSITORY}/releases" \
               -f tag_name="$DESKTOP_TAG" \
@@ -376,22 +336,27 @@ jobs:
               -f name="Desktop Arcade ${DESKTOP_VERSION}" \
               -F body=@release-notes.md \
               -F draft=true \
-              -F prerelease=false \
+              "${prerelease_flag[@]}" \
               --jq ".id"
           )"
 
           gh release upload "$DESKTOP_TAG" --repo "$GITHUB_REPOSITORY" \
             "release/desktop/Aksel-Arcade-${DESKTOP_VERSION}-mac-arm64.dmg" \
-            "release/desktop/Aksel-Arcade-${DESKTOP_VERSION}-mac-x64.dmg" \
-            "release/desktop/Aksel-Arcade-${DESKTOP_VERSION}-windows-x64.exe"
+            "release/desktop/Aksel-Arcade-${DESKTOP_VERSION}-mac-x64.dmg"
 
           gh release view "$DESKTOP_TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq ".assets[].name" | sort > release-assets.txt
           diff -u expected-assets.txt release-assets.txt
 
-          gh api --method PATCH "repos/${GITHUB_REPOSITORY}/releases/${release_id}" \
-            -F draft=false \
-            -F prerelease=false \
-            -f make_latest=true >/dev/null
+          if [[ "$DESKTOP_PRERELEASE" == "true" ]]; then
+            gh api --method PATCH "repos/${GITHUB_REPOSITORY}/releases/${release_id}" \
+              -F draft=false \
+              -F prerelease=true >/dev/null
+          else
+            gh api --method PATCH "repos/${GITHUB_REPOSITORY}/releases/${release_id}" \
+              -F draft=false \
+              -F prerelease=false \
+              -f make_latest=true >/dev/null
+          fi
 
           release_published=true
           trap - EXIT

@@ -94,7 +94,7 @@ describe('Desktop Arcade packaging contract', () => {
     expect(config.files).toEqual(['dist-desktop/**/*', 'desktop/**/*', 'package.json'])
   })
 
-  it('uses the documented target matrix and installer artifact names', () => {
+  it('keeps the documented macOS artifact names and explicit-only Windows packaging metadata', () => {
     const config = createDesktopBuilderConfig()
 
     expect(config.mac.target).toEqual([{ target: 'dmg', arch: ['arm64', 'x64'] }])
@@ -136,8 +136,7 @@ describe('Desktop Arcade packaging contract', () => {
     expect(packageJson.scripts['desktop:build']).toContain(
       'vite build --config vite.desktop.config.ts'
     )
-    expect(packageJson.scripts['desktop:package']).toContain('--mac --win')
-    expect(packageJson.scripts['desktop:package']).toContain('--publish never')
+    expect(packageJson.scripts['desktop:package']).toBe('npm run desktop:package:mac')
     expect(packageJson.scripts['desktop:package:mac']).toContain('--mac')
     expect(packageJson.scripts['desktop:package:mac:release']).toBe(
       'node scripts/desktop-macos-release-signing.cjs package'

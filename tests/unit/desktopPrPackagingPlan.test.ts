@@ -5,9 +5,7 @@ import { describe, expect, it } from "vitest";
 
 interface DesktopPrPackagingPlanInput {
   changedFiles?: string[];
-  eventName?: string;
-  refName?: string;
-  releaseTags?: string[];
+  targetVersion?: string;
 }
 
 interface DesktopPrPackagePlatform {
@@ -40,13 +38,13 @@ const prPackaging = require(
 ) as DesktopPrPackagingPlanModule;
 
 describe("Desktop PR packaging plan", () => {
-  it("requires unsigned packaging for Desktop-impacting PR changes", () => {
+  it("requires unsigned macOS packaging for Desktop-impacting PR changes", () => {
     const plan = prPackaging.createDesktopPrPackagingPlan({
       changedFiles: [
         "src/App.tsx",
         ".github/workflows/desktop-pr-packaging.yml",
       ],
-      eventName: "pull_request",
+      targetVersion: "0.2.0",
     });
 
     expect(plan).toMatchObject({
@@ -55,11 +53,11 @@ describe("Desktop PR packaging plan", () => {
         "src/App.tsx",
         ".github/workflows/desktop-pr-packaging.yml",
       ],
-      desktopVersion: "0.1.0",
+      desktopVersion: "0.2.0",
       releasePlanReason: "desktop-impacting-change",
     });
     expect(plan.versionEnvironment).toEqual({
-      [prPackaging.VERSION_ENV_VAR]: "0.1.0",
+      [prPackaging.VERSION_ENV_VAR]: "0.2.0",
     });
     expect(plan.platforms).toEqual([
       {
@@ -67,16 +65,8 @@ describe("Desktop PR packaging plan", () => {
         runner: "macos-latest",
         command: "npm run desktop:package:mac",
         expectedArtifacts: [
-          "release/desktop/Aksel-Arcade-0.1.0-mac-arm64.dmg",
-          "release/desktop/Aksel-Arcade-0.1.0-mac-x64.dmg",
-        ],
-      },
-      {
-        id: "windows",
-        runner: "windows-latest",
-        command: "npm run desktop:package:win",
-        expectedArtifacts: [
-          "release/desktop/Aksel-Arcade-0.1.0-windows-x64.exe",
+          "release/desktop/Aksel-Arcade-0.2.0-mac-arm64.dmg",
+          "release/desktop/Aksel-Arcade-0.2.0-mac-x64.dmg",
         ],
       },
     ]);
@@ -90,13 +80,13 @@ describe("Desktop PR packaging plan", () => {
         ".github/workflows/deploy.yml",
         "tests/unit/desktopPrPackagingPlan.test.ts",
       ],
-      eventName: "pull_request",
+      targetVersion: "0.2.0",
     });
 
     expect(plan).toMatchObject({
       packageRequired: false,
       desktopImpactingFiles: [],
-      desktopVersion: "0.1.0",
+      desktopVersion: "0.2.0",
       platforms: [],
       releasePlanReason: "no-desktop-impacting-change",
     });
@@ -105,7 +95,7 @@ describe("Desktop PR packaging plan", () => {
   it("requires unsigned packaging when a renamed file previously had Desktop impact", () => {
     const plan = prPackaging.createDesktopPrPackagingPlan({
       changedFiles: ["archive/main.cjs", "desktop/main.cjs"],
-      eventName: "pull_request",
+      targetVersion: "0.2.0",
     });
 
     expect(plan).toMatchObject({
@@ -118,12 +108,12 @@ describe("Desktop PR packaging plan", () => {
   it("writes only scalar GitHub step outputs", () => {
     const plan = prPackaging.createDesktopPrPackagingPlan({
       changedFiles: ["desktop/main.cjs"],
-      eventName: "pull_request",
+      targetVersion: "0.2.0",
     });
 
     expect(prPackaging.formatGithubOutputs(plan)).toBe(
       "package-required=true\n" +
-        "desktop-version=0.1.0\n" +
+        "desktop-version=0.2.0\n" +
         "desktop-impacting-count=1\n",
     );
   });
@@ -146,19 +136,18 @@ describe("Desktop PR packaging workflow", () => {
     expect(workflow).toContain(".previous_filename // empty");
   });
 
-  it("runs unsigned packaging conditionally for the macOS and Windows targets", () => {
+  it("runs unsigned packaging conditionally for the macOS target only", () => {
     expect(workflow).toContain(
       "if: needs.plan.outputs.package-required == 'true'",
     );
     expect(workflow).toContain("npm run desktop:pr-package-plan");
+    expect(workflow).toContain("DESKTOP_RELEASE_STATE_FILE: .github/release-candidate.json");
     expect(workflow).toContain("npm run desktop:package:mac");
-    expect(workflow).toContain("npm run desktop:package:win");
     expect(workflow).toContain(
       "release/desktop/Aksel-Arcade-${AKSEL_ARCADE_DESKTOP_VERSION}-mac-arm64.dmg",
     );
-    expect(workflow).toContain(
-      "release/desktop/Aksel-Arcade-${AKSEL_ARCADE_DESKTOP_VERSION}-windows-x64.exe",
-    );
+    expect(workflow).not.toContain("npm run desktop:package:win");
+    expect(workflow).not.toContain("windows-x64.exe");
   });
 
   it("does not publish installers or request Desktop release credentials", () => {

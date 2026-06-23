@@ -6,6 +6,7 @@ const fs = require("node:fs");
 const {
   VERSION_ENV_VAR,
   createDesktopReleasePlan,
+  readReleaseCandidateState,
 } = require("./desktop-release-plan.cjs");
 
 function splitList(value) {
@@ -46,6 +47,9 @@ function parseBoolean(value) {
 }
 
 function createWorkflowPlan(env = process.env) {
+  const { targetVersion } = readReleaseCandidateState(
+    env.DESKTOP_RELEASE_STATE_FILE,
+  );
   const plan = createDesktopReleasePlan({
     changedFiles: readListInput(
       env,
@@ -54,10 +58,11 @@ function createWorkflowPlan(env = process.env) {
     ),
     eventName: env.GITHUB_EVENT_NAME ?? "push",
     refName: env.GITHUB_REF_NAME ?? env.GITHUB_REF,
-    refOnProtectedMaster: parseBoolean(
-      env.DESKTOP_RELEASE_REF_ON_PROTECTED_MASTER,
+    refOnProtectedBranch: parseBoolean(
+      env.DESKTOP_RELEASE_REF_ON_PROTECTED_BRANCH,
     ),
-    protectedBranch: env.DESKTOP_RELEASE_PROTECTED_BRANCH,
+    stableBranch: env.DESKTOP_RELEASE_STABLE_BRANCH,
+    releaseCandidateBranch: env.DESKTOP_RELEASE_CANDIDATE_BRANCH,
     releaseTags: readListInput(
       env,
       "DESKTOP_RELEASE_TAGS_FILE",
@@ -68,16 +73,10 @@ function createWorkflowPlan(env = process.env) {
       "DESKTOP_RELEASE_CURRENT_REF_TAGS_FILE",
       "DESKTOP_RELEASE_CURRENT_REF_TAGS",
     ),
+    targetVersion,
   });
 
-  const desktopTag = plan.nextDesktopVersion
-    ? `desktop-v${plan.nextDesktopVersion}`
-    : "";
-
-  return {
-    ...plan,
-    desktopTag,
-  };
+  return plan;
 }
 
 function appendGithubOutput(outputs, outputFile = process.env.GITHUB_OUTPUT) {
@@ -99,10 +98,15 @@ function writeWorkflowOutputs(plan, outputFile = process.env.GITHUB_OUTPUT) {
       "rejection-reason": plan.rejectionReason ?? "",
       "release-required": plan.releaseRequired,
       reason: plan.reason,
-      "desktop-version": plan.nextDesktopVersion ?? "",
-      "desktop-tag": plan.desktopTag,
+      "release-channel": plan.releaseChannel ?? "",
+      prerelease: plan.prerelease,
+      "target-version": plan.targetVersion ?? "",
+      "desktop-version": plan.desktopVersion ?? "",
+      "desktop-tag": plan.desktopTag ?? "",
       "desktop-impacting-count": plan.desktopImpactingFiles.length,
-      "latest-desktop-release-tag": plan.latestDesktopReleaseTag ?? "",
+      "latest-public-desktop-release-tag":
+        plan.latestPublicDesktopReleaseTag ?? "",
+      "latest-release-candidate-tag": plan.latestReleaseCandidateTag ?? "",
       "current-ref-desktop-release-tag":
         plan.currentRefDesktopReleaseTag ?? "",
       "version-env-var": VERSION_ENV_VAR,

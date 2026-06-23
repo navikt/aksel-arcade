@@ -9,41 +9,39 @@ const workflowPath = path.join(
 const workflow = fs.readFileSync(workflowPath, "utf8");
 
 describe("Desktop release workflow", () => {
-  it("runs only from protected master pushes or guarded recovery dispatches", () => {
+  it("runs from protected release-candidate and master pushes plus guarded recovery dispatches", () => {
     expect(workflow).toContain("name: Desktop release");
     expect(workflow).toContain("push:");
+    expect(workflow).toContain("- release-candidate");
     expect(workflow).toContain("- master");
     expect(workflow).toContain("workflow_dispatch:");
     expect(workflow).toContain("recovery_sha:");
     expect(workflow).toContain("git merge-base --is-ancestor");
-    expect(workflow).toContain("DESKTOP_RELEASE_REF_ON_PROTECTED_MASTER");
+    expect(workflow).toContain("DESKTOP_RELEASE_REF_ON_PROTECTED_BRANCH");
     expect(workflow).toContain("release-source:");
+    expect(workflow).toContain("release-candidate-state.json");
   });
 
-  it("builds required installers before publishing from one aggregation job", () => {
+  it("builds signed macOS installers before publishing from one aggregation job", () => {
     expect(workflow).toContain("package-macos:");
-    expect(workflow).toContain("package-windows:");
     expect(workflow).toContain("publish:");
     expect(workflow).toContain("- package-macos");
-    expect(workflow).toContain("- package-windows");
     expect(workflow).toContain("AKSEL_ARCADE_DESKTOP_VERSION");
     expect(workflow).toContain("Aksel-Arcade-${DESKTOP_VERSION}-mac-arm64.dmg");
     expect(workflow).toContain("Aksel-Arcade-${DESKTOP_VERSION}-mac-x64.dmg");
-    expect(workflow).toContain(
-      "Aksel-Arcade-${DESKTOP_VERSION}-windows-x64.exe",
-    );
     expect(workflow).toContain("Checkout trusted workflow ref");
     expect(workflow).toContain("Checkout verified release source");
     expect(workflow).toContain('git checkout --detach "$RELEASE_SOURCE"');
-    expect(workflow).not.toContain(
-      "ref: ${{ needs.plan.outputs.release-sha }}",
-    );
+    expect(workflow).not.toContain("package-windows:");
+    expect(workflow).not.toContain("windows-x64.exe");
   });
 
-  it("publishes no public partial release and omits checksum artifacts", () => {
-    expect(workflow).toContain("-F draft=true");
-    expect(workflow).toContain("-F draft=false");
-    expect(workflow).toContain("-F prerelease=false");
+  it("publishes prereleases for RC builds, stable releases for master, and no partial public artifacts", () => {
+    expect(workflow).toContain("DESKTOP_PRERELEASE");
+    expect(workflow).toContain("## Release candidate");
+    expect(workflow).toContain("prerelease_flag=(-F prerelease=true)");
+    expect(workflow).toContain('-F prerelease=true');
+    expect(workflow).toContain('-F prerelease=false');
     expect(workflow).toContain("-f make_latest=true");
     expect(workflow).toContain(
       'gh release delete "$DESKTOP_TAG" --repo "$GITHUB_REPOSITORY"',

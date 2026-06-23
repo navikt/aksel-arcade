@@ -39,7 +39,8 @@ interface AccessError {
 interface ReadinessInput {
   environment?: DesktopReleaseEnvironment | null;
   branchPolicies?: BranchPolicies | null;
-  masterBranch?: Branch | null;
+  stableBranch?: Branch | null;
+  releaseCandidateBranch?: Branch | null;
   secrets?: EnvironmentSecrets | null;
   secretsAccessError?: AccessError | null;
 }
@@ -60,6 +61,7 @@ interface Readiness {
 interface DesktopReleaseEnvironmentCheckModule {
   INSUFFICIENT_PERMISSION_EXIT_CODE: number;
   REQUIRED_SECRET_NAMES: string[];
+  REQUIRED_BRANCH_NAMES: string[];
   createDesktopReleaseEnvironmentReadiness(input?: ReadinessInput): Readiness;
   formatDesktopReleaseEnvironmentReadiness(readiness: Readiness): string;
 }
@@ -80,12 +82,20 @@ const readyEnvironment: DesktopReleaseEnvironment = {
   },
 };
 
-const masterOnlyBranchPolicies: BranchPolicies = {
-  branch_policies: [{ name: "master", type: "branch" }],
+const protectedBranchPolicies: BranchPolicies = {
+  branch_policies: [
+    { name: "release-candidate", type: "branch" },
+    { name: "master", type: "branch" },
+  ],
 };
 
-const protectedMasterBranch: Branch = {
+const protectedStableBranch: Branch = {
   name: "master",
+  protected: true,
+};
+
+const protectedReleaseCandidateBranch: Branch = {
+  name: "release-candidate",
   protected: true,
 };
 
@@ -98,8 +108,9 @@ const createReadyReadiness = (
 ): Readiness =>
   environmentCheck.createDesktopReleaseEnvironmentReadiness({
     environment: readyEnvironment,
-    branchPolicies: masterOnlyBranchPolicies,
-    masterBranch: protectedMasterBranch,
+    branchPolicies: protectedBranchPolicies,
+    stableBranch: protectedStableBranch,
+    releaseCandidateBranch: protectedReleaseCandidateBranch,
     secrets: createSecrets(),
     ...overrides,
   });
@@ -115,11 +126,15 @@ const findCheck = (readiness: Readiness, checkId: string): ReadinessCheck => {
 };
 
 describe("Desktop release environment check", () => {
-  it("accepts a no-approval desktop-release environment limited to protected master with all secret names present", () => {
+  it("accepts a no-approval desktop-release environment limited to protected release-candidate and master with all secret names present", () => {
     const readiness = createReadyReadiness();
 
     expect(readiness.ready).toBe(true);
     expect(readiness.missingSecretNames).toEqual([]);
+    expect(environmentCheck.REQUIRED_BRANCH_NAMES).toEqual([
+      "release-candidate",
+      "master",
+    ]);
     expect(
       environmentCheck.formatDesktopReleaseEnvironmentReadiness(readiness),
     ).toContain(
@@ -158,7 +173,7 @@ describe("Desktop release environment check", () => {
     });
   });
 
-  it("rejects broad protected-branch policies because Desktop release credentials are master-only", () => {
+  it("rejects broad protected-branch policies because Desktop release credentials are limited to the two release branches", () => {
     const readiness = createReadyReadiness({
       environment: {
         ...readyEnvironment,
@@ -170,13 +185,14 @@ describe("Desktop release environment check", () => {
     });
 
     expect(readiness.ready).toBe(false);
-    expect(findCheck(readiness, "master-only-branch-policy")).toMatchObject({
+    expect(findCheck(readiness, "expected-branch-policies")).toMatchObject({
       ok: false,
-      message: "Environment branch policy must allow only the `master` branch.",
+      message:
+        "Environment branch policy must allow only the `release-candidate` and `master` branches.",
     });
   });
 
-  it("rejects non-master environment branch policies", () => {
+  it("rejects environment branch policies that do not match the exact release branches", () => {
     const readiness = createReadyReadiness({
       branchPolicies: {
         branch_policies: [
@@ -187,15 +203,16 @@ describe("Desktop release environment check", () => {
     });
 
     expect(readiness.ready).toBe(false);
-    expect(findCheck(readiness, "master-only-branch-policy")).toMatchObject({
+    expect(findCheck(readiness, "expected-branch-policies")).toMatchObject({
       ok: false,
-      message: "Environment branch policy must allow only the `master` branch.",
+      message:
+        "Environment branch policy must allow only the `release-candidate` and `master` branches.",
     });
   });
 
   it("rejects the setup when master branch protection cannot be confirmed", () => {
     const readiness = createReadyReadiness({
-      masterBranch: {
+      stableBranch: {
         name: "master",
         protected: false,
       },
@@ -206,6 +223,24 @@ describe("Desktop release environment check", () => {
       ok: false,
       message:
         "`master` is not protected before Desktop release credentials can be used.",
+    });
+  });
+
+  it("rejects the setup when release-candidate branch protection cannot be confirmed", () => {
+    const readiness = createReadyReadiness({
+      releaseCandidateBranch: {
+        name: "release-candidate",
+        protected: false,
+      },
+    });
+
+    expect(readiness.ready).toBe(false);
+    expect(
+      findCheck(readiness, "release-candidate-branch-protected"),
+    ).toMatchObject({
+      ok: false,
+      message:
+        "`release-candidate` is not protected before Desktop release credentials can be used.",
     });
   });
 

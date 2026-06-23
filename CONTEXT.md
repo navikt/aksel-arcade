@@ -84,6 +84,34 @@ _Avoid_: Electron app, native app
 A versioned publication of **Desktop Arcade** for download, containing the supported platform-specific install artifacts for that version.
 _Avoid_: Web deploy, build run, artifact batch
 
+**Desktop release candidate**:
+A versioned pre-release publication of **Desktop Arcade** for team testing before a general-download **Desktop Arcade release**. It contains the supported **Desktop install artifacts** for a candidate **Desktop Arcade version**.
+_Avoid_: Test build, beta artifact, workflow run
+
+**Release candidate line**:
+The candidate-ready integration line of work that automatically publishes **Desktop release candidates** for team testing. It is promoted into the stable public line when the current candidate set is accepted.
+_Avoid_: Experimental master, ad hoc test branch, feature pile
+
+**Stable release line**:
+The public line of work that publishes **Desktop Arcade releases** and GitHub Pages updates. It receives **Release promotions** and urgent **Hotfixes** only.
+_Avoid_: Integration branch, RC line, experiment branch
+
+**Release promotion**:
+The maintainer-approved promotion of the current **Release candidate line** into the **Stable release line** to publish a new **Desktop Arcade release**.
+_Avoid_: Manual tag, direct publish, ad hoc merge
+
+**Hotfix**:
+An urgent fix applied to the **Stable release line** to publish a patch **Desktop Arcade release** without waiting for the current **Release candidate line** to be promoted. The same fix is then carried back into the **Release candidate line**.
+_Avoid_: Deferred RC fix, one-sided patch, emergency experiment
+
+**RC cycle**:
+The release-candidate period for one chosen **Target release version**, beginning when that version target is set on the **Release candidate line** and ending when it is promoted or superseded.
+_Avoid_: Endless branch state, unversioned test phase
+
+**Target release version**:
+The chosen SemVer version that the current **RC cycle** aims to publish as the next public **Desktop Arcade release**. Its **Desktop release candidates** use the same version with an `-rc.N` suffix.
+_Avoid_: Guess-later version, build number, hidden bump
+
 **Desktop install artifact**:
 A human-facing installer included in a **Desktop Arcade release** for one supported desktop platform and processor family.
 _Avoid_: Build output, ZIP bundle, auto-update feed
@@ -210,9 +238,17 @@ Developer: "A Desktop-impacting change was merged."
 
 Domain expert: "Create a new Desktop Arcade release with the next Desktop Arcade version and the supported Desktop install artifacts. Do not treat it as a Web deploy."
 
+Developer: "The current RC cycle targets 0.2.0 on the Release candidate line."
+
+Domain expert: "Then Desktop release candidates should publish as 0.2.0-rc.N from release-candidate. Only a Release promotion into the Stable release line should publish 0.2.0 as a public Desktop Arcade release from master."
+
 Developer: "A release job needs a signing secret."
 
 Domain expert: "That is a Desktop release credential. It belongs only to release automation and must not become app data, project data, or Web Arcade behavior."
+
+Developer: "A production bug needs an urgent fix before the RC cycle is promoted."
+
+Domain expert: "That is a Hotfix. Apply it to the Stable release line, publish the patch Desktop Arcade release from master, and then carry the same fix back into the Release candidate line."
 
 Developer: "The user opened a Web share URL from a colleague."
 

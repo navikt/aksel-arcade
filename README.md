@@ -70,15 +70,14 @@ One of Aksel Arcade's most powerful features! Enable inspect mode to:
 Just visit **[https://navikt.github.io/aksel-arcade/](https://navikt.github.io/aksel-arcade/)** and start coding in the browser-hosted Web Arcade. No Desktop install artifact is needed for Web Arcade, and ordinary Web Arcade URLs do not install, update, or distribute Desktop Arcade.
 
 ### Download Desktop Arcade
-Desktop Arcade is distributed from the repository's **[GitHub Releases](https://github.com/navikt/aksel-arcade/releases)** page. Open the latest published release tagged `desktop-vX.Y.Z`, then download the Desktop install artifact for your machine:
+Desktop Arcade is distributed from the repository's **[GitHub Releases](https://github.com/navikt/aksel-arcade/releases)** page. Team testers should use the latest matching GitHub pre-release for the active RC cycle, and end users should use the latest published release tagged `desktop-vX.Y.Z`:
 
 | Machine | Desktop install artifact |
 | --- | --- |
-| Windows x64 | `Aksel-Arcade-X.Y.Z-windows-x64.exe` |
 | Mac with Apple Silicon | `Aksel-Arcade-X.Y.Z-mac-arm64.dmg` |
 | Mac with Intel processor | `Aksel-Arcade-X.Y.Z-mac-x64.dmg` |
 
-Replace `X.Y.Z` with the Desktop Arcade version shown in the release. The initial Desktop distribution path does not include a Web Arcade download UI, in-app updates, package-manager distribution, checksum artifacts, or signed Windows installers. macOS DMGs are signed and notarized; the Windows installer is unsigned initially.
+Replace `X.Y.Z` with the Desktop Arcade version shown in the release. The current Desktop distribution path does not include a Web Arcade download UI, in-app updates, package-manager distribution, checksum artifacts, or Windows installers. macOS DMGs are signed and notarized.
 
 ---
 
@@ -146,7 +145,7 @@ Inspect mode helps you understand your UI structure:
 npm run dev              # Start development server
 npm run desktop:dev      # Start macOS-first Desktop Arcade dev shell
 npm run desktop:build    # Build Desktop Arcade renderer with local relative assets
-npm run desktop:package  # Build unsigned Desktop install artifacts without publishing
+npm run desktop:package  # Build unsigned macOS Desktop install artifacts without publishing
 npm run build            # Build for production
 npm run preview          # Preview production build
 npm test                 # Run unit tests
@@ -246,15 +245,14 @@ Desktop MCP v1 intentionally omits prompts, SSE/subscriptions, general filesyste
 
 ### Local unsigned Desktop packaging
 
-Use `npm run desktop:build` to create Desktop Arcade renderer output in `dist-desktop` with relative asset URLs, separate from the Web Arcade GitHub Pages build in `dist`. Use `AKSEL_ARCADE_DESKTOP_VERSION=0.1.0 npm run desktop:package` to build the configured unsigned local installers into `release/desktop` without publishing:
+Use `npm run desktop:build` to create Desktop Arcade renderer output in `dist-desktop` with relative asset URLs, separate from the Web Arcade GitHub Pages build in `dist`. Use `AKSEL_ARCADE_DESKTOP_VERSION=0.2.0 npm run desktop:package` to build the supported unsigned local macOS installers into `release/desktop` without publishing:
 
 | Platform | Artifact |
 | --- | --- |
-| Windows x64 | `Aksel-Arcade-X.Y.Z-windows-x64.exe` |
 | Mac Apple Silicon | `Aksel-Arcade-X.Y.Z-mac-arm64.dmg` |
 | Mac Intel | `Aksel-Arcade-X.Y.Z-mac-x64.dmg` |
 
-For host-specific local packaging, use `npm run desktop:package:mac` or `npm run desktop:package:win`. macOS DMGs require macOS, and Windows NSIS builds from macOS or Linux may require Wine.
+For host-specific local packaging, use `npm run desktop:package:mac`. macOS DMGs require macOS.
 
 ### Tech Stack
 
