@@ -78,5 +78,13 @@
     "vite": "^8.0.16",
     "vitest": "^4.0.8",
     "tsx": "^4.20.6"
+  },
+  "overrides": {
+    "@electron/get": {
+      "undici": "^7.28.0"
+    },
+    "node-gyp": {
+      "undici": "^6.27.0"
+    }
   }
 }
