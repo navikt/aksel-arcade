@@ -5,7 +5,7 @@ Aksel Arcade is a playground for creating Aksel-based React prototypes with live
 ## Language
 
 **Arcade project**:
-A shell-neutral user-owned prototype in Aksel Arcade, including its editable source and preview preferences.
+A shell-neutral user-owned prototype in Aksel Arcade, including its editable source, page-scoped annotations, and preview preferences.
 _Avoid_: File, document, artifact
 
 **Arcade project source**:
@@ -15,6 +15,42 @@ _Avoid_: Files, filesystem, project code
 **Arcade page**:
 A named, independently rendered screen within an **Arcade project source**, identified by a stable page id that is never renumbered or reused. Each page holds its own JSX and Hooks.
 _Avoid_: File, route, tab, document, screen mock
+
+**Annotation**:
+A durable note in an **Arcade project** that is scoped to exactly one **Arcade page** and attached to one or more preview elements on that page. It is review information for other users and **External agents**, survives page renaming through the stable page id, and is deleted when its page is deleted; it is not a **Workspace preference**, **Preview evidence**, or separate Desktop-only session.
+_Avoid_: Feedback, comment, marker, inspection result
+
+**Open annotation**:
+An **Annotation** that still needs attention, including pending annotations, acknowledged annotations, and legacy annotations with no status, as long as its **Annotation target** can be resolved in the current preview. Resolved, dismissed, or dead-target annotations remain in project data for history, but they are not counted in the active page badge, shown as normal markers, or returned as agent work.
+_Avoid_: Stored annotation, unresolved marker, active comment
+
+**Annotation thread**:
+The conversation attached to an **Annotation** after the original note is created, containing follow-up messages from humans or **External agents**. In v0.3.0, status and thread changes are agent/MCP-facing workflow data; agents may add thread replies and update annotation status, but they do not rewrite the original human-authored annotation note or target.
+_Avoid_: Annotation text, chat session, agent change
+
+**Annotation mode**:
+A temporary preview interaction state where the active page's **Annotations** are visible and a user can create or edit annotations on preview elements. It intercepts preview interactions, is mutually exclusive with Inspect mode, and turning it off hides annotation UI without deleting annotations.
+_Avoid_: Feedback mode, review mode, agent mode
+
+**Annotation target**:
+The smallest meaningful user-perceived preview element, or group of such elements, that an **Annotation** is attached to on an **Arcade page**. Targets are resolved identity-first and marker geometry second: a target can remain valid even when currently hidden by viewport or layout, while saved coordinates and geometry are compatibility and diagnostic data, not a substitute anchor for normal marker placement.
+_Avoid_: CSS selector, marker position, inspection target
+
+**Dead annotation target**:
+An **Annotation target** that cannot be reconnected unambiguously to a live preview element or complete element group in the current render. The annotation remains in project data for history, but humans and **External agents** ignore it while the target is dead: it is not counted, shown in normal **Annotation mode**, or returned as agent work; if the complete target becomes resolvable again in a later render, the annotation becomes usable again.
+_Avoid_: Stale marker, broken marker, deleted element, missing annotation
+
+**Hidden annotation target**:
+An **Annotation target** that can be resolved by identity in the current preview but is not visible in the selected viewport or layout state. The annotation still counts as open and remains visible to **External agents**; for element groups, normal **Annotation mode** may show the visible subset as long as the complete group still resolves.
+_Avoid_: Dead annotation target, hidden marker, unresolved annotation
+
+**Clear annotations**:
+A page-scoped destructive action that removes every **Annotation** record for the active **Arcade page**, including open annotations, resolved or dismissed history, and annotations whose target is currently dead.
+_Avoid_: Clear visible markers, reset project, dismiss annotations
+
+**Context replacement**:
+An explicit action that replaces the prototype context being reviewed, such as Reset editor, loading a built-in template or demo, applying a **Web share URL**, importing an **Arcade project package**, or a future replace-project flow. It resets the entire **Arcade project** annotation set rather than preserving old review information across the new context.
+_Avoid_: Ordinary source edit, annotation clear, page navigation
 
 **Global config**:
 The permanent, non-navigable part of an **Arcade project source** whose JSX (shared component definitions) and Hooks (shared logic) are in scope for every **Arcade page**. It is never renamed, deleted, or used as a **start page**.
@@ -53,11 +89,11 @@ A local product-surface preference for arranging Arcade itself around an **Arcad
 _Avoid_: Preview preference, project content
 
 **Arcade project package**:
-A shell-neutral portable share artifact named with the `.akselarcade` extension that contains only the importable **Arcade project** data needed for import, export, or desktop file opening: name, **Arcade project source**, and viewport **Preview preference**. Importing one creates a new local **Arcade project** identity rather than preserving the source project instance; it excludes AI metadata, setup instructions, explanatory text, documentation links, production-import guidance, diagnostics, preview evidence, and **Workspace preferences**.
+A shell-neutral portable share artifact named with the `.akselarcade` extension that contains only the importable **Arcade project** data needed for import, export, or desktop file opening: name, **Arcade project source**, **Annotations**, and viewport **Preview preference**. Importing one creates a new local **Arcade project** identity rather than preserving the source project instance; it excludes AI metadata, setup instructions, explanatory text, documentation links, production-import guidance, diagnostics, preview evidence, and **Workspace preferences**.
 _Avoid_: Arcade project, save file, document, AI export bundle
 
 **Web share URL**:
-A Web Arcade link that carries the portable **Arcade project** data needed to load a shared prototype — **Arcade project source** and shareable **Preview preferences** — and may also carry share-opening intent such as **Preview fullscreen**. Opening one creates a fresh local **Arcade project** identity without preserving sender identity, timestamps, diagnostics, preview evidence, or durable **Workspace preferences**.
+A Web Arcade link that carries the portable **Arcade project** data needed to load a shared prototype — **Arcade project source**, complete **Annotations** when they fit the URL payload boundary, and shareable **Preview preferences** — and may also carry share-opening intent such as **Preview fullscreen**. Opening one creates a fresh local **Arcade project** identity without preserving sender identity, timestamps, diagnostics, preview evidence, or durable **Workspace preferences**.
 _Avoid_: Project code URL, save file, telemetry bundle
 
 **Web Arcade URL**:
@@ -69,11 +105,11 @@ The browser-hosted product surface for working with **Arcade projects**.
 _Avoid_: Browser-only Arcade, original Arcade
 
 **Web Arcade working copy**:
-A tab-scoped editing instance of an **Arcade project** in **Web Arcade**, including its name, **Arcade project source**, **Preview preferences**, and **Workspace preferences**. It survives reloads in its own tab, and duplicating the tab forks the visible work into an independent working copy; a new tab opened through a **Web Arcade URL** starts as a new default working copy. Autosave belongs to the working copy, not to a browser-wide last project, and closed working copies are not a durable project library.
+A tab-scoped editing instance of an **Arcade project** in **Web Arcade**, including its name, **Arcade project source**, **Annotations**, **Preview preferences**, and **Workspace preferences**. It survives reloads in its own tab, and duplicating the tab forks the visible work into an independent working copy; a new tab opened through a **Web Arcade URL** starts as a new default working copy. Autosave belongs to the working copy, not to a browser-wide last project, and closed working copies are not a durable project library.
 _Avoid_: Synchronized tab, shared browser project
 
 **Reset editor**:
-A Web Arcade action that replaces only the current **Web Arcade working copy** with the default Untitled Project.
+A Web Arcade action that replaces only the current **Web Arcade working copy** with the default Untitled Project, including clearing any **Annotations** in that working copy.
 _Avoid_: Clear storage, reload
 
 **Desktop Arcade**:
