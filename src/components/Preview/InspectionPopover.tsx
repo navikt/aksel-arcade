@@ -28,17 +28,13 @@ export const InspectionPopover = ({ data, iframeRef, isVisible }: InspectionPopo
 
       const iframeRect = iframeRef.current.getBoundingClientRect()
       const elementRect = data.boundingRect
-      const intrinsicIframeWidth = iframeRef.current.offsetWidth || iframeRect.width || 1
-      const intrinsicIframeHeight = iframeRef.current.offsetHeight || iframeRect.height || 1
-      const scaleX = intrinsicIframeWidth > 0 ? iframeRect.width / intrinsicIframeWidth : 1
-      const scaleY = intrinsicIframeHeight > 0 ? iframeRect.height / intrinsicIframeHeight : 1
       const elementInWindow = {
-        left: iframeRect.left + elementRect.left * scaleX,
-        right: iframeRect.left + elementRect.right * scaleX,
-        top: iframeRect.top + elementRect.top * scaleY,
-        bottom: iframeRect.top + elementRect.bottom * scaleY,
-        width: elementRect.width * scaleX,
-        height: elementRect.height * scaleY,
+        left: iframeRect.left + elementRect.left,
+        right: iframeRect.left + elementRect.right,
+        top: iframeRect.top + elementRect.top,
+        bottom: iframeRect.top + elementRect.bottom,
+        width: elementRect.width,
+        height: elementRect.height,
       }
 
       const popoverRect = popoverRef.current.getBoundingClientRect()
