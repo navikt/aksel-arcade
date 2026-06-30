@@ -63,6 +63,7 @@ import {
   type ShareDecodeError,
 } from '@/utils/shareDecoding'
 import { appendSandboxConsoleMessage } from '@/services/previewDiagnostics'
+import { getViewportWidth } from '@/types/viewports'
 import type { DecodedWebShareProject } from '@/utils/sharePayload'
 
 interface ShareHydrationState {
@@ -252,6 +253,15 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   }, [shareHydration.status, shareHydration.token])
 
   const updateProject = (updates: ProjectUpdate) => {
+    if (updates.viewportSize !== undefined) {
+      const nextViewportSize = updates.viewportSize
+      setPreviewState((prev) => ({
+        ...prev,
+        currentViewport: nextViewportSize,
+        viewportWidth: getViewportWidth(nextViewportSize),
+      }))
+    }
+
     setProjectState((prev) => {
       let nextProject: Project = {
         ...prev,

@@ -42,7 +42,10 @@ const baseData: InspectionData = {
   cursorY: 120,
 }
 
-const createIframeRef = (overrides: Partial<DOMRect> = {}) => {
+const createIframeRef = (
+  overrides: Partial<DOMRect> = {},
+  options: { intrinsicWidth?: number; intrinsicHeight?: number } = {}
+) => {
   const iframe = document.createElement('iframe')
   document.body.appendChild(iframe)
 
@@ -63,6 +66,15 @@ const createIframeRef = (overrides: Partial<DOMRect> = {}) => {
     x: left,
     y: top,
   }) as DOMRect
+
+  Object.defineProperty(iframe, 'offsetWidth', {
+    configurable: true,
+    get: () => options.intrinsicWidth ?? width,
+  })
+  Object.defineProperty(iframe, 'offsetHeight', {
+    configurable: true,
+    get: () => options.intrinsicHeight ?? height,
+  })
 
   return { current: iframe }
 }
@@ -161,5 +173,40 @@ describe('InspectionPopover positioning', () => {
 
     expect(left).toBeGreaterThanOrEqual(8)
     expect(left + POPOVER_WIDTH).toBeLessThanOrEqual(320 - 8)
+  })
+
+  it('accounts for iframe scaling when mapping preview coordinates into window coordinates', () => {
+    Object.defineProperty(window, 'innerWidth', { value: 1200, writable: true })
+    Object.defineProperty(window, 'innerHeight', { value: 900, writable: true })
+    const iframeRef = createIframeRef(
+      { left: 100, top: 40, width: 400, height: 300, right: 500, bottom: 340 },
+      { intrinsicWidth: 800, intrinsicHeight: 600 }
+    )
+
+    render(
+      <InspectionPopover
+        data={{
+          ...baseData,
+          boundingRect: {
+            ...baseBoundingRect,
+            left: 300,
+            right: 500,
+            width: 200,
+            top: 120,
+            bottom: 220,
+            height: 100,
+            x: 300,
+            y: 120,
+          },
+        }}
+        iframeRef={iframeRef}
+        isVisible
+      />
+    )
+
+    const popover = screen.getByTestId('inspection-popover')
+
+    expect(parseFloat(popover.style.left)).toBeCloseTo(150, 0)
+    expect(parseFloat(popover.style.top)).toBeCloseTo(72, 0)
   })
 })

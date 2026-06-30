@@ -3,16 +3,29 @@
   flex: 1;
   min-height: 0; /* Allow flex item to shrink below content size */
   position: relative;
-  background: var(--ax-bg-default);
+  background: var(--ax-bg-sunken);
   overflow: hidden; /* Container should not scroll - iframe handles internal scrolling */
   display: flex;
   flex-direction: column;
 }
 
-.live-preview__iframe {
-  width: 100%;
+.live-preview__stage {
+  display: grid;
   flex: 1;
-  min-height: 0; /* Allow flex item to shrink */
+  min-height: 0;
+  width: 100%;
+  place-items: start center;
+  overflow: hidden;
+}
+
+.live-preview__viewport-shell {
+  position: relative;
+  max-width: 100%;
+  max-height: 100%;
+  overflow: hidden;
+}
+
+.live-preview__iframe {
   border: none;
   background: transparent;
   display: block;
