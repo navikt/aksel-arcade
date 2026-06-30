@@ -66,8 +66,10 @@ export const LivePreview = ({
   theme,
 }: LivePreviewProps) => {
   const [sandboxReady, setSandboxReady] = useState(false)
+  const [viewportBounds, setViewportBounds] = useState({ width: 0, height: 0 })
   const pendingCodeRef = useRef<string | null>(null)
   const latestTranspiledCodeRef = useRef(transpiledCode)
+  const viewportStageRef = useRef<HTMLDivElement | null>(null)
   const sandboxPortRef = useRef<MessagePort | null>(null)
   const previewEvidenceRequestIdRef = useRef(0)
   const previewEvidenceRequestsRef = useRef(new Map<string, PendingPreviewEvidenceRequest>())
@@ -88,6 +90,45 @@ export const LivePreview = ({
   
   // T082: Inspection state
   const [inspectionData, setInspectionData] = useState<InspectionData | null>(null)
+  const selectedViewportWidth = getViewportWidth(viewportWidth)
+  const effectiveViewportWidth =
+    viewportBounds.width > 0 ? Math.min(selectedViewportWidth, viewportBounds.width) : selectedViewportWidth
+  const viewportIntrinsicHeight = viewportBounds.height > 0 ? viewportBounds.height : 1
+
+  useEffect(() => {
+    const stage = viewportStageRef.current
+    if (!stage) {
+      return
+    }
+
+    const measureStage = () => {
+      const rect = stage.getBoundingClientRect()
+      setViewportBounds((prev) => {
+        const nextWidth = Math.max(0, Math.floor(rect.width))
+        const nextHeight = Math.max(0, Math.floor(rect.height))
+        if (prev.width === nextWidth && prev.height === nextHeight) {
+          return prev
+        }
+
+        return {
+          width: nextWidth,
+          height: nextHeight,
+        }
+      })
+    }
+
+    measureStage()
+
+    const resizeObserver =
+      typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(() => measureStage())
+    resizeObserver?.observe(stage)
+    window.addEventListener('resize', measureStage)
+
+    return () => {
+      resizeObserver?.disconnect()
+      window.removeEventListener('resize', measureStage)
+    }
+  }, [])
 
   useEffect(() => {
     latestTranspiledCodeRef.current = transpiledCode
@@ -426,14 +467,13 @@ export const LivePreview = ({
       return
     }
 
-    const width = getViewportWidth(viewportWidth)
     const message: MainToSandboxMessage = {
       type: 'UPDATE_VIEWPORT',
-      payload: { width },
+      payload: { width: effectiveViewportWidth },
     }
 
     postMessageToSandbox(iframeRef.current.contentWindow, message)
-  }, [viewportWidth, sandboxReady, iframeRef])
+  }, [effectiveViewportWidth, sandboxReady, iframeRef])
 
   // Send theme update when theme changes
   useEffect(() => {
@@ -451,16 +491,35 @@ export const LivePreview = ({
 
   return (
     <div className="live-preview" data-testid="live-preview">
-      <iframe
-        ref={iframeRef}
-        className="live-preview__iframe"
-        src={getSandboxIframeSrc(0)}
-        allow="clipboard-write"
-        sandbox="allow-scripts allow-forms"
-        referrerPolicy="no-referrer"
-        title="Live Preview Sandbox"
-        data-testid="preview-iframe"
-      />
+      <div
+        ref={viewportStageRef}
+        className="live-preview__stage"
+        data-testid="preview-viewport-stage"
+      >
+        <div
+          className="live-preview__viewport-shell"
+          data-testid="preview-viewport-shell"
+          style={{
+            width: `${effectiveViewportWidth}px`,
+            height: `${viewportIntrinsicHeight}px`,
+          }}
+        >
+          <iframe
+            ref={iframeRef}
+            className="live-preview__iframe"
+            style={{
+              width: `${effectiveViewportWidth}px`,
+              height: `${viewportIntrinsicHeight}px`,
+            }}
+            src={getSandboxIframeSrc(0)}
+            allow="clipboard-write"
+            sandbox="allow-scripts allow-forms"
+            referrerPolicy="no-referrer"
+            title="Live Preview Sandbox"
+            data-testid="preview-iframe"
+          />
+        </div>
+      </div>
       
       {inspectionData && iframeRef.current && (
         <InspectionPopover

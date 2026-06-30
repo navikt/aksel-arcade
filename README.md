@@ -31,7 +31,7 @@ Perfect for:
 
 ### 👁️ Live Preview
 - **Instant updates**: See your UI render as you type (250ms debounce)
-- **Responsive testing**: Toggle between 6 viewport sizes (XS 320px → 2XL 1440px)
+- **Responsive testing**: Toggle between 6 viewport sizes (XS 320px → 2XL 1440px), clamped to the available preview pane width when the pane is narrower than the selected breakpoint
 - **Light/dark themes**: Preview components with current Aksel styling
 - **Error overlay**: Friendly error messages when something goes wrong
 
