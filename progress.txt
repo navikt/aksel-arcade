@@ -4111,3 +4111,17 @@ Verification:
 - `npm run test -- --run`
 - `npm run test:e2e -- preview-header-layout.spec.ts`
 - Browser verification at `http://127.0.0.1:5177/aksel-arcade/` measuring rendered controls: annotation, Clear all, Inspect, and fullscreen buttons are 24x24; badge is 12x12 at the annotation button top-right; Clear all appears before the active annotation button.
+
+
+2026-07-01 - PR #331 badge size follow-up for Issue #317
+
+Fixed before merge:
+- Re-read updated Figma node `157:2903` through the local Figma Dev Mode MCP after the badge was enlarged.
+- Updated the annotation count badge to Figma's new values: 14px badge height/min width, `var(--ax-space-4)` inline padding, 12px Source Sans 3 text, 12px line height, and `0.048px` letter spacing.
+
+Verification:
+- `npm run typecheck`
+- `npm run lint`
+- `npm test -- --run tests/integration/annotation-mode-header-shell.test.tsx`
+- `npm run test -- --run`
+- Browser measurement at `http://127.0.0.1:5177/aksel-arcade/`: rendered badge measured 14px tall with 12px font, 12px line height, 4px inline padding, and 0.048px letter spacing.
