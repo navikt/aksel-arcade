@@ -1,0 +1,188 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import { AppContext } from '@/hooks/useProject'
+import { SettingsProvider } from '@/contexts/SettingsContext'
+import { PreviewPane } from '@/components/Preview/PreviewPane'
+import type { ArcadeAnnotation } from '@/types/annotations'
+import type { ArcadePageId, Project } from '@/types/project'
+import {
+  createDefaultEditorState,
+  createDefaultPreviewState,
+  createDefaultProject,
+} from '@/utils/projectDefaults'
+
+vi.mock('@/components/Preview/LivePreview', () => ({
+  LivePreview: () => <div data-testid="live-preview" />,
+}))
+
+vi.mock('@/services/transpiler', () => ({
+  transpileProjectSource: vi.fn().mockResolvedValue({ success: true, code: 'compiled preview' }),
+}))
+
+const annotation = (
+  id: string,
+  pageId: ArcadePageId = 'page01',
+  overrides: Partial<ArcadeAnnotation> = {}
+): ArcadeAnnotation => ({
+  id,
+  pageId,
+  x: 10,
+  y: 20,
+  comment: 'Review this',
+  element: 'Button',
+  elementPath: 'main > button',
+  timestamp: 1,
+  kind: 'feedback',
+  status: 'pending',
+  createdAt: '2026-07-01T08:00:00.000Z',
+  updatedAt: '2026-07-01T08:00:00.000Z',
+  ...overrides,
+})
+
+const createProjectWithAnnotations = (annotations: ArcadeAnnotation[] = []): Project => ({
+  ...createDefaultProject(),
+  id: `project-${annotations.length}`,
+  activePageId: 'page01',
+  annotations,
+})
+
+const createContextValue = (project: Project) => ({
+    project,
+    editorState: createDefaultEditorState(),
+    previewState: createDefaultPreviewState(project.viewportSize),
+    previewIframeRef: { current: null },
+    isComponentPaletteOpen: false,
+    isSettingsOpen: false,
+    updateProject: vi.fn(),
+    replaceProjectState: vi.fn(),
+    createPage: vi.fn(),
+    renamePage: vi.fn(),
+    deletePage: vi.fn(),
+    setStartPage: vi.fn(),
+    replaceProject: vi.fn(),
+    updateEditorState: vi.fn(),
+    updatePreviewState: vi.fn(),
+    recordSandboxConsoleMessage: vi.fn(),
+    toggleComponentPalette: vi.fn(),
+    closeComponentPalette: vi.fn(),
+    toggleSettings: vi.fn(),
+    insertSnippet: vi.fn(),
+    resetToIntro: vi.fn(),
+    loadFormSummaryTemplate: vi.fn(),
+    loadHooksDemo: vi.fn(),
+    shareHydration: { status: 'idle' as const },
+    applySharedSnapshot: vi.fn(),
+    dismissShareHydration: vi.fn(),
+})
+
+const renderPreviewPane = (project: Project = createProjectWithAnnotations()) => {
+  const renderResult = render(
+    <SettingsProvider>
+      <AppContext.Provider value={createContextValue(project)}>
+        <PreviewPane />
+      </AppContext.Provider>
+    </SettingsProvider>
+  )
+
+  const rerenderProject = (nextProject: Project) =>
+    renderResult.rerender(
+      <SettingsProvider>
+        <AppContext.Provider value={createContextValue(nextProject)}>
+          <PreviewPane />
+        </AppContext.Provider>
+      </SettingsProvider>
+    )
+
+  return { ...renderResult, rerenderProject }
+}
+
+const getAnnotationToggle = () =>
+  screen.getByRole('button', {
+    name: /annotation mode/i,
+  })
+
+describe('Annotation mode preview-header shell', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    window.localStorage.clear()
+    window.sessionStorage.clear()
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('starts off, toggles Clear all visibility, and exits with Escape', async () => {
+    const user = userEvent.setup()
+    renderPreviewPane()
+
+    const annotationToggle = getAnnotationToggle()
+    expect(annotationToggle.getAttribute('aria-pressed')).toBe('false')
+    expect(screen.queryByRole('button', { name: /clear all/i })).toBeNull()
+    expect(screen.queryByText('Annotations')).toBeNull()
+
+    await user.click(annotationToggle)
+
+    expect(annotationToggle.getAttribute('aria-pressed')).toBe('true')
+    const clearAllButton = screen.getByRole('button', { name: /clear all annotations/i })
+    expect(clearAllButton).toBeTruthy()
+    expect(
+      clearAllButton.compareDocumentPosition(annotationToggle) & Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy()
+
+    fireEvent.keyDown(annotationToggle, { key: 'Escape' })
+
+    await waitFor(() => {
+      expect(annotationToggle.getAttribute('aria-pressed')).toBe('false')
+    })
+    expect(screen.queryByRole('button', { name: /clear all/i })).toBeNull()
+  })
+
+  it('renders page-scoped zero, single-digit, and double-digit open annotation counts', () => {
+    const { rerenderProject } = renderPreviewPane(createProjectWithAnnotations())
+    expect(screen.getByTestId('annotation-count-badge').textContent).toBe('0')
+
+    const singleCountProject = createProjectWithAnnotations([annotation('annotation-1')])
+    rerenderProject(singleCountProject)
+    expect(screen.getByTestId('annotation-count-badge').textContent).toBe('1')
+
+    const doubleCountProject = createProjectWithAnnotations([
+      ...Array.from({ length: 12 }, (_, index) => annotation(`annotation-${index}`)),
+      annotation('other-page', 'page02'),
+      annotation('resolved', 'page01', { status: 'resolved' }),
+    ])
+    rerenderProject(doubleCountProject)
+    expect(screen.getByTestId('annotation-count-badge').textContent).toBe('12')
+  })
+
+  it('keeps Annotation mode and Inspect mode mutually exclusive', async () => {
+    const user = userEvent.setup()
+    renderPreviewPane()
+
+    const annotationToggle = getAnnotationToggle()
+    const inspectToggle = screen.getByRole('button', { name: /enable inspect mode/i })
+
+    await user.click(inspectToggle)
+    expect(inspectToggle.getAttribute('aria-pressed')).toBe('true')
+
+    await user.click(annotationToggle)
+    expect(annotationToggle.getAttribute('aria-pressed')).toBe('true')
+    expect(inspectToggle.getAttribute('aria-pressed')).toBe('false')
+
+    await user.click(inspectToggle)
+    expect(inspectToggle.getAttribute('aria-pressed')).toBe('true')
+    expect(annotationToggle.getAttribute('aria-pressed')).toBe('false')
+    expect(screen.queryByRole('button', { name: /clear all/i })).toBeNull()
+  })
+
+  it('caps large badge counts to the Figma two-digit badge width', () => {
+    renderPreviewPane(
+      createProjectWithAnnotations(
+        Array.from({ length: 120 }, (_, index) => annotation(`annotation-${index}`))
+      )
+    )
+
+    expect(screen.getByTestId('annotation-count-badge').textContent).toBe('99+')
+  })
+})

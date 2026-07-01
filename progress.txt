@@ -4074,3 +4074,78 @@ Verification:
 - `npm run build:sandbox`
 - `npm run build`
 - Browser smoke check at `http://127.0.0.1:5173/aksel-arcade/` with the app shell + live preview rendered and no captured browser console/page errors.
+
+
+2026-07-01 - Issue #317: Annotation mode preview-header shell
+
+Selected `#317` as the highest-priority `ready-for-agent` feature from `#317`-`#326` after reading parent PRD `#314`, `CONTEXT.md`, and ADRs `0020`, `0023`, and `0024`. It is the first human-visible Annotation mode foundation and unblocks later creation, marker, persistence, MCP, and Preview evidence slices; blocker `#315` is closed.
+
+Implemented:
+- Added the host-side preview-header Annotation mode shell with an Aksel `Button`, verified `NotePencilIcon`, page-scoped open annotation count badge, and `Clear all` shell button visible only while Annotation mode is on.
+- Made Annotation mode off by default, toggleable without changing project annotation data, and escapable with `Escape` when no annotation popover is open.
+- Converted `InspectMode` to controlled state from `PreviewPane` so Annotation mode and Inspect mode are mutually exclusive in both directions.
+- Added focused integration coverage for default/toggle state, `Clear all` visibility, Escape behavior, page-scoped zero/one/two-digit badge counts, and Inspect exclusivity.
+
+Verification:
+- `npm install`
+- `npm run typecheck`
+- `npm run lint`
+- `npm run test -- --run`
+- Browser verification at `http://127.0.0.1:5177/aksel-arcade/` for the #317 human checklist: off/default annotation toggle, active state, `Clear all` only while active, toggle-off behavior, Escape exit, Inspect/Annotation mutual exclusion both ways, zero/one/two-digit supplied badge counts, light and dark header states, and no captured console errors.
+
+Next note:
+- `#318` can wire annotation creation to the existing Annotation mode shell. Keep `Clear all` destructive behavior out until `#322`.
+
+
+2026-07-01 - PR #331 design follow-up for Issue #317
+
+Fixed before merge:
+- Used the local Figma Dev Mode MCP for nodes `157:2724`, `157:2903`, `157:1726`, `157:1730`, and `157:3755` after the browser/Figma public fetch required login.
+- Corrected the preview-header controls to match Figma: 24px `xsmall` icon-only header buttons, Trash icon Clear all control before the active annotation toggle, 12px top-right annotation badge, `10px` Source Sans 3 badge text, `var(--ax-bg-accent-strong)` badge background, and `var(--ax-bg-neutral-moderate-pressedA)` active annotation state.
+- Aligned the fullscreen and Inspect header buttons to the same 24px row so the annotation controls sit in the Figma header layout instead of a mixed 24px/32px row.
+- Updated regression coverage for icon-only annotation controls, Clear all placement, capped large badge counts, and xsmall fullscreen/Inspect buttons.
+
+Verification:
+- `npm run typecheck`
+- `npm run lint`
+- `npm run test -- --run`
+- `npm run test:e2e -- preview-header-layout.spec.ts`
+- Browser verification at `http://127.0.0.1:5177/aksel-arcade/` measuring rendered controls: annotation, Clear all, Inspect, and fullscreen buttons are 24x24; badge is 12x12 at the annotation button top-right; Clear all appears before the active annotation button.
+
+
+2026-07-01 - PR #331 badge size follow-up for Issue #317
+
+Fixed before merge:
+- Re-read updated Figma node `157:2903` through the local Figma Dev Mode MCP after the badge was enlarged.
+- Updated the annotation count badge to Figma's new values: 14px badge height/min width, `var(--ax-space-4)` inline padding, 12px Source Sans 3 text, 12px line height, and `0.048px` letter spacing.
+
+Verification:
+- `npm run typecheck`
+- `npm run lint`
+- `npm test -- --run tests/integration/annotation-mode-header-shell.test.tsx`
+- `npm run test -- --run`
+- Browser measurement at `http://127.0.0.1:5177/aksel-arcade/`: rendered badge measured 14px tall with 12px font, 12px line height, 4px inline padding, and 0.048px letter spacing.
+
+
+2026-07-01 - PR #331 badge optical-centering follow-up for Issue #317
+
+Fixed before merge:
+- Wrapped the annotation badge count in an inner text span and applied a 0.5px vertical optical offset so the text center aligns with the 14px badge for both one- and two-digit counts.
+
+Verification:
+- `npm run typecheck`
+- `npm run lint`
+- `npm test -- --run tests/integration/annotation-mode-header-shell.test.tsx`
+- `npm run test -- --run`
+- Browser measurement at `http://127.0.0.1:5177/aksel-arcade/`: `9` and `12` both measured with equal top/bottom text overflow (`verticalDelta: 0`) inside the 14px badge, with horizontal centering still within subpixel rounding.
+
+
+2026-07-01 - PR #331 annotation icon follow-up for Issue #317
+
+Fixed before merge:
+- Replaced the annotation toggle icon with the verified Aksel `ChatElipsisIcon`.
+
+Verification:
+- `npm run typecheck`
+- `npm run lint`
+- `npm test -- --run tests/integration/annotation-mode-header-shell.test.tsx`
