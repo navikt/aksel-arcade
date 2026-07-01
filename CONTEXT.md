@@ -33,7 +33,7 @@ A temporary preview interaction state where the active page's **Annotations** ar
 _Avoid_: Feedback mode, review mode, agent mode
 
 **Annotation target**:
-The smallest meaningful user-perceived preview element, or group of such elements, that an **Annotation** is attached to on an **Arcade page**. Targets are resolved identity-first and marker geometry second: a target can remain valid even when currently hidden by viewport or layout, while saved coordinates and geometry are compatibility and diagnostic data, not a substitute anchor for normal marker placement.
+The concrete user-perceived preview DOM element, or group of preview DOM elements, that an **Annotation** is attached to on an **Arcade page**. Any rendered user-authored preview element can be a target, including generic/custom `div` and `span` elements, layout wrappers, and Aksel component roots; only non-preview chrome and non-rendered implementation nodes such as `script`, `style`, `template`, `html`, `body`, `display: none`, `display: contents`, or hidden elements are excluded. Targets are resolved identity-first and marker geometry second: a target can remain valid even when currently hidden by viewport or layout, while saved coordinates and geometry are compatibility and diagnostic data, not a substitute anchor for normal marker placement.
 _Avoid_: CSS selector, marker position, inspection target
 
 **Dead annotation target**:

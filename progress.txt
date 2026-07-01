@@ -4179,3 +4179,21 @@ Next note:
   - Annotation hover no longer crashes the app; the root cause was a host-side read of `iframe.contentWindow.scrollY`, which throws for Arcade's sandboxed opaque-origin iframe during hover rendering.
 - Added regression coverage for the zero-badge state and for hover metadata from an iframe whose `contentWindow.scrollY` throws a `SecurityError`.
 - Re-ran the practical browser flow on a dedicated dev server at `http://127.0.0.1:5188/aksel-arcade/`: zero badge hidden, Annotation mode hover keeps the app visible with no console/page errors, add popover opens, blank Save is disabled, Enter saves after Shift+Enter newline, badge increments to `1`, marker hides when Annotation mode is off, and marker reappears when Annotation mode is turned back on.
+### 2026-07-01 - PR #332 annotation target follow-up
+
+Fixed after user feedback:
+
+- Broadened annotation target resolution from a semantic/Aksel allowlist to any visible rendered preview DOM element, so generic/custom `div` and `span` elements, Aksel layout wrappers (`Box`, `VStack`, `HStack`), `InlineMessage`, and text-containing inline elements can all be annotated.
+- Kept exclusions for non-preview chrome and non-rendered implementation nodes (`script`, `style`, `template`, `html`, `body`, `display: none`, `display: contents`, hidden/collapsed visibility).
+- Changed identity re-resolution to prefer the stored full DOM path before treating same-signature generic elements as ambiguous, which keeps persisted annotations usable for otherwise-identical custom elements.
+- Updated `CONTEXT.md`, ADR 0021, PRD issue #314, and issues #318/#320/#321 so future annotation work does not reintroduce “meaningful/semantic-only” target wording.
+- Regenerated `public/preview-evidence-global.js` so the sandbox iframe uses the same broad target resolver.
+
+Verification:
+
+- npm run typecheck
+- npm run test -- --run
+- npm run lint
+- Browser probe at `http://127.0.0.1:5192/aksel-arcade/` confirmed Annotation mode resolves outer Box padding, VStack gap/body, InlineMessage root exposed area, InlineMessage non-strong text span, in-root custom `div`, and custom `span`, and opens the add-popover for the custom `div` without console errors.
+
+Next note: target creation is now intentionally broad. Future drag/multi-select work should collect rendered preview DOM elements, not semantic-only or Aksel-only elements, while continuing to ignore preview chrome and non-rendered implementation nodes.

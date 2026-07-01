@@ -63,64 +63,6 @@ export interface AnnotationTargetResolutionResult {
   matchCount?: number
 }
 
-const MEANINGFUL_TAGS = new Set([
-  'a',
-  'button',
-  'input',
-  'textarea',
-  'select',
-  'option',
-  'label',
-  'img',
-  'svg',
-  'p',
-  'blockquote',
-  'code',
-  'pre',
-  'li',
-  'td',
-  'th',
-  'summary',
-  'details',
-  'section',
-  'article',
-  'aside',
-  'nav',
-  'main',
-  'header',
-  'footer',
-])
-const MEANINGFUL_TARGET_SELECTOR = [
-  'button',
-  'a[href]',
-  'input',
-  'textarea',
-  'select',
-  'option',
-  'label',
-  'img',
-  'svg',
-  'p',
-  'blockquote',
-  'code',
-  'pre',
-  'li',
-  'td',
-  'th',
-  'summary',
-  'details',
-  'section',
-  'article',
-  'aside',
-  'nav',
-  'main',
-  'header',
-  'footer',
-  '[role]:not([role="none"]):not([role="presentation"])',
-  '[aria-label]',
-  '[aria-labelledby]',
-  '[tabindex]:not([tabindex="-1"])',
-].join(',')
 const INTERACTIVE_TARGET_SELECTOR = [
   'button',
   'a[href]',
@@ -204,7 +146,7 @@ export const resolveAnnotationTargetsInRect = (
   }
 
   const matchingElements = filterContainedElements(
-    getMeaningfulCandidates(root, frameWindow).filter((element) => {
+    getAnnotatableCandidates(root, frameWindow).filter((element) => {
       const elementRect = element.getBoundingClientRect()
       return (
         hasUsableGeometry(elementRect) &&
@@ -269,7 +211,21 @@ export const resolveAnnotationTargetIdentity = (
   identity: AnnotationTargetIdentity,
   frameWindow: Window = root.ownerDocument.defaultView ?? window
 ): AnnotationTargetResolutionResult => {
-  const matches = getMeaningfulCandidates(root, frameWindow).filter(
+  const pathMatch = queryFullPath(root, identity.fullPath)
+  if (
+    pathMatch &&
+    isAnnotatableElement(pathMatch, frameWindow) &&
+    getAnnotationTargetIdentity(root, pathMatch, frameWindow).signature === identity.signature
+  ) {
+    const target = createResolvedTarget(root, pathMatch, frameWindow)
+    return {
+      status: target.visibility === 'visible' ? 'resolved' : 'hidden',
+      target,
+      matchCount: 1,
+    }
+  }
+
+  const matches = getAnnotatableCandidates(root, frameWindow).filter(
     (candidate) => getAnnotationTargetIdentity(root, candidate, frameWindow).signature === identity.signature
   )
 
@@ -289,10 +245,7 @@ export const resolveAnnotationTargetIdentity = (
     }
   }
 
-  const pathMatch = queryFullPath(root, identity.fullPath)
-  const resolvedElement =
-    pathMatch && matches[0] === pathMatch ? pathMatch : matches[0]
-  const target = createResolvedTarget(root, resolvedElement, frameWindow)
+  const target = createResolvedTarget(root, matches[0], frameWindow)
   return {
     status: target.visibility === 'visible' ? 'resolved' : 'hidden',
     target,
@@ -479,23 +432,23 @@ const normalizeAnnotationElement = (
   }
 
   const interactive = closestWithinRoot(element, root, INTERACTIVE_TARGET_SELECTOR)
-  if (interactive && isMeaningfulElement(interactive, frameWindow)) {
+  if (interactive && isAnnotatableElement(interactive, frameWindow)) {
     return interactive
   }
 
   let current: Element | null = element
   while (current && current !== root && current !== root.ownerDocument.body) {
-    if (isMeaningfulElement(current, frameWindow)) {
+    if (isAnnotatableElement(current, frameWindow)) {
       return current
     }
     current = current.parentElement
   }
 
-  return isMeaningfulElement(root, frameWindow) ? root : null
+  return isAnnotatableElement(root, frameWindow) ? root : null
 }
 
-const getMeaningfulCandidates = (root: Element, frameWindow: Window): Element[] =>
-  [root, ...Array.from(root.querySelectorAll(MEANINGFUL_TARGET_SELECTOR))]
+const getAnnotatableCandidates = (root: Element, frameWindow: Window): Element[] =>
+  [root, ...Array.from(root.querySelectorAll('*'))]
     .filter((candidate) => root.contains(candidate))
     .map((candidate) => normalizeAnnotationElement(root, candidate, frameWindow))
     .filter((candidate): candidate is Element => Boolean(candidate))
@@ -506,7 +459,7 @@ const filterContainedElements = (elements: Element[]): Element[] =>
     (element) => !elements.some((otherElement) => otherElement !== element && element.contains(otherElement))
   )
 
-const isMeaningfulElement = (element: Element, frameWindow: Window): boolean => {
+const isAnnotatableElement = (element: Element, frameWindow: Window): boolean => {
   if (isExcludedElement(element) || isPreviewChromeElement(element)) {
     return false
   }
@@ -516,26 +469,12 @@ const isMeaningfulElement = (element: Element, frameWindow: Window): boolean => 
     return false
   }
 
-  if (MEANINGFUL_TAGS.has(tagName) || /^h[1-6]$/.test(tagName)) {
-    return true
-  }
-
-  if (
-    element.hasAttribute('role') ||
-    element.hasAttribute('aria-label') ||
-    element.hasAttribute('aria-labelledby') ||
-    element.hasAttribute('tabindex')
-  ) {
-    return true
-  }
-
   const style = frameWindow.getComputedStyle(element)
-  const text = normalizeWhitespace(element.textContent ?? '')
   return (
-    text.length > 0 &&
-    text.length <= 120 &&
+    style.display !== 'none' &&
     style.display !== 'contents' &&
-    element.children.length === 0
+    style.visibility !== 'hidden' &&
+    style.visibility !== 'collapse'
   )
 }
 
@@ -601,7 +540,7 @@ const getReadableElementIdentifier = (element: Element): string => {
   if (name) {
     return `${tagName} "${truncateText(name, 35)}"`
   }
-  const classes = getMeaningfulClassNames(element).slice(0, 1)
+  const classes = getTargetClassNames(element).slice(0, 1)
   return classes.length > 0 ? `${tagName}.${classes[0]}` : tagName
 }
 
@@ -811,11 +750,11 @@ const getNearbyText = (element: Element): string => {
 }
 
 const getElementClasses = (element: Element): string | undefined => {
-  const classes = getMeaningfulClassNames(element)
+  const classes = getTargetClassNames(element)
   return classes.length > 0 ? classes.join(' ') : undefined
 }
 
-const getMeaningfulClassNames = (element: Element): string[] =>
+const getTargetClassNames = (element: Element): string[] =>
   Array.from(element.classList ?? [])
     .filter((className) => className.length > 1 && !/^[a-z]{1,2}$/.test(className))
     .slice(0, 12)
