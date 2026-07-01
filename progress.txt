@@ -4064,6 +4064,7 @@ Next note:
 Fixed before merge:
 - Tightened saved identity resolution so a matching DOM path can no longer mask multiple plausible identity matches; repeated identical targets now stay dead until unambiguous.
 - Extended the target-resolution matrix with real Aksel `Button`, `TextField`, `Checkbox`, and `HStack` DOM so the #316 matrix covers common Aksel components/layouts instead of only generic HTML fixtures.
+- Fixed the CI-only `tsc -b` overload issue in the Aksel `HStack` test fixture by using the explicit `as="div"` primitive prop.
 
 Verification:
 - `npm run typecheck`
@@ -4071,4 +4072,5 @@ Verification:
 - `npm run test -- --run tests/unit/services/annotationTargets.test.ts`
 - `npm run test -- --run`
 - `npm run build:sandbox`
+- `npm run build`
 - Browser smoke check at `http://127.0.0.1:5173/aksel-arcade/` with the app shell + live preview rendered and no captured browser console/page errors.

@@ -187,7 +187,7 @@ describe('annotation target resolution', () => {
     const { container } = render(
       React.createElement(
         HStack,
-        { gap: 'space-4' },
+        { as: 'div', gap: 'space-4' },
         React.createElement(Button, null, 'Send'),
         React.createElement(TextField, { label: 'Navn' }),
         React.createElement(Checkbox, null, 'Godta')
