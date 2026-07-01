@@ -23,6 +23,7 @@ import {
   createSinglePageProjectSource,
   getStartPageSource,
 } from '@/services/projectSource'
+import type { ArcadeAnnotation } from '@/types/annotations'
 import {
   setupLocalStorageMock,
   setupSessionStorageMock,
@@ -48,6 +49,7 @@ const createTestProject = (
     name: 'Test Project',
     source: source ?? createSinglePageProjectSource(jsxCode, hooksCode),
     activePageId,
+    annotations: [],
     viewportSize: 'MD',
     panelLayout: 'editor-left',
     version,
@@ -102,9 +104,7 @@ const createLegacyPortablePackage = (project: Project) => ({
 
 const getPrimarySource = (project: Project) => getStartPageSource(project)
 
-const createLossyMultiPageProject = (
-  overrides: Partial<Project> = {}
-): Project =>
+const createLossyMultiPageProject = (overrides: Partial<Project> = {}): Project =>
   createTestProject({
     name: 'Lossy Multi-page Project',
     source: {
@@ -189,6 +189,7 @@ describe('Storage Service', () => {
       expect(stored).toBeTruthy()
       const parsed = JSON.parse(stored!)
       expect(parsed.project.name).toBe('Test Project')
+      expect(parsed.project.annotations).toEqual([])
       expect(parsed.preferences).toEqual({
         theme: DEFAULT_WEB_ARCADE_WORKING_COPY_PREFERENCES.theme,
         panelOrder: DEFAULT_WEB_ARCADE_WORKING_COPY_PREFERENCES.panelOrder,
@@ -367,6 +368,7 @@ describe('Storage Service', () => {
       expect(result.project).toMatchObject({
         name: 'Legacy Migrated Project',
         activePageId: FIRST_PAGE_ID,
+        annotations: [],
         viewportSize: 'LG',
         source: {
           globalConfig: { jsx: '', hooks: '' },
@@ -374,6 +376,7 @@ describe('Storage Service', () => {
           nextPageNumber: 2,
         },
       })
+
       expect(result.project?.source.pages).toEqual([
         {
           id: FIRST_PAGE_ID,
@@ -384,6 +387,103 @@ describe('Storage Service', () => {
           },
         },
       ])
+    })
+
+    it('migrates current-version stored projects with missing annotations to an empty annotation set', () => {
+      const project = createTestProject({
+        name: 'Current project without annotations',
+      }) as Project & { annotations?: ArcadeAnnotation[] }
+      delete project.annotations
+      sessionStorage.setItem(WEB_ARCADE_WORKING_COPY_STORAGE_KEY, JSON.stringify(project))
+
+      const result = loadProject()
+
+      expect(result.error).toBeUndefined()
+      expect(result.migrated).toBe(false)
+      expect(result.project?.annotations).toEqual([])
+    })
+
+    it('rejects local Agentation sync markers from durable project data', () => {
+      const project = createTestProject()
+      const badAnnotation = {
+        id: crypto.randomUUID(),
+        pageId: FIRST_PAGE_ID,
+        x: 10,
+        y: 20,
+        comment: 'Bad annotation',
+        element: 'Button',
+        elementPath: 'main > button',
+        timestamp: 1,
+        _syncedTo: 'agent-session',
+      }
+      sessionStorage.setItem(
+        WEB_ARCADE_WORKING_COPY_STORAGE_KEY,
+        JSON.stringify({
+          ...project,
+          annotations: [badAnnotation],
+        })
+      )
+
+      const result = loadProject()
+
+      expect(result.project).toBeNull()
+      expect(result.error).toContain('local sync marker')
+    })
+
+    it('rejects unknown annotation kinds during project validation', () => {
+      const project = createTestProject()
+      const badAnnotation = {
+        id: crypto.randomUUID(),
+        pageId: FIRST_PAGE_ID,
+        x: 10,
+        y: 20,
+        comment: 'Bad annotation',
+        element: 'Button',
+        elementPath: 'main > button',
+        timestamp: 1,
+        kind: 'unknown-kind',
+      }
+      sessionStorage.setItem(
+        WEB_ARCADE_WORKING_COPY_STORAGE_KEY,
+        JSON.stringify({
+          ...project,
+          annotations: [badAnnotation],
+        })
+      )
+
+      const result = loadProject()
+
+      expect(result.project).toBeNull()
+      expect(result.error).toContain('annotation kind')
+    })
+
+    it('restores known non-feedback annotations while normal workflows can ignore them', () => {
+      const placementAnnotation: ArcadeAnnotation = {
+        id: crypto.randomUUID(),
+        pageId: FIRST_PAGE_ID,
+        x: 10,
+        y: 20,
+        comment: 'Place here',
+        element: 'Box',
+        elementPath: 'main > div',
+        timestamp: 1,
+        kind: 'placement',
+        status: 'pending',
+        createdAt: '2026-07-01T08:00:00.000Z',
+        updatedAt: '2026-07-01T08:00:00.000Z',
+      }
+      sessionStorage.setItem(
+        WEB_ARCADE_WORKING_COPY_STORAGE_KEY,
+        JSON.stringify({
+          ...createTestProject(),
+          annotations: [placementAnnotation],
+        })
+      )
+
+      const result = loadProject()
+
+      expect(result.error).toBeUndefined()
+      expect(result.project?.annotations).toEqual([placementAnnotation])
     })
 
     it('should handle corrupted JSON gracefully', () => {
@@ -970,7 +1070,9 @@ describe('Storage Service', () => {
         activePageId: FIRST_PAGE_ID,
       })
       expect(result.project!.source).toEqual(sourceProject.source)
-      expect(getPrimarySource(result.project!).jsx).toBe('<VStack><Heading>Packaged</Heading></VStack>')
+      expect(getPrimarySource(result.project!).jsx).toBe(
+        '<VStack><Heading>Packaged</Heading></VStack>'
+      )
       expect(getPrimarySource(result.project!).hooks).toBe('export const usePackaged = () => "ok"')
       expect(result.project!.id).not.toBe(sourceProject.id)
       expect(result.project!.createdAt).not.toBe(sourceProject.createdAt)

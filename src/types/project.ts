@@ -1,3 +1,5 @@
+import type { ArcadeAnnotation } from '@/types/annotations'
+
 // Per Figma design (node 36:981) and Aksel breakpoints
 export type ViewportSize = '2XL' | 'XL' | 'LG' | 'MD' | 'SM' | 'XS'
 export type PanelLayout = 'editor-left' | 'editor-right'
@@ -35,6 +37,7 @@ export interface Project {
   // Code content
   source: ProjectSource
   activePageId: ArcadePageId
+  annotations: ArcadeAnnotation[]
 
   // UI state
   viewportSize: ViewportSize // Selected responsive breakpoint
