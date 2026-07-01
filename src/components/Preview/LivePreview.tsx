@@ -26,6 +26,8 @@ const PREVIEW_EVIDENCE_REQUEST_TIMEOUT_MS = 5_000
 const SANDBOX_IFRAME_SRC =
   import.meta.env.MODE === 'test' ? 'about:blank' : import.meta.env.BASE_URL + 'sandbox.html'
 const ANNOTATION_TARGET_TEXT_MAX_LENGTH = 24
+const ANNOTATION_MARKER_SIZE_PX = 24
+const ANNOTATION_MARKER_SAFE_INSET_PX = ANNOTATION_MARKER_SIZE_PX / 2
 
 const AKSEL_TARGET_LABELS: Array<[className: string, label: string]> = [
   ['aksel-inline-message', 'InlineMessage'],
@@ -100,6 +102,9 @@ const truncateTargetText = (text: string, maxLength: number): string => {
 
 const capitalizeTargetName = (value: string): string =>
   value.length === 0 ? value : `${value[0].toUpperCase()}${value.slice(1)}`
+
+const clampNumber = (value: number, min: number, max: number): number =>
+  Math.min(Math.max(value, min), max)
 
 interface LivePreviewProps {
   iframeRef: React.RefObject<HTMLIFrameElement | null>
@@ -664,18 +669,36 @@ export const LivePreview = ({
   const getOverlayPosition = (target: ResolvedAnnotationTarget | ArcadeAnnotation) => {
     const isResolvedTarget = 'snapshot' in target
     const box = isResolvedTarget ? target.snapshot.boundingBox : target.boundingBox
-    const left =
-      box && Number.isFinite(box.x) ? box.x + box.width : isResolvedTarget ? target.snapshot.x : target.x
-    const top =
-      box && Number.isFinite(box.y)
-        ? Math.max(0, box.y)
-        : isResolvedTarget
-          ? target.snapshot.y
-          : target.y
+    const clickX = isResolvedTarget ? target.snapshot.x : target.x
+    const clickY = isResolvedTarget ? target.snapshot.y : target.y
+    const viewportWidthPx = Math.max(1, effectiveViewportWidth)
+    const viewportHeightPx = Math.max(1, viewportIntrinsicHeight)
+    const rawLeft =
+      typeof clickX === 'number' && Number.isFinite(clickX)
+        ? (clickX / 100) * viewportWidthPx
+        : box && Number.isFinite(box.x)
+          ? box.x + box.width
+          : 0
+    const rawTop =
+      typeof clickY === 'number' && Number.isFinite(clickY)
+        ? clickY
+        : box && Number.isFinite(box.y)
+          ? Math.max(0, box.y)
+          : 0
+    const left = clampNumber(
+      rawLeft,
+      ANNOTATION_MARKER_SAFE_INSET_PX,
+      Math.max(ANNOTATION_MARKER_SAFE_INSET_PX, viewportWidthPx - ANNOTATION_MARKER_SAFE_INSET_PX)
+    )
+    const top = clampNumber(
+      rawTop,
+      ANNOTATION_MARKER_SAFE_INSET_PX,
+      Math.max(ANNOTATION_MARKER_SAFE_INSET_PX, viewportHeightPx - ANNOTATION_MARKER_SAFE_INSET_PX)
+    )
 
     return {
-      left: typeof left === 'number' ? `${left}${box ? 'px' : '%'}` : left,
-      top: typeof top === 'number' ? `${top}px` : `${top}%`,
+      left: `${left}px`,
+      top: `${top}px`,
     }
   }
 

@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import { LivePreview } from '@/components/Preview/LivePreview'
 import type { SandboxToMainMessage } from '@/types/messages'
+import type { ArcadeAnnotation } from '@/types/annotations'
 import type { ResolvedAnnotationTarget } from '@/services/annotationTargets'
 
 const selectedTarget: ResolvedAnnotationTarget = {
@@ -52,6 +53,22 @@ const inlineMessageTarget: ResolvedAnnotationTarget = {
     boundingBox: { x: 24, y: 32, width: 420, height: 56 },
   },
   visibility: 'visible',
+}
+
+const edgeAnnotation: ArcadeAnnotation = {
+  id: 'edge-annotation',
+  pageId: 'page01',
+  x: 98,
+  y: 44,
+  comment: 'Near the edge',
+  element: 'div "Edge target"',
+  elementPath: 'div.edge-target',
+  timestamp: 1,
+  kind: 'feedback',
+  status: 'pending',
+  createdAt: '2026-07-02T00:00:00.000Z',
+  updatedAt: '2026-07-02T00:00:00.000Z',
+  boundingBox: { x: 300, y: 32, width: 120, height: 40 },
 }
 
 const renderLivePreview = (props: Partial<Parameters<typeof LivePreview>[0]> = {}) => {
@@ -169,5 +186,16 @@ describe('Annotation add popover', () => {
     expect(await screen.findByText('InlineMessage: Quick tip: Delete this...')).toBeTruthy()
     expect(screen.queryByText(/Features: Two tabs/i)).toBeNull()
     expect(screen.queryByText(/aksel-inline-message\\.aksel-body-long/i)).toBeNull()
+  })
+
+  it('keeps saved marker positions visible when switching to a narrower breakpoint', () => {
+    renderLivePreview({
+      viewportWidth: 'XS',
+      annotations: [edgeAnnotation],
+    })
+
+    const marker = screen.getByRole('button', { name: /annotation 1: near the edge/i })
+    expect(marker.style.left).toBe('308px')
+    expect(marker.style.left).not.toBe('420px')
   })
 })

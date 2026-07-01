@@ -4226,3 +4226,18 @@ Verification:
 - npm run test -- --run
 - npm run lint
 - Browser check at `http://127.0.0.1:5194/aksel-arcade/` opened Annotation mode, selected a default preview target, and measured `.live-preview__annotation-popover-content` at `280px` with no console errors.
+
+### 2026-07-02 - PR #332 annotation marker breakpoint follow-up
+
+Fixed after user feedback:
+
+- Changed annotation marker positioning to use the stored click point instead of the saved element bounding-box right edge, so markers stay close to where the user clicked when creating the annotation.
+- Clamped marker positions inside the active preview viewport with a half-marker inset, keeping edge markers visible when switching from wider breakpoints such as MD to XS.
+- Added regression coverage for an annotation saved near the MD right edge rendering inside the XS viewport instead of at the stale saved bounding-box edge.
+
+Verification:
+
+- npm run typecheck
+- npm run test -- --run
+- npm run lint
+- Browser check at `http://127.0.0.1:5195/aksel-arcade/` annotated near the MD right edge, switched to XS, and confirmed the marker remained fully inside the 320px preview shell at `left: 308px` with no console errors.
