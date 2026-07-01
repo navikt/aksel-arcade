@@ -4125,3 +4125,16 @@ Verification:
 - `npm test -- --run tests/integration/annotation-mode-header-shell.test.tsx`
 - `npm run test -- --run`
 - Browser measurement at `http://127.0.0.1:5177/aksel-arcade/`: rendered badge measured 14px tall with 12px font, 12px line height, 4px inline padding, and 0.048px letter spacing.
+
+
+2026-07-01 - PR #331 badge optical-centering follow-up for Issue #317
+
+Fixed before merge:
+- Wrapped the annotation badge count in an inner text span and applied a 0.5px vertical optical offset so the text center aligns with the 14px badge for both one- and two-digit counts.
+
+Verification:
+- `npm run typecheck`
+- `npm run lint`
+- `npm test -- --run tests/integration/annotation-mode-header-shell.test.tsx`
+- `npm run test -- --run`
+- Browser measurement at `http://127.0.0.1:5177/aksel-arcade/`: `9` and `12` both measured with equal top/bottom text overflow (`verticalDelta: 0`) inside the 14px badge, with horizontal centering still within subpixel rounding.

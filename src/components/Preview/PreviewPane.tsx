@@ -410,7 +410,7 @@ export const PreviewPane = ({
                   data-testid="annotation-count-badge"
                   aria-hidden="true"
                 >
-                  {visibleAnnotationCount}
+                  <span className="preview-pane__annotation-badge-text">{visibleAnnotationCount}</span>
                 </span>
               </div>
             </div>

@@ -90,6 +90,11 @@
   white-space: nowrap;
 }
 
+.preview-pane__annotation-badge-text {
+  display: block;
+  transform: translateY(0.5px);
+}
+
 .preview-pane__viewport-toggle {
   flex: 0 0 auto;
   min-width: 0;
