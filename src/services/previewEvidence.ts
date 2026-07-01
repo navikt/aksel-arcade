@@ -166,6 +166,27 @@ export interface PreviewEvidenceCaptureTarget {
   label?: string
 }
 
+export {
+  getAnnotationTargetIdentity,
+  resolveAnnotationTarget,
+  resolveAnnotationTargetAtPoint,
+  resolveAnnotationTargetGroup,
+  resolveAnnotationTargetIdentity,
+  resolveAnnotationTargetsInRect,
+} from './annotationTargets'
+export type {
+  AnnotationTargetGroupRequest,
+  AnnotationTargetIdentity,
+  AnnotationTargetIdentityRequest,
+  AnnotationTargetPointRequest,
+  AnnotationTargetRect,
+  AnnotationTargetRectRequest,
+  AnnotationTargetResolutionRequest,
+  AnnotationTargetResolutionResult,
+  AnnotationTargetResolutionStatus,
+  ResolvedAnnotationTarget,
+} from './annotationTargets'
+
 export interface PreviewClickInteraction {
   action: 'click'
   target: PreviewEvidenceCaptureTarget

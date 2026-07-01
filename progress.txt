@@ -4034,3 +4034,26 @@ Verification:
 - `npm run lint`
 - `npm run build`
 - `npm run test -- --run`
+
+
+2026-07-01 - Issue #316: Resolve annotation targets through the sandbox boundary
+
+Selected `#316` as the highest-priority `ready-for-agent` feature from `#316`-`#326` after reading parent PRD `#314`, `CONTEXT.md`, ADRs `0021`, `0023`, and `0024`, and confirming `#315` was closed. This is the foundational Annotation target-resolution slice that later Annotation mode UI, marker resilience, package/share, MCP annotation resources, and Preview evidence overlays depend on.
+
+Implemented:
+- Added `src/services/annotationTargets.ts` as the stable target-resolution module for point/click, drag rectangle, saved identity, and multi-element group requests.
+- Resolution is identity-first: targets get a deterministic identity signature plus DOM path metadata; saved coordinates and bounding boxes are returned only as compatibility/diagnostic snapshot data.
+- Added dead-target semantics for zero or ambiguous identity matches, hidden-target semantics for uniquely resolved but non-visible targets, selected-text capture anchored to the containing normalized element, and all-or-nothing group resolution.
+- Extended the sandbox message contract with `RESOLVE_ANNOTATION_TARGET` / `ANNOTATION_TARGET_RESOLVED`, wired `public/sandbox.html` to resolve through the preview iframe, and exported the resolver through the checked-in Preview evidence sandbox bundle.
+- Added a target-resolution regression matrix covering normalized point targets, selected text, repeated/ambiguous elements, hidden targets, empty drag no-ops, drag multi-select, and all-or-nothing groups.
+
+Verification:
+- `npm install`
+- `npm run typecheck`
+- `npm run lint`
+- `npm run test -- --run`
+- `npm run build:sandbox`
+- Browser smoke check at `http://127.0.0.1:5173/aksel-arcade/` with the app shell + live preview rendered and no captured browser console/page errors.
+
+Next note:
+- `#317` can now build the Annotation mode shell against the sandbox target-resolution message contract without adding annotation IDs or data attributes to user-authored Arcade project source. Keep `x`/`y`/bounding boxes diagnostic-only and persist identity metadata from resolver output for later dead/hidden recovery.
