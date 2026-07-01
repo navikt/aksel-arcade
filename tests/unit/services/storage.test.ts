@@ -390,9 +390,11 @@ describe('Storage Service', () => {
     })
 
     it('migrates current-version stored projects with missing annotations to an empty annotation set', () => {
-      const project = createTestProject({
-        name: 'Current project without annotations',
-      }) as Project & { annotations?: ArcadeAnnotation[] }
+      const project = {
+        ...createTestProject({
+          name: 'Current project without annotations',
+        }),
+      } as Omit<Project, 'annotations'> & { annotations?: ArcadeAnnotation[] }
       delete project.annotations
       sessionStorage.setItem(WEB_ARCADE_WORKING_COPY_STORAGE_KEY, JSON.stringify(project))
 
@@ -401,6 +403,27 @@ describe('Storage Service', () => {
       expect(result.error).toBeUndefined()
       expect(result.migrated).toBe(false)
       expect(result.project?.annotations).toEqual([])
+    })
+
+    it('migrates v2 stored projects with missing annotations to the current annotation-aware schema', () => {
+      const project = {
+        ...createTestProject({
+          name: 'V2 project without annotations',
+          version: '2.0.0',
+        }),
+      } as Omit<Project, 'annotations'> & { annotations?: ArcadeAnnotation[] }
+      delete project.annotations
+      sessionStorage.setItem(WEB_ARCADE_WORKING_COPY_STORAGE_KEY, JSON.stringify(project))
+
+      const result = loadProject()
+
+      expect(result.error).toBeUndefined()
+      expect(result.migrated).toBe(true)
+      expect(result.project).toMatchObject({
+        name: 'V2 project without annotations',
+        version: CURRENT_PROJECT_VERSION,
+        annotations: [],
+      })
     })
 
     it('rejects local Agentation sync markers from durable project data', () => {

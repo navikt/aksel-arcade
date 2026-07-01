@@ -54,12 +54,16 @@ export interface AnnotationFilterOptions {
   status?: AnnotationStatus | 'open' | 'all'
   includeNonFeedback?: boolean
   isDeadTarget?: (annotation: ArcadeAnnotation) => boolean
+  isHiddenTarget?: (annotation: ArcadeAnnotation) => boolean
+  targetVisibility?: 'all' | 'visible' | 'hidden'
 }
 
 export interface AnnotationCountOptions {
   pageId?: ArcadePageId
   includeNonFeedback?: boolean
   isDeadTarget?: (annotation: ArcadeAnnotation) => boolean
+  isHiddenTarget?: (annotation: ArcadeAnnotation) => boolean
+  targetVisibility?: 'all' | 'visible' | 'hidden'
 }
 
 export const createEmptyAnnotations = (): ArcadeAnnotation[] => []
@@ -119,6 +123,17 @@ export const filterAnnotations = (
 
     if (options.isDeadTarget?.(annotation)) {
       return false
+    }
+
+    const targetVisibility = options.targetVisibility ?? 'all'
+    if (targetVisibility !== 'all') {
+      const isHiddenTarget = options.isHiddenTarget?.(annotation) ?? false
+      if (targetVisibility === 'visible' && isHiddenTarget) {
+        return false
+      }
+      if (targetVisibility === 'hidden' && !isHiddenTarget) {
+        return false
+      }
     }
 
     switch (options.status ?? 'all') {

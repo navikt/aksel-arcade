@@ -289,6 +289,7 @@ export interface ExportProjectOptions {
 
 const LEGACY_SINGLE_PAGE_ARCADE_PROJECT_PACKAGE_FORMAT_VERSION = 2 as const
 const LEGACY_PORTABLE_ARCADE_PROJECT_PACKAGE_FORMAT_VERSION = 1 as const
+const LEGACY_PROJECT_VERSION_WITHOUT_ANNOTATIONS = '2.0.0' as const
 
 export interface PortableArcadeProjectData {
   name: string
@@ -1244,6 +1245,16 @@ const migrateProject = (stored: unknown): Project => {
 
   if (version === '1.0.0') {
     return migrateLegacyProject(stored)
+  }
+
+  if (version === LEGACY_PROJECT_VERSION_WITHOUT_ANNOTATIONS) {
+    if (!isRecord(stored)) {
+      throw new Error('Legacy project must be an object')
+    }
+    return normalizeImportedProject({
+      ...stored,
+      version: CURRENT_PROJECT_VERSION,
+    })
   }
 
   if (version === CURRENT_PROJECT_VERSION) {

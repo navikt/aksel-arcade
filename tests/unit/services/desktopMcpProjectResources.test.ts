@@ -1,8 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import {
-  createArcadePage,
-  createArcadeSourceFile,
-} from '@/services/projectSource'
+import { createArcadePage, createArcadeSourceFile } from '@/services/projectSource'
 import type { Project } from '@/types/project'
 import type { PreviewDiagnostics } from '@/services/previewDiagnostics'
 import {
@@ -53,6 +50,7 @@ const createProject = (): Project => ({
     nextPageNumber: 3,
   },
   activePageId: 'page02',
+  annotations: [],
   viewportSize: 'LG',
   panelLayout: 'editor-left',
   version: '2.0.0',
@@ -202,8 +200,7 @@ describe('desktopMcpProjectResources', () => {
       kind: 'runtime-error',
       message:
         'Invalid hook call. Hooks can only be called inside of the body of a function component.',
-      hint:
-        'This often means a hook is still running at module scope (for example Global config, or a bare page Hooks statement) instead of inside a page component. In Arcade, keep page state in top-level bindings in the page Hooks tab (for example `const [value, setValue] = useState(...)`), or define a custom hook function in Global config and call it from a page.',
+      hint: 'This often means a hook is still running at module scope (for example Global config, or a bare page Hooks statement) instead of inside a page component. In Arcade, keep page state in top-level bindings in the page Hooks tab (for example `const [value, setValue] = useState(...)`), or define a custom hook function in Global config and call it from a page.',
     })
     expect(runtimeIssue).not.toHaveProperty('pageId')
   })

@@ -27,7 +27,7 @@ export interface ProjectSource {
   nextPageNumber: number
 }
 
-export const CURRENT_PROJECT_VERSION = '2.0.0' as const
+export const CURRENT_PROJECT_VERSION = '3.0.0' as const
 
 export interface Project {
   // Identity

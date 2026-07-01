@@ -4020,3 +4020,17 @@ Verification:
 
 Next note:
 - `#316` can now build target resolution on top of `ArcadeAnnotation.pageId` plus the stored Agentation identity fields. Keep saved `x`/`y`/bounding boxes diagnostic-only; normal open/pending counts already accept dead-target filtering input.
+
+
+2026-07-01 - PR #329 review follow-up for Issue #315
+
+Fixed before merge:
+- Added the missing `annotations: []` test fixtures that CI build surfaced after making `Project.annotations` required.
+- Bumped `CURRENT_PROJECT_VERSION` to `3.0.0` for the annotation-aware project schema and added a v2 stored-project migration path that restores missing annotations to an empty set.
+- Extended annotation lifecycle filtering with explicit hidden/visible target filtering inputs while keeping hidden-but-resolved annotations included in default open/pending counts.
+
+Verification:
+- `npm run typecheck`
+- `npm run lint`
+- `npm run build`
+- `npm run test -- --run`

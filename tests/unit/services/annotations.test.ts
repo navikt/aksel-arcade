@@ -68,7 +68,7 @@ describe('annotation lifecycle service', () => {
     expect(created.authorId).toBeUndefined()
   })
 
-  it('filters page-scoped, open, pending, dead-target, and non-feedback annotations for v0.3 workflows', () => {
+  it('filters page-scoped, open, pending, dead-target, hidden-target, and non-feedback annotations for v0.3 workflows', () => {
     const annotations = [
       annotation({ id: crypto.randomUUID(), pageId: 'page01', status: 'pending' }),
       annotation({ id: crypto.randomUUID(), pageId: 'page01', status: 'acknowledged' }),
@@ -86,15 +86,22 @@ describe('annotation lifecycle service', () => {
         status: 'pending',
         elementPath: 'dead',
       }),
+      annotation({
+        id: crypto.randomUUID(),
+        pageId: 'page01',
+        status: 'pending',
+        elementPath: 'hidden',
+      }),
     ]
 
     const isDeadTarget = (candidate: ArcadeAnnotation) => candidate.elementPath === 'dead'
+    const isHiddenTarget = (candidate: ArcadeAnnotation) => candidate.elementPath === 'hidden'
 
-    expect(getOpenAnnotations(annotations, { pageId: 'page01', isDeadTarget })).toHaveLength(2)
-    expect(getPendingAnnotations(annotations, { pageId: 'page01', isDeadTarget })).toHaveLength(1)
+    expect(getOpenAnnotations(annotations, { pageId: 'page01', isDeadTarget })).toHaveLength(3)
+    expect(getPendingAnnotations(annotations, { pageId: 'page01', isDeadTarget })).toHaveLength(2)
     expect(
       filterAnnotations(annotations, { pageId: 'page01', status: 'all', isDeadTarget })
-    ).toHaveLength(3)
+    ).toHaveLength(4)
     expect(
       filterAnnotations(annotations, {
         pageId: 'page01',
@@ -102,7 +109,25 @@ describe('annotation lifecycle service', () => {
         includeNonFeedback: true,
         isDeadTarget,
       })
+    ).toHaveLength(3)
+    expect(
+      filterAnnotations(annotations, {
+        pageId: 'page01',
+        status: 'open',
+        isDeadTarget,
+        isHiddenTarget,
+        targetVisibility: 'visible',
+      })
     ).toHaveLength(2)
+    expect(
+      filterAnnotations(annotations, {
+        pageId: 'page01',
+        status: 'open',
+        isDeadTarget,
+        isHiddenTarget,
+        targetVisibility: 'hidden',
+      })
+    ).toHaveLength(1)
   })
 
   it('counts open and pending annotations by page while excluding dead targets and non-feedback records', () => {
