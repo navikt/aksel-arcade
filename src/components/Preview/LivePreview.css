@@ -73,7 +73,7 @@
 }
 
 .live-preview__annotation-popover-content {
-  max-width: min(22rem, calc(100vw - var(--ax-space-32)));
+  width: min(280px, calc(100vw - var(--ax-space-32)));
 }
 
 .live-preview__annotation-target-metadata,

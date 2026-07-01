@@ -4213,3 +4213,16 @@ Verification:
 - npm run test -- --run
 - npm run lint
 - Browser check at `http://127.0.0.1:5193/aksel-arcade/` selected the default InlineMessage in Annotation mode and confirmed the add-popover shows `InlineMessage: Quick tip: Delete this...` without `Features: Two tabs`, raw `.aksel-*` classes, or the `Informasjon:` status prefix.
+
+### 2026-07-02 - PR #332 annotation popover width follow-up
+
+Fixed after user feedback:
+
+- Set the add-annotation popover content to a 280px default width while preserving the existing viewport-safe max width behavior for narrow screens.
+
+Verification:
+
+- npm run typecheck
+- npm run test -- --run
+- npm run lint
+- Browser check at `http://127.0.0.1:5194/aksel-arcade/` opened Annotation mode, selected a default preview target, and measured `.live-preview__annotation-popover-content` at `280px` with no console errors.
