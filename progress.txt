@@ -4197,3 +4197,19 @@ Verification:
 - Browser probe at `http://127.0.0.1:5192/aksel-arcade/` confirmed Annotation mode resolves outer Box padding, VStack gap/body, InlineMessage root exposed area, InlineMessage non-strong text span, in-root custom `div`, and custom `span`, and opens the add-popover for the custom `div` without console errors.
 
 Next note: target creation is now intentionally broad. Future drag/multi-select work should collect rendered preview DOM elements, not semantic-only or Aksel-only elements, while continuing to ignore preview chrome and non-rendered implementation nodes.
+
+### 2026-07-01 - PR #332 annotation popover target label follow-up
+
+Fixed after user feedback:
+
+- Replaced the verbose add-popover target metadata with a short human label, e.g. `InlineMessage: Quick tip: Delete this...`.
+- Removed the popover's nearby subtree/context text and raw CSS-class display; that detailed data still remains in the annotation target snapshot for persistence/agent use, but it is no longer shown to the human author while adding an annotation.
+- Normalized clicks on decorative InlineMessage icon internals back to the InlineMessage root so they do not show as `Img` targets.
+- Added regression coverage for the InlineMessage label and for InlineMessage icon internals resolving to the component root, then regenerated `public/preview-evidence-global.js`.
+
+Verification:
+
+- npm run typecheck
+- npm run test -- --run
+- npm run lint
+- Browser check at `http://127.0.0.1:5193/aksel-arcade/` selected the default InlineMessage in Annotation mode and confirmed the add-popover shows `InlineMessage: Quick tip: Delete this...` without `Features: Two tabs`, raw `.aksel-*` classes, or the `Informasjon:` status prefix.

@@ -226,6 +226,7 @@ describe('annotation target resolution', () => {
     const textInput = root.querySelector('input[type="text"]') as HTMLInputElement
     const checkbox = root.querySelector('input[type="checkbox"]') as HTMLInputElement
     const inlineMessage = root.querySelector('.aksel-inline-message') as HTMLElement
+    const inlineMessageIcon = root.querySelector('.aksel-inline-message__icon') as SVGElement | null
     const unorderedList = root.querySelector('ul') as HTMLUListElement
 
     setRect(root, { x: 0, y: 0, width: 520, height: 240 })
@@ -235,6 +236,9 @@ describe('annotation target resolution', () => {
     setRect(textInput, { x: 132, y: 32, width: 160, height: 40 })
     setRect(checkbox, { x: 312, y: 42, width: 24, height: 24 })
     setRect(inlineMessage, { x: 16, y: 112, width: 420, height: 48 })
+    if (inlineMessageIcon) {
+      setRect(inlineMessageIcon, { x: 24, y: 124, width: 20, height: 20 })
+    }
     setRect(unorderedList, { x: 16, y: 176, width: 220, height: 48 })
 
     Object.defineProperty(document, 'elementFromPoint', {
@@ -242,6 +246,7 @@ describe('annotation target resolution', () => {
         if (x === 4 && y === 4) return root
         if (x === 20 && y === 96) return vStack
         if (x === 24 && y === 84) return hStack
+        if (x === 30 && y === 130) return inlineMessageIcon ?? inlineMessage
         if (x === 24 && y === 124) return inlineMessage
         if (x === 24 && y === 184) return unorderedList
         return button
@@ -272,6 +277,11 @@ describe('annotation target resolution', () => {
       { mode: 'point', x: 24, y: 124 },
       window
     )
+    const inlineMessageIconTarget = resolveAnnotationTargetAtPoint(
+      root,
+      { mode: 'point', x: 30, y: 130 },
+      window
+    )
     const listTarget = resolveAnnotationTargetAtPoint(root, { mode: 'point', x: 24, y: 184 }, window)
 
     expect(buttonTarget).toMatchObject({
@@ -299,6 +309,10 @@ describe('annotation target resolution', () => {
       target: { identity: { cssClasses: expect.stringContaining('aksel-hstack') } },
     })
     expect(inlineMessageTarget).toMatchObject({
+      status: 'resolved',
+      target: { identity: { cssClasses: expect.stringContaining('aksel-inline-message') } },
+    })
+    expect(inlineMessageIconTarget).toMatchObject({
       status: 'resolved',
       target: { identity: { cssClasses: expect.stringContaining('aksel-inline-message') } },
     })

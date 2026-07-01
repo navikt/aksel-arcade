@@ -58,6 +58,10 @@ var previewEvidenceUtils = (() => {
     '[role="menuitem"]',
     "[onclick]"
   ].join(",");
+  var COMPONENT_INTERNAL_TARGET_SELECTOR = [
+    ".aksel-inline-message__icon",
+    ".aksel-inline-message__icon *"
+  ].join(",");
   var MAX_TEXT_LENGTH = 500;
   var resolveAnnotationTarget = (root, request, frameWindow = root.ownerDocument.defaultView ?? window) => {
     switch (request.mode) {
@@ -311,6 +315,10 @@ var previewEvidenceUtils = (() => {
     if (isExcludedElement(element) || isPreviewChromeElement(element)) {
       return null;
     }
+    const componentRoot = getComponentRootForInternalElement(element, root);
+    if (componentRoot && isAnnotatableElement(componentRoot, frameWindow)) {
+      return componentRoot;
+    }
     const interactive = closestWithinRoot(element, root, INTERACTIVE_TARGET_SELECTOR);
     if (interactive && isAnnotatableElement(interactive, frameWindow)) {
       return interactive;
@@ -323,6 +331,10 @@ var previewEvidenceUtils = (() => {
       current = current.parentElement;
     }
     return isAnnotatableElement(root, frameWindow) ? root : null;
+  };
+  var getComponentRootForInternalElement = (element, root) => {
+    const inlineMessageInternal = closestWithinRoot(element, root, COMPONENT_INTERNAL_TARGET_SELECTOR);
+    return inlineMessageInternal ? closestWithinRoot(inlineMessageInternal, root, ".aksel-inline-message") : null;
   };
   var getAnnotatableCandidates = (root, frameWindow) => [root, ...Array.from(root.querySelectorAll("*"))].filter((candidate) => root.contains(candidate)).map((candidate) => normalizeAnnotationElement(root, candidate, frameWindow)).filter((candidate) => Boolean(candidate)).filter((candidate, index, candidates) => candidates.indexOf(candidate) === index);
   var filterContainedElements = (elements) => elements.filter(

@@ -81,6 +81,10 @@ const INTERACTIVE_TARGET_SELECTOR = [
   '[role="menuitem"]',
   '[onclick]',
 ].join(',')
+const COMPONENT_INTERNAL_TARGET_SELECTOR = [
+  '.aksel-inline-message__icon',
+  '.aksel-inline-message__icon *',
+].join(',')
 const MAX_TEXT_LENGTH = 500
 
 export const resolveAnnotationTarget = (
@@ -431,6 +435,11 @@ const normalizeAnnotationElement = (
     return null
   }
 
+  const componentRoot = getComponentRootForInternalElement(element, root)
+  if (componentRoot && isAnnotatableElement(componentRoot, frameWindow)) {
+    return componentRoot
+  }
+
   const interactive = closestWithinRoot(element, root, INTERACTIVE_TARGET_SELECTOR)
   if (interactive && isAnnotatableElement(interactive, frameWindow)) {
     return interactive
@@ -445,6 +454,13 @@ const normalizeAnnotationElement = (
   }
 
   return isAnnotatableElement(root, frameWindow) ? root : null
+}
+
+const getComponentRootForInternalElement = (element: Element, root: Element): Element | null => {
+  const inlineMessageInternal = closestWithinRoot(element, root, COMPONENT_INTERNAL_TARGET_SELECTOR)
+  return inlineMessageInternal
+    ? closestWithinRoot(inlineMessageInternal, root, '.aksel-inline-message')
+    : null
 }
 
 const getAnnotatableCandidates = (root: Element, frameWindow: Window): Element[] =>

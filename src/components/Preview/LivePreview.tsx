@@ -25,6 +25,20 @@ import './LivePreview.css'
 const PREVIEW_EVIDENCE_REQUEST_TIMEOUT_MS = 5_000
 const SANDBOX_IFRAME_SRC =
   import.meta.env.MODE === 'test' ? 'about:blank' : import.meta.env.BASE_URL + 'sandbox.html'
+const ANNOTATION_TARGET_TEXT_MAX_LENGTH = 24
+
+const AKSEL_TARGET_LABELS: Array<[className: string, label: string]> = [
+  ['aksel-inline-message', 'InlineMessage'],
+  ['aksel-button', 'Button'],
+  ['aksel-checkbox', 'Checkbox'],
+  ['aksel-text-field', 'TextField'],
+  ['aksel-textarea', 'Textarea'],
+  ['aksel-select', 'Select'],
+  ['aksel-box', 'Box'],
+  ['aksel-vstack', 'VStack'],
+  ['aksel-hstack', 'HStack'],
+  ['aksel-hgrid', 'HGrid'],
+]
 
 const getSandboxIframeSrc = (recoveryRevision: number) => {
   if (SANDBOX_IFRAME_SRC === 'about:blank' || recoveryRevision === 0) {
@@ -36,6 +50,56 @@ const getSandboxIframeSrc = (recoveryRevision: number) => {
 }
 
 const getSandboxIframeHref = (src: string) => new URL(src, window.location.href).href
+
+const getAnnotationTargetLabel = (target: ResolvedAnnotationTarget): string => {
+  const targetName = getAnnotationTargetName(target)
+  const targetText = getAnnotationTargetText(target)
+
+  return targetText ? `${targetName}: ${targetText}` : targetName
+}
+
+const getAnnotationTargetName = (target: ResolvedAnnotationTarget): string => {
+  const classes = target.identity.cssClasses?.split(/\s+/) ?? []
+  const akselLabel = AKSEL_TARGET_LABELS.find(([className]) => classes.includes(className))?.[1]
+  if (akselLabel) {
+    return akselLabel
+  }
+
+  if (target.identity.role && target.identity.role !== target.identity.tagName) {
+    return capitalizeTargetName(target.identity.role)
+  }
+
+  return target.identity.tagName
+}
+
+const getAnnotationTargetText = (target: ResolvedAnnotationTarget): string => {
+  const text = stripAkselStatusPrefix(
+    target.identity.accessibleName || target.identity.text || extractQuotedElementText(target.snapshot.element)
+  )
+  return truncateTargetText(text, ANNOTATION_TARGET_TEXT_MAX_LENGTH)
+}
+
+const stripAkselStatusPrefix = (text: string | undefined): string =>
+  (text ?? '').replace(/^(informasjon|info|suksess|success|advarsel|warning|feil|error):\s*/i, '').trim()
+
+const extractQuotedElementText = (elementLabel: string): string => {
+  const match = elementLabel.match(/"([^"]+)"/)
+  return match?.[1] ?? ''
+}
+
+const truncateTargetText = (text: string, maxLength: number): string => {
+  if (text.length <= maxLength) {
+    return text
+  }
+
+  const candidate = text.slice(0, maxLength)
+  const lastSpace = candidate.lastIndexOf(' ')
+  const truncated = (lastSpace > 0 ? candidate.slice(0, lastSpace) : candidate).trim()
+  return `${truncated}...`
+}
+
+const capitalizeTargetName = (value: string): string =>
+  value.length === 0 ? value : `${value[0].toUpperCase()}${value.slice(1)}`
 
 interface LivePreviewProps {
   iframeRef: React.RefObject<HTMLIFrameElement | null>
@@ -689,15 +753,7 @@ export const LivePreview = ({
               <BodyShort weight="semibold">Add annotation</BodyShort>
               {selectedAnnotationTarget && (
                 <Detail className="live-preview__annotation-target-metadata">
-                  {selectedAnnotationTarget.snapshot.element}
-                  {selectedAnnotationTarget.snapshot.cssClasses
-                    ? ` · .${selectedAnnotationTarget.snapshot.cssClasses.split(/\s+/).join('.')}`
-                    : ''}
-                </Detail>
-              )}
-              {selectedAnnotationTarget?.snapshot.nearbyText && (
-                <Detail className="live-preview__annotation-target-context">
-                  {selectedAnnotationTarget.snapshot.nearbyText}
+                  {getAnnotationTargetLabel(selectedAnnotationTarget)}
                 </Detail>
               )}
             </VStack>

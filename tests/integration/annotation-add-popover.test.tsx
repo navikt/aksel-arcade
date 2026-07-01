@@ -28,6 +28,32 @@ const selectedTarget: ResolvedAnnotationTarget = {
   visibility: 'visible',
 }
 
+const inlineMessageTarget: ResolvedAnnotationTarget = {
+  identity: {
+    signature: 'inline-message-signature',
+    tagName: 'div',
+    role: 'div',
+    text: 'Informasjon: Quick tip: Delete this intro and start coding! You can always reset via Settings -> Reset editor.',
+    cssClasses: 'aksel-inline-message aksel-body-long aksel-body-long--medium',
+    elementPath:
+      'div "Welcome" > div "Informasjon: Quick tip: Delete this" > div "Informasjon: Quick tip: Delete this"',
+    fullPath: ':scope > div:nth-of-type(1) > div:nth-of-type(2)',
+  },
+  snapshot: {
+    x: 50,
+    y: 44,
+    element: 'div "Informasjon: Quick tip: Delete this intr"',
+    elementPath:
+      'div "Welcome" > div "Informasjon: Quick tip: Delete this" > div "Informasjon: Quick tip: Delete this"',
+    fullPath: ':scope > div:nth-of-type(1) > div:nth-of-type(2)',
+    cssClasses: 'aksel-inline-message aksel-body-long aksel-body-long--medium',
+    nearbyText:
+      'Features: Two tabs: JSX for components, Hooks for custom logic Live preview: S Informasjon: Quick tip: Delete this intro and start coding! You can always reset',
+    boundingBox: { x: 24, y: 32, width: 420, height: 56 },
+  },
+  visibility: 'visible',
+}
+
 const renderLivePreview = (props: Partial<Parameters<typeof LivePreview>[0]> = {}) => {
   const iframeRef = { current: null as HTMLIFrameElement | null }
   const onAnnotationsChange = vi.fn()
@@ -125,5 +151,23 @@ describe('Annotation add popover', () => {
     })
 
     expect(screen.getByRole('button', { name: /selected annotation target/i })).toBeTruthy()
+  })
+
+  it('shows a short target identifier instead of element subtree context for InlineMessage targets', async () => {
+    const { iframeRef } = renderLivePreview()
+    expect(iframeRef.current).toBeTruthy()
+
+    postSandboxMessage(iframeRef.current!, {
+      type: 'ANNOTATION_TARGET_SELECTED',
+      payload: {
+        status: 'resolved',
+        target: inlineMessageTarget,
+        matchCount: 1,
+      },
+    })
+
+    expect(await screen.findByText('InlineMessage: Quick tip: Delete this...')).toBeTruthy()
+    expect(screen.queryByText(/Features: Two tabs/i)).toBeNull()
+    expect(screen.queryByText(/aksel-inline-message\\.aksel-body-long/i)).toBeNull()
   })
 })
