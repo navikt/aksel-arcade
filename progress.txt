@@ -4074,3 +4074,24 @@ Verification:
 - `npm run build:sandbox`
 - `npm run build`
 - Browser smoke check at `http://127.0.0.1:5173/aksel-arcade/` with the app shell + live preview rendered and no captured browser console/page errors.
+
+
+2026-07-01 - Issue #317: Annotation mode preview-header shell
+
+Selected `#317` as the highest-priority `ready-for-agent` feature from `#317`-`#326` after reading parent PRD `#314`, `CONTEXT.md`, and ADRs `0020`, `0023`, and `0024`. It is the first human-visible Annotation mode foundation and unblocks later creation, marker, persistence, MCP, and Preview evidence slices; blocker `#315` is closed.
+
+Implemented:
+- Added the host-side preview-header Annotation mode shell with an Aksel `Button`, verified `NotePencilIcon`, page-scoped open annotation count badge, and `Clear all` shell button visible only while Annotation mode is on.
+- Made Annotation mode off by default, toggleable without changing project annotation data, and escapable with `Escape` when no annotation popover is open.
+- Converted `InspectMode` to controlled state from `PreviewPane` so Annotation mode and Inspect mode are mutually exclusive in both directions.
+- Added focused integration coverage for default/toggle state, `Clear all` visibility, Escape behavior, page-scoped zero/one/two-digit badge counts, and Inspect exclusivity.
+
+Verification:
+- `npm install`
+- `npm run typecheck`
+- `npm run lint`
+- `npm run test -- --run`
+- Browser verification at `http://127.0.0.1:5177/aksel-arcade/` for the #317 human checklist: off/default annotation toggle, active state, `Clear all` only while active, toggle-off behavior, Escape exit, Inspect/Annotation mutual exclusion both ways, zero/one/two-digit supplied badge counts, light and dark header states, and no captured console errors.
+
+Next note:
+- `#318` can wire annotation creation to the existing Annotation mode shell. Keep `Clear all` destructive behavior out until `#322`.

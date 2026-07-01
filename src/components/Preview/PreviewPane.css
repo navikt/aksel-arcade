@@ -42,6 +42,37 @@
   margin-inline-start: auto;
 }
 
+.preview-pane__annotation-controls {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: var(--ax-space-8);
+}
+
+.preview-pane__annotation-button-label {
+  white-space: nowrap;
+}
+
+.preview-pane__annotation-badge {
+  display: inline-grid;
+  min-width: 1.25rem;
+  height: 1.25rem;
+  align-items: center;
+  justify-content: center;
+  padding-inline: var(--ax-space-4);
+  border-radius: var(--ax-radius-full);
+  background: var(--ax-bg-neutral-strong);
+  color: var(--ax-text-neutral-contrast);
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.preview-pane__annotation-clear {
+  white-space: nowrap;
+}
+
 .preview-pane__viewport-toggle {
   flex: 0 0 auto;
   min-width: 0;

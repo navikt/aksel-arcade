@@ -1,8 +1,9 @@
 import { useCallback, useContext, useEffect, useRef, useState } from 'react'
 import { Alert, BodyShort, Box, Button, Detail, VStack } from '@navikt/ds-react'
-import { ExpandIcon, ShrinkIcon } from '@navikt/aksel-icons'
+import { ExpandIcon, NotePencilIcon, ShrinkIcon } from '@navikt/aksel-icons'
 import { SharePopoverButton } from '@/components/Share/SharePopoverButton'
 import { AppContext } from '@/hooks/useProject'
+import { countOpenAnnotationsByPage } from '@/services/annotations'
 import { transpileProjectSource } from '@/services/transpiler'
 import { resolveSelectedEditTarget } from '@/services/projectSource'
 import { WEB_ARCADE_CAPABILITIES, type ShellCapabilities } from '@/services/shellCapabilities'
@@ -44,6 +45,7 @@ export const PreviewPane = ({
   const [compileError, setCompileError] = useState<CompileError | null>(null)
   const [runtimeError, setRuntimeError] = useState<RuntimeError | null>(null)
   const [isInspectMode, setIsInspectMode] = useState(false)
+  const [isAnnotationMode, setIsAnnotationMode] = useState(false)
   const debounceTimerRef = useRef<number | undefined>(undefined)
   const pendingCompileErrorRef = useRef<CompileError | null>(null)
   const isCodeEditorFocusedRef = useRef(editorState.isCodeEditorFocused)
@@ -249,7 +251,20 @@ export const PreviewPane = ({
   }
 
   const handleInspectToggle = (enabled: boolean) => {
+    if (enabled) {
+      setIsAnnotationMode(false)
+    }
     setIsInspectMode(enabled)
+  }
+
+  const handleAnnotationToggle = () => {
+    setIsAnnotationMode((current) => {
+      const nextMode = !current
+      if (nextMode) {
+        setIsInspectMode(false)
+      }
+      return nextMode
+    })
   }
 
   const exitPreviewFullscreen = useCallback(() => {
@@ -273,7 +288,7 @@ export const PreviewPane = ({
 
   const handlePreviewPaneKeyDown = useCallback(
     (event: React.KeyboardEvent<HTMLElement>) => {
-      if (!previewFullscreen || event.key !== 'Escape' || event.defaultPrevented) {
+      if (event.key !== 'Escape' || event.defaultPrevented) {
         return
       }
 
@@ -284,10 +299,20 @@ export const PreviewPane = ({
         return
       }
 
+      if (isAnnotationMode) {
+        event.preventDefault()
+        setIsAnnotationMode(false)
+        return
+      }
+
+      if (!previewFullscreen) {
+        return
+      }
+
       event.preventDefault()
       exitPreviewFullscreen()
     },
-    [exitPreviewFullscreen, previewFullscreen]
+    [exitPreviewFullscreen, isAnnotationMode, previewFullscreen]
   )
 
   useEffect(() => {
@@ -307,6 +332,11 @@ export const PreviewPane = ({
   const fullscreenToggleLabel = previewFullscreen
     ? 'Exit preview fullscreen'
     : 'Enter preview fullscreen'
+  const activePageOpenAnnotationCount =
+    countOpenAnnotationsByPage(project.annotations).get(project.activePageId) ?? 0
+  const annotationToggleLabel = isAnnotationMode
+    ? `Exit annotation mode, ${activePageOpenAnnotationCount} open annotations on this page`
+    : `Enter annotation mode, ${activePageOpenAnnotationCount} open annotations on this page`
 
   return (
     <Box
@@ -344,7 +374,40 @@ export const PreviewPane = ({
             className="preview-pane__header-controls-right"
             data-testid="preview-header-controls-right"
           >
-            <InspectMode onInspectToggle={handleInspectToggle} />
+            <div className="preview-pane__annotation-controls">
+              <Button
+                type="button"
+                variant={isAnnotationMode ? 'secondary' : 'tertiary'}
+                data-color={isAnnotationMode ? 'accent' : 'neutral'}
+                size="small"
+                aria-label={annotationToggleLabel}
+                aria-pressed={isAnnotationMode}
+                icon={<NotePencilIcon aria-hidden />}
+                onClick={handleAnnotationToggle}
+                className="preview-pane__annotation-toggle"
+              >
+                <span className="preview-pane__annotation-button-label">Annotations</span>
+                <span
+                  className="preview-pane__annotation-badge"
+                  data-testid="annotation-count-badge"
+                  aria-hidden="true"
+                >
+                  {activePageOpenAnnotationCount}
+                </span>
+              </Button>
+              {isAnnotationMode && (
+                <Button
+                  type="button"
+                  variant="tertiary"
+                  data-color="neutral"
+                  size="small"
+                  className="preview-pane__annotation-clear"
+                >
+                  Clear all
+                </Button>
+              )}
+            </div>
+            <InspectMode isInspectMode={isInspectMode} onInspectToggle={handleInspectToggle} />
             <div className="preview-pane__viewport-toggle">
               <ViewportToggle />
             </div>
