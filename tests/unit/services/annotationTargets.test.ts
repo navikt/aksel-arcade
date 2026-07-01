@@ -1,4 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
+import React from 'react'
+import { render } from '@testing-library/react'
+import { Button, Checkbox, HStack, TextField } from '@navikt/ds-react'
 import {
   getAnnotationTargetIdentity,
   resolveAnnotationTargetAtPoint,
@@ -177,6 +180,56 @@ describe('annotation target resolution', () => {
       status: 'dead',
       reason: 'partial-group',
       matchCount: 1,
+    })
+  })
+
+  it('covers common Aksel component and layout DOM in the target matrix', () => {
+    const { container } = render(
+      React.createElement(
+        HStack,
+        { gap: 'space-4' },
+        React.createElement(Button, null, 'Send'),
+        React.createElement(TextField, { label: 'Navn' }),
+        React.createElement(Checkbox, null, 'Godta')
+      )
+    )
+    const root = container.firstElementChild as HTMLElement
+    const button = root.querySelector('button') as HTMLButtonElement
+    const textInput = root.querySelector('input[type="text"]') as HTMLInputElement
+    const checkbox = root.querySelector('input[type="checkbox"]') as HTMLInputElement
+
+    setRect(root, { x: 0, y: 0, width: 420, height: 80 })
+    setRect(button, { x: 10, y: 10, width: 80, height: 40 })
+    setRect(textInput, { x: 110, y: 10, width: 160, height: 40 })
+    setRect(checkbox, { x: 290, y: 20, width: 24, height: 24 })
+
+    const buttonTarget = resolveAnnotationTargetIdentity(
+      root,
+      getAnnotationTargetIdentity(root, button, window),
+      window
+    )
+    const textFieldTarget = resolveAnnotationTargetIdentity(
+      root,
+      getAnnotationTargetIdentity(root, textInput, window),
+      window
+    )
+    const checkboxTarget = resolveAnnotationTargetIdentity(
+      root,
+      getAnnotationTargetIdentity(root, checkbox, window),
+      window
+    )
+
+    expect(buttonTarget).toMatchObject({
+      status: 'resolved',
+      target: { identity: { role: 'button', accessibleName: 'Send' } },
+    })
+    expect(textFieldTarget).toMatchObject({
+      status: 'resolved',
+      target: { identity: { role: 'textbox', accessibleName: 'Navn' } },
+    })
+    expect(checkboxTarget).toMatchObject({
+      status: 'resolved',
+      target: { identity: { role: 'checkbox', accessibleName: 'Godta' } },
     })
   })
 })

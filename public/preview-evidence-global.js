@@ -210,15 +210,6 @@ var previewEvidenceUtils = (() => {
     };
   };
   var resolveAnnotationTargetIdentity = (root, identity, frameWindow = root.ownerDocument.defaultView ?? window) => {
-    const pathMatch = queryFullPath(root, identity.fullPath);
-    if (pathMatch && getAnnotationTargetIdentity(root, pathMatch, frameWindow).signature === identity.signature) {
-      const target2 = createResolvedTarget(root, pathMatch, frameWindow);
-      return {
-        status: target2.visibility === "visible" ? "resolved" : "hidden",
-        target: target2,
-        matchCount: 1
-      };
-    }
     const matches = getMeaningfulCandidates(root, frameWindow).filter(
       (candidate) => getAnnotationTargetIdentity(root, candidate, frameWindow).signature === identity.signature
     );
@@ -236,7 +227,9 @@ var previewEvidenceUtils = (() => {
         matchCount: matches.length
       };
     }
-    const target = createResolvedTarget(root, matches[0], frameWindow);
+    const pathMatch = queryFullPath(root, identity.fullPath);
+    const resolvedElement = pathMatch && matches[0] === pathMatch ? pathMatch : matches[0];
+    const target = createResolvedTarget(root, resolvedElement, frameWindow);
     return {
       status: target.visibility === "visible" ? "resolved" : "hidden",
       target,

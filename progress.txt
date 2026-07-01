@@ -4057,3 +4057,18 @@ Verification:
 
 Next note:
 - `#317` can now build the Annotation mode shell against the sandbox target-resolution message contract without adding annotation IDs or data attributes to user-authored Arcade project source. Keep `x`/`y`/bounding boxes diagnostic-only and persist identity metadata from resolver output for later dead/hidden recovery.
+
+
+2026-07-01 - PR #330 review follow-up for Issue #316
+
+Fixed before merge:
+- Tightened saved identity resolution so a matching DOM path can no longer mask multiple plausible identity matches; repeated identical targets now stay dead until unambiguous.
+- Extended the target-resolution matrix with real Aksel `Button`, `TextField`, `Checkbox`, and `HStack` DOM so the #316 matrix covers common Aksel components/layouts instead of only generic HTML fixtures.
+
+Verification:
+- `npm run typecheck`
+- `npm run lint`
+- `npm run test -- --run tests/unit/services/annotationTargets.test.ts`
+- `npm run test -- --run`
+- `npm run build:sandbox`
+- Browser smoke check at `http://127.0.0.1:5173/aksel-arcade/` with the app shell + live preview rendered and no captured browser console/page errors.
