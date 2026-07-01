@@ -48,6 +48,7 @@ const createProject = ({
       nextPageNumber: resolvedPageCount + 1,
     },
     activePageId,
+    annotations: [],
     viewportSize: 'LG',
     panelLayout: 'editor-left',
     version: '2.0.0',
@@ -769,163 +770,163 @@ describe('desktopMcpApplyChanges', () => {
     const originalProject = createProject({ pageCount: 4 })
 
     const result = prepareDesktopMcpApplyChanges(
-        {
-          summary: 'Replace the project with a three-step form',
-          operations: [
-            {
-              type: 'replace_source',
-              resourceUri: createDesktopMcpProjectPageSourceUri('page01', 'jsx'),
-              content:
-                'export default function StepOne() {\n  return <Button onClick={() => goToPage("page02")}>Next</Button>\n}',
-            },
-            {
-              type: 'rename_page',
-              pageId: 'page01',
-              name: 'Step 1',
-            },
-            {
-              type: 'replace_source',
-              resourceUri: createDesktopMcpProjectPageSourceUri('page02', 'jsx'),
-              content:
-                'export default function StepTwo() {\n  return <Button onClick={() => goToPage("{{pageRef:step3}}")}>Next</Button>\n}',
-            },
-            {
-              type: 'rename_page',
-              pageId: 'page02',
-              name: 'Step 2',
-            },
-            {
-              type: 'create_page',
-              newPageRef: 'step3',
-              name: 'Step 3',
-              jsxCode:
-                'export default function StepThree() {\n  return <Button onClick={() => goToPage("page01")}>Start over</Button>\n}',
-            },
-            {
-              type: 'delete_page',
-              pageId: 'page03',
-            },
-            {
-              type: 'delete_page',
-              pageId: 'page04',
-            },
-            {
-              type: 'set_start_page',
-              pageId: 'page01',
-            },
-            {
-              type: 'select_active_page',
-              pageId: 'page01',
-            },
-          ],
-          assertions: {
-            pageCount: 3,
-            startPage: 'first',
-            activePage: 'first',
-            forbidImports: true,
+      {
+        summary: 'Replace the project with a three-step form',
+        operations: [
+          {
+            type: 'replace_source',
+            resourceUri: createDesktopMcpProjectPageSourceUri('page01', 'jsx'),
+            content:
+              'export default function StepOne() {\n  return <Button onClick={() => goToPage("page02")}>Next</Button>\n}',
           },
-        },
-        {
-          project: originalProject,
-          theme: 'dark',
-          diagnostics: createDiagnostics(),
-        },
-        FIXED_TIMESTAMP
-      )
-
-      expect(result.ok).toBe(true)
-      if (!result.ok) {
-        throw new Error(result.message)
-      }
-
-      expect(result.nextProject.source.pages.map((page) => page.id)).toEqual([
-        'page01',
-        'page02',
-        'page05',
-      ])
-      expect(result.nextProject.source.pages.map((page) => page.name)).toEqual([
-        'Step 1',
-        'Step 2',
-        'Step 3',
-      ])
-      expect(result.nextProject.source.pages[1]?.source.jsx).toContain('goToPage("page05")')
-      expect(result.nextProject.source.startPageId).toBe('page01')
-      expect(result.nextProject.activePageId).toBe('page01')
-      expect(result.result.postChangeSummary).toMatchObject({
-        pageCount: 3,
-        startPageId: 'page01',
-        activePageId: 'page01',
-        pages: [
-          { id: 'page01', name: 'Step 1' },
-          { id: 'page02', name: 'Step 2' },
-          { id: 'page05', name: 'Step 3' },
+          {
+            type: 'rename_page',
+            pageId: 'page01',
+            name: 'Step 1',
+          },
+          {
+            type: 'replace_source',
+            resourceUri: createDesktopMcpProjectPageSourceUri('page02', 'jsx'),
+            content:
+              'export default function StepTwo() {\n  return <Button onClick={() => goToPage("{{pageRef:step3}}")}>Next</Button>\n}',
+          },
+          {
+            type: 'rename_page',
+            pageId: 'page02',
+            name: 'Step 2',
+          },
+          {
+            type: 'create_page',
+            newPageRef: 'step3',
+            name: 'Step 3',
+            jsxCode:
+              'export default function StepThree() {\n  return <Button onClick={() => goToPage("page01")}>Start over</Button>\n}',
+          },
+          {
+            type: 'delete_page',
+            pageId: 'page03',
+          },
+          {
+            type: 'delete_page',
+            pageId: 'page04',
+          },
+          {
+            type: 'set_start_page',
+            pageId: 'page01',
+          },
+          {
+            type: 'select_active_page',
+            pageId: 'page01',
+          },
         ],
-        warnings: [],
-      })
+        assertions: {
+          pageCount: 3,
+          startPage: 'first',
+          activePage: 'first',
+          forbidImports: true,
+        },
+      },
+      {
+        project: originalProject,
+        theme: 'dark',
+        diagnostics: createDiagnostics(),
+      },
+      FIXED_TIMESTAMP
+    )
+
+    expect(result.ok).toBe(true)
+    if (!result.ok) {
+      throw new Error(result.message)
+    }
+
+    expect(result.nextProject.source.pages.map((page) => page.id)).toEqual([
+      'page01',
+      'page02',
+      'page05',
+    ])
+    expect(result.nextProject.source.pages.map((page) => page.name)).toEqual([
+      'Step 1',
+      'Step 2',
+      'Step 3',
+    ])
+    expect(result.nextProject.source.pages[1]?.source.jsx).toContain('goToPage("page05")')
+    expect(result.nextProject.source.startPageId).toBe('page01')
+    expect(result.nextProject.activePageId).toBe('page01')
+    expect(result.result.postChangeSummary).toMatchObject({
+      pageCount: 3,
+      startPageId: 'page01',
+      activePageId: 'page01',
+      pages: [
+        { id: 'page01', name: 'Step 1' },
+        { id: 'page02', name: 'Step 2' },
+        { id: 'page05', name: 'Step 3' },
+      ],
+      warnings: [],
+    })
   })
 
   it('rejects final-state assertions before persistence', () => {
-      const result = prepareDesktopMcpApplyChanges(
-        {
-          summary: 'Leave too many pages',
-          operations: [
-            {
-              type: 'rename_project',
-              name: 'Still messy',
-            },
-          ],
-          assertions: {
-            pageCount: 3,
+    const result = prepareDesktopMcpApplyChanges(
+      {
+        summary: 'Leave too many pages',
+        operations: [
+          {
+            type: 'rename_project',
+            name: 'Still messy',
           },
+        ],
+        assertions: {
+          pageCount: 3,
         },
-        {
-          project: createProject({ pageCount: 4 }),
-          theme: 'dark',
-          diagnostics: createDiagnostics(),
-        },
-        FIXED_TIMESTAMP
-      )
+      },
+      {
+        project: createProject({ pageCount: 4 }),
+        theme: 'dark',
+        diagnostics: createDiagnostics(),
+      },
+      FIXED_TIMESTAMP
+    )
 
     expect(result).toEqual({
-        ok: false,
-        code: 'assertion-failed',
-        message: 'apply_changes assertion failed: expected 3 pages, but the project now has 4.',
-        manifestResourceUri: DESKTOP_MCP_PROJECT_MANIFEST_URI,
-      })
+      ok: false,
+      code: 'assertion-failed',
+      message: 'apply_changes assertion failed: expected 3 pages, but the project now has 4.',
+      manifestResourceUri: DESKTOP_MCP_PROJECT_MANIFEST_URI,
+    })
   })
 
   it('rejects importful final source when forbidImports is asserted', () => {
     const result = prepareDesktopMcpApplyChanges(
-        {
-          summary: 'Write importful source',
-          operations: [
-            {
-              type: 'replace_source',
-              resourceUri: createDesktopMcpProjectPageSourceUri('page01', 'jsx'),
-              content:
-                'import { Button } from "@navikt/ds-react"\nexport default function PageOne() {\n  return <Button>Bad</Button>\n}',
-            },
-          ],
-          assertions: {
-            forbidImports: true,
+      {
+        summary: 'Write importful source',
+        operations: [
+          {
+            type: 'replace_source',
+            resourceUri: createDesktopMcpProjectPageSourceUri('page01', 'jsx'),
+            content:
+              'import { Button } from "@navikt/ds-react"\nexport default function PageOne() {\n  return <Button>Bad</Button>\n}',
           },
+        ],
+        assertions: {
+          forbidImports: true,
         },
-        {
-          project: createProject(),
-          theme: 'dark',
-          diagnostics: createDiagnostics(),
-        },
-        FIXED_TIMESTAMP
-      )
+      },
+      {
+        project: createProject(),
+        theme: 'dark',
+        diagnostics: createDiagnostics(),
+      },
+      FIXED_TIMESTAMP
+    )
 
     expect(result).toEqual({
-        ok: false,
-        code: 'assertion-failed',
-        message:
-          'apply_changes assertion failed: forbidImports found an import statement in page01 JSX. Arcade source must be import-free.',
-        manifestResourceUri: DESKTOP_MCP_PROJECT_MANIFEST_URI,
-        resourceUri: createDesktopMcpProjectPageSourceUri('page01', 'jsx'),
-      })
+      ok: false,
+      code: 'assertion-failed',
+      message:
+        'apply_changes assertion failed: forbidImports found an import statement in page01 JSX. Arcade source must be import-free.',
+      manifestResourceUri: DESKTOP_MCP_PROJECT_MANIFEST_URI,
+      resourceUri: createDesktopMcpProjectPageSourceUri('page01', 'jsx'),
+    })
   })
 
   it('fails stale project revisions before applying anything', () => {
@@ -1082,7 +1083,11 @@ describe('desktopMcpApplyChanges', () => {
         ],
       },
       {
-        project: createProject({ includeSecondPage: true, startPageId: 'page02', activePageId: 'page02' }),
+        project: createProject({
+          includeSecondPage: true,
+          startPageId: 'page02',
+          activePageId: 'page02',
+        }),
         theme: 'dark',
         diagnostics: createDiagnostics(),
       },

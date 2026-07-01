@@ -334,6 +334,7 @@ Built with ❤️ using:
 - [CodeMirror](https://codemirror.net/) for the editor
 - [Babel](https://babeljs.io/) for JSX transpilation
 - [React](https://react.dev/) for the UI framework
+- [Agentation](https://github.com/benjitaylor/agentation) for the annotation schema and workflow reference
 
 ---
 

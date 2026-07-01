@@ -89,7 +89,8 @@ const Harness = () => {
             createWorkingCopyProject({
               name: 'Imported replacement project',
               jsxCode: 'export default function App() { return <div>Imported replacement</div> }',
-              hooksCode: 'export function useImportedReplacement() { return "Imported replacement" }',
+              hooksCode:
+                'export function useImportedReplacement() { return "Imported replacement" }',
               viewportSize: 'LG',
               panelLayout: 'editor-right',
             })
@@ -193,6 +194,7 @@ const createWorkingCopyProject = (
     hooksCode = '',
     source,
     activePageId = FIRST_PAGE_ID,
+    annotations = [],
     version = CURRENT_PROJECT_VERSION,
     ...projectOverrides
   } = overrides
@@ -202,6 +204,7 @@ const createWorkingCopyProject = (
     name: 'Working copy project',
     source: source ?? createSinglePageProjectSource(jsxCode, hooksCode),
     activePageId,
+    annotations,
     viewportSize: 'MD',
     panelLayout: 'editor-left',
     version,
@@ -564,13 +567,10 @@ describe('share decode integration', () => {
       'export default function App() { return <Heading>Shared fullscreen preview</Heading> }',
       'export function useSharedFullscreenPreview() { return "Shared Hooks" }'
     )
-    const envelope = await encodeSharePayload(
-      senderProject,
-      {
-        previewTheme: 'light',
-        openingIntent: { previewFullscreen: true },
-      }
-    )
+    const envelope = await encodeSharePayload(senderProject, {
+      previewTheme: 'light',
+      openingIntent: { previewFullscreen: true },
+    })
     const token = createShareToken(envelope)
     window.history.replaceState({}, '', `/?share=${encodeURIComponent(token)}`)
 
@@ -667,13 +667,10 @@ describe('share decode integration', () => {
       'export default function App() { return <Heading>Shared fullscreen preview</Heading> }',
       'export function useSharedFullscreenPreview() { return "Shared Hooks" }'
     )
-    const envelope = await encodeSharePayload(
-      senderProject,
-      {
-        previewTheme: 'light',
-        openingIntent: { previewFullscreen: true },
-      }
-    )
+    const envelope = await encodeSharePayload(senderProject, {
+      previewTheme: 'light',
+      openingIntent: { previewFullscreen: true },
+    })
     const token = createShareToken(envelope)
     window.history.replaceState({}, '', `/?share=${encodeURIComponent(token)}`)
 
@@ -716,7 +713,9 @@ describe('share decode integration', () => {
     expect(screen.getByTestId('project-active-page-id').textContent).toBe('page02')
     expect(screen.getByTestId('editor-active-tab').textContent).toBe('JSX')
     expect(screen.getByTestId('global-config-jsx').textContent).toContain('Shared chrome')
-    expect(screen.getByTestId('active-jsx-code').textContent).toContain('Portable shared start page')
+    expect(screen.getByTestId('active-jsx-code').textContent).toContain(
+      'Portable shared start page'
+    )
     expect(screen.getByTestId('active-hooks-code').textContent).toContain(
       'usePortableSharedStartPage'
     )
@@ -746,9 +745,9 @@ describe('share decode integration', () => {
       'Original tab working copy'
     )
     await waitFor(() => {
-      expect(within(originalTab.container).getByTestId('settings-multi-page-enabled').textContent).toBe(
-        'true'
-      )
+      expect(
+        within(originalTab.container).getByTestId('settings-multi-page-enabled').textContent
+      ).toBe('true')
       expect(within(originalTab.container).getByTestId('settings-theme').textContent).toBe('light')
       expect(within(originalTab.container).getByTestId('settings-panel-order').textContent).toBe(
         'preview-left'

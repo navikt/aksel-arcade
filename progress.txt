@@ -3996,3 +3996,41 @@ Verification:
 
 Next note:
 - Treat the in-app Agent-session bridge as intentionally removed. Follow-up work should extend the Desktop MCP resources/guides/tests directly instead of reintroducing renderer-to-main Agent transport helpers or parity coverage.
+
+
+2026-07-01 - Issue #315: Add annotation project data lifecycle
+
+Selected `#315` as the highest-priority `ready-for-agent` feature from `#315`-`#326` after reading parent PRD `#314`, `CONTEXT.md`, and ADRs `0020`, `0021`, `0023`, and `0024`. It is the unblocked annotation foundation, and the later human UI, package/share, MCP, target-resilience, and evidence-capture slices depend on it.
+
+Implemented:
+- Added an Agentation-compatible Arcade annotation schema with required `pageId`, lifecycle/status/thread fields, known `feedback` / `placement` / `rearrange` kinds, and no durable `_syncedTo` sync marker.
+- Added reusable annotation lifecycle helpers for creating pending feedback annotations, page filtering, open/pending counts, edit-to-pending behavior, hard delete, page-scoped clear, status updates, and thread-compatible replies.
+- Made `Project` own a top-level `annotations` collection, defaulted new/fresh imported projects to an empty set, and migrated stored current/legacy projects with missing annotations to `[]`.
+- Validated stored annotation records for known kinds/statuses, page ownership, UUIDs, timestamps, thread shape, and exclusion of local Agentation sync bookkeeping.
+- Deleted page-scoped annotations when deleting an Arcade page at the project-source service boundary.
+- Added Agentation acknowledgement to `README.md`.
+- Added focused unit coverage for annotation lifecycle behavior, storage validation/migration, non-feedback preservation, dead-target filtering inputs, page deletion cleanup, and README attribution.
+
+Verification:
+- `npm install`
+- `npm run typecheck`
+- `npm run lint`
+- `npm run test -- --run`
+- Browser smoke check at `http://127.0.0.1:5176/aksel-arcade/` with the app shell + preview rendered and no captured browser console/page errors.
+
+Next note:
+- `#316` can now build target resolution on top of `ArcadeAnnotation.pageId` plus the stored Agentation identity fields. Keep saved `x`/`y`/bounding boxes diagnostic-only; normal open/pending counts already accept dead-target filtering input.
+
+
+2026-07-01 - PR #329 review follow-up for Issue #315
+
+Fixed before merge:
+- Added the missing `annotations: []` test fixtures that CI build surfaced after making `Project.annotations` required.
+- Bumped `CURRENT_PROJECT_VERSION` to `3.0.0` for the annotation-aware project schema and added a v2 stored-project migration path that restores missing annotations to an empty set.
+- Extended annotation lifecycle filtering with explicit hidden/visible target filtering inputs while keeping hidden-but-resolved annotations included in default open/pending counts.
+
+Verification:
+- `npm run typecheck`
+- `npm run lint`
+- `npm run build`
+- `npm run test -- --run`

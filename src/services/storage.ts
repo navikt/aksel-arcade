@@ -1,3 +1,15 @@
+import type {
+  ArcadeAnnotation,
+  AnnotationKind,
+  AnnotationStatus,
+  AnnotationThreadMessage,
+} from '@/types/annotations'
+import {
+  cloneAnnotations,
+  createEmptyAnnotations,
+  isKnownAnnotationKind,
+  isKnownAnnotationStatus,
+} from '@/services/annotations'
 import {
   CURRENT_PROJECT_VERSION,
   type ArcadePage,
@@ -47,6 +59,188 @@ export interface SaveResult {
   error?: string
 }
 
+const parseProjectAnnotations = (
+  value: unknown,
+  pageIds: ReadonlySet<string>
+): ArcadeAnnotation[] => {
+  if (value === undefined) {
+    return createEmptyAnnotations()
+  }
+
+  if (!Array.isArray(value)) {
+    throw new Error('Invalid annotations field (must be array)')
+  }
+
+  return value.map((annotation, index) => parseProjectAnnotation(annotation, index, pageIds))
+}
+
+const parseProjectAnnotation = (
+  value: unknown,
+  index: number,
+  pageIds: ReadonlySet<string>
+): ArcadeAnnotation => {
+  if (!isRecord(value)) {
+    throw new Error(`Invalid annotation at index ${index}`)
+  }
+
+  assertNoLocalAnnotationSyncMarker(value, index)
+
+  if (typeof value.id !== 'string' || !isValidUUID(value.id)) {
+    throw new Error(`Invalid annotation id at index ${index}`)
+  }
+
+  if (!isArcadePageId(value.pageId) || !pageIds.has(value.pageId)) {
+    throw new Error(`Invalid annotation pageId at index ${index}`)
+  }
+
+  if (typeof value.x !== 'number' || !Number.isFinite(value.x)) {
+    throw new Error(`Invalid annotation x at index ${index}`)
+  }
+
+  if (typeof value.y !== 'number' || !Number.isFinite(value.y)) {
+    throw new Error(`Invalid annotation y at index ${index}`)
+  }
+
+  if (typeof value.comment !== 'string') {
+    throw new Error(`Invalid annotation comment at index ${index}`)
+  }
+
+  if (typeof value.element !== 'string') {
+    throw new Error(`Invalid annotation element at index ${index}`)
+  }
+
+  if (typeof value.elementPath !== 'string') {
+    throw new Error(`Invalid annotation elementPath at index ${index}`)
+  }
+
+  if (typeof value.timestamp !== 'number' || !Number.isFinite(value.timestamp)) {
+    throw new Error(`Invalid annotation timestamp at index ${index}`)
+  }
+
+  const kind = parseOptionalAnnotationKind(value.kind, index)
+  const status = parseOptionalAnnotationStatus(value.status, index)
+
+  if (
+    value.createdAt !== undefined &&
+    (typeof value.createdAt !== 'string' || !isValidISODate(value.createdAt))
+  ) {
+    throw new Error(`Invalid annotation createdAt at index ${index}`)
+  }
+
+  if (
+    value.updatedAt !== undefined &&
+    (typeof value.updatedAt !== 'string' || !isValidISODate(value.updatedAt))
+  ) {
+    throw new Error(`Invalid annotation updatedAt at index ${index}`)
+  }
+
+  if (
+    value.resolvedAt !== undefined &&
+    (typeof value.resolvedAt !== 'string' || !isValidISODate(value.resolvedAt))
+  ) {
+    throw new Error(`Invalid annotation resolvedAt at index ${index}`)
+  }
+
+  const thread = parseOptionalAnnotationThread(value.thread, index)
+  const annotation: ArcadeAnnotation = {
+    ...value,
+    pageId: value.pageId,
+    id: value.id,
+    x: value.x,
+    y: value.y,
+    comment: value.comment,
+    element: value.element,
+    elementPath: value.elementPath,
+    timestamp: value.timestamp,
+    ...(kind ? { kind } : {}),
+    ...(status ? { status } : {}),
+    ...(thread ? { thread } : {}),
+  } as ArcadeAnnotation
+
+  return cloneAnnotations([annotation])[0]
+}
+
+const assertNoLocalAnnotationSyncMarker = (value: Record<string, unknown>, index: number): void => {
+  if ('_syncedTo' in value) {
+    throw new Error(`Invalid annotation local sync marker at index ${index}`)
+  }
+}
+
+const parseOptionalAnnotationKind = (kind: unknown, index: number): AnnotationKind | undefined => {
+  if (kind === undefined) {
+    return undefined
+  }
+
+  if (!isKnownAnnotationKind(kind)) {
+    throw new Error(`Invalid annotation kind at index ${index}`)
+  }
+
+  return kind
+}
+
+const parseOptionalAnnotationStatus = (
+  status: unknown,
+  index: number
+): AnnotationStatus | undefined => {
+  if (status === undefined) {
+    return undefined
+  }
+
+  if (!isKnownAnnotationStatus(status)) {
+    throw new Error(`Invalid annotation status at index ${index}`)
+  }
+
+  return status
+}
+
+const parseOptionalAnnotationThread = (
+  thread: unknown,
+  annotationIndex: number
+): AnnotationThreadMessage[] | undefined => {
+  if (thread === undefined) {
+    return undefined
+  }
+
+  if (!Array.isArray(thread)) {
+    throw new Error(`Invalid annotation thread at index ${annotationIndex}`)
+  }
+
+  return thread.map((message, messageIndex) => {
+    if (!isRecord(message)) {
+      throw new Error(
+        `Invalid annotation thread message at index ${annotationIndex}.${messageIndex}`
+      )
+    }
+
+    if (typeof message.id !== 'string' || !isValidUUID(message.id)) {
+      throw new Error(`Invalid annotation thread id at index ${annotationIndex}.${messageIndex}`)
+    }
+
+    if (message.role !== 'human' && message.role !== 'agent') {
+      throw new Error(`Invalid annotation thread role at index ${annotationIndex}.${messageIndex}`)
+    }
+
+    if (typeof message.content !== 'string') {
+      throw new Error(
+        `Invalid annotation thread content at index ${annotationIndex}.${messageIndex}`
+      )
+    }
+
+    if (typeof message.timestamp !== 'number' || !Number.isFinite(message.timestamp)) {
+      throw new Error(
+        `Invalid annotation thread timestamp at index ${annotationIndex}.${messageIndex}`
+      )
+    }
+
+    return {
+      id: message.id,
+      role: message.role,
+      content: message.content,
+      timestamp: message.timestamp,
+    }
+  })
+}
+
 export interface WebArcadeWorkingCopyPreferences {
   theme: ThemeMode
   panelOrder: PanelOrder
@@ -56,8 +250,10 @@ export interface WebArcadeWorkingCopyPreferences {
   previewFullscreen: boolean
 }
 
-interface PersistedWebArcadeWorkingCopyPreferences
-  extends Omit<WebArcadeWorkingCopyPreferences, 'multiPageEnabled'> {
+interface PersistedWebArcadeWorkingCopyPreferences extends Omit<
+  WebArcadeWorkingCopyPreferences,
+  'multiPageEnabled'
+> {
   multiPageEnabled?: boolean
 }
 
@@ -93,6 +289,7 @@ export interface ExportProjectOptions {
 
 const LEGACY_SINGLE_PAGE_ARCADE_PROJECT_PACKAGE_FORMAT_VERSION = 2 as const
 const LEGACY_PORTABLE_ARCADE_PROJECT_PACKAGE_FORMAT_VERSION = 1 as const
+const LEGACY_PROJECT_VERSION_WITHOUT_ANNOTATIONS = '2.0.0' as const
 
 export interface PortableArcadeProjectData {
   name: string
@@ -405,6 +602,7 @@ export const buildFreshProjectFromPortableArcadeProjectData = (
     name: cleanProject.name,
     source: cloneProjectSource(cleanProject.source),
     activePageId: cleanProject.source.startPageId,
+    annotations: createEmptyAnnotations(),
     viewportSize: cleanProject.preview.viewport,
     panelLayout: createDefaultProject().panelLayout,
     createdAt: now,
@@ -439,7 +637,9 @@ const parseCleanArcadeProjectPackage = (payload: unknown): PortableArcadeProject
     case LEGACY_PORTABLE_ARCADE_PROJECT_PACKAGE_FORMAT_VERSION:
       return parseLegacyPortablePackageProject(payload.project)
     default:
-      throw new Error(`Unsupported Arcade project package version "${String(payload.formatVersion)}"`)
+      throw new Error(
+        `Unsupported Arcade project package version "${String(payload.formatVersion)}"`
+      )
   }
 }
 
@@ -505,7 +705,11 @@ const parseLegacyPortablePackageProject = (payload: unknown): PortableArcadeProj
     throw new Error('Legacy project package is missing portable project content')
   }
 
-  assertExactKeys(payload, ['version', 'id', 'name', 'createdAt', 'lastModified', 'code', 'ui'], 'legacy portable project')
+  assertExactKeys(
+    payload,
+    ['version', 'id', 'name', 'createdAt', 'lastModified', 'code', 'ui'],
+    'legacy portable project'
+  )
 
   if (typeof payload.version !== 'string') {
     throw new Error('Legacy project package version must be a string')
@@ -585,7 +789,10 @@ export const parsePortableArcadeProjectData = (
   }
 }
 
-const parsePortableProjectSource = (payload: unknown, label = 'project source'): PortableArcadeProjectData['source'] => {
+const parsePortableProjectSource = (
+  payload: unknown,
+  label = 'project source'
+): PortableArcadeProjectData['source'] => {
   if (!isRecord(payload)) {
     throw new Error(`${capitalizeLabel(label)} must be an object`)
   }
@@ -648,7 +855,10 @@ const parsePackagePage = (
   return {
     id: payload.id,
     name: payload.name,
-    source: parsePackageSourceFile(payload.source, `${capitalizeLabel(projectSourceLabel)} page "${payload.id}" source`),
+    source: parsePackageSourceFile(
+      payload.source,
+      `${capitalizeLabel(projectSourceLabel)} page "${payload.id}" source`
+    ),
   }
 }
 
@@ -717,8 +927,7 @@ const assertExactKeys = (
 
 const formatKeyList = (keys: string[]): string => keys.map((key) => `"${key}"`).join(', ')
 
-const capitalizeLabel = (label: string): string =>
-  label.charAt(0).toUpperCase() + label.slice(1)
+const capitalizeLabel = (label: string): string => label.charAt(0).toUpperCase() + label.slice(1)
 
 const formatCleanPackageRejection = (error: unknown): string => {
   const message = error instanceof Error ? error.message : String(error)
@@ -738,6 +947,7 @@ const copyProjectFields = (project: Project): Project => ({
   name: project.name,
   source: cloneProjectSource(project.source),
   activePageId: project.activePageId,
+  annotations: cloneAnnotations(project.annotations),
   viewportSize: project.viewportSize,
   panelLayout: project.panelLayout,
   createdAt: project.createdAt,
@@ -880,15 +1090,14 @@ const validateWorkingCopyPreferences = (preferences: unknown): WebArcadeWorkingC
   const legacyMultiPageEnabled =
     'multiPageEnabled' in preferences ? preferences.multiPageEnabled : undefined
 
-  if (
-    legacyMultiPageEnabled !== undefined &&
-    typeof legacyMultiPageEnabled !== 'boolean'
-  ) {
+  if (legacyMultiPageEnabled !== undefined && typeof legacyMultiPageEnabled !== 'boolean') {
     throw new Error('Invalid Web Arcade working copy multi-page preference')
   }
 
   const pagePanelOpen =
-    'pagePanelOpen' in preferences ? preferences.pagePanelOpen : DEFAULT_WEB_ARCADE_WORKING_COPY_PREFERENCES.pagePanelOpen
+    'pagePanelOpen' in preferences
+      ? preferences.pagePanelOpen
+      : DEFAULT_WEB_ARCADE_WORKING_COPY_PREFERENCES.pagePanelOpen
 
   if (typeof pagePanelOpen !== 'boolean') {
     throw new Error('Invalid Web Arcade working copy page panel preference')
@@ -1008,6 +1217,9 @@ const validateProjectSchema: (project: unknown) => asserts project is Project = 
     throw new Error('Invalid activePageId field')
   }
 
+  const annotations = parseProjectAnnotations(p.annotations, pageIds)
+  p.annotations = annotations
+
   if (!isViewportSize(p.viewportSize)) {
     throw new Error('Invalid viewportSize field')
   }
@@ -1033,6 +1245,16 @@ const migrateProject = (stored: unknown): Project => {
 
   if (version === '1.0.0') {
     return migrateLegacyProject(stored)
+  }
+
+  if (version === LEGACY_PROJECT_VERSION_WITHOUT_ANNOTATIONS) {
+    if (!isRecord(stored)) {
+      throw new Error('Legacy project must be an object')
+    }
+    return normalizeImportedProject({
+      ...stored,
+      version: CURRENT_PROJECT_VERSION,
+    })
   }
 
   if (version === CURRENT_PROJECT_VERSION) {
@@ -1084,7 +1306,11 @@ const migrateLegacyProject = (stored: unknown): Project => {
     throw new Error('Invalid legacy id field (must be UUID)')
   }
 
-  if (typeof stored.name !== 'string' || stored.name.trim().length === 0 || stored.name.length > 100) {
+  if (
+    typeof stored.name !== 'string' ||
+    stored.name.trim().length === 0 ||
+    stored.name.length > 100
+  ) {
     throw new Error('Invalid legacy name field (1-100 characters)')
   }
 
@@ -1120,6 +1346,7 @@ const migrateLegacyProject = (stored: unknown): Project => {
     name: stored.name,
     source: createSinglePageProjectSource(stored.jsxCode, stored.hooksCode),
     activePageId: FIRST_PAGE_ID,
+    annotations: createEmptyAnnotations(),
     viewportSize: stored.viewportSize,
     panelLayout: stored.panelLayout,
     createdAt: stored.createdAt,
