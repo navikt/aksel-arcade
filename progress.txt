@@ -4138,3 +4138,14 @@ Verification:
 - `npm test -- --run tests/integration/annotation-mode-header-shell.test.tsx`
 - `npm run test -- --run`
 - Browser measurement at `http://127.0.0.1:5177/aksel-arcade/`: `9` and `12` both measured with equal top/bottom text overflow (`verticalDelta: 0`) inside the 14px badge, with horizontal centering still within subpixel rounding.
+
+
+2026-07-01 - PR #331 annotation icon follow-up for Issue #317
+
+Fixed before merge:
+- Replaced the annotation toggle icon with the verified Aksel `ChatElipsisIcon`.
+
+Verification:
+- `npm run typecheck`
+- `npm run lint`
+- `npm test -- --run tests/integration/annotation-mode-header-shell.test.tsx`

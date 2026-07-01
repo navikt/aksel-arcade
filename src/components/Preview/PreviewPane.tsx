@@ -1,6 +1,6 @@
 import { useCallback, useContext, useEffect, useRef, useState } from 'react'
 import { Alert, BodyShort, Box, Button, Detail, VStack } from '@navikt/ds-react'
-import { ExpandIcon, NotePencilIcon, ShrinkIcon, TrashIcon } from '@navikt/aksel-icons'
+import { ChatElipsisIcon, ExpandIcon, ShrinkIcon, TrashIcon } from '@navikt/aksel-icons'
 import { SharePopoverButton } from '@/components/Share/SharePopoverButton'
 import { AppContext } from '@/hooks/useProject'
 import { countOpenAnnotationsByPage } from '@/services/annotations'
@@ -397,7 +397,7 @@ export const PreviewPane = ({
                   size="xsmall"
                   aria-label={annotationToggleLabel}
                   aria-pressed={isAnnotationMode}
-                  icon={<NotePencilIcon aria-hidden />}
+                  icon={<ChatElipsisIcon aria-hidden />}
                   onClick={handleAnnotationToggle}
                   className={
                     isAnnotationMode
