@@ -477,6 +477,9 @@ export const PreviewPane = ({
           previewPageId={project.activePageId}
           viewportWidth={project.viewportSize}
           isInspectMode={isInspectMode}
+          isAnnotationMode={isAnnotationMode}
+          annotations={project.annotations}
+          onAnnotationsChange={(annotations) => updateProject({ annotations })}
           theme={theme}
         />
 

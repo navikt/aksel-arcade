@@ -23,6 +23,7 @@ import {
   type ShareUrlOpeningIntent,
 } from '@/types/project'
 import type { EditorState } from '@/types/editor'
+import type { ArcadeAnnotation } from '@/types/annotations'
 import type { PreviewState, SandboxConsoleMessage } from '@/types/preview'
 import {
   createDefaultProject,
@@ -76,7 +77,10 @@ interface ShareHydrationState {
   error?: ShareDecodeError
 }
 
-type ProjectUpdate = Partial<Pick<Project, 'name' | 'viewportSize' | 'panelLayout' | 'activePageId'>> & {
+type ProjectUpdate = Partial<
+  Pick<Project, 'name' | 'viewportSize' | 'panelLayout' | 'activePageId'>
+> & {
+  annotations?: ArcadeAnnotation[]
   jsxCode?: string
   hooksCode?: string
   editTarget?: SelectedEditTarget
@@ -282,6 +286,10 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
       if (updates.activePageId !== undefined) {
         nextProject = setActivePage(nextProject, updates.activePageId)
+      }
+
+      if (updates.annotations !== undefined) {
+        nextProject = { ...nextProject, annotations: updates.annotations }
       }
 
       if (updates.jsxCode !== undefined || updates.hooksCode !== undefined) {

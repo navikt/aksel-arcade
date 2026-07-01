@@ -325,6 +325,11 @@
 
     // Inspection state (T077)
     let inspectEnabled = false;
+    let annotationModeEnabled = false;
+    let annotationHoverOverlay = null;
+    let annotationSelectionOverlay = null;
+    let lastAnnotationHoverSignature = null;
+    let lastAnnotationMoveTime = 0;
     let overlayElements = null;
     let lastInspectionData = null;
     let lastInspectionTime = 0;
@@ -570,6 +575,13 @@
             console.log('🔍 Toggling inspect mode...');
             toggleInspect(message.payload);
             break;
+          case 'TOGGLE_ANNOTATION_MODE':
+            console.log('💬 Toggling annotation mode...');
+            toggleAnnotationMode(message.payload);
+            break;
+          case 'CLEAR_ANNOTATION_SELECTION':
+            clearAnnotationSelectionOverlay();
+            break;
           case 'UPDATE_THEME':
             console.log('🎨 Updating theme...');
             updateTheme(message.payload);
@@ -735,6 +747,168 @@
         requestId,
         result,
       });
+    }
+
+    function toggleAnnotationMode(payload) {
+      if (!payload || typeof payload.enabled !== 'boolean') {
+        console.error('❌ Invalid payload for TOGGLE_ANNOTATION_MODE:', payload);
+        return;
+      }
+
+      annotationModeEnabled = payload.enabled;
+      if (annotationModeEnabled) {
+        if (inspectEnabled) {
+          toggleInspect({ enabled: false });
+        }
+        ensureAnnotationOverlayElements();
+        document.addEventListener('mousemove', handleAnnotationMouseMove, true);
+        document.addEventListener('click', handleAnnotationClick, true);
+        document.documentElement.classList.add('aksel-arcade-annotation-mode');
+      } else {
+        document.removeEventListener('mousemove', handleAnnotationMouseMove, true);
+        document.removeEventListener('click', handleAnnotationClick, true);
+        document.documentElement.classList.remove('aksel-arcade-annotation-mode');
+        clearAnnotationOverlays();
+        sendMessage('ANNOTATION_TARGET_HOVERED', null);
+      }
+    }
+
+    function ensureAnnotationOverlayElements() {
+      if (annotationHoverOverlay && annotationSelectionOverlay) {
+        return;
+      }
+
+      const styleId = 'aksel-arcade-annotation-overlay-styles';
+      if (!document.getElementById(styleId)) {
+        const style = document.createElement('style');
+        style.id = styleId;
+        style.textContent = `
+          html.aksel-arcade-annotation-mode,
+          html.aksel-arcade-annotation-mode * {
+            cursor: crosshair !important;
+          }
+
+          html.aksel-arcade-annotation-mode input,
+          html.aksel-arcade-annotation-mode textarea,
+          html.aksel-arcade-annotation-mode [contenteditable="true"] {
+            cursor: text !important;
+          }
+
+          .aksel-arcade-annotation-box {
+            position: fixed;
+            z-index: 2147483647;
+            display: none;
+            box-sizing: border-box;
+            border: 2px solid var(--ax-border-accent);
+            border-radius: var(--ax-radius-8);
+            background: var(--ax-bg-accent-softA);
+            pointer-events: none;
+            transition:
+              left 120ms ease,
+              top 120ms ease,
+              width 120ms ease,
+              height 120ms ease;
+          }
+
+          .aksel-arcade-annotation-box--selected {
+            border-width: 3px;
+            box-shadow: 0 0 0 2px var(--ax-bg-accent-softA);
+          }
+        `;
+        document.head.appendChild(style);
+      }
+
+      annotationHoverOverlay = document.createElement('div');
+      annotationHoverOverlay.className = 'aksel-arcade-annotation-box';
+      annotationSelectionOverlay = document.createElement('div');
+      annotationSelectionOverlay.className =
+        'aksel-arcade-annotation-box aksel-arcade-annotation-box--selected';
+      document.body.append(annotationHoverOverlay, annotationSelectionOverlay);
+    }
+
+    function handleAnnotationMouseMove(event) {
+      if (!annotationModeEnabled) {
+        return;
+      }
+
+      const now = Date.now();
+      if (now - lastAnnotationMoveTime < INSPECTION_THROTTLE_MS) {
+        return;
+      }
+      lastAnnotationMoveTime = now;
+
+      const target = resolveAnnotationPoint(event.clientX, event.clientY);
+      if (!target || target.status !== 'resolved' || !target.target) {
+        lastAnnotationHoverSignature = null;
+        hideAnnotationOverlay(annotationHoverOverlay);
+        sendMessage('ANNOTATION_TARGET_HOVERED', null);
+        return;
+      }
+
+      const signature = target.target.identity.signature;
+      renderAnnotationOverlay(annotationHoverOverlay, target.target);
+      if (signature !== lastAnnotationHoverSignature) {
+        lastAnnotationHoverSignature = signature;
+        sendMessage('ANNOTATION_TARGET_HOVERED', target);
+      }
+    }
+
+    function handleAnnotationClick(event) {
+      if (!annotationModeEnabled) {
+        return;
+      }
+
+      event.preventDefault();
+      event.stopPropagation();
+      event.stopImmediatePropagation?.();
+
+      const target = resolveAnnotationPoint(event.clientX, event.clientY);
+      if (!target || target.status !== 'resolved' || !target.target) {
+        return;
+      }
+
+      renderAnnotationOverlay(annotationSelectionOverlay, target.target);
+      sendMessage('ANNOTATION_TARGET_SELECTED', target);
+    }
+
+    function resolveAnnotationPoint(x, y) {
+      const root = document.querySelector(PREVIEW_EVIDENCE_ROOT_SELECTOR);
+      if (!root) {
+        return null;
+      }
+
+      return resolveAnnotationTarget(root, { mode: 'point', x, y }, window);
+    }
+
+    function renderAnnotationOverlay(overlay, target) {
+      ensureAnnotationOverlayElements();
+      const box = target?.snapshot?.boundingBox;
+      if (!overlay || !box) {
+        return;
+      }
+
+      const top = target.snapshot.isFixed ? box.y : box.y - window.scrollY;
+      overlay.style.display = 'block';
+      overlay.style.left = `${box.x}px`;
+      overlay.style.top = `${top}px`;
+      overlay.style.width = `${box.width}px`;
+      overlay.style.height = `${box.height}px`;
+    }
+
+    function hideAnnotationOverlay(overlay) {
+      if (overlay) {
+        overlay.style.display = 'none';
+      }
+    }
+
+    function clearAnnotationSelectionOverlay() {
+      hideAnnotationOverlay(annotationSelectionOverlay);
+    }
+
+    function clearAnnotationOverlays() {
+      hideAnnotationOverlay(annotationHoverOverlay);
+      hideAnnotationOverlay(annotationSelectionOverlay);
+      lastAnnotationHoverSignature = null;
     }
 
     // T077: Handle TOGGLE_INSPECT message

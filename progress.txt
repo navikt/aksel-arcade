@@ -4149,3 +4149,25 @@ Verification:
 - `npm run typecheck`
 - `npm run lint`
 - `npm test -- --run tests/integration/annotation-mode-header-shell.test.tsx`
+### 2026-07-01 - Issue #318: Single-element annotation creation
+
+Implemented:
+
+- Selected #318 as the highest-priority `ready-for-agent` feature from #318-#326 because it is the first complete human annotation path and later annotation management, persistence, geometry, evidence, and MCP slices depend on it.
+- Read issue #314, issue #318, `CONTEXT.md`, and ADRs 0021/0023/0024 before changing code.
+- Added Annotation mode host/sandbox messages for hover/selection, sandbox-side hover/selected target overlays, and preview-interaction click interception while Annotation mode is active.
+- Added the host add-annotation UI in `LivePreview` with Aksel `Popover`, `Textarea`, and buttons: target metadata/context, blank-submit disablement, Enter-to-save, Shift+Enter newline, Escape cancel, and project-backed `feedback` annotation creation.
+- Rendered page-scoped open annotation markers only while Annotation mode is on, with the badge updating from the persisted project annotations and markers reappearing when mode is re-enabled.
+- Extended project updates to persist annotation array changes and added integration coverage for the preview creation flow plus popover keyboard behavior.
+
+Verification:
+
+- npm install
+- npm run typecheck
+- npm run test -- --run
+- npm run lint
+- Browser/dev-server practical checks were attempted on `http://127.0.0.1:5177/aksel-arcade/`; this exposed and fixed a hidden-Popover anchor issue. Further Playwright iframe pointer checks were limited by sandbox/frame event tooling, so future work should manually re-check the full #318 Human verification checklist in a visible browser session, especially real pointer selection on an Aksel button/control and prototype navigation blocking.
+
+Next note:
+
+- #319 can build on the marker rendering and `editAnnotationComment`/`hardDeleteAnnotation` services, but should first confirm marker focus/tooltip/edit behavior against the visible browser because the current #318 slice only creates and displays markers.

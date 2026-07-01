@@ -30,3 +30,53 @@
   background: transparent;
   display: block;
 }
+
+.live-preview__annotation-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+}
+
+.live-preview__annotation-marker,
+.live-preview__annotation-add-anchor {
+  position: absolute;
+  transform: translate(-50%, -50%);
+}
+
+.live-preview__annotation-marker {
+  display: inline-grid;
+  width: 1.5rem;
+  height: 1.5rem;
+  place-items: center;
+  border: 2px solid var(--ax-border-accent);
+  border-radius: var(--ax-radius-full);
+  background: var(--ax-bg-accent-strong);
+  color: var(--ax-text-accent-contrast);
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1;
+  pointer-events: auto;
+}
+
+.live-preview__annotation-add-anchor {
+  width: 1px;
+  height: 1px;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  pointer-events: none;
+}
+
+.live-preview__annotation-popover {
+  z-index: 10;
+}
+
+.live-preview__annotation-popover-content {
+  max-width: min(22rem, calc(100vw - var(--ax-space-32)));
+}
+
+.live-preview__annotation-target-metadata,
+.live-preview__annotation-target-context {
+  overflow-wrap: anywhere;
+}
