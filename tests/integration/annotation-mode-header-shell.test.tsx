@@ -178,9 +178,9 @@ describe('Annotation mode preview-header shell', () => {
     expect(screen.queryByRole('button', { name: /clear all/i })).toBeNull()
   })
 
-  it('renders page-scoped zero, single-digit, and double-digit open annotation counts', () => {
+  it('hides zero counts and renders page-scoped single-digit and double-digit open annotation counts', () => {
     const { rerenderProject } = renderPreviewPane(createProjectWithAnnotations())
-    expect(screen.getByTestId('annotation-count-badge').textContent).toBe('0')
+    expect(screen.queryByTestId('annotation-count-badge')).toBeNull()
 
     const singleCountProject = createProjectWithAnnotations([annotation('annotation-1')])
     rerenderProject(singleCountProject)

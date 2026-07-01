@@ -101,4 +101,29 @@ describe('Annotation add popover', () => {
       }),
     ])
   })
+
+  it('does not crash when hover metadata arrives from a sandboxed iframe with inaccessible window state', async () => {
+    const { iframeRef } = renderLivePreview()
+    expect(iframeRef.current).toBeTruthy()
+
+    Object.defineProperty(iframeRef.current!, 'contentWindow', {
+      configurable: true,
+      value: Object.defineProperty({}, 'scrollY', {
+        get() {
+          throw new DOMException('Blocked a frame with origin from accessing a cross-origin frame.', 'SecurityError')
+        },
+      }),
+    })
+
+    postSandboxMessage(iframeRef.current!, {
+      type: 'ANNOTATION_TARGET_HOVERED',
+      payload: {
+        status: 'resolved',
+        target: selectedTarget,
+        matchCount: 1,
+      },
+    })
+
+    expect(screen.getByRole('button', { name: /selected annotation target/i })).toBeTruthy()
+  })
 })

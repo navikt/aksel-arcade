@@ -600,13 +600,11 @@ export const LivePreview = ({
   const getOverlayPosition = (target: ResolvedAnnotationTarget | ArcadeAnnotation) => {
     const isResolvedTarget = 'snapshot' in target
     const box = isResolvedTarget ? target.snapshot.boundingBox : target.boundingBox
-    const iframeWindow = iframeRef.current?.contentWindow
-    const scrollY = iframeWindow?.scrollY ?? 0
     const left =
       box && Number.isFinite(box.x) ? box.x + box.width : isResolvedTarget ? target.snapshot.x : target.x
     const top =
       box && Number.isFinite(box.y)
-        ? Math.max(0, box.y - scrollY)
+        ? Math.max(0, box.y)
         : isResolvedTarget
           ? target.snapshot.y
           : target.y
