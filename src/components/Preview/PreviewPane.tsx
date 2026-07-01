@@ -1,6 +1,6 @@
 import { useCallback, useContext, useEffect, useRef, useState } from 'react'
 import { Alert, BodyShort, Box, Button, Detail, VStack } from '@navikt/ds-react'
-import { ExpandIcon, NotePencilIcon, ShrinkIcon } from '@navikt/aksel-icons'
+import { ExpandIcon, NotePencilIcon, ShrinkIcon, TrashIcon } from '@navikt/aksel-icons'
 import { SharePopoverButton } from '@/components/Share/SharePopoverButton'
 import { AppContext } from '@/hooks/useProject'
 import { countOpenAnnotationsByPage } from '@/services/annotations'
@@ -337,6 +337,8 @@ export const PreviewPane = ({
   const annotationToggleLabel = isAnnotationMode
     ? `Exit annotation mode, ${activePageOpenAnnotationCount} open annotations on this page`
     : `Enter annotation mode, ${activePageOpenAnnotationCount} open annotations on this page`
+  const visibleAnnotationCount =
+    activePageOpenAnnotationCount > 99 ? '99+' : String(activePageOpenAnnotationCount)
 
   return (
     <Box
@@ -363,11 +365,12 @@ export const PreviewPane = ({
               ref={fullscreenToggleRef}
               variant="tertiary"
               data-color="neutral"
-              size="small"
+              size="xsmall"
               aria-label={fullscreenToggleLabel}
               aria-pressed={previewFullscreen}
               icon={previewFullscreen ? <ShrinkIcon aria-hidden /> : <ExpandIcon aria-hidden />}
               onClick={handlePreviewFullscreenToggle}
+              className="preview-pane__icon-button"
             />
           </div>
           <div
@@ -375,37 +378,41 @@ export const PreviewPane = ({
             data-testid="preview-header-controls-right"
           >
             <div className="preview-pane__annotation-controls">
-              <Button
-                type="button"
-                variant={isAnnotationMode ? 'secondary' : 'tertiary'}
-                data-color={isAnnotationMode ? 'accent' : 'neutral'}
-                size="small"
-                aria-label={annotationToggleLabel}
-                aria-pressed={isAnnotationMode}
-                icon={<NotePencilIcon aria-hidden />}
-                onClick={handleAnnotationToggle}
-                className="preview-pane__annotation-toggle"
-              >
-                <span className="preview-pane__annotation-button-label">Annotations</span>
+              {isAnnotationMode && (
+                <Button
+                  type="button"
+                  variant="tertiary"
+                  data-color="danger"
+                  size="xsmall"
+                  aria-label="Clear all annotations on this page"
+                  icon={<TrashIcon aria-hidden />}
+                  className="preview-pane__icon-button"
+                />
+              )}
+              <div className="preview-pane__annotation-toggle-wrapper">
+                <Button
+                  type="button"
+                  variant="tertiary"
+                  data-color="neutral"
+                  size="xsmall"
+                  aria-label={annotationToggleLabel}
+                  aria-pressed={isAnnotationMode}
+                  icon={<NotePencilIcon aria-hidden />}
+                  onClick={handleAnnotationToggle}
+                  className={
+                    isAnnotationMode
+                      ? 'preview-pane__icon-button preview-pane__annotation-toggle preview-pane__annotation-toggle--active'
+                      : 'preview-pane__icon-button preview-pane__annotation-toggle'
+                  }
+                />
                 <span
                   className="preview-pane__annotation-badge"
                   data-testid="annotation-count-badge"
                   aria-hidden="true"
                 >
-                  {activePageOpenAnnotationCount}
+                  {visibleAnnotationCount}
                 </span>
-              </Button>
-              {isAnnotationMode && (
-                <Button
-                  type="button"
-                  variant="tertiary"
-                  data-color="neutral"
-                  size="small"
-                  className="preview-pane__annotation-clear"
-                >
-                  Clear all
-                </Button>
-              )}
+              </div>
             </div>
             <InspectMode isInspectMode={isInspectMode} onInspectToggle={handleInspectToggle} />
             <div className="preview-pane__viewport-toggle">

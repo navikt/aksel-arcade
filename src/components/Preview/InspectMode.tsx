@@ -21,14 +21,14 @@ export const InspectMode = ({ isInspectMode, onInspectToggle }: InspectModeProps
     <Button
       variant={isInspectMode ? 'secondary' : 'tertiary'}
       data-color="neutral"
-      size="small"
+      size="xsmall"
       icon={
         <FileSearchIcon title={isInspectMode ? 'Disable inspect mode' : 'Enable inspect mode'} />
       }
       onClick={handleToggle}
       aria-label={isInspectMode ? 'Disable inspect mode' : 'Enable inspect mode'}
       aria-pressed={isInspectMode}
-      className="inspect-mode-button"
+      className="preview-pane__icon-button inspect-mode-button"
     />
   )
 }

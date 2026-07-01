@@ -41,7 +41,7 @@ const measurePreviewHeader = async (page: Page): Promise<HeaderLayoutMetrics> =>
 }
 
 const expectCompactLeftPreviewControl = (metrics: HeaderLayoutMetrics) => {
-  expect(metrics.leftControls.height).toBe(32)
+  expect(metrics.leftControls.height).toBe(24)
 }
 
 const expectRightAlignedPreviewControls = (metrics: HeaderLayoutMetrics) => {

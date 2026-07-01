@@ -47,8 +47,7 @@ const createProjectWithAnnotations = (annotations: ArcadeAnnotation[] = []): Pro
   annotations,
 })
 
-const renderPreviewPane = (project: Project = createProjectWithAnnotations()) => {
-  const contextValue = {
+const createContextValue = (project: Project) => ({
     project,
     editorState: createDefaultEditorState(),
     previewState: createDefaultPreviewState(project.viewportSize),
@@ -75,15 +74,27 @@ const renderPreviewPane = (project: Project = createProjectWithAnnotations()) =>
     shareHydration: { status: 'idle' as const },
     applySharedSnapshot: vi.fn(),
     dismissShareHydration: vi.fn(),
-  }
+})
 
-  return render(
+const renderPreviewPane = (project: Project = createProjectWithAnnotations()) => {
+  const renderResult = render(
     <SettingsProvider>
-      <AppContext.Provider value={contextValue}>
+      <AppContext.Provider value={createContextValue(project)}>
         <PreviewPane />
       </AppContext.Provider>
     </SettingsProvider>
   )
+
+  const rerenderProject = (nextProject: Project) =>
+    renderResult.rerender(
+      <SettingsProvider>
+        <AppContext.Provider value={createContextValue(nextProject)}>
+          <PreviewPane />
+        </AppContext.Provider>
+      </SettingsProvider>
+    )
+
+  return { ...renderResult, rerenderProject }
 }
 
 const getAnnotationToggle = () =>
@@ -109,11 +120,16 @@ describe('Annotation mode preview-header shell', () => {
     const annotationToggle = getAnnotationToggle()
     expect(annotationToggle.getAttribute('aria-pressed')).toBe('false')
     expect(screen.queryByRole('button', { name: /clear all/i })).toBeNull()
+    expect(screen.queryByText('Annotations')).toBeNull()
 
     await user.click(annotationToggle)
 
     expect(annotationToggle.getAttribute('aria-pressed')).toBe('true')
-    expect(screen.getByRole('button', { name: /clear all/i })).toBeTruthy()
+    const clearAllButton = screen.getByRole('button', { name: /clear all annotations/i })
+    expect(clearAllButton).toBeTruthy()
+    expect(
+      clearAllButton.compareDocumentPosition(annotationToggle) & Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy()
 
     fireEvent.keyDown(annotationToggle, { key: 'Escape' })
 
@@ -124,46 +140,11 @@ describe('Annotation mode preview-header shell', () => {
   })
 
   it('renders page-scoped zero, single-digit, and double-digit open annotation counts', () => {
-    const { rerender } = renderPreviewPane(createProjectWithAnnotations())
+    const { rerenderProject } = renderPreviewPane(createProjectWithAnnotations())
     expect(screen.getByTestId('annotation-count-badge').textContent).toBe('0')
 
     const singleCountProject = createProjectWithAnnotations([annotation('annotation-1')])
-    rerender(
-      <SettingsProvider>
-        <AppContext.Provider
-          value={{
-            project: singleCountProject,
-            editorState: createDefaultEditorState(),
-            previewState: createDefaultPreviewState(singleCountProject.viewportSize),
-            previewIframeRef: { current: null },
-            isComponentPaletteOpen: false,
-            isSettingsOpen: false,
-            updateProject: vi.fn(),
-            replaceProjectState: vi.fn(),
-            createPage: vi.fn(),
-            renamePage: vi.fn(),
-            deletePage: vi.fn(),
-            setStartPage: vi.fn(),
-            replaceProject: vi.fn(),
-            updateEditorState: vi.fn(),
-            updatePreviewState: vi.fn(),
-            recordSandboxConsoleMessage: vi.fn(),
-            toggleComponentPalette: vi.fn(),
-            closeComponentPalette: vi.fn(),
-            toggleSettings: vi.fn(),
-            insertSnippet: vi.fn(),
-            resetToIntro: vi.fn(),
-            loadFormSummaryTemplate: vi.fn(),
-            loadHooksDemo: vi.fn(),
-            shareHydration: { status: 'idle' },
-            applySharedSnapshot: vi.fn(),
-            dismissShareHydration: vi.fn(),
-          }}
-        >
-          <PreviewPane />
-        </AppContext.Provider>
-      </SettingsProvider>
-    )
+    rerenderProject(singleCountProject)
     expect(screen.getByTestId('annotation-count-badge').textContent).toBe('1')
 
     const doubleCountProject = createProjectWithAnnotations([
@@ -171,42 +152,7 @@ describe('Annotation mode preview-header shell', () => {
       annotation('other-page', 'page02'),
       annotation('resolved', 'page01', { status: 'resolved' }),
     ])
-    rerender(
-      <SettingsProvider>
-        <AppContext.Provider
-          value={{
-            project: doubleCountProject,
-            editorState: createDefaultEditorState(),
-            previewState: createDefaultPreviewState(doubleCountProject.viewportSize),
-            previewIframeRef: { current: null },
-            isComponentPaletteOpen: false,
-            isSettingsOpen: false,
-            updateProject: vi.fn(),
-            replaceProjectState: vi.fn(),
-            createPage: vi.fn(),
-            renamePage: vi.fn(),
-            deletePage: vi.fn(),
-            setStartPage: vi.fn(),
-            replaceProject: vi.fn(),
-            updateEditorState: vi.fn(),
-            updatePreviewState: vi.fn(),
-            recordSandboxConsoleMessage: vi.fn(),
-            toggleComponentPalette: vi.fn(),
-            closeComponentPalette: vi.fn(),
-            toggleSettings: vi.fn(),
-            insertSnippet: vi.fn(),
-            resetToIntro: vi.fn(),
-            loadFormSummaryTemplate: vi.fn(),
-            loadHooksDemo: vi.fn(),
-            shareHydration: { status: 'idle' },
-            applySharedSnapshot: vi.fn(),
-            dismissShareHydration: vi.fn(),
-          }}
-        >
-          <PreviewPane />
-        </AppContext.Provider>
-      </SettingsProvider>
-    )
+    rerenderProject(doubleCountProject)
     expect(screen.getByTestId('annotation-count-badge').textContent).toBe('12')
   })
 
@@ -228,5 +174,15 @@ describe('Annotation mode preview-header shell', () => {
     expect(inspectToggle.getAttribute('aria-pressed')).toBe('true')
     expect(annotationToggle.getAttribute('aria-pressed')).toBe('false')
     expect(screen.queryByRole('button', { name: /clear all/i })).toBeNull()
+  })
+
+  it('caps large badge counts to the Figma two-digit badge width', () => {
+    renderPreviewPane(
+      createProjectWithAnnotations(
+        Array.from({ length: 120 }, (_, index) => annotation(`annotation-${index}`))
+      )
+    )
+
+    expect(screen.getByTestId('annotation-count-badge').textContent).toBe('99+')
   })
 })

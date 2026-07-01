@@ -4095,3 +4095,19 @@ Verification:
 
 Next note:
 - `#318` can wire annotation creation to the existing Annotation mode shell. Keep `Clear all` destructive behavior out until `#322`.
+
+
+2026-07-01 - PR #331 design follow-up for Issue #317
+
+Fixed before merge:
+- Used the local Figma Dev Mode MCP for nodes `157:2724`, `157:2903`, `157:1726`, `157:1730`, and `157:3755` after the browser/Figma public fetch required login.
+- Corrected the preview-header controls to match Figma: 24px `xsmall` icon-only header buttons, Trash icon Clear all control before the active annotation toggle, 12px top-right annotation badge, `10px` Source Sans 3 badge text, `var(--ax-bg-accent-strong)` badge background, and `var(--ax-bg-neutral-moderate-pressedA)` active annotation state.
+- Aligned the fullscreen and Inspect header buttons to the same 24px row so the annotation controls sit in the Figma header layout instead of a mixed 24px/32px row.
+- Updated regression coverage for icon-only annotation controls, Clear all placement, capped large badge counts, and xsmall fullscreen/Inspect buttons.
+
+Verification:
+- `npm run typecheck`
+- `npm run lint`
+- `npm run test -- --run`
+- `npm run test:e2e -- preview-header-layout.spec.ts`
+- Browser verification at `http://127.0.0.1:5177/aksel-arcade/` measuring rendered controls: annotation, Clear all, Inspect, and fullscreen buttons are 24x24; badge is 12x12 at the annotation button top-right; Clear all appears before the active annotation button.
