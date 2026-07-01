@@ -155,6 +155,7 @@
     const {
       capturePreviewEvidenceSnapshot,
       PREVIEW_EVIDENCE_ROOT_SELECTOR,
+      resolveAnnotationTarget,
       runPreviewInteractionSequence,
     } = window.previewEvidenceUtils;
 
@@ -577,6 +578,10 @@
             console.log('📸 Capturing Preview evidence...');
             capturePreviewEvidence(message.payload);
             break;
+          case 'RESOLVE_ANNOTATION_TARGET':
+            console.log('📍 Resolving annotation target...');
+            resolveAnnotationTargetRequest(message.payload);
+            break;
           case 'CHECK_CSS_VARS':
             checkCSSVariables(message.id);
             break;
@@ -695,6 +700,34 @@
       };
 
       await captureWhenReady();
+    }
+
+    function resolveAnnotationTargetRequest(payload) {
+      const requestId = payload?.requestId;
+      const request = payload?.request;
+      if (typeof requestId !== 'string' || requestId.length === 0 || !request) {
+        console.warn('Invalid Annotation target request payload:', payload);
+        return;
+      }
+
+      const root = document.querySelector(PREVIEW_EVIDENCE_ROOT_SELECTOR);
+      if (!root) {
+        sendAnnotationTargetResult(requestId, {
+          status: 'dead',
+          reason: 'no-match',
+          matchCount: 0,
+        });
+        return;
+      }
+
+      sendAnnotationTargetResult(requestId, resolveAnnotationTarget(root, request, window));
+    }
+
+    function sendAnnotationTargetResult(requestId, result) {
+      sendMessage('ANNOTATION_TARGET_RESOLVED', {
+        requestId,
+        result,
+      });
     }
 
     function sendPreviewEvidenceResult(requestId, result) {

@@ -26,6 +26,7 @@ export const validateMainToSandboxMessage = (data: unknown): data is MainToSandb
     'GET_INSPECTION_DATA',
     'UPDATE_THEME',
     'CAPTURE_PREVIEW_EVIDENCE',
+    'RESOLVE_ANNOTATION_TARGET',
   ]
   return validTypes.includes((data as { type: string }).type)
 }
@@ -47,6 +48,7 @@ export const validateSandboxToMainMessage = (data: unknown): data is SandboxToMa
     'THEME_UPDATED',
     'CONSOLE_LOG',
     'PREVIEW_EVIDENCE_CAPTURED',
+    'ANNOTATION_TARGET_RESOLVED',
   ]
   return validTypes.includes((data as { type: string }).type)
 }

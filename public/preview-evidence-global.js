@@ -27,11 +27,685 @@ var previewEvidenceUtils = (() => {
     PREVIEW_EVIDENCE_ROOT_SELECTOR: () => PREVIEW_EVIDENCE_ROOT_SELECTOR,
     capturePreviewEvidenceSnapshot: () => capturePreviewEvidenceSnapshot,
     collectPreviewEvidenceFromFrame: () => collectPreviewEvidenceFromFrame,
+    getAnnotationTargetIdentity: () => getAnnotationTargetIdentity,
     registerPreviewEvidenceRequestHandler: () => registerPreviewEvidenceRequestHandler,
     requestPreviewEvidenceFromFrame: () => requestPreviewEvidenceFromFrame,
+    resolveAnnotationTarget: () => resolveAnnotationTarget,
+    resolveAnnotationTargetAtPoint: () => resolveAnnotationTargetAtPoint,
+    resolveAnnotationTargetGroup: () => resolveAnnotationTargetGroup,
+    resolveAnnotationTargetIdentity: () => resolveAnnotationTargetIdentity,
+    resolveAnnotationTargetsInRect: () => resolveAnnotationTargetsInRect,
     runPreviewInteractionSequence: () => runPreviewInteractionSequence,
     serializePreviewEvidence: () => serializePreviewEvidence
   });
+
+  // src/services/annotationTargets.ts
+  var MEANINGFUL_TAGS = /* @__PURE__ */ new Set([
+    "a",
+    "button",
+    "input",
+    "textarea",
+    "select",
+    "option",
+    "label",
+    "img",
+    "svg",
+    "p",
+    "blockquote",
+    "code",
+    "pre",
+    "li",
+    "td",
+    "th",
+    "summary",
+    "details",
+    "section",
+    "article",
+    "aside",
+    "nav",
+    "main",
+    "header",
+    "footer"
+  ]);
+  var MEANINGFUL_TARGET_SELECTOR = [
+    "button",
+    "a[href]",
+    "input",
+    "textarea",
+    "select",
+    "option",
+    "label",
+    "img",
+    "svg",
+    "p",
+    "blockquote",
+    "code",
+    "pre",
+    "li",
+    "td",
+    "th",
+    "summary",
+    "details",
+    "section",
+    "article",
+    "aside",
+    "nav",
+    "main",
+    "header",
+    "footer",
+    '[role]:not([role="none"]):not([role="presentation"])',
+    "[aria-label]",
+    "[aria-labelledby]",
+    '[tabindex]:not([tabindex="-1"])'
+  ].join(",");
+  var INTERACTIVE_TARGET_SELECTOR = [
+    "button",
+    "a[href]",
+    "input",
+    "textarea",
+    "select",
+    "option",
+    "label",
+    "summary",
+    '[role="button"]',
+    '[role="link"]',
+    '[role="checkbox"]',
+    '[role="radio"]',
+    '[role="switch"]',
+    '[role="tab"]',
+    '[role="menuitem"]',
+    "[onclick]"
+  ].join(",");
+  var MAX_TEXT_LENGTH = 500;
+  var resolveAnnotationTarget = (root, request, frameWindow = root.ownerDocument.defaultView ?? window) => {
+    switch (request.mode) {
+      case "point":
+        return resolveAnnotationTargetAtPoint(root, request, frameWindow);
+      case "rect":
+        return resolveAnnotationTargetsInRect(root, request.rect, frameWindow);
+      case "identity":
+        return resolveAnnotationTargetIdentity(root, request.identity, frameWindow);
+      case "group":
+        return resolveAnnotationTargetGroup(root, request.identities, frameWindow);
+    }
+  };
+  var resolveAnnotationTargetAtPoint = (root, request, frameWindow = root.ownerDocument.defaultView ?? window) => {
+    const selectionTarget = resolveSelectedTextTarget(root, request.selectedText, frameWindow);
+    if (selectionTarget) {
+      return createResolvedResult(root, selectionTarget.element, frameWindow, {
+        x: request.x,
+        y: request.y,
+        selectedText: selectionTarget.selectedText
+      });
+    }
+    const rawElement = deepElementFromPoint(root, request.x, request.y);
+    const element = rawElement ? normalizeAnnotationElement(root, rawElement, frameWindow) : null;
+    if (!element) {
+      return {
+        status: "no-target",
+        reason: "no-match",
+        matchCount: 0
+      };
+    }
+    return createResolvedResult(root, element, frameWindow, {
+      x: request.x,
+      y: request.y,
+      selectedText: request.selectedText
+    });
+  };
+  var resolveAnnotationTargetsInRect = (root, rect, frameWindow = root.ownerDocument.defaultView ?? window) => {
+    const normalizedRect = normalizeSelectionRect(rect);
+    if (!normalizedRect || normalizedRect.width === 0 || normalizedRect.height === 0) {
+      return {
+        status: "no-target",
+        reason: "empty-selection",
+        matchCount: 0
+      };
+    }
+    const matchingElements = filterContainedElements(
+      getMeaningfulCandidates(root, frameWindow).filter((element) => {
+        const elementRect = element.getBoundingClientRect();
+        return hasUsableGeometry(elementRect) && rectsIntersect(elementRect, normalizedRect) && !isPreviewChromeElement(element);
+      })
+    );
+    if (matchingElements.length === 0) {
+      return {
+        status: "no-target",
+        reason: "empty-selection",
+        matchCount: 0
+      };
+    }
+    if (matchingElements.length === 1) {
+      return createResolvedResult(root, matchingElements[0], frameWindow, {
+        x: normalizedRect.x + normalizedRect.width,
+        y: normalizedRect.y + normalizedRect.height
+      });
+    }
+    const targets = matchingElements.map(
+      (element) => createResolvedTarget(root, element, frameWindow, {
+        x: normalizedRect.x + normalizedRect.width,
+        y: normalizedRect.y + normalizedRect.height,
+        isMultiSelect: true
+      })
+    );
+    const visibleTargets = targets.filter((target) => target.visibility === "visible");
+    const boxes = visibleTargets.length > 0 ? visibleTargets.map((target) => target.snapshot.boundingBox) : [];
+    const unionBox = unionRects(boxes.filter((box) => Boolean(box)));
+    return {
+      status: visibleTargets.length > 0 ? "resolved" : "hidden",
+      target: {
+        ...targets[0],
+        snapshot: {
+          ...targets[0].snapshot,
+          element: matchingElements.slice(0, 5).map((element) => describeElement(element)).join(", "),
+          elementPath: targets.map((target) => target.identity.elementPath).join(" | "),
+          fullPath: targets.map((target) => target.identity.fullPath).join(" | "),
+          isMultiSelect: true,
+          ...unionBox ? { boundingBox: unionBox } : {},
+          elementBoundingBoxes: targets.map((target) => target.snapshot.boundingBox).filter((box) => Boolean(box))
+        }
+      },
+      targets,
+      matchCount: targets.length
+    };
+  };
+  var resolveAnnotationTargetIdentity = (root, identity, frameWindow = root.ownerDocument.defaultView ?? window) => {
+    const matches = getMeaningfulCandidates(root, frameWindow).filter(
+      (candidate) => getAnnotationTargetIdentity(root, candidate, frameWindow).signature === identity.signature
+    );
+    if (matches.length === 0) {
+      return {
+        status: "dead",
+        reason: "no-match",
+        matchCount: 0
+      };
+    }
+    if (matches.length > 1) {
+      return {
+        status: "dead",
+        reason: "ambiguous-match",
+        matchCount: matches.length
+      };
+    }
+    const pathMatch = queryFullPath(root, identity.fullPath);
+    const resolvedElement = pathMatch && matches[0] === pathMatch ? pathMatch : matches[0];
+    const target = createResolvedTarget(root, resolvedElement, frameWindow);
+    return {
+      status: target.visibility === "visible" ? "resolved" : "hidden",
+      target,
+      matchCount: 1
+    };
+  };
+  var resolveAnnotationTargetGroup = (root, identities, frameWindow = root.ownerDocument.defaultView ?? window) => {
+    if (identities.length === 0) {
+      return {
+        status: "no-target",
+        reason: "empty-selection",
+        matchCount: 0
+      };
+    }
+    const resolvedTargets = [];
+    for (const identity of identities) {
+      const result = resolveAnnotationTargetIdentity(root, identity, frameWindow);
+      if (!result.target || result.status !== "resolved" && result.status !== "hidden") {
+        return {
+          status: "dead",
+          reason: "partial-group",
+          matchCount: resolvedTargets.length
+        };
+      }
+      resolvedTargets.push(result.target);
+    }
+    const visibleTargets = resolvedTargets.filter((target) => target.visibility === "visible");
+    const boxes = visibleTargets.map((target) => target.snapshot.boundingBox).filter((box) => Boolean(box));
+    const unionBox = unionRects(boxes);
+    return {
+      status: visibleTargets.length > 0 ? "resolved" : "hidden",
+      targets: resolvedTargets,
+      target: {
+        ...resolvedTargets[0],
+        snapshot: {
+          ...resolvedTargets[0].snapshot,
+          element: resolvedTargets.map((target) => target.snapshot.element).join(", "),
+          elementPath: resolvedTargets.map((target) => target.identity.elementPath).join(" | "),
+          fullPath: resolvedTargets.map((target) => target.identity.fullPath).join(" | "),
+          isMultiSelect: true,
+          ...unionBox ? { boundingBox: unionBox } : {},
+          elementBoundingBoxes: boxes
+        }
+      },
+      matchCount: resolvedTargets.length
+    };
+  };
+  var getAnnotationTargetIdentity = (root, element, frameWindow = root.ownerDocument.defaultView ?? window) => {
+    const tagName = element.tagName.toLowerCase();
+    const role = getElementRole(element);
+    const accessibleName = getElementAccessibleName(element);
+    const text = getVisibleText(element);
+    const cssClasses = getElementClasses(element);
+    const elementPath = getReadableElementPath(root, element);
+    const fullPath = getFullElementPath(root, element);
+    const signature = stableStringify({
+      tagName,
+      role,
+      accessibleName: normalizeComparableText(accessibleName),
+      text: normalizeComparableText(text),
+      cssClasses: normalizeComparableText(cssClasses)
+    });
+    void frameWindow;
+    return {
+      signature,
+      tagName,
+      ...role ? { role } : {},
+      ...accessibleName ? { accessibleName } : {},
+      ...text ? { text: truncateText(text, MAX_TEXT_LENGTH) } : {},
+      ...cssClasses ? { cssClasses } : {},
+      elementPath,
+      fullPath
+    };
+  };
+  var createResolvedResult = (root, element, frameWindow, options = {}) => {
+    const target = createResolvedTarget(root, element, frameWindow, options);
+    return {
+      status: target.visibility === "visible" ? "resolved" : "hidden",
+      target,
+      matchCount: 1
+    };
+  };
+  var createResolvedTarget = (root, element, frameWindow, options = {}) => {
+    const identity = getAnnotationTargetIdentity(root, element, frameWindow);
+    const rect = element.getBoundingClientRect();
+    const isFixed = frameWindow.getComputedStyle(element).position === "fixed";
+    const pageX = typeof options.x === "number" ? options.x : rect.left + rect.width / 2;
+    const pageY = typeof options.y === "number" ? options.y : rect.top + rect.height / 2;
+    const snapshot = {
+      x: frameWindow.innerWidth > 0 ? pageX / frameWindow.innerWidth * 100 : pageX,
+      y: isFixed ? pageY : pageY + frameWindow.scrollY,
+      element: describeElement(element),
+      elementPath: identity.elementPath,
+      boundingBox: {
+        x: rect.left,
+        y: isFixed ? rect.top : rect.top + frameWindow.scrollY,
+        width: rect.width,
+        height: rect.height
+      },
+      nearbyText: getNearbyText(element),
+      cssClasses: identity.cssClasses,
+      computedStyles: getComputedStyleSummary(element, frameWindow),
+      fullPath: identity.fullPath,
+      accessibility: getAccessibilitySummary(element),
+      isFixed,
+      ...options.isMultiSelect ? { isMultiSelect: true } : {},
+      ...options.selectedText ? { selectedText: truncateText(options.selectedText, MAX_TEXT_LENGTH) } : {}
+    };
+    return {
+      identity,
+      snapshot,
+      visibility: isElementVisibleInViewport(element, frameWindow) ? "visible" : "hidden"
+    };
+  };
+  var deepElementFromPoint = (root, x, y) => {
+    if (typeof root.ownerDocument.elementFromPoint !== "function") {
+      return null;
+    }
+    let element = root.ownerDocument.elementFromPoint(x, y);
+    while (element?.shadowRoot) {
+      const nested = element.shadowRoot.elementFromPoint(x, y);
+      if (!nested || nested === element) {
+        break;
+      }
+      element = nested;
+    }
+    return element && root.contains(element) ? element : null;
+  };
+  var normalizeAnnotationElement = (root, element, frameWindow) => {
+    if (isExcludedElement(element) || isPreviewChromeElement(element)) {
+      return null;
+    }
+    const interactive = closestWithinRoot(element, root, INTERACTIVE_TARGET_SELECTOR);
+    if (interactive && isMeaningfulElement(interactive, frameWindow)) {
+      return interactive;
+    }
+    let current = element;
+    while (current && current !== root && current !== root.ownerDocument.body) {
+      if (isMeaningfulElement(current, frameWindow)) {
+        return current;
+      }
+      current = current.parentElement;
+    }
+    return isMeaningfulElement(root, frameWindow) ? root : null;
+  };
+  var getMeaningfulCandidates = (root, frameWindow) => [root, ...Array.from(root.querySelectorAll(MEANINGFUL_TARGET_SELECTOR))].filter((candidate) => root.contains(candidate)).map((candidate) => normalizeAnnotationElement(root, candidate, frameWindow)).filter((candidate) => Boolean(candidate)).filter((candidate, index, candidates) => candidates.indexOf(candidate) === index);
+  var filterContainedElements = (elements) => elements.filter(
+    (element) => !elements.some((otherElement) => otherElement !== element && element.contains(otherElement))
+  );
+  var isMeaningfulElement = (element, frameWindow) => {
+    if (isExcludedElement(element) || isPreviewChromeElement(element)) {
+      return false;
+    }
+    const tagName = element.tagName.toLowerCase();
+    if (tagName === "html" || tagName === "body") {
+      return false;
+    }
+    if (MEANINGFUL_TAGS.has(tagName) || /^h[1-6]$/.test(tagName)) {
+      return true;
+    }
+    if (element.hasAttribute("role") || element.hasAttribute("aria-label") || element.hasAttribute("aria-labelledby") || element.hasAttribute("tabindex")) {
+      return true;
+    }
+    const style = frameWindow.getComputedStyle(element);
+    const text = normalizeWhitespace(element.textContent ?? "");
+    return text.length > 0 && text.length <= 120 && style.display !== "contents" && element.children.length === 0;
+  };
+  var isPreviewChromeElement = (element) => Boolean(
+    element.closest(
+      "[data-annotation-marker], [data-annotation-popup], [data-feedback-toolbar], [data-inspect-overlay]"
+    )
+  );
+  var resolveSelectedTextTarget = (root, explicitSelectedText, frameWindow) => {
+    const selection = frameWindow.getSelection?.();
+    const selectedText = truncateText(
+      normalizeWhitespace(explicitSelectedText ?? selection?.toString() ?? ""),
+      MAX_TEXT_LENGTH
+    );
+    if (!selectedText || !selection || selection.rangeCount === 0) {
+      return null;
+    }
+    const range = selection.getRangeAt(0);
+    const commonAncestor = range.commonAncestorContainer.nodeType === Node.ELEMENT_NODE ? range.commonAncestorContainer : range.commonAncestorContainer.parentElement;
+    const element = commonAncestor ? normalizeAnnotationElement(root, commonAncestor, frameWindow) : null;
+    return element ? { element, selectedText } : null;
+  };
+  var queryFullPath = (root, fullPath) => {
+    if (!fullPath) {
+      return null;
+    }
+    try {
+      return fullPath === ":scope" ? root : root.querySelector(fullPath);
+    } catch {
+      return null;
+    }
+  };
+  var getReadableElementPath = (root, element, maxDepth = 4) => {
+    const parts = [];
+    let current = element;
+    let depth = 0;
+    while (current && current !== root && depth < maxDepth) {
+      parts.unshift(getReadableElementIdentifier(current));
+      current = current.parentElement;
+      depth += 1;
+    }
+    return parts.join(" > ") || getReadableElementIdentifier(element);
+  };
+  var getReadableElementIdentifier = (element) => {
+    const tagName = element.tagName.toLowerCase();
+    const name = getElementAccessibleName(element) || getVisibleText(element);
+    if (name) {
+      return `${tagName} "${truncateText(name, 35)}"`;
+    }
+    const classes = getMeaningfulClassNames(element).slice(0, 1);
+    return classes.length > 0 ? `${tagName}.${classes[0]}` : tagName;
+  };
+  var getFullElementPath = (root, element) => {
+    if (element === root) {
+      return ":scope";
+    }
+    const parts = [];
+    let current = element;
+    while (current && current !== root) {
+      const tagName = current.tagName.toLowerCase();
+      const siblings = current.parentElement ? Array.from(current.parentElement.children).filter(
+        (sibling) => sibling.tagName.toLowerCase() === tagName
+      ) : [];
+      const index = Math.max(1, siblings.indexOf(current) + 1);
+      parts.unshift(`${tagName}:nth-of-type(${index})`);
+      current = current.parentElement;
+    }
+    return parts.join(" > ");
+  };
+  var describeElement = (element) => {
+    const role = getElementRole(element);
+    const name = getElementAccessibleName(element) || getVisibleText(element);
+    if (role && name) {
+      return `${role} "${truncateText(name, 40)}"`;
+    }
+    if (name) {
+      return `${element.tagName.toLowerCase()} "${truncateText(name, 40)}"`;
+    }
+    return role || element.tagName.toLowerCase();
+  };
+  var getElementRole = (element) => {
+    const explicitRole = element.getAttribute("role")?.trim().toLowerCase();
+    if (explicitRole && explicitRole !== "presentation" && explicitRole !== "none") {
+      return explicitRole;
+    }
+    const tagName = element.tagName.toLowerCase();
+    if (tagName === "button") return "button";
+    if (tagName === "a" && element.hasAttribute("href")) return "link";
+    if (tagName === "textarea") return "textbox";
+    if (tagName === "select") return "combobox";
+    if (tagName === "option") return "option";
+    if (tagName === "img") return "img";
+    if (tagName === "summary") return "button";
+    if (/^h[1-6]$/.test(tagName)) return "heading";
+    if (tagName !== "input") return tagName;
+    const input = element;
+    switch (input.type) {
+      case "checkbox":
+        return "checkbox";
+      case "radio":
+        return "radio";
+      case "range":
+        return "slider";
+      case "button":
+      case "submit":
+      case "reset":
+        return "button";
+      default:
+        return "textbox";
+    }
+  };
+  var getElementAccessibleName = (element) => {
+    const ariaLabel = element.getAttribute("aria-label");
+    if (ariaLabel) {
+      return normalizeWhitespace(ariaLabel);
+    }
+    const labelledBy = element.getAttribute("aria-labelledby");
+    if (labelledBy) {
+      const text = labelledBy.split(/\s+/).map((id) => {
+        const referencedElement = element.ownerDocument.getElementById(id);
+        return referencedElement ? getVisibleText(referencedElement) : "";
+      }).join(" ");
+      if (text.trim()) {
+        return normalizeWhitespace(text);
+      }
+    }
+    if (element instanceof HTMLImageElement) {
+      return normalizeWhitespace(element.getAttribute("alt") ?? "");
+    }
+    if (element instanceof HTMLInputElement && element.type === "image") {
+      return normalizeWhitespace(element.getAttribute("alt") ?? "");
+    }
+    const labelText = getElementLabelText(element);
+    if (labelText) {
+      return labelText;
+    }
+    const title = element.getAttribute("title");
+    if (title) {
+      return normalizeWhitespace(title);
+    }
+    if (element instanceof HTMLInputElement && ["button", "submit", "reset"].includes(element.type)) {
+      return normalizeWhitespace(element.value);
+    }
+    if (elementUsesContentAsAccessibleName(element)) {
+      return getVisibleText(element);
+    }
+    return "";
+  };
+  var getElementLabelText = (element) => {
+    if (!(element instanceof HTMLElement)) {
+      return "";
+    }
+    if ("labels" in element && element.labels) {
+      const labels = Array.from(element.labels);
+      if (labels.length > 0) {
+        return normalizeWhitespace(labels.map((label) => getVisibleText(label)).join(" "));
+      }
+    }
+    if (element.id) {
+      const label = Array.from(element.ownerDocument.querySelectorAll("label[for]")).find(
+        (candidate) => candidate.getAttribute("for") === element.id
+      );
+      if (label) {
+        return getVisibleText(label);
+      }
+    }
+    const wrappingLabel = element.closest("label");
+    return wrappingLabel ? getVisibleText(wrappingLabel) : "";
+  };
+  var elementUsesContentAsAccessibleName = (element) => {
+    const role = element.getAttribute("role")?.trim().toLowerCase();
+    if (role) {
+      return [
+        "button",
+        "cell",
+        "checkbox",
+        "columnheader",
+        "gridcell",
+        "heading",
+        "link",
+        "menuitem",
+        "menuitemcheckbox",
+        "menuitemradio",
+        "option",
+        "radio",
+        "rowheader",
+        "switch",
+        "tab",
+        "treeitem"
+      ].includes(role);
+    }
+    const tagName = element.tagName.toLowerCase();
+    return /^h[1-6]$/.test(tagName) || ["button", "option", "summary"].includes(tagName);
+  };
+  var getVisibleText = (element) => normalizeWhitespace(getSanitizedSubtreeText(element));
+  var getSanitizedSubtreeText = (node) => {
+    if (node.nodeType === Node.TEXT_NODE) {
+      return node.textContent ?? "";
+    }
+    if (node.nodeType === Node.ELEMENT_NODE) {
+      const element = node;
+      if (isExcludedElement(element) || element.getAttribute("aria-hidden") === "true" || element.hasAttribute("hidden")) {
+        return "";
+      }
+    }
+    return Array.from(node.childNodes).map((child) => getSanitizedSubtreeText(child)).join(" ");
+  };
+  var getNearbyText = (element) => {
+    const texts = [
+      element.previousElementSibling ? getVisibleText(element.previousElementSibling) : "",
+      getVisibleText(element),
+      element.nextElementSibling ? getVisibleText(element.nextElementSibling) : ""
+    ].map((text) => truncateText(text, 80)).filter(Boolean);
+    return texts.join(" ");
+  };
+  var getElementClasses = (element) => {
+    const classes = getMeaningfulClassNames(element);
+    return classes.length > 0 ? classes.join(" ") : void 0;
+  };
+  var getMeaningfulClassNames = (element) => Array.from(element.classList ?? []).filter((className) => className.length > 1 && !/^[a-z]{1,2}$/.test(className)).slice(0, 12);
+  var getComputedStyleSummary = (element, frameWindow) => {
+    const style = frameWindow.getComputedStyle(element);
+    const entries = [
+      ["display", style.display],
+      ["position", style.position],
+      ["color", style.color],
+      ["backgroundColor", style.backgroundColor],
+      ["fontSize", style.fontSize],
+      ["fontWeight", style.fontWeight]
+    ].filter(([, value]) => value);
+    return entries.map(([key, value]) => `${key}: ${value}`).join("; ");
+  };
+  var getAccessibilitySummary = (element) => {
+    const role = getElementRole(element);
+    const name = getElementAccessibleName(element);
+    if (!role && !name) {
+      return void 0;
+    }
+    return [role ? `role=${role}` : null, name ? `name="${name}"` : null].filter(Boolean).join(" ");
+  };
+  var closestWithinRoot = (element, root, selector) => {
+    const closest = element.closest(selector);
+    return closest && root.contains(closest) ? closest : null;
+  };
+  var isExcludedElement = (element) => {
+    const tagName = element.tagName.toLowerCase();
+    return tagName === "script" || tagName === "style" || tagName === "template" || tagName === "noscript" || tagName === "html" || tagName === "body";
+  };
+  var isElementVisibleInViewport = (element, frameWindow) => {
+    const style = frameWindow.getComputedStyle(element);
+    if (style.display === "none" || style.visibility === "hidden" || style.visibility === "collapse") {
+      return false;
+    }
+    const rect = element.getBoundingClientRect();
+    return hasUsableGeometry(rect) && rect.right > 0 && rect.bottom > 0 && rect.left < frameWindow.innerWidth && rect.top < frameWindow.innerHeight;
+  };
+  var normalizeSelectionRect = (rect) => {
+    const left = Math.min(rect.x, rect.x + rect.width);
+    const top = Math.min(rect.y, rect.y + rect.height);
+    const width = Math.abs(rect.width);
+    const height = Math.abs(rect.height);
+    if (!Number.isFinite(left) || !Number.isFinite(top) || !Number.isFinite(width) || !Number.isFinite(height)) {
+      return null;
+    }
+    return {
+      x: left,
+      y: top,
+      width,
+      height
+    };
+  };
+  var rectsIntersect = (left, right) => left.left < right.x + right.width && left.right > right.x && left.top < right.y + right.height && left.bottom > right.y;
+  var hasUsableGeometry = (rect) => rect.width >= 1 && rect.height >= 1;
+  var unionRects = (rects) => {
+    if (rects.length === 0) {
+      return null;
+    }
+    const bounds = rects.reduce(
+      (acc, rect) => ({
+        left: Math.min(acc.left, rect.x),
+        top: Math.min(acc.top, rect.y),
+        right: Math.max(acc.right, rect.x + rect.width),
+        bottom: Math.max(acc.bottom, rect.y + rect.height)
+      }),
+      {
+        left: Infinity,
+        top: Infinity,
+        right: -Infinity,
+        bottom: -Infinity
+      }
+    );
+    return {
+      x: bounds.left,
+      y: bounds.top,
+      width: bounds.right - bounds.left,
+      height: bounds.bottom - bounds.top
+    };
+  };
+  var normalizeComparableText = (value) => normalizeWhitespace(value ?? "").toLowerCase();
+  var normalizeWhitespace = (value) => value.replace(/\s+/g, " ").trim();
+  var truncateText = (value, maxLength) => value.length > maxLength ? value.slice(0, maxLength) : value;
+  var stableStringify = (value) => JSON.stringify(
+    Object.keys(value).sort().reduce((acc, key) => {
+      const item = value[key];
+      if (item) {
+        acc[key] = item;
+      }
+      return acc;
+    }, {})
+  );
+
+  // src/services/previewEvidence.ts
   var PREVIEW_EVIDENCE_ROOT_SELECTOR = "#root";
   var MAX_PREVIEW_EVIDENCE_ELEMENTS = 200;
   var MAX_PREVIEW_INTERACTION_STEPS = 10;
@@ -256,7 +930,7 @@ var previewEvidenceUtils = (() => {
     };
   };
   var serializeElement = (element, frameWindow, state) => {
-    if (isExcludedElement(element)) {
+    if (isExcludedElement2(element)) {
       return null;
     }
     if (state.capturedElementCount >= MAX_PREVIEW_EVIDENCE_ELEMENTS) {
@@ -285,7 +959,7 @@ var previewEvidenceUtils = (() => {
     };
   };
   var serializeAccessibilityNodes = (element, frameWindow, state) => {
-    if (isExcludedElement(element) || isAccessibilityHidden(element, frameWindow) || state.truncated) {
+    if (isExcludedElement2(element) || isAccessibilityHidden(element, frameWindow) || state.truncated) {
       return [];
     }
     const node = createAccessibilityNode(element);
@@ -315,7 +989,7 @@ var previewEvidenceUtils = (() => {
   };
   var createAccessibilityNode = (element) => {
     const explicitlyNamed = hasExplicitAccessibleName(element);
-    const name = getElementAccessibleName(element);
+    const name = getElementAccessibleName2(element);
     const role = getElementAccessibilityRole(element, explicitlyNamed);
     const focusable = isElementFocusable(element);
     const level = getElementHeadingLevel(element);
@@ -331,7 +1005,7 @@ var previewEvidenceUtils = (() => {
       ...states ? { states } : {}
     };
   };
-  var isExcludedElement = (element) => {
+  var isExcludedElement2 = (element) => {
     const tagName = element.tagName.toLowerCase();
     return tagName === "script" || tagName === "style" || tagName === "template" || tagName === "noscript";
   };
@@ -464,7 +1138,7 @@ var previewEvidenceUtils = (() => {
     return bodyColor || documentElementColor || "transparent";
   };
   var cloneStyledElementTree = (element, frameWindow) => {
-    if (isExcludedElement(element)) {
+    if (isExcludedElement2(element)) {
       return null;
     }
     const clonedElement = element.cloneNode(false);
@@ -531,7 +1205,7 @@ var previewEvidenceUtils = (() => {
     }
     if (target.selector) {
       const element = queryPreviewTargetSelector(root, target.selector);
-      if (!element || isExcludedElement(element)) {
+      if (!element || isExcludedElement2(element)) {
         throw createTaggedPreviewCaptureError(
           "invalid-capture-target",
           "Preview region selector target did not match a preview element."
@@ -544,9 +1218,9 @@ var previewEvidenceUtils = (() => {
     }
     const candidates = [root, ...Array.from(root.querySelectorAll("*"))];
     const normalizedRole = target.role?.toLowerCase();
-    const normalizedName = normalizeComparableText(target.name);
-    const normalizedText = normalizeComparableText(target.text);
-    const normalizedLabel = normalizeComparableText(target.label);
+    const normalizedName = normalizeComparableText2(target.name);
+    const normalizedText = normalizeComparableText2(target.text);
+    const normalizedLabel = normalizeComparableText2(target.label);
     const matchingCandidates = candidates.filter(
       (candidate) => matchesPreviewCaptureTargetCandidate(candidate, {
         normalizedRole,
@@ -688,10 +1362,10 @@ var previewEvidenceUtils = (() => {
       return "renderIdle";
     }
     if (typeof step.text === "string") {
-      const normalizedText = normalizeComparableText(step.text);
+      const normalizedText = normalizeComparableText2(step.text);
       const startedAt2 = Date.now();
       while (Date.now() - startedAt2 < timeoutMs) {
-        if (normalizeComparableText(getElementVisibleText(root)).includes(normalizedText)) {
+        if (normalizeComparableText2(getElementVisibleText(root)).includes(normalizedText)) {
           return `text="${step.text}"`;
         }
         await waitForPreviewInteractionTick(frameWindow);
@@ -733,7 +1407,7 @@ var previewEvidenceUtils = (() => {
   var tryResolvePreviewInteractionTarget = (root, target, kind) => {
     if (target.selector) {
       const element = queryPreviewTargetSelector(root, target.selector);
-      if (!element || isExcludedElement(element)) {
+      if (!element || isExcludedElement2(element)) {
         return null;
       }
       return {
@@ -743,9 +1417,9 @@ var previewEvidenceUtils = (() => {
     }
     const candidates = [root, ...Array.from(root.querySelectorAll("*"))];
     const normalizedRole = target.role?.toLowerCase();
-    const normalizedName = normalizeComparableText(target.name);
-    const normalizedText = normalizeComparableText(target.text);
-    const normalizedLabel = normalizeComparableText(target.label);
+    const normalizedName = normalizeComparableText2(target.name);
+    const normalizedText = normalizeComparableText2(target.text);
+    const normalizedLabel = normalizeComparableText2(target.label);
     const matchingCandidates = candidates.filter(
       (candidate) => matchesPreviewCaptureTargetCandidate(candidate, {
         normalizedRole,
@@ -774,7 +1448,7 @@ var previewEvidenceUtils = (() => {
     if (element instanceof HTMLLabelElement) {
       score -= 20;
     }
-    const role = getElementRole(element);
+    const role = getElementRole2(element);
     if (role !== "generic") {
       score += 10;
     }
@@ -1058,19 +1732,19 @@ var previewEvidenceUtils = (() => {
     normalizedText,
     normalizedLabel
   }) => {
-    if (isExcludedElement(candidate)) {
+    if (isExcludedElement2(candidate)) {
       return false;
     }
-    if (normalizedRole && getElementRole(candidate) !== normalizedRole) {
+    if (normalizedRole && getElementRole2(candidate) !== normalizedRole) {
       return false;
     }
-    if (normalizedName && !normalizeComparableText(getElementAccessibleName(candidate)).includes(normalizedName)) {
+    if (normalizedName && !normalizeComparableText2(getElementAccessibleName2(candidate)).includes(normalizedName)) {
       return false;
     }
-    if (normalizedText && !normalizeComparableText(getElementVisibleText(candidate)).includes(normalizedText)) {
+    if (normalizedText && !normalizeComparableText2(getElementVisibleText(candidate)).includes(normalizedText)) {
       return false;
     }
-    if (normalizedLabel && !normalizeComparableText(getElementLabelText(candidate)).includes(normalizedLabel)) {
+    if (normalizedLabel && !normalizeComparableText2(getElementLabelText2(candidate)).includes(normalizedLabel)) {
       return false;
     }
     return true;
@@ -1093,7 +1767,7 @@ var previewEvidenceUtils = (() => {
     ].filter(Boolean);
     return parts.length > 0 ? `${parts.join("+")} target` : "target";
   };
-  var getElementRole = (element) => {
+  var getElementRole2 = (element) => {
     const explicitRole = element.getAttribute("role");
     if (explicitRole) {
       return explicitRole.toLowerCase();
@@ -1123,10 +1797,10 @@ var previewEvidenceUtils = (() => {
         return "textbox";
     }
   };
-  var getElementAccessibleName = (element) => {
+  var getElementAccessibleName2 = (element) => {
     const ariaLabel = element.getAttribute("aria-label");
     if (ariaLabel) {
-      return normalizeWhitespace(ariaLabel);
+      return normalizeWhitespace2(ariaLabel);
     }
     const labelledBy = element.getAttribute("aria-labelledby");
     if (labelledBy) {
@@ -1135,28 +1809,28 @@ var previewEvidenceUtils = (() => {
         return referencedElement ? getElementVisibleText(referencedElement) : "";
       }).join(" ");
       if (text.trim()) {
-        return normalizeWhitespace(text);
+        return normalizeWhitespace2(text);
       }
     }
     const altText = getElementAltText(element);
     if (altText) {
       return altText;
     }
-    const labelText = getElementLabelText(element);
+    const labelText = getElementLabelText2(element);
     if (labelText) {
       return labelText;
     }
     const title = element.getAttribute("title");
     if (title) {
-      return normalizeWhitespace(title);
+      return normalizeWhitespace2(title);
     }
     if (element instanceof HTMLInputElement && inputUsesValueAsAccessibleName(element) && element.value) {
-      return normalizeWhitespace(element.value);
+      return normalizeWhitespace2(element.value);
     }
-    return elementUsesContentAsAccessibleName(element) ? getElementVisibleText(element) : "";
+    return elementUsesContentAsAccessibleName2(element) ? getElementVisibleText(element) : "";
   };
-  var hasExplicitAccessibleName = (element) => element.hasAttribute("aria-label") || element.hasAttribute("aria-labelledby") || getElementAltText(element).length > 0 || element.hasAttribute("title") || getElementLabelText(element).length > 0 || element instanceof HTMLInputElement && inputUsesValueAsAccessibleName(element) && normalizeWhitespace(element.value).length > 0;
-  var getElementLabelText = (element) => {
+  var hasExplicitAccessibleName = (element) => element.hasAttribute("aria-label") || element.hasAttribute("aria-labelledby") || getElementAltText(element).length > 0 || element.hasAttribute("title") || getElementLabelText2(element).length > 0 || element instanceof HTMLInputElement && inputUsesValueAsAccessibleName(element) && normalizeWhitespace2(element.value).length > 0;
+  var getElementLabelText2 = (element) => {
     if (!(element instanceof HTMLElement)) {
       return "";
     }
@@ -1165,7 +1839,7 @@ var previewEvidenceUtils = (() => {
     }
     const labels = Array.from(element.labels ?? []);
     if (labels.length > 0) {
-      return normalizeWhitespace(labels.map((label) => getElementVisibleText(label)).join(" "));
+      return normalizeWhitespace2(labels.map((label) => getElementVisibleText(label)).join(" "));
     }
     if (element.id) {
       const label = Array.from(element.ownerDocument.querySelectorAll("label[for]")).find(
@@ -1178,30 +1852,30 @@ var previewEvidenceUtils = (() => {
     const wrappingLabel = element.closest("label");
     return wrappingLabel ? getElementVisibleText(wrappingLabel) : "";
   };
-  var getElementVisibleText = (element) => normalizeWhitespace(getSanitizedSubtreeText(element));
-  var getSanitizedSubtreeText = (node) => {
+  var getElementVisibleText = (element) => normalizeWhitespace2(getSanitizedSubtreeText2(element));
+  var getSanitizedSubtreeText2 = (node) => {
     if (node.nodeType === Node.TEXT_NODE) {
       return node.textContent ?? "";
     }
     if (node.nodeType === Node.ELEMENT_NODE) {
       const element = node;
-      if (isExcludedElement(element) || element.getAttribute("aria-hidden") === "true" || element.hasAttribute("hidden")) {
+      if (isExcludedElement2(element) || element.getAttribute("aria-hidden") === "true" || element.hasAttribute("hidden")) {
         return "";
       }
     }
-    return Array.from(node.childNodes).map((child) => getSanitizedSubtreeText(child)).join(" ");
+    return Array.from(node.childNodes).map((child) => getSanitizedSubtreeText2(child)).join(" ");
   };
   var getElementAltText = (element) => {
     if (element instanceof HTMLImageElement) {
-      return normalizeWhitespace(element.getAttribute("alt") ?? "");
+      return normalizeWhitespace2(element.getAttribute("alt") ?? "");
     }
     if (element instanceof HTMLInputElement && element.type === "image") {
-      return normalizeWhitespace(element.getAttribute("alt") ?? "");
+      return normalizeWhitespace2(element.getAttribute("alt") ?? "");
     }
     return "";
   };
   var inputUsesValueAsAccessibleName = (input) => input.type === "button" || input.type === "submit" || input.type === "reset";
-  var elementUsesContentAsAccessibleName = (element) => {
+  var elementUsesContentAsAccessibleName2 = (element) => {
     const explicitRole = element.getAttribute("role")?.trim().toLowerCase();
     if (explicitRole) {
       return explicitRole === "button" || explicitRole === "cell" || explicitRole === "checkbox" || explicitRole === "columnheader" || explicitRole === "gridcell" || explicitRole === "heading" || explicitRole === "link" || explicitRole === "menuitem" || explicitRole === "menuitemcheckbox" || explicitRole === "menuitemradio" || explicitRole === "option" || explicitRole === "radio" || explicitRole === "rowheader" || explicitRole === "switch" || explicitRole === "tab" || explicitRole === "tooltip" || explicitRole === "treeitem";
@@ -1215,7 +1889,7 @@ var previewEvidenceUtils = (() => {
     }
     return tagName === "a" && element.hasAttribute("href");
   };
-  var normalizeComparableText = (value) => normalizeWhitespace(value ?? "").toLowerCase();
+  var normalizeComparableText2 = (value) => normalizeWhitespace2(value ?? "").toLowerCase();
   var getElementAccessibilityRole = (element, explicitlyNamed) => {
     const explicitRole = element.getAttribute("role")?.trim().toLowerCase();
     if (explicitRole) {
@@ -1382,7 +2056,7 @@ var previewEvidenceUtils = (() => {
     const attributes = Array.from(element.attributes).filter((attribute) => isAllowedAttributeName(attribute.name)).sort((left, right) => left.name.localeCompare(right.name)).map((attribute) => [
       attribute.name,
       truncateEvidenceValue(
-        normalizeWhitespace(attribute.value),
+        normalizeWhitespace2(attribute.value),
         MAX_PREVIEW_EVIDENCE_ATTRIBUTE_LENGTH
       )
     ]);
@@ -1404,7 +2078,7 @@ var previewEvidenceUtils = (() => {
   };
   var getDirectTextContent = (element) => {
     const text = Array.from(element.childNodes).filter((node) => node.nodeType === Node.TEXT_NODE).map((node) => node.textContent ?? "").join(" ");
-    const normalizedText = normalizeWhitespace(text);
+    const normalizedText = normalizeWhitespace2(text);
     return normalizedText ? truncateEvidenceValue(normalizedText, MAX_PREVIEW_EVIDENCE_TEXT_LENGTH) : void 0;
   };
   var getBoundingBox = (element) => {
@@ -1465,7 +2139,7 @@ var previewEvidenceUtils = (() => {
   var removeEmptyStyleValues = (style) => Object.fromEntries(
     Object.entries(style).filter(([, value]) => Boolean(value))
   );
-  var normalizeWhitespace = (value) => value.replace(/\s+/g, " ").trim();
+  var normalizeWhitespace2 = (value) => value.replace(/\s+/g, " ").trim();
   var isAccessibilityHidden = (element, frameWindow) => {
     if (element.getAttribute("aria-hidden") === "true" || element.hasAttribute("hidden")) {
       return true;
@@ -1520,7 +2194,7 @@ var previewEvidenceUtils = (() => {
     }
   };
   var isTransparentColor = (value) => {
-    const normalized = normalizeComparableText(value);
+    const normalized = normalizeComparableText2(value);
     return normalized.length === 0 || normalized === "transparent" || /^rgba\(\s*\d+\s*,\s*\d+\s*,\s*\d+\s*,\s*0(?:\.0+)?\s*\)$/.test(normalized);
   };
   var truncateEvidenceValue = (value, maxLength) => value.length > maxLength ? `${value.slice(0, maxLength)}...` : value;

@@ -8,6 +8,10 @@ import type {
   PreviewEvidenceLayer,
   PreviewEvidenceScreenshotScope,
 } from '@/services/previewEvidence'
+import type {
+  AnnotationTargetResolutionRequest,
+  AnnotationTargetResolutionResult,
+} from '@/services/annotationTargets'
 
 // Main → Sandbox messages
 export type MainToSandboxMessage =
@@ -31,6 +35,13 @@ export type MainToSandboxMessage =
         expectedPageId?: ArcadePageId
       }
     }
+  | {
+      type: 'RESOLVE_ANNOTATION_TARGET'
+      payload: {
+        requestId: string
+        request: AnnotationTargetResolutionRequest
+      }
+    }
 
 // Sandbox → Main messages
 export type SandboxToMainMessage =
@@ -45,6 +56,10 @@ export type SandboxToMainMessage =
   | {
       type: 'PREVIEW_EVIDENCE_CAPTURED'
       payload: { requestId: string; result: PreviewEvidenceCaptureResult }
+    }
+  | {
+      type: 'ANNOTATION_TARGET_RESOLVED'
+      payload: { requestId: string; result: AnnotationTargetResolutionResult }
     }
 
 // Type guards
