@@ -4171,3 +4171,11 @@ Verification:
 Next note:
 
 - #319 can build on the marker rendering and `editAnnotationComment`/`hardDeleteAnnotation` services, but should first confirm marker focus/tooltip/edit behavior against the visible browser because the current #318 slice only creates and displays markers.
+
+2026-07-01 follow-up:
+
+- Fixed two #318 regressions found during review:
+  - The active-page annotation badge is now hidden when there are zero open annotations instead of showing `0`.
+  - Annotation hover no longer crashes the app; the root cause was a host-side read of `iframe.contentWindow.scrollY`, which throws for Arcade's sandboxed opaque-origin iframe during hover rendering.
+- Added regression coverage for the zero-badge state and for hover metadata from an iframe whose `contentWindow.scrollY` throws a `SecurityError`.
+- Re-ran the practical browser flow on a dedicated dev server at `http://127.0.0.1:5188/aksel-arcade/`: zero badge hidden, Annotation mode hover keeps the app visible with no console/page errors, add popover opens, blank Save is disabled, Enter saves after Shift+Enter newline, badge increments to `1`, marker hides when Annotation mode is off, and marker reappears when Annotation mode is turned back on.
