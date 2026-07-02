@@ -285,4 +285,41 @@ describe('Annotation mode preview-header shell', () => {
       annotations: [],
     })
   })
+
+  it('confirms and clears every annotation record on only the active page', async () => {
+    const user = userEvent.setup()
+    const activePending = annotation('active-pending', 'page01', { comment: 'Pending copy' })
+    const activeResolved = annotation('active-resolved', 'page01', {
+      comment: 'Resolved copy',
+      status: 'resolved',
+    })
+    const activePlacement = annotation('active-placement', 'page01', {
+      comment: 'Placement history',
+      kind: 'placement',
+    })
+    const otherPage = annotation('other-page', 'page02', { comment: 'Keep other page' })
+    const { contextValue } = renderPreviewPane(
+      createProjectWithAnnotations([activePending, activeResolved, activePlacement, otherPage])
+    )
+
+    await user.click(getAnnotationToggle())
+
+    const clearAllButton = screen.getByRole('button', { name: /clear all annotations/i })
+    expect(clearAllButton.getAttribute('disabled')).toBeNull()
+    await user.click(clearAllButton)
+
+    const dialog = await screen.findByRole('alertdialog', { name: /clear annotations/i })
+    expect(dialog.textContent).toContain('Page 1')
+    expect(dialog.textContent).toMatch(/3 annotation records/i)
+
+    await user.click(screen.getByRole('button', { name: /cancel/i }))
+    expect(contextValue.updateProject).not.toHaveBeenCalled()
+
+    await user.click(clearAllButton)
+    await user.click(await screen.findByRole('button', { name: /^clear annotations$/i }))
+
+    expect(contextValue.updateProject).toHaveBeenCalledWith({
+      annotations: [otherPage],
+    })
+  })
 })
