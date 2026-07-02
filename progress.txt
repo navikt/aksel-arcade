@@ -1,3 +1,16 @@
+### 2026-07-02 - PR #337 CI follow-up
+
+Implemented:
+
+- Fixed the PR-only TypeScript build failure in `tests/integration/annotation-mode-header-shell.test.tsx` by capturing the mocked resolved-count value before `queueMicrotask`, so the callback no longer closes over a `number | null` union that fails `tsc -b` in CI.
+
+Verification:
+
+- npm run type-check
+- npm run lint
+- npm test
+- npm run build
+
 ### 2026-07-02 - Issue #321 follow-up: saved annotation marker placement and frames
 
 Implemented:

@@ -28,8 +28,9 @@ vi.mock('@/components/Preview/LivePreview', () => ({
     previewPageId: ArcadePageId
   }) => {
     useEffect(() => {
-      if (mockResolvedOpenCount !== null) {
-        queueMicrotask(() => onActivePageOpenAnnotationCountChange?.(mockResolvedOpenCount))
+      const resolvedOpenCount = mockResolvedOpenCount
+      if (resolvedOpenCount !== null) {
+        queueMicrotask(() => onActivePageOpenAnnotationCountChange?.(resolvedOpenCount))
       }
     }, [onActivePageOpenAnnotationCountChange])
 
