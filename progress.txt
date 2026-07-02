@@ -4568,3 +4568,5 @@ Verification:
 - npm run type-check
 - npm run lint
 - CI=1 npm test -- --run
+
+- Implemented Desktop MCP annotation mutations/watch plumbing for issue #325: added `acknowledge_annotation`, `resolve_annotation`, `dismiss_annotation`, `reply_to_annotation`, and `watch_annotations` to the MCP server, bridged mutation handling through the Desktop renderer, and updated guidance text/tests.

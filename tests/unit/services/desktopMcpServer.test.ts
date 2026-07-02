@@ -22,9 +22,12 @@ const {
       port: number
       path: string
       readProjectResource: (request: { uri: string }) => ProjectResourceReadResult | Promise<ProjectResourceReadResult>
-      applyChanges: (
+    mutateAnnotation: (
         request: Record<string, unknown>
-      ) => ApplyChangesResult | Promise<ApplyChangesResult>
+    ) => AnnotationMutationResult | Promise<AnnotationMutationResult>
+    applyChanges: (
+      request: Record<string, unknown>
+    ) => ApplyChangesResult | Promise<ApplyChangesResult>
       capturePreviewEvidence: (
         request: Record<string, unknown>
       ) => CapturePreviewResult | Promise<CapturePreviewResult>
@@ -63,6 +66,25 @@ interface ProjectResourceReadFailure {
 }
 
 type ProjectResourceReadResult = ProjectResourceReadSuccess | ProjectResourceReadFailure
+
+interface AnnotationMutationSuccess {
+  ok: true
+  toolName: string
+  annotationId: string
+  pageId: string
+  message: string
+  annotation: Record<string, unknown>
+  annotations: Array<Record<string, unknown>>
+}
+
+interface AnnotationMutationFailure {
+  ok: false
+  code: 'project-unavailable' | 'annotation-not-found' | 'dead-target-annotation' | 'invalid-annotation-payload'
+  annotationId: string
+  message: string
+}
+
+type AnnotationMutationResult = AnnotationMutationSuccess | AnnotationMutationFailure
 
 interface ApplyChangesSuccess {
   ok: true
@@ -309,6 +331,36 @@ describe('desktopMcpServer', () => {
              },
            },
            {
+             name: 'watch_annotations',
+             inputSchema: {
+               additionalProperties: false,
+             },
+           },
+           {
+             name: 'acknowledge_annotation',
+             inputSchema: {
+               additionalProperties: false,
+             },
+           },
+           {
+             name: 'resolve_annotation',
+             inputSchema: {
+               additionalProperties: false,
+             },
+           },
+           {
+             name: 'dismiss_annotation',
+             inputSchema: {
+               additionalProperties: false,
+             },
+           },
+           {
+             name: 'reply_to_annotation',
+             inputSchema: {
+               additionalProperties: false,
+             },
+           },
+           {
              name: 'capture_preview_evidence',
              inputSchema: {
                additionalProperties: false,
@@ -356,6 +408,11 @@ describe('desktopMcpServer', () => {
     expect(toolsPayload.result.tools.map((tool: { name: string }) => tool.name)).toEqual([
       'read_resource',
       'list_annotations',
+      'watch_annotations',
+      'acknowledge_annotation',
+      'resolve_annotation',
+      'dismiss_annotation',
+      'reply_to_annotation',
       'capture_preview_evidence',
       'apply_changes',
     ])
@@ -1314,6 +1371,8 @@ describe('desktopMcpServer', () => {
     expect(operatingGuidePayload.result.contents[0].text).toContain(
       '`capture_preview_evidence({ pageId })` is the normal autonomous inspection path'
     )
+    expect(operatingGuidePayload.result.contents[0].text).toContain('watch_annotations')
+    expect(operatingGuidePayload.result.contents[0].text).toContain('acknowledge_annotation')
     expect(operatingGuidePayload.result.contents[0].text).toContain(
       'Start with `tools/list`, `resources/list`, and `resources/read`'
     )
@@ -1480,6 +1539,11 @@ describe('desktopMcpServer', () => {
       projectResourceReads: 'available when an active project reader is connected',
       toolExecution: {
         list_annotations: 'available when an active project reader is connected',
+        watch_annotations: 'available when an active project reader is connected',
+        acknowledge_annotation: 'available when an active project writer is connected',
+        resolve_annotation: 'available when an active project writer is connected',
+        dismiss_annotation: 'available when an active project writer is connected',
+        reply_to_annotation: 'available when an active project writer is connected',
         capture_preview_evidence:
           'available when an active preview capture bridge is connected',
         apply_changes: 'available when an active project writer is connected',
@@ -2166,6 +2230,181 @@ describe('desktopMcpServer', () => {
         code: -32602,
         message:
           'list_annotations status must be one of pending, acknowledged, resolved, dismissed, all.',
+      },
+    })
+  })
+
+  it('routes annotation mutation tools and watch_annotations through the active project bridge', async () => {
+    let pendingAnnotations = [
+      {
+        id: 'ann-1',
+        status: 'pending',
+        comment: 'Pending note',
+      },
+    ]
+    const readProjectResource = vi.fn(async ({ uri }: { uri: string }): Promise<ProjectResourceReadResult> => {
+      switch (uri) {
+        case 'arcade://project/manifest':
+          return {
+            ok: true,
+            uri,
+            mimeType: 'application/json',
+            text: JSON.stringify({
+              activePageId: 'page01',
+              pages: [{ id: 'page01', name: 'Overview' }],
+            }),
+          }
+        case 'arcade://project/pages/page01/annotations':
+          return {
+            ok: true,
+            uri,
+            mimeType: 'application/json',
+            text: JSON.stringify({
+              page: { id: 'page01', name: 'Overview' },
+              counts: {
+                open: pendingAnnotations.length,
+                pending: pendingAnnotations.length,
+                acknowledged: 0,
+                resolved: 0,
+                dismissed: 0,
+              },
+              annotations: pendingAnnotations,
+            }),
+          }
+        default:
+          return {
+            ok: false,
+            code: 'source-not-found',
+            resourceUri: uri,
+            message: `Missing ${uri}`,
+          }
+      }
+    })
+    const mutateAnnotation = vi.fn(async (request: Record<string, unknown>): Promise<AnnotationMutationResult> => ({
+      ok: true,
+      toolName: String(request.toolName),
+      annotationId: String(request.annotationId),
+      pageId: 'page01',
+      message: `Handled ${String(request.toolName)}`,
+      annotation: { id: 'ann-1', status: 'acknowledged' },
+      annotations: [{ id: 'ann-1', status: 'acknowledged' }],
+    }))
+    const server = createManagedServer({ port: 0, readProjectResource, mutateAnnotation })
+    const state = await server.start()
+
+    const acknowledgeResponse = await postJson(state.url, {
+      jsonrpc: '2.0',
+      id: 20,
+      method: 'tools/call',
+      params: {
+        name: 'acknowledge_annotation',
+        arguments: {
+          annotationId: 'ann-1',
+        },
+      },
+    })
+    expect(acknowledgeResponse.status).toBe(200)
+    await expect(acknowledgeResponse.json()).resolves.toMatchObject({
+      jsonrpc: '2.0',
+      id: 20,
+      result: {
+        structuredContent: {
+          toolName: 'acknowledge_annotation',
+        },
+      },
+    })
+    expect(mutateAnnotation).toHaveBeenCalledWith({
+      toolName: 'acknowledge_annotation',
+      annotationId: 'ann-1',
+    })
+
+    for (const [toolName, argumentsPayload] of [
+      ['resolve_annotation', { annotationId: 'ann-1', summary: 'Done' }],
+      ['dismiss_annotation', { annotationId: 'ann-1', reason: 'Not needed' }],
+      ['reply_to_annotation', { annotationId: 'ann-1', message: 'Thanks' }],
+    ] as const) {
+      const response = await postJson(state.url, {
+        jsonrpc: '2.0',
+        id: toolName,
+        method: 'tools/call',
+        params: {
+          name: toolName,
+          arguments: argumentsPayload,
+        },
+      })
+      expect(response.status).toBe(200)
+      const payload = await response.json()
+      expect(payload.result.structuredContent.toolName).toBe(toolName)
+      expect(mutateAnnotation).toHaveBeenCalledWith({
+        toolName,
+        ...argumentsPayload,
+      })
+    }
+
+    const watchImmediateResponse = await postJson(state.url, {
+      jsonrpc: '2.0',
+      id: 21,
+      method: 'tools/call',
+      params: {
+        name: 'watch_annotations',
+        arguments: {
+          scope: 'page',
+          waitTimeoutSeconds: 1,
+          batchWindowSeconds: 1,
+        },
+      },
+    })
+    expect(watchImmediateResponse.status).toBe(200)
+    await expect(watchImmediateResponse.json()).resolves.toMatchObject({
+      jsonrpc: '2.0',
+      id: 21,
+      result: {
+        structuredContent: {
+          ok: true,
+          scope: 'page',
+          status: 'pending',
+          timedOut: false,
+          annotations: [{ id: 'ann-1', status: 'pending', comment: 'Pending note' }],
+        },
+      },
+    })
+
+    pendingAnnotations = []
+    setTimeout(() => {
+      pendingAnnotations = [
+        {
+          id: 'ann-2',
+          status: 'pending',
+          comment: 'Arrived later',
+        },
+      ]
+    }, 250)
+
+    const watchDelayedResponse = await postJson(state.url, {
+      jsonrpc: '2.0',
+      id: 22,
+      method: 'tools/call',
+      params: {
+        name: 'watch_annotations',
+        arguments: {
+          scope: 'page',
+          waitTimeoutSeconds: 2,
+          batchWindowSeconds: 1,
+        },
+      },
+    })
+    expect(watchDelayedResponse.status).toBe(200)
+    await expect(watchDelayedResponse.json()).resolves.toMatchObject({
+      jsonrpc: '2.0',
+      id: 22,
+      result: {
+        structuredContent: {
+          ok: true,
+          scope: 'page',
+          status: 'pending',
+          timedOut: false,
+          annotations: [{ id: 'ann-2', status: 'pending', comment: 'Arrived later' }],
+        },
       },
     })
   })

@@ -1,7 +1,17 @@
 import type { ArcadeAnnotation } from '@/types/annotations'
 import type { ArcadePageId, ThemeMode } from '@/types/project'
 import type { MainToSandboxMessage, SandboxToMainMessage } from '@/types/messages'
+import type { Project } from '@/types/project'
 import { buildAnnotationTargetResolutionRequest } from './annotationTargetRequests'
+import {
+  appendAnnotationThreadMessage,
+  setAnnotationStatus,
+  type AnnotationAuthorRole,
+} from './annotations'
+import type {
+  DesktopMcpAnnotationMutationRequest,
+  DesktopMcpAnnotationMutationResult,
+} from './desktopMcpAnnotationProtocol'
 
 const SANDBOX_IFRAME_SRC =
   import.meta.env.MODE === 'test' ? 'about:blank' : `${import.meta.env.BASE_URL}sandbox.html`
@@ -10,6 +20,10 @@ const RESOLUTION_SETTLE_DELAY_MS = 32
 const RESOLUTION_TIMEOUT_MS = 20_000
 
 export type DesktopMcpAnnotationVisibility = 'visible' | 'hidden' | 'dead'
+
+export type DesktopMcpAnnotationMutationHandler = (
+  request: DesktopMcpAnnotationMutationRequest
+) => DesktopMcpAnnotationMutationResult | Promise<DesktopMcpAnnotationMutationResult>
 
 interface ResolveDesktopMcpAnnotationVisibilitiesOptions {
   annotations: readonly ArcadeAnnotation[]
@@ -232,3 +246,156 @@ const normalizeResolutionVisibility = (
       return 'dead'
   }
 }
+
+interface DesktopMcpAnnotationMutationOptions {
+  isDeadTarget?: (annotation: ArcadeAnnotation) => boolean
+  now?: number
+  nowIso?: string
+}
+
+export const mutateDesktopMcpAnnotation = (
+  project: Project,
+  request: DesktopMcpAnnotationMutationRequest,
+  options: DesktopMcpAnnotationMutationOptions = {}
+): DesktopMcpAnnotationMutationResult => {
+  const annotation = project.annotations.find((item) => item.id === request.annotationId)
+  if (!annotation) {
+    return {
+      ok: false,
+      code: 'annotation-not-found',
+      annotationId: request.annotationId,
+      message: `Desktop MCP annotation "${request.annotationId}" was not found.`,
+    }
+  }
+
+  if (options.isDeadTarget?.(annotation)) {
+    return {
+      ok: false,
+      code: 'dead-target-annotation',
+      annotationId: request.annotationId,
+      message: `Desktop MCP annotation "${request.annotationId}" cannot be changed because its target is dead.`,
+    }
+  }
+
+  const now = options.now ?? Date.now()
+  const nowIso = options.nowIso ?? new Date(now).toISOString()
+  const resolvedBy: AnnotationAuthorRole = 'agent'
+
+  switch (request.toolName) {
+    case 'acknowledge_annotation': {
+      const annotations = setAnnotationStatus(project.annotations, annotation.id, 'acknowledged', {
+        nowIso,
+      })
+      return {
+        ok: true,
+        toolName: request.toolName,
+        annotationId: annotation.id,
+        pageId: annotation.pageId,
+        message: `Acknowledged annotation ${annotation.id}.`,
+        annotation: findAnnotation(annotations, annotation.id) ?? annotation,
+        annotations,
+      }
+    }
+    case 'reply_to_annotation': {
+      const message = request.message.trim()
+      if (!message) {
+        return {
+          ok: false,
+          code: 'invalid-annotation-payload',
+          annotationId: annotation.id,
+          message: 'reply_to_annotation message must be a non-empty string.',
+        }
+      }
+
+      const annotations = appendAnnotationThreadMessage(
+        project.annotations,
+        annotation.id,
+        {
+          id: undefined,
+          role: resolvedBy,
+          content: message,
+          timestamp: now,
+        },
+        { nowIso }
+      )
+      return {
+        ok: true,
+        toolName: request.toolName,
+        annotationId: annotation.id,
+        pageId: annotation.pageId,
+        message: `Replied to annotation ${annotation.id}.`,
+        annotation: findAnnotation(annotations, annotation.id) ?? annotation,
+        annotations,
+      }
+    }
+    case 'resolve_annotation': {
+      const annotationsWithReply =
+        request.summary && request.summary.trim().length > 0
+          ? appendAnnotationThreadMessage(
+              project.annotations,
+              annotation.id,
+              {
+                id: undefined,
+                role: resolvedBy,
+                content: request.summary.trim(),
+                timestamp: now,
+              },
+              { nowIso }
+            )
+          : project.annotations.map((item) => ({ ...item }))
+
+      const annotations = setAnnotationStatus(annotationsWithReply, annotation.id, 'resolved', {
+        nowIso,
+        resolvedBy,
+      })
+      return {
+        ok: true,
+        toolName: request.toolName,
+        annotationId: annotation.id,
+        pageId: annotation.pageId,
+        message: `Resolved annotation ${annotation.id}.`,
+        annotation: findAnnotation(annotations, annotation.id) ?? annotation,
+        annotations,
+      }
+    }
+    case 'dismiss_annotation': {
+      const reason = request.reason.trim()
+      if (!reason) {
+        return {
+          ok: false,
+          code: 'invalid-annotation-payload',
+          annotationId: annotation.id,
+          message: 'dismiss_annotation reason must be a non-empty string.',
+        }
+      }
+
+      const annotationsWithReason = appendAnnotationThreadMessage(
+        project.annotations,
+        annotation.id,
+        {
+          id: undefined,
+          role: resolvedBy,
+          content: reason,
+          timestamp: now,
+        },
+        { nowIso }
+      )
+      const annotations = setAnnotationStatus(annotationsWithReason, annotation.id, 'dismissed', {
+        nowIso,
+        resolvedBy,
+      })
+      return {
+        ok: true,
+        toolName: request.toolName,
+        annotationId: annotation.id,
+        pageId: annotation.pageId,
+        message: `Dismissed annotation ${annotation.id}.`,
+        annotation: findAnnotation(annotations, annotation.id) ?? annotation,
+        annotations,
+      }
+    }
+  }
+}
+
+const findAnnotation = (annotations: readonly ArcadeAnnotation[], annotationId: string) =>
+  annotations.find((annotation) => annotation.id === annotationId)

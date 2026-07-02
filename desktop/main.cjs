@@ -9,6 +9,10 @@ const ROUTE_DESKTOP_MCP_PROJECT_RESOURCE_REQUEST_CHANNEL =
   'aksel-arcade:route-desktop-mcp-project-resource-request'
 const ROUTE_DESKTOP_MCP_PROJECT_RESOURCE_RESPONSE_CHANNEL =
   'aksel-arcade:route-desktop-mcp-project-resource-response'
+const ROUTE_DESKTOP_MCP_ANNOTATION_MUTATION_REQUEST_CHANNEL =
+  'aksel-arcade:route-desktop-mcp-annotation-mutation-request'
+const ROUTE_DESKTOP_MCP_ANNOTATION_MUTATION_RESPONSE_CHANNEL =
+  'aksel-arcade:route-desktop-mcp-annotation-mutation-response'
 const ROUTE_DESKTOP_MCP_APPLY_CHANGES_REQUEST_CHANNEL =
   'aksel-arcade:route-desktop-mcp-apply-changes-request'
 const ROUTE_DESKTOP_MCP_APPLY_CHANGES_RESPONSE_CHANNEL =
@@ -24,16 +28,20 @@ const DESKTOP_RENDERER_HOST = 'app'
 const DESKTOP_RENDERER_ORIGIN = `${DESKTOP_RENDERER_PROTOCOL}://${DESKTOP_RENDERER_HOST}`
 const DESKTOP_RENDERER_URL = `${DESKTOP_RENDERER_ORIGIN}/index.html`
 const DESKTOP_MCP_PROJECT_RESOURCE_ROUTE_TIMEOUT_MS = 5000
+const DESKTOP_MCP_ANNOTATION_MUTATION_ROUTE_TIMEOUT_MS = 5000
 const DESKTOP_MCP_APPLY_CHANGES_ROUTE_TIMEOUT_MS = 5000
 const DESKTOP_MCP_PREVIEW_CAPTURE_ROUTE_TIMEOUT_MS = 30000
 const desktopMcpServer = createDesktopMcpServer({
   readProjectResource: routeDesktopMcpProjectResourceRead,
+  mutateAnnotation: routeDesktopMcpAnnotationMutation,
   applyChanges: routeDesktopMcpApplyChanges,
   capturePreviewEvidence: routeDesktopMcpPreviewCapture,
 })
 let activeMainWindow = null
 let nextDesktopMcpProjectResourceRequestId = 0
 const pendingDesktopMcpProjectResourceRequests = new Map()
+let nextDesktopMcpAnnotationMutationRequestId = 0
+const pendingDesktopMcpAnnotationMutationRequests = new Map()
 let nextDesktopMcpApplyChangesRequestId = 0
 const pendingDesktopMcpApplyChangesRequests = new Map()
 let nextDesktopMcpPreviewCaptureRequestId = 0
@@ -81,6 +89,10 @@ const registerDesktopIpc = () => {
     handleDesktopMcpProjectResourceResponse
   )
   ipcMain.on(
+    ROUTE_DESKTOP_MCP_ANNOTATION_MUTATION_RESPONSE_CHANNEL,
+    handleDesktopMcpAnnotationMutationResponse
+  )
+  ipcMain.on(
     ROUTE_DESKTOP_MCP_APPLY_CHANGES_RESPONSE_CHANNEL,
     handleDesktopMcpApplyChangesResponse
   )
@@ -96,6 +108,10 @@ const removeDesktopIpc = () => {
   ipcMain.off(
     ROUTE_DESKTOP_MCP_PROJECT_RESOURCE_RESPONSE_CHANNEL,
     handleDesktopMcpProjectResourceResponse
+  )
+  ipcMain.off(
+    ROUTE_DESKTOP_MCP_ANNOTATION_MUTATION_RESPONSE_CHANNEL,
+    handleDesktopMcpAnnotationMutationResponse
   )
   ipcMain.off(ROUTE_DESKTOP_MCP_APPLY_CHANGES_RESPONSE_CHANNEL, handleDesktopMcpApplyChangesResponse)
   ipcMain.off(
@@ -171,6 +187,58 @@ function routeDesktopMcpProjectResourceRead({ uri }) {
           'project-unavailable',
           uri,
           'Desktop Arcade project resources are unavailable because the renderer window is no longer reachable.'
+        )
+      )
+    }
+  })
+}
+
+function routeDesktopMcpAnnotationMutation(request) {
+  const targetWindow = getDesktopMcpProjectResourceWindow()
+  if (!targetWindow) {
+    return Promise.resolve(
+      createDesktopMcpAnnotationMutationFailure(
+        'project-unavailable',
+        request.annotationId,
+        'Desktop Arcade annotation mutations are unavailable because no renderer window is available.'
+      )
+    )
+  }
+
+  const requestId = `desktop-mcp-annotation-mutation-${++nextDesktopMcpAnnotationMutationRequestId}`
+
+  return new Promise((resolve) => {
+    const timeout = setTimeout(() => {
+      pendingDesktopMcpAnnotationMutationRequests.delete(requestId)
+      resolve(
+        createDesktopMcpAnnotationMutationFailure(
+          'project-unavailable',
+          request.annotationId,
+          'Desktop Arcade annotation mutation timed out before the renderer responded.'
+        )
+      )
+    }, DESKTOP_MCP_ANNOTATION_MUTATION_ROUTE_TIMEOUT_MS)
+
+    pendingDesktopMcpAnnotationMutationRequests.set(requestId, {
+      resolve,
+      timeout,
+      request,
+      webContentsId: targetWindow.webContents.id,
+    })
+
+    try {
+      targetWindow.webContents.send(ROUTE_DESKTOP_MCP_ANNOTATION_MUTATION_REQUEST_CHANNEL, {
+        requestId,
+        ...request,
+      })
+    } catch {
+      pendingDesktopMcpAnnotationMutationRequests.delete(requestId)
+      clearTimeout(timeout)
+      resolve(
+        createDesktopMcpAnnotationMutationFailure(
+          'project-unavailable',
+          request.annotationId,
+          'Desktop Arcade annotation mutations are unavailable because the renderer window is no longer reachable.'
         )
       )
     }
@@ -300,6 +368,33 @@ function handleDesktopMcpProjectResourceResponse(event, payload) {
   pendingRequest.resolve(payload.response)
 }
 
+function handleDesktopMcpAnnotationMutationResponse(event, payload) {
+  if (!isRecord(payload) || typeof payload.requestId !== 'string') {
+    return
+  }
+
+  const pendingRequest = pendingDesktopMcpAnnotationMutationRequests.get(payload.requestId)
+  if (!pendingRequest || pendingRequest.webContentsId !== event.sender.id) {
+    return
+  }
+
+  pendingDesktopMcpAnnotationMutationRequests.delete(payload.requestId)
+  clearTimeout(pendingRequest.timeout)
+
+  if (!isDesktopMcpAnnotationMutationResult(payload.response)) {
+    pendingRequest.resolve(
+      createDesktopMcpAnnotationMutationFailure(
+        'project-unavailable',
+        pendingRequest.request.annotationId,
+        'Desktop Arcade annotation mutations are unavailable because the renderer returned an invalid response.'
+      )
+    )
+    return
+  }
+
+  pendingRequest.resolve(payload.response)
+}
+
 function handleDesktopMcpApplyChangesResponse(event, payload) {
   if (!isRecord(payload) || typeof payload.requestId !== 'string') {
     return
@@ -368,6 +463,14 @@ const resolvePendingDesktopMcpProjectResourceRequests = (responseFactory) => {
   }
 }
 
+const resolvePendingDesktopMcpAnnotationMutationRequests = (responseFactory) => {
+  for (const [requestId, pendingRequest] of pendingDesktopMcpAnnotationMutationRequests) {
+    pendingDesktopMcpAnnotationMutationRequests.delete(requestId)
+    clearTimeout(pendingRequest.timeout)
+    pendingRequest.resolve(responseFactory(pendingRequest))
+  }
+}
+
 const resolvePendingDesktopMcpApplyChangesRequests = (responseFactory) => {
   for (const [requestId, pendingRequest] of pendingDesktopMcpApplyChangesRequests) {
     pendingDesktopMcpApplyChangesRequests.delete(requestId)
@@ -388,6 +491,13 @@ const createDesktopMcpProjectResourceFailure = (code, resourceUri, message) => (
   ok: false,
   code,
   resourceUri,
+  message,
+})
+
+const createDesktopMcpAnnotationMutationFailure = (code, annotationId, message) => ({
+  ok: false,
+  code,
+  annotationId,
   message,
 })
 
@@ -491,6 +601,13 @@ const createWindow = async () => {
         'Desktop Arcade project resources are unavailable because the renderer window closed.'
       )
     )
+    resolvePendingDesktopMcpAnnotationMutationRequests((pendingRequest) =>
+      createDesktopMcpAnnotationMutationFailure(
+        'project-unavailable',
+        pendingRequest.request.annotationId,
+        'Desktop Arcade annotation mutations are unavailable because the renderer window closed.'
+      )
+    )
     resolvePendingDesktopMcpApplyChangesRequests(() =>
       createDesktopMcpApplyChangesFailure(
         'project-unavailable',
@@ -554,6 +671,13 @@ app.on('will-quit', () => {
       'Desktop Arcade project resources are unavailable because the renderer is shutting down.'
     )
   )
+  resolvePendingDesktopMcpAnnotationMutationRequests((pendingRequest) =>
+    createDesktopMcpAnnotationMutationFailure(
+      'project-unavailable',
+      pendingRequest.request.annotationId,
+      'Desktop Arcade annotation mutations are unavailable because the renderer is shutting down.'
+    )
+  )
   resolvePendingDesktopMcpApplyChangesRequests(() =>
     createDesktopMcpApplyChangesFailure(
       'project-unavailable',
@@ -580,6 +704,37 @@ const isDesktopMcpProjectResourceReadResult = (value, expectedUri) => {
       typeof value.mimeType === 'string' &&
       value.mimeType.length > 0 &&
       typeof value.text === 'string'
+    )
+  }
+
+  const isDesktopMcpAnnotationMutationResult = (value) => {
+    if (!isRecord(value) || typeof value.ok !== 'boolean') {
+      return false
+    }
+
+    if (value.ok) {
+      return (
+        typeof value.toolName === 'string' &&
+        typeof value.annotationId === 'string' &&
+        value.annotationId.trim().length > 0 &&
+        typeof value.pageId === 'string' &&
+        value.pageId.trim().length > 0 &&
+        typeof value.message === 'string' &&
+        value.message.trim().length > 0 &&
+        isRecord(value.annotation) &&
+        Array.isArray(value.annotations)
+      )
+    }
+
+    return (
+      (value.code === 'project-unavailable' ||
+        value.code === 'annotation-not-found' ||
+        value.code === 'dead-target-annotation' ||
+        value.code === 'invalid-annotation-payload') &&
+      typeof value.annotationId === 'string' &&
+      value.annotationId.trim().length > 0 &&
+      typeof value.message === 'string' &&
+      value.message.trim().length > 0
     )
   }
 

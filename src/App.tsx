@@ -71,6 +71,7 @@ function App({
     workingCopyPreferences,
     setTheme,
     replaceProjectState,
+    updateProject,
     updatePreviewState,
   })
 

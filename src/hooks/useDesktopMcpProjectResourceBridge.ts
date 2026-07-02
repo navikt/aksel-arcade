@@ -16,6 +16,11 @@ import type {
   DesktopMcpApplyChangesFailure,
   DesktopMcpApplyChangesRequest,
 } from '@/services/desktopMcpApplyChangesProtocol'
+import { registerDesktopPreloadMcpAnnotationHandler } from '@/services/desktopMcpAnnotationAdapter'
+import {
+  mutateDesktopMcpAnnotation,
+  type DesktopMcpAnnotationMutationHandler,
+} from '@/services/desktopMcpAnnotations'
 import {
   finalizeDesktopMcpPreviewCapture,
   prepareDesktopMcpPreviewCapture,
@@ -39,6 +44,10 @@ interface UseDesktopMcpProjectResourceBridgeOptions {
   workingCopyPreferences: WebArcadeWorkingCopyPreferences
   setTheme: (theme: ThemeMode) => void
   replaceProjectState: (project: Project) => void
+  updateProject: (updates: Partial<Pick<Project, 'annotations' | 'name' | 'viewportSize' | 'panelLayout' | 'activePageId'>> & {
+    jsxCode?: string
+    hooksCode?: string
+  }) => void
   updatePreviewState: (updates: Partial<PreviewState>) => void
 }
 
@@ -58,6 +67,7 @@ export const useDesktopMcpProjectResourceBridge = ({
   workingCopyPreferences,
   setTheme,
   replaceProjectState,
+  updateProject,
   updatePreviewState,
 }: UseDesktopMcpProjectResourceBridgeOptions): void => {
   const resourceContextRef = useRef<DesktopMcpResourceBridgeContext>({
@@ -156,6 +166,47 @@ export const useDesktopMcpProjectResourceBridge = ({
     [replaceProjectState, setTheme, updatePreviewState]
   )
 
+  const handleAnnotationMutation = useCallback<DesktopMcpAnnotationMutationHandler>(
+    async (request) => {
+      const currentContext = resourceContextRef.current
+      const annotation = currentContext.project.annotations.find(
+        (item) => item.id === request.annotationId
+      )
+      if (!annotation) {
+        return mutateDesktopMcpAnnotation(currentContext.project, request)
+      }
+
+      const visibility = await resolveDesktopMcpAnnotationVisibilitiesInSandbox({
+        annotations: [annotation],
+        transpiledCode: currentContext.compileError === null ? currentContext.transpiledCode : null,
+        pageId: annotation.pageId,
+        startPageId: currentContext.project.source.startPageId,
+        theme: currentContext.theme,
+        viewportWidth: getViewportWidth(currentContext.project.viewportSize),
+        viewportHeight: Math.max(1, previewIframeRef.current?.clientHeight ?? 900),
+      })
+
+      const result = mutateDesktopMcpAnnotation(currentContext.project, request, {
+        isDeadTarget: (item) => visibility.get(item.id) === 'dead',
+      })
+
+      if (result.ok) {
+        resourceContextRef.current = {
+          ...currentContext,
+          project: {
+            ...currentContext.project,
+            annotations: result.annotations,
+            lastModified: new Date().toISOString(),
+          },
+        }
+        updateProject({ annotations: result.annotations })
+      }
+
+      return result
+    },
+    [previewIframeRef, updateProject]
+  )
+
   const handleCapturePreviewEvidence = useCallback(
     async (
       request: DesktopMcpPreviewCaptureRequest
@@ -201,6 +252,8 @@ export const useDesktopMcpProjectResourceBridge = ({
   useLayoutEffect(() => {
     const unregisterProjectRead =
       registerDesktopPreloadMcpProjectResourceReadHandler(handleProjectResourceRead)
+    const unregisterAnnotationMutation =
+      registerDesktopPreloadMcpAnnotationHandler(handleAnnotationMutation)
     const unregisterApplyChanges = registerDesktopPreloadMcpApplyChangesHandler(handleApplyChanges)
     const unregisterPreviewCapture =
       registerDesktopPreloadMcpPreviewCaptureHandler(handleCapturePreviewEvidence)
@@ -208,9 +261,15 @@ export const useDesktopMcpProjectResourceBridge = ({
     return () => {
       unregisterPreviewCapture?.()
       unregisterApplyChanges?.()
+      unregisterAnnotationMutation?.()
       unregisterProjectRead?.()
     }
-  }, [handleApplyChanges, handleCapturePreviewEvidence, handleProjectResourceRead])
+  }, [
+    handleAnnotationMutation,
+    handleApplyChanges,
+    handleCapturePreviewEvidence,
+    handleProjectResourceRead,
+  ])
 }
 
 const createApplyChangesPersistenceFailure = ({
