@@ -38,6 +38,28 @@
   pointer-events: none;
 }
 
+.live-preview__annotation-outline {
+  position: absolute;
+  border: 2px solid var(--ax-border-accent);
+  border-radius: var(--ax-radius-8);
+  background: color-mix(in srgb, var(--ax-bg-accent-soft) 22%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ax-border-accent) 40%, transparent);
+}
+
+.live-preview__annotation-outline--selected {
+  border-color: var(--ax-border-accent);
+}
+
+.live-preview__annotation-outline--selected-element {
+  border-color: var(--ax-border-success);
+  background: color-mix(in srgb, var(--ax-bg-success-soft) 18%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ax-border-success) 40%, transparent);
+}
+
+.live-preview__annotation-outline--multi-select {
+  background: color-mix(in srgb, var(--ax-bg-accent-soft) 14%, transparent);
+}
+
 .live-preview__annotation-marker,
 .live-preview__annotation-add-anchor {
   position: absolute;

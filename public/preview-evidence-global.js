@@ -441,6 +441,8 @@ var previewEvidenceUtils = (() => {
       element: describeElement(element),
       elementPath: identity.elementPath,
       targetIdentities: [{ ...identity }],
+      clickOffsetX: pageX - rect.left,
+      clickOffsetY: pageY - rect.top,
       boundingBox: {
         x: rect.left,
         y: isFixed ? rect.top : rect.top + frameWindow.scrollY,

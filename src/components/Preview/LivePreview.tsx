@@ -175,6 +175,50 @@ const getSelectedTextPreview = (selectedText: string): string =>
 const clampNumber = (value: number, min: number, max: number): number =>
   Math.min(Math.max(value, min), max)
 
+interface AnnotationOutlineBox {
+  key: string
+  className: string
+  box: NonNullable<ArcadeAnnotation['boundingBox']>
+}
+
+const getAnnotationOutlineBoxes = (
+  target: ResolvedAnnotationTarget | ArcadeAnnotation
+): AnnotationOutlineBox[] => {
+  const isResolvedTarget = 'snapshot' in target
+  const snapshot = isResolvedTarget ? target.snapshot : target
+  const outlineBoxes: AnnotationOutlineBox[] = []
+
+  if (snapshot.isMultiSelect) {
+    snapshot.elementBoundingBoxes?.forEach((box, index) => {
+      outlineBoxes.push({
+        key: `element-${index}`,
+        className:
+          'live-preview__annotation-outline live-preview__annotation-outline--selected-element',
+        box,
+      })
+    })
+    if (snapshot.boundingBox) {
+      outlineBoxes.push({
+        key: 'union',
+        className:
+          'live-preview__annotation-outline live-preview__annotation-outline--selected live-preview__annotation-outline--multi-select',
+        box: snapshot.boundingBox,
+      })
+    }
+    return outlineBoxes
+  }
+
+  if (snapshot.boundingBox) {
+    outlineBoxes.push({
+      key: 'single',
+      className: 'live-preview__annotation-outline live-preview__annotation-outline--selected',
+      box: snapshot.boundingBox,
+    })
+  }
+
+  return outlineBoxes
+}
+
 interface LivePreviewProps {
   iframeRef: React.RefObject<HTMLIFrameElement | null>
   transpiledCode: string | null
@@ -906,6 +950,32 @@ export const LivePreview = ({
     [activePageOpenAnnotations, markerPreview]
   )
 
+  const activeOutlinedAnnotation = useMemo(() => {
+    const activeAnnotationId = editingAnnotationId ?? markerPreview?.annotationId ?? null
+    if (!activeAnnotationId) {
+      return null
+    }
+
+    const annotation =
+      activePageOpenAnnotations.find((candidate) => candidate.id === activeAnnotationId) ?? null
+    if (!annotation) {
+      return null
+    }
+
+    const resolution = annotationResolutionById[activeAnnotationId]
+    if (resolution?.status === 'resolved' && resolution.target) {
+      return {
+        annotation,
+        target: resolution.target as ResolvedAnnotationTarget | ArcadeAnnotation,
+      }
+    }
+
+    return {
+      annotation,
+      target: annotation as ResolvedAnnotationTarget | ArcadeAnnotation,
+    }
+  }, [activePageOpenAnnotations, annotationResolutionById, editingAnnotationId, markerPreview])
+
   useEffect(() => {
     if (editingAnnotationId && !editingAnnotation) {
       setEditingAnnotationId(null)
@@ -1073,23 +1143,32 @@ export const LivePreview = ({
     onEscape()
   }
 
-  const getOverlayPosition = (target: ResolvedAnnotationTarget | ArcadeAnnotation) => {
+  const getOverlayPosition = (
+    target: ResolvedAnnotationTarget | ArcadeAnnotation,
+    storedAnnotation?: ArcadeAnnotation
+  ) => {
     const isResolvedTarget = 'snapshot' in target
-    const box = isResolvedTarget ? target.snapshot.boundingBox : target.boundingBox
-    const clickX = isResolvedTarget ? target.snapshot.x : target.x
-    const clickY = isResolvedTarget ? target.snapshot.y : target.y
-    const scrollOffsetY =
-      isResolvedTarget && !target.snapshot.isFixed ? previewScrollPosition.y : 0
+    const snapshot = isResolvedTarget ? target.snapshot : target
+    const box = snapshot.boundingBox
+    const clickX = snapshot.x
+    const clickY = snapshot.y
+    const markerOffsetX = storedAnnotation?.clickOffsetX ?? snapshot.clickOffsetX
+    const markerOffsetY = storedAnnotation?.clickOffsetY ?? snapshot.clickOffsetY
+    const scrollOffsetY = snapshot.isFixed ? 0 : previewScrollPosition.y
     const viewportWidthPx = Math.max(1, effectiveViewportWidth)
     const viewportHeightPx = Math.max(1, viewportIntrinsicHeight)
     const rawLeft =
-      typeof clickX === 'number' && Number.isFinite(clickX)
+      box && typeof markerOffsetX === 'number' && Number.isFinite(markerOffsetX)
+        ? box.x + markerOffsetX
+        : typeof clickX === 'number' && Number.isFinite(clickX)
         ? (clickX / 100) * viewportWidthPx
         : box && Number.isFinite(box.x)
           ? box.x + box.width
           : 0
     const rawTop =
-      typeof clickY === 'number' && Number.isFinite(clickY)
+      box && typeof markerOffsetY === 'number' && Number.isFinite(markerOffsetY)
+        ? box.y + markerOffsetY - scrollOffsetY
+        : typeof clickY === 'number' && Number.isFinite(clickY)
         ? clickY - scrollOffsetY
         : box && Number.isFinite(box.y)
           ? Math.max(0, box.y - scrollOffsetY)
@@ -1109,6 +1188,17 @@ export const LivePreview = ({
       left: `${left}px`,
       top: `${top}px`,
     }
+  }
+
+  const getOutlineStyle = (target: ResolvedAnnotationTarget | ArcadeAnnotation) => {
+    const snapshot = 'snapshot' in target ? target.snapshot : target
+
+    return (box: NonNullable<typeof snapshot.boundingBox>) => ({
+      left: `${box.x}px`,
+      top: `${snapshot.isFixed ? box.y : box.y - previewScrollPosition.y}px`,
+      width: `${box.width}px`,
+      height: `${box.height}px`,
+    })
   }
 
   const selectedAnchorPosition = selectedAnnotationTarget
@@ -1148,6 +1238,16 @@ export const LivePreview = ({
           />
           {isAnnotationMode && (
             <div className="live-preview__annotation-layer" data-testid="annotation-overlay-layer">
+              {activeOutlinedAnnotation &&
+                getAnnotationOutlineBoxes(activeOutlinedAnnotation.target).map((outline) => (
+                  <span
+                    key={`${activeOutlinedAnnotation.annotation.id}-${outline.key}`}
+                    className={outline.className}
+                    style={getOutlineStyle(activeOutlinedAnnotation.target)(outline.box)}
+                    data-testid="annotation-outline"
+                    aria-hidden="true"
+                  />
+                ))}
               {visibleMarkerEntries.map(({ annotation, target }, index) => (
                 <Button
                   key={annotation.id}
@@ -1165,7 +1265,7 @@ export const LivePreview = ({
                       .filter(Boolean)
                       .join(' ')
                   }
-                  style={getOverlayPosition(target)}
+                  style={getOverlayPosition(target, annotation)}
                   aria-label={`Open annotation ${index + 1}: ${getAnnotationPreviewContent(annotation)}`}
                   aria-expanded={editingAnnotationId === annotation.id}
                   onMouseEnter={(event) => openMarkerPreview(annotation, event.currentTarget)}

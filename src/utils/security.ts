@@ -157,6 +157,8 @@ const isAnnotationTargetSnapshot = (value: unknown): boolean => {
     optionalString(value.cssClasses) &&
     optionalString(value.fullPath) &&
     optionalString(value.accessibility) &&
+    optionalNumber(value.clickOffsetX) &&
+    optionalNumber(value.clickOffsetY) &&
     optionalBoolean(value.isFixed) &&
     optionalBoolean(value.isMultiSelect)
   )
@@ -164,6 +166,7 @@ const isAnnotationTargetSnapshot = (value: unknown): boolean => {
 
 const optionalString = (value: unknown): boolean => value === undefined || typeof value === 'string'
 const optionalBoolean = (value: unknown): boolean => value === undefined || typeof value === 'boolean'
+const optionalNumber = (value: unknown): boolean => value === undefined || typeof value === 'number'
 const optionalResolvedTargetIdentityArray = (value: unknown): boolean =>
   value === undefined || (Array.isArray(value) && value.every(isAnnotationTargetIdentity))
 

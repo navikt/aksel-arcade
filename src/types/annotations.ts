@@ -57,6 +57,8 @@ export interface ArcadeAnnotation {
   elementPath: string
   timestamp: number
   selectedText?: string
+  clickOffsetX?: number
+  clickOffsetY?: number
   targetIdentities?: AnnotationTargetIdentity[]
   boundingBox?: AnnotationRect
   nearbyText?: string

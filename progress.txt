@@ -1,3 +1,25 @@
+### 2026-07-02 - Issue #321 follow-up: saved annotation marker placement and frames
+
+Implemented:
+
+- Preserved annotation click offsets in the durable annotation target snapshot (`clickOffsetX` / `clickOffsetY`) so saved markers reopen at the clicked point instead of snapping back to the element center.
+- Updated `LivePreview` marker positioning to prefer the stored click offset against the current live-resolved target box, which keeps markers separated when multiple annotations target the same element and still lets them follow re-resolved geometry.
+- Added host-rendered saved-annotation outlines for hover/edit states, including single-target frames plus per-element and union frames for multi-select annotations.
+- Rebuilt the checked-in sandbox evidence bundle so the sandbox-side selected-target payload includes the new click-offset metadata in production-mode/dev-on-non-5173 verification.
+- Extended integration coverage for saved click-offset positioning, stored click-offset persistence on save, and visible single-/multi-select saved-marker outlines.
+
+Verification:
+
+- npm run type-check
+- npm run lint
+- npm test
+- npm run build:sandbox
+- Browser verification via Playwright against the local Vite app, confirming two annotations on different click points of the same element keep distinct marker positions, saved single-marker hover shows its frame, saved multi-select marker open state shows element + union frames, and no console errors were emitted
+
+Next note:
+
+- Older saved annotations without `clickOffsetX` / `clickOffsetY` still fall back to the legacy center-style placement. Only annotations created after this patch persist exact click points.
+
 2026-05-23 - Issue #5: V8 runtime foundation tracer
 
 Selected #5 as the highest-priority ready-for-agent feature because it establishes the v8 runtime/theme foundation needed by the later catalog, autocomplete, palette, and chrome work.
