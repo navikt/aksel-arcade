@@ -139,7 +139,7 @@ const createDiagnostics = (overrides: Partial<PreviewDiagnostics> = {}): Preview
 
 const resolvePageAnnotationVisibilities = async (
   _pageId: string,
-  annotations: Array<{ id: string }>
+  annotations: ReadonlyArray<{ id: string }>
 ): Promise<Map<string, 'visible' | 'hidden' | 'dead'>> =>
   new Map(
     annotations.map((annotation) => {

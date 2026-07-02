@@ -248,6 +248,8 @@ Follow-up before merge:
 - Tightened the `list_annotations` MCP contract after PR review so `open` stays the implicit default only; explicit status filters are now limited to the requested set: `pending`, `acknowledged`, `resolved`, `dismissed`, and `all`.
 - Updated the README Desktop MCP contract and smoke checklist to document the shipped annotation read surface (`list_annotations`, `arcade://project/annotations`, and page annotation resources), which had drifted behind the implementation.
 - Re-ran `npm run typecheck`, `npm run lint`, `npm test -- --run`, and `npm run test:e2e -- tests/e2e/desktop-mcp-smoke.spec.ts`.
+- Fixed the PR-only CI build failure in `tests/unit/services/desktopMcpProjectResources.test.ts` by making the shared annotation-visibility stub accept a readonly annotation array, matching the production resolver contract that `tsc -b` enforces in the Validate workflow.
+- Re-ran `npm run typecheck`, `npm run lint`, `npm test -- --run`, and `npm run build`.
 - npm run lint (existing `InspectionPopover` hook dependency warning only)
 - CI=1 npm run test -- --run
 - npm run build
