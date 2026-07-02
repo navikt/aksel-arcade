@@ -57,6 +57,7 @@ export const validateSandboxToMainMessage = (data: unknown): data is SandboxToMa
     'INSPECTION_DATA',
     'ANNOTATION_TARGET_HOVERED',
     'ANNOTATION_TARGET_SELECTED',
+    'ANNOTATION_VIEWPORT_CHANGED',
     'THEME_UPDATED',
     'CONSOLE_LOG',
     'PREVIEW_EVIDENCE_CAPTURED',
@@ -80,6 +81,15 @@ export const validateSandboxToMainMessage = (data: unknown): data is SandboxToMa
       isRecord(payload) &&
       typeof payload.requestId === 'string' &&
       isAnnotationTargetResolutionResult(payload.result)
+    )
+  }
+
+  if (type === 'ANNOTATION_VIEWPORT_CHANGED') {
+    const payload = (data as { payload?: unknown }).payload
+    return (
+      isRecord(payload) &&
+      typeof payload.scrollX === 'number' &&
+      typeof payload.scrollY === 'number'
     )
   }
 
@@ -156,6 +166,8 @@ const isAnnotationTargetSnapshot = (value: unknown): boolean => {
     optionalString(value.cssClasses) &&
     optionalString(value.fullPath) &&
     optionalString(value.accessibility) &&
+    optionalNumber(value.clickOffsetX) &&
+    optionalNumber(value.clickOffsetY) &&
     optionalBoolean(value.isFixed) &&
     optionalBoolean(value.isMultiSelect)
   )
@@ -163,6 +175,7 @@ const isAnnotationTargetSnapshot = (value: unknown): boolean => {
 
 const optionalString = (value: unknown): boolean => value === undefined || typeof value === 'string'
 const optionalBoolean = (value: unknown): boolean => value === undefined || typeof value === 'boolean'
+const optionalNumber = (value: unknown): boolean => value === undefined || typeof value === 'number'
 const optionalResolvedTargetIdentityArray = (value: unknown): boolean =>
   value === undefined || (Array.isArray(value) && value.every(isAnnotationTargetIdentity))
 

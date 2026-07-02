@@ -47,6 +47,9 @@ export const PreviewPane = ({
   const [isInspectMode, setIsInspectMode] = useState(false)
   const [isAnnotationMode, setIsAnnotationMode] = useState(false)
   const [isClearAnnotationsDialogOpen, setIsClearAnnotationsDialogOpen] = useState(false)
+  const [activePageResolvedOpenAnnotationCount, setActivePageResolvedOpenAnnotationCount] = useState<
+    number | null
+  >(null)
   const debounceTimerRef = useRef<number | undefined>(undefined)
   const pendingCompileErrorRef = useRef<CompileError | null>(null)
   const isCodeEditorFocusedRef = useRef(editorState.isCodeEditorFocused)
@@ -337,11 +340,17 @@ export const PreviewPane = ({
     fullscreenToggleRef.current?.focus()
   }, [previewFullscreen])
 
+  useEffect(() => {
+    setActivePageResolvedOpenAnnotationCount(null)
+  }, [project.activePageId, project.annotations, project.id, project.source])
+
   const fullscreenToggleLabel = previewFullscreen
     ? 'Exit preview fullscreen'
     : 'Enter preview fullscreen'
   const activePageOpenAnnotationCount =
-    countOpenAnnotationsByPage(project.annotations).get(project.activePageId) ?? 0
+    activePageResolvedOpenAnnotationCount ??
+    countOpenAnnotationsByPage(project.annotations).get(project.activePageId) ??
+    0
   const activePageAnnotationRecordCount = project.annotations.filter(
     (annotation) => annotation.pageId === project.activePageId
   ).length
@@ -498,6 +507,7 @@ export const PreviewPane = ({
           isAnnotationMode={isAnnotationMode}
           annotations={project.annotations}
           onAnnotationsChange={(annotations) => updateProject({ annotations })}
+          onActivePageOpenAnnotationCountChange={setActivePageResolvedOpenAnnotationCount}
           theme={theme}
         />
 

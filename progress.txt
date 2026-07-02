@@ -1,3 +1,53 @@
+### 2026-07-02 - PR #337 review follow-up
+
+Implemented:
+
+- Tightened sandbox message validation so `ANNOTATION_VIEWPORT_CHANGED` now requires numeric `scrollX` / `scrollY` payload fields instead of bypassing the postMessage contract checks.
+- Stopped rendering saved markers and open counts from stored geometry once the sandbox is connected but a live target has not resolved yet, which removes the stale pre-resolution window where dead or ambiguous targets could briefly appear as normal annotations.
+- Added regression coverage for the stricter viewport-change validation and for hiding saved markers/open counts until live resolution arrives after sandbox connection.
+
+Verification:
+
+- npm run type-check
+- npm run lint
+- npm test
+- npm run build
+
+### 2026-07-02 - PR #337 CI follow-up
+
+Implemented:
+
+- Fixed the PR-only TypeScript build failure in `tests/integration/annotation-mode-header-shell.test.tsx` by capturing the mocked resolved-count value before `queueMicrotask`, so the callback no longer closes over a `number | null` union that fails `tsc -b` in CI.
+
+Verification:
+
+- npm run type-check
+- npm run lint
+- npm test
+- npm run build
+
+### 2026-07-02 - Issue #321 follow-up: saved annotation marker placement and frames
+
+Implemented:
+
+- Preserved annotation click offsets in the durable annotation target snapshot (`clickOffsetX` / `clickOffsetY`) so saved markers reopen at the clicked point instead of snapping back to the element center.
+- Updated `LivePreview` marker positioning to prefer the stored click offset against the current live-resolved target box, which keeps markers separated when multiple annotations target the same element and still lets them follow re-resolved geometry.
+- Added host-rendered saved-annotation outlines for hover/edit states, including single-target frames plus per-element and union frames for multi-select annotations.
+- Rebuilt the checked-in sandbox evidence bundle so the sandbox-side selected-target payload includes the new click-offset metadata in production-mode/dev-on-non-5173 verification.
+- Extended integration coverage for saved click-offset positioning, stored click-offset persistence on save, and visible single-/multi-select saved-marker outlines.
+
+Verification:
+
+- npm run type-check
+- npm run lint
+- npm test
+- npm run build:sandbox
+- Browser verification via Playwright against the local Vite app, confirming two annotations on different click points of the same element keep distinct marker positions, saved single-marker hover shows its frame, saved multi-select marker open state shows element + union frames, and no console errors were emitted
+
+Next note:
+
+- Older saved annotations without `clickOffsetX` / `clickOffsetY` still fall back to the legacy center-style placement. Only annotations created after this patch persist exact click points.
+
 2026-05-23 - Issue #5: V8 runtime foundation tracer
 
 Selected #5 as the highest-priority ready-for-agent feature because it establishes the v8 runtime/theme foundation needed by the later catalog, autocomplete, palette, and chrome work.
@@ -10,7 +60,7 @@ Implemented:
 - Fixed the sandbox development CSP for 127.0.0.1 so local browser verification has no CSP errors.
 
 Verification:
-- npm run typecheck
+- npm run type-check
 - CI=1 npm run test
 - Browser check at http://127.0.0.1:5173/aksel-arcade/ for default preview render and light/dark toggle
 
@@ -23,7 +73,7 @@ Fixed a build-only v8 token type regression before merge:
 
 Verification:
 - npm run build
-- npm run typecheck
+- npm run type-check
 - CI=1 npm run test
 
 2026-05-23 - Issue #6: Catalog-backed starter path
@@ -37,7 +87,7 @@ Implemented:
 - Added catalog regression tests covering the catalog interface, palette adapter, snippet adapter, and autocomplete metadata path.
 
 Verification:
-- npm run typecheck
+- npm run type-check
 - CI=1 npm run test -- --run
 
 ### 2026-06-16 - Issue #272: Expose active Arcade project read resources over MCP
@@ -58,7 +108,7 @@ Implemented:
 Verification:
 
 - npm install
-- npm run typecheck
+- npm run type-check
 - npm run lint
 - CI=1 npm run test
 - npm run build
@@ -83,7 +133,7 @@ Implemented:
 
 Verification:
 
-- npm run typecheck
+- npm run type-check
 - npm run lint (existing `InspectionPopover` hook dependency warning only)
 - npm test -- --run
 - npm run build
@@ -107,7 +157,7 @@ Implemented:
 
 Verification:
 
-- npm run typecheck
+- npm run type-check
 - npm run lint (existing `InspectionPopover` hook dependency warning only)
 - CI=1 npm run test -- --run
 - npm run build
@@ -133,7 +183,7 @@ Implemented:
 
 Verification:
 
-- npm run typecheck
+- npm run type-check
 - npm run lint (existing `InspectionPopover` hook dependency warning only)
 - CI=1 npm run test -- --run
 - npm run build
@@ -162,7 +212,7 @@ Implemented:
 
 Verification:
 
-- npm run typecheck
+- npm run type-check
 - npm run lint (existing `InspectionPopover` hook dependency warning only)
 - CI=1 npm run test -- --run
 - npm run build
@@ -183,7 +233,7 @@ Fixed before merge:
 
 Verification:
 
-- npm run typecheck
+- npm run type-check
 - npm run lint (existing `InspectionPopover` hook dependency warning only)
 - CI=1 npm run test -- --run
 - Browser check at `http://127.0.0.1:4177/aksel-arcade/` for multi-page preview navigation to Page 2, staying on Page 2 after editing Page 1, corrected labeled compile errors during an induced broken Page 2 edit, and no console errors on a clean reload
@@ -201,7 +251,7 @@ Implemented:
 
 Verification:
 
-- npm run typecheck
+- npm run type-check
 - CI=1 npm test -- --run
 - npm run lint
 - npm run build
@@ -225,7 +275,7 @@ Implemented:
 - Fixed Add Component modal polish bugs: initial focus now goes to the search field, the modal container focus border is suppressed, list/card focus rings have inset room, the first card is no longer clipped, and the tablist scrollbar strip between tabs and list is hidden.
 
 Verification:
-- npm run typecheck
+- npm run type-check
 - CI=1 npm run test -- --run
 - Browser smoke checks at local Vite URLs for 900+ Icons palette entries, icon insertion/rendering, hidden legacy layout entries, no redundant card tags, search initial focus, focus-ring spacing, hidden tablist scrollbar strip, and no console errors.
 
@@ -241,7 +291,7 @@ Updated after UX review:
 - Updated PR #16 description and PRD #4 implementation progress to reflect these follow-up fixes.
 
 Verification:
-- npm run typecheck
+- npm run type-check
 - CI=1 npm run test -- --run
 - Browser smoke checks at local Vite URLs for 900+ icon entries, icon insertion/rendering, no redundant tags, initial search focus, focus-ring spacing, hidden tablist scrollbar strip, and no console errors.
 
@@ -257,7 +307,7 @@ Implemented:
 - Added user-facing regression coverage in `tests/unit/akselAutocomplete.test.ts` for tag, subcomponent, multi-line prop, enum, spacing, Box token, and `data-color` contexts.
 
 Verification:
-- npm run typecheck
+- npm run type-check
 - CI=1 npm run test
 - npm run lint (passes with the existing `InspectionPopover` hook dependency warning)
 - Browser smoke check at http://127.0.0.1:5176/aksel-arcade/ for app render and console output.
@@ -274,7 +324,7 @@ Updated after autocomplete coverage review:
 - Added regression coverage proving all generated docs entries and all 949 installed icons are suggested, plus representative props/values for Box, DataGrid, Combobox, Accordion, and icons.
 
 Verification:
-- npm run typecheck
+- npm run type-check
 - CI=1 npm run test
 - npm run lint (passes with the existing `InspectionPopover` hook dependency warning)
 - Browser smoke check at http://127.0.0.1:5177/aksel-arcade/ for render, console output, and visible `Box` `asChild` autocomplete.
@@ -289,7 +339,7 @@ Reviewed, fixed, and merged PR #17:
 - `faa3e84` completed the coverage follow-up with generated `aksel.nav.no/llm.md` metadata, documented primitives/components/subcomponents/legacy entries, all 949 installed Aksel icons, `Box` `asChild`, and icon prop/value completions.
 - CodeQL then blocked the PR on the generator: broad HTML tag stripping and direct network-data-to-file output.
 - `17068a9` fixed those findings by normalizing docs text without multi-character tag stripping and making `scripts/generate-aksel-autocomplete-data.mjs` write generated TypeScript to stdout.
-- Re-ran `npm run typecheck`, `CI=1 npm run test`, `npm run lint`, and a browser smoke check at the local Vite URL; GitHub CodeQL checks refreshed green.
+- Re-ran `npm run type-check`, `CI=1 npm run test`, `npm run lint`, and a browser smoke check at the local Vite URL; GitHub CodeQL checks refreshed green.
 - Merged PR #17 on 2026-05-24 and deleted the remote branch `sjur-gr/ready-feature-pr-2`.
 
 Next note:
@@ -308,7 +358,7 @@ Implemented:
 - Added engine-level regression coverage for default icon exclusion, icon prop contexts, icon-looking tag identifiers, normal prop-list exclusion, and icon prop/value behavior.
 
 Verification:
-- npm run typecheck
+- npm run type-check
 - CI=1 npm run test
 - Browser smoke check at http://127.0.0.1:5178/aksel-arcade/ for contextual autocomplete behavior and no runtime console errors.
 
@@ -328,7 +378,7 @@ Updated definition:
 - Icon-aware context means an icon prop value (`icon={<DogH` / `icon={DogH`) or a valid JSX icon tag prefix (`<DogH`, `<DogHarnessIcon`, or nested forms like `<Box><DogH`) when the typed prefix does not collide with a component prefix.
 
 Verification:
-- npm run typecheck
+- npm run type-check
 - CI=1 npm run test
 - Browser smoke check at http://127.0.0.1:5178/aksel-arcade/ for `<DogH`, `<DogHarnessIcon`, and icon props.
 
@@ -342,7 +392,7 @@ Fixed after dev testing showed the real nested editor interaction still missed t
 - Kept plain child text such as `<Box>DogH` out of icon autocomplete because it is not valid JSX component authoring.
 
 Verification:
-- npm run typecheck
+- npm run type-check
 - CI=1 npm run test
 - npm run lint
 - npx playwright test tests/e2e/autocomplete.spec.ts --project=chromium --reporter=line
@@ -366,7 +416,7 @@ Implemented:
 - Added regression coverage for import stripping, alias preservation, unsupported import guidance, safe compatibility aliases, and ambiguous legacy guidance.
 
 Verification:
-- npm run typecheck
+- npm run type-check
 - CI=1 npm run test -- --run
 - npm run lint (passes with the existing `InspectionPopover` hook dependency warning)
 - npm run build
@@ -381,7 +431,7 @@ Reviewed, fixed, and merged PR #19:
 - `492a3e2` implemented #10: supported production-style import stripping, safe `BoxNew`/`Combobox` runtime compatibility, explicit `Grid`/`Stack` guidance, sandbox bundle regeneration, and regression coverage.
 - Review found one robustness gap: supported imports with trailing line or block comments were not stripped, which could break pasted production code before sandbox execution.
 - `f637a5a` fixed that gap by extending the supported static import matcher and covering commented React, Aksel component, icon, CSS, and local hooks imports in the transpiler regression test.
-- Re-ran local validation: `npm run typecheck`, `CI=1 npm run test -- --run`, `npm run lint` (existing `InspectionPopover` hook dependency warning only), `npm run build`, and `git diff --check`.
+- Re-ran local validation: `npm run type-check`, `CI=1 npm run test -- --run`, `npm run lint` (existing `InspectionPopover` hook dependency warning only), `npm run build`, and `git diff --check`.
 - GitHub CodeQL checks refreshed green after the review fix.
 - PR #19 was merged on 2026-05-24, and the remote/local branch `sjur-gr/ready-issue-feature` was deleted.
 
@@ -401,7 +451,7 @@ Implemented:
 - Updated PRD issue #4 with the #11 implementation progress.
 
 Verification:
-- npm run typecheck
+- npm run type-check
 - CI=1 npm run test
 - npm run lint (passes with the existing `InspectionPopover` hook dependency warning)
 - npm run build
@@ -421,7 +471,7 @@ Validation work recorded in this branch:
 - Updated visible README guidance and hidden project governance memory/templates to the Aksel v8 CSS, Theme, and current layout primitive model so future work does not inherit old setup paths.
 - Added regression coverage for built-in template migration, built-in sandbox transpilation, exported metadata contents, package version pins, setup docs, and breakpoint metadata.
 
-Verification completed with `npm run typecheck`, `CI=1 npm run test`, `npm run lint` (existing `InspectionPopover` hook dependency warning only), `npm run build`, and browser smoke checks of the default starter, both built-in templates, exported metadata, and console output at the local Vite URL.
+Verification completed with `npm run type-check`, `CI=1 npm run test`, `npm run lint` (existing `InspectionPopover` hook dependency warning only), `npm run build`, and browser smoke checks of the default starter, both built-in templates, exported metadata, and console output at the local Vite URL.
 
 Follow-up note: #12 should modernize app chrome separately. Keep #11-style content/export/governance changes separate from the #12 chrome refactor, and keep future built-ins on `Box`, `HStack`/`VStack`, `HGrid`, `Page`, and v8 `space-*` tokens.
 
@@ -435,7 +485,7 @@ Completed in this branch:
 - Tightened custom CSS so it now focuses on shell sizing, modal scroll/focus mechanics, palette card interaction, preview error overlay, iframe/split-pane mechanics, and inspect overlays instead of duplicating Aksel layout/spacing primitives.
 - Refreshed the project-controls integration test to assert the new light/dark theme wording while preserving Import -> Share -> Settings order and share metrics.
 
-Verification completed with `npm run typecheck`, `CI=1 npm run test`, `npm run lint` (existing `InspectionPopover` hook dependency warning only), `npm run build`, and a browser smoke check at `http://127.0.0.1:5179/aksel-arcade/` for app render, preview render, component palette, settings theme copy, inspect toggle, and console output.
+Verification completed with `npm run type-check`, `CI=1 npm run test`, `npm run lint` (existing `InspectionPopover` hook dependency warning only), `npm run build`, and a browser smoke check at `http://127.0.0.1:5179/aksel-arcade/` for app render, preview render, component palette, settings theme copy, inspect toggle, and console output.
 
 Follow-up note: #13 can now start from `master` once #12 is merged. Keep chrome work separate from migration hardening; if later polish touches the palette, preserve the current Layout/Components/Icons grouping and avoid reintroducing `BoxNew` or legacy neutral button variants into app chrome.
 
@@ -448,7 +498,7 @@ Completed in this branch:
 - Added `tests/e2e/migration-regression.spec.ts` to cover protected playground flows: saved prototype load, live preview/sandbox readiness, theme updates, viewport updates, component palette insertion, share generation, export metadata, import hydration, and inspect overlays.
 - Covered migration-sensitive runtime behavior in the browser: v8 `--ax` CSS/theme semantics, safe `BoxNew` compatibility, import-free authoring, and both built-in examples rendering without error overlays.
 
-Verification completed with `npm run typecheck`, `CI=1 npm run test`, `npm run lint` (existing `InspectionPopover` hook dependency warning only), `npm run build`, `CI=1 npx playwright test tests/e2e/autocomplete.spec.ts tests/e2e/migration-regression.spec.ts --project=chromium --reporter=line`, and a browser smoke/console check at `http://127.0.0.1:5173/aksel-arcade/`.
+Verification completed with `npm run type-check`, `CI=1 npm run test`, `npm run lint` (existing `InspectionPopover` hook dependency warning only), `npm run build`, `CI=1 npx playwright test tests/e2e/autocomplete.spec.ts tests/e2e/migration-regression.spec.ts --project=chromium --reporter=line`, and a browser smoke/console check at `http://127.0.0.1:5173/aksel-arcade/`.
 
 Follow-up note: #13 is intentionally test-focused. If future migration regressions appear, start with the two Playwright specs touched here before changing product code; keep autocomplete contract coverage in `tests/e2e/autocomplete.spec.ts` and broader protected-flow coverage in `tests/e2e/migration-regression.spec.ts`.
 
@@ -460,7 +510,7 @@ Fixed after reviewing PR #22:
 - Fixed the blocking CodeQL alert `js/insecure-temporary-file` in `tests/e2e/migration-regression.spec.ts` by replacing the `os.tmpdir()` import fixture path with Playwright's per-test `testInfo.outputPath(...)`.
 - Kept the review fix scoped to the migration regression e2e test; no product behavior changed.
 
-Verification completed with `npm run typecheck`, `CI=1 npm run test`, `npm run lint` (existing `InspectionPopover` hook dependency warning only), `npm run build`, `CI=1 npx playwright test tests/e2e/migration-regression.spec.ts --project=chromium --reporter=line`, and `git diff --check`.
+Verification completed with `npm run type-check`, `CI=1 npm run test`, `npm run lint` (existing `InspectionPopover` hook dependency warning only), `npm run build`, `CI=1 npx playwright test tests/e2e/migration-regression.spec.ts --project=chromium --reporter=line`, and `git diff --check`.
 
 ### 2026-05-25 - +Add modal LinkCards
 
@@ -483,7 +533,7 @@ Completed for #25:
 - Kept the Aksel package pins at `8.11.0`; `npm audit` reports 0 vulnerabilities after the refresh.
 - Rebuilt the committed sandbox bundle so generated assets match the refreshed dependency graph.
 
-Verification completed with `npm run typecheck`, `npm run test -- --run`, `npm run lint` (existing `InspectionPopover` hook dependency warning only), `npm run build`, and a browser smoke/console check at `http://127.0.0.1:5173/aksel-arcade/` (no errors; existing sandbox iframe warning only).
+Verification completed with `npm run type-check`, `npm run test -- --run`, `npm run lint` (existing `InspectionPopover` hook dependency warning only), `npm run build`, and a browser smoke/console check at `http://127.0.0.1:5173/aksel-arcade/` (no errors; existing sandbox iframe warning only).
 
 Follow-up note: no npm overrides were added. If Dependabot still reports any of #8, #9, #11, #14, #16, #18, #19, #20, #22, or #24 after merge, re-check whether the alert is scanning the default-branch lockfile or a cached dependency graph; the patched versions are present in `package-lock.json`.
 
@@ -495,7 +545,7 @@ Completed for #23:
 - Kept enum/string props with value suggestions applying as `prop=""`, so existing value autocomplete behavior remains unchanged.
 - Added regression coverage across generated docs props, catalog props, and icon SVG Booleanish props to catch future boolean autocomplete regressions.
 
-Verification completed with `npm run typecheck`, `CI=1 npm run test`, and a browser smoke/console check at `http://127.0.0.1:5173/aksel-arcade/`.
+Verification completed with `npm run type-check`, `CI=1 npm run test`, and a browser smoke/console check at `http://127.0.0.1:5173/aksel-arcade/`.
 
 Follow-up note: the fix is centralized in `src/services/akselAutocomplete.ts` inside prop option generation. If new prop metadata sources are added, make sure boolean-like types still flow through the same `isBooleanLikeProp` handling instead of adding source-specific apply strings.
 
@@ -511,7 +561,7 @@ Completed in this branch:
 - Kept status copy activity-based, including revoked/inactive states, without implying durable socket connectivity.
 - Added integration coverage for header placement, default permissions, bridge absence before start, start/stop lifecycle, unmount cleanup, reload-style inactive behavior, mandatory read-access copy, and status wording.
 
-Verification completed with `npm run typecheck`, `CI=1 npm run test -- --run`, `npm run lint` (existing `InspectionPopover` hook dependency warning only), and a browser smoke/console check at `http://127.0.0.1:5173/aksel-arcade/`.
+Verification completed with `npm run type-check`, `CI=1 npm run test -- --run`, `npm run lint` (existing `InspectionPopover` hook dependency warning only), and a browser smoke/console check at `http://127.0.0.1:5173/aksel-arcade/`.
 
 Follow-up note: #32 should build on `src/services/agentBridge.ts` and `src/hooks/useAgentSession.ts` by adding read commands and copyable instructions. Keep share/export out of the bridge command list until the fallback-packaging issue explicitly asks for regression coverage.
 
@@ -523,7 +573,7 @@ Fixed after PR #39 checks failed:
 - Replaced the Agent session ID generator with the existing `generateSecureUUID()` Web Crypto helper so the bridge session ID never falls back to insecure randomness.
 - Added integration coverage that starts Agent access through the header and verifies the bridge uses the mocked `crypto.randomUUID()` session id.
 
-Verification completed with `npm run typecheck`, `CI=1 npm run test -- --run`, `npm run lint` (existing `InspectionPopover` hook dependency warning only), and a browser smoke/console check at `http://127.0.0.1:5174/aksel-arcade/`.
+Verification completed with `npm run type-check`, `CI=1 npm run test -- --run`, `npm run lint` (existing `InspectionPopover` hook dependency warning only), and a browser smoke/console check at `http://127.0.0.1:5174/aksel-arcade/`.
 
 ### 2026-05-25 - #32 Copy agent instructions and read Arcade-scoped state
 
@@ -537,7 +587,7 @@ Completed in this branch:
 - Recorded Agent read activity in the menu status and kept stale bridge references returning structured `session-revoked` errors after access is stopped.
 - Added integration coverage for copied instruction contents, inactive bridge state before start, active read command success, revoked-session errors after stop, activity status, and scoped read shape.
 
-Verification completed with `npm run typecheck`, `CI=1 npm run test -- --run`, `npm run lint` (existing `InspectionPopover` hook dependency warning only), and a browser smoke/console check at `http://127.0.0.1:5175/aksel-arcade/`.
+Verification completed with `npm run type-check`, `CI=1 npm run test -- --run`, `npm run lint` (existing `InspectionPopover` hook dependency warning only), and a browser smoke/console check at `http://127.0.0.1:5175/aksel-arcade/`.
 
 ### 2026-05-25 - #33 Apply source Agent changes with Checkpoints and rollback
 
@@ -552,7 +602,7 @@ Completed in this branch:
 - Let accepted schema-valid source changes apply immediately without waiting for compile/render success, so the normal preview flow reports later compile/runtime failures.
 - Added integration coverage for bridge command shape, successful source apply, atomic JSX+Hooks updates, Checkpoint creation/capping, human rollback, permission denial, absence of bridge rollback commands, and preview compile-error behavior after an accepted invalid source change.
 
-Verification completed with `npm run typecheck`, `CI=1 npm run test -- --run`, and a browser smoke/console check at `http://127.0.0.1:5175/aksel-arcade/`.
+Verification completed with `npm run type-check`, `CI=1 npm run test -- --run`, and a browser smoke/console check at `http://127.0.0.1:5175/aksel-arcade/`.
 
 Follow-up note: #34 should harden `applySourceChange` validation around malformed/oversized/unknown-field payloads and whole-command rejection. #35 can extend the same command path to preview settings and project metadata; keep rollback human-only unless a later issue explicitly changes that contract.
 
@@ -566,7 +616,7 @@ Fixed after the merged PR #40 broke the GitHub Pages build:
 - Added `expectBridgeSuccess` so the test keeps a sharp assertion for successful read commands while preserving TypeScript narrowing.
 - Kept the fix scoped to `tests/integration/project-controls-layout.test.tsx`; product bridge behavior was unchanged.
 
-Verification completed with `npm run build`, `CI=1 npm run test -- --run tests/integration/project-controls-layout.test.tsx`, `npm run typecheck`, `CI=1 npm run test -- --run`, `npm run lint` (existing `InspectionPopover` hook dependency warning only), and a browser smoke/console check at `http://127.0.0.1:5175/aksel-arcade/`.
+Verification completed with `npm run build`, `CI=1 npm run test -- --run tests/integration/project-controls-layout.test.tsx`, `npm run type-check`, `CI=1 npm run test -- --run`, `npm run lint` (existing `InspectionPopover` hook dependency warning only), and a browser smoke/console check at `http://127.0.0.1:5175/aksel-arcade/`.
 
 Follow-up note: #33 should build source replacement and automatic Checkpoints on top of these bridge/session primitives. Keep share/export out of the bridge command list, and keep read commands constrained to Arcade-scoped state unless a later issue explicitly expands the command contract.
 
@@ -579,7 +629,7 @@ Fixed after reviewing PR #40:
 - Changed the bridge `permissions` member to a current-state getter backed by the active session controller.
 - Added integration coverage proving captured bridge references return updated project source/name, preview theme/viewport, and active permission state after the human changes them during an Agent session.
 
-Verification completed with `npm run typecheck`, `CI=1 npm run test -- --run`, `npm run lint` (existing `InspectionPopover` hook dependency warning only), and a browser smoke/console check at `http://127.0.0.1:5175/aksel-arcade/`.
+Verification completed with `npm run type-check`, `CI=1 npm run test -- --run`, `npm run lint` (existing `InspectionPopover` hook dependency warning only), and a browser smoke/console check at `http://127.0.0.1:5175/aksel-arcade/`.
 
 ### 2026-05-26 - #34 Reject invalid or unauthorized Agent changes as structured errors
 
@@ -593,7 +643,7 @@ Completed in this branch:
 - Preserved project source/name, preview context, active permissions, menu status, and Checkpoint history after rejected bridge calls.
 - Added integration coverage for valid changes, malformed payloads, permission denial, unsupported viewport/theme/name fields, oversize rejection, structured error shape, whole-command rejection, and unchanged state after failures.
 
-Verification completed with `npm run typecheck`, `CI=1 npm run test`, and a browser smoke/console check at `http://127.0.0.1:5176/aksel-arcade/`.
+Verification completed with `npm run type-check`, `CI=1 npm run test`, and a browser smoke/console check at `http://127.0.0.1:5176/aksel-arcade/`.
 
 Follow-up note: #35 can extend the same guarded command path to permitted `viewportSize`, `theme`, and `name` replacements. Reuse the unsupported-field whole-request behavior when adding those fields so mixed invalid or unauthorized Agent changes stay atomic.
 
@@ -605,7 +655,7 @@ Fixed after reviewing PR #43:
 - Added non-empty source field validation before mutation and Checkpoint creation.
 - Added regression coverage proving empty JSX and blank Hooks replacements return structured `invalid-request` errors and leave project, preview, permissions, status, and Checkpoint history unchanged.
 
-Verification completed with `npm run typecheck`, `CI=1 npm run test`, and a browser smoke/console check at `http://127.0.0.1:5176/aksel-arcade/`.
+Verification completed with `npm run type-check`, `CI=1 npm run test`, and a browser smoke/console check at `http://127.0.0.1:5176/aksel-arcade/`.
 
 Follow-up note: #35 should preserve this non-empty source validation when it extends the guarded Agent change path to preview settings and metadata.
 
@@ -614,12 +664,12 @@ Follow-up note: #35 should preserve this non-empty source validation when it ext
 Fixed after the merged PR #43 broke the GitHub Pages build:
 
 - Reproduced the failing workflow locally with `npm run build` and confirmed the CI error from run `26434521486`.
-- Root cause: `useAgentSession` typed its `project` option as a narrow Arcade read-context subset, but the oversize validation path passed that value to `validateProjectSize(Project)`. `npm run typecheck` missed this because the CI build uses `tsc -b`, which checks the referenced app/test configs.
+- Root cause: `useAgentSession` typed its `project` option as a narrow Arcade read-context subset, but the oversize validation path passed that value to `validateProjectSize(Project)`. `npm run type-check` missed this because the CI build uses `tsc -b`, which checks the referenced app/test configs.
 - Changed `UseAgentSessionOptions.project` to the full `Project`, matching the actual caller while keeping the bridge read context scoped to `{ name, jsxCode, hooksCode }` and preview state.
 
-Verification completed with `npm run build`, `npm run typecheck`, `CI=1 npm run test`, and a browser smoke/console check at `http://127.0.0.1:5176/aksel-arcade/`.
+Verification completed with `npm run build`, `npm run type-check`, `CI=1 npm run test`, and a browser smoke/console check at `http://127.0.0.1:5176/aksel-arcade/`.
 
-Follow-up note: when Agent bridge validation uses project-wide helpers, run `npm run build` before merge because `npm run typecheck` does not catch all build-mode referenced-project errors.
+Follow-up note: when Agent bridge validation uses project-wide helpers, run `npm run build` before merge because `npm run type-check` does not catch all build-mode referenced-project errors.
 
 ### 2026-05-26 - #35 Allow permitted preview and metadata replacements
 
@@ -633,7 +683,7 @@ Completed in this branch:
 - Created a Checkpoint before every accepted Agent change and extended human rollback so source/name/viewport/theme fields restore only when they were changed by that Checkpoint.
 - Updated copied Agent instructions and integration coverage for active permission toggles, preview setting apply, metadata default denial, metadata opt-in apply, combined source/preview/metadata apply, whole-change rejection, invalid value handling, Checkpoint capping, and combined rollback.
 
-Verification completed with `npm run typecheck`, `npm run test -- --run`, `npm run build`, and a browser smoke/console check at `http://127.0.0.1:5177/aksel-arcade/`.
+Verification completed with `npm run type-check`, `npm run test -- --run`, `npm run build`, and a browser smoke/console check at `http://127.0.0.1:5177/aksel-arcade/`.
 
 Follow-up note: #36 should add diagnostics as a read-only bridge command over preview status/errors/console history. #37 can now rely on preview settings being safely agent-changeable while building sanitized Preview evidence.
 
@@ -645,7 +695,7 @@ Fixed after reviewing PR #45:
 - Synchronized the Agent session's current project/preview refs immediately after accepted Agent changes and human rollback, so subsequent bridge calls capture the latest accepted state even before React flushes a render.
 - Added regression coverage that applies two Agent changes in the same React act batch, restores the second Checkpoint back to the first change, then restores the first Checkpoint back to the original source.
 
-Verification completed with `npm run typecheck`, `npm run test -- --run`, `npm run build`, and a browser smoke/console check at `http://127.0.0.1:5177/aksel-arcade/`.
+Verification completed with `npm run type-check`, `npm run test -- --run`, `npm run build`, and a browser smoke/console check at `http://127.0.0.1:5177/aksel-arcade/`.
 
 ### 2026-05-26 - #36 Return diagnostics with bounded sandbox console history
 
@@ -660,7 +710,7 @@ Completed in this branch:
 - Kept schema-valid Agent source changes apply-then-review: compile/render failures are still not blocked by apply, and diagnostics reports the resulting normal preview errors afterward.
 - Added unit and integration coverage for diagnostics normalization, bounded console history, command shape, revoked-session errors, read activity status, runtime errors, and compile errors.
 
-Verification completed with `npm run typecheck`, `CI=1 npm run test -- --run tests/unit/services/previewDiagnostics.test.ts tests/integration/project-controls-layout.test.tsx`, the full required `CI=1 npm run typecheck && CI=1 npm run test` check, and a browser smoke check of the active Agent `getDiagnostics()` command.
+Verification completed with `npm run type-check`, `CI=1 npm run test -- --run tests/unit/services/previewDiagnostics.test.ts tests/integration/project-controls-layout.test.tsx`, the full required `CI=1 npm run type-check && CI=1 npm run test` check, and a browser smoke check of the active Agent `getDiagnostics()` command.
 
 Follow-up note: #37 should reuse the same active-session/read-activity bridge pattern for permission-gated Preview evidence. Keep diagnostics scoped to preview state only; do not add share/export, browser storage, cookies, clipboard, or unrelated page state to diagnostics.
 
@@ -678,7 +728,7 @@ Completed in this branch:
 - Updated copied Agent instructions and command discovery to include `getPreviewEvidence()`.
 - Added unit serializer coverage plus integration coverage for successful evidence reads, permission denial without evidence, stale bridge revocation, deterministic output, included facts, excluded unsafe data, and read activity status.
 
-Verification completed with `npm run typecheck`, `npm run test -- --run`, targeted `npm run test -- --run tests/integration/project-controls-layout.test.tsx`, `git diff --check`, and a headless browser smoke check of the active `getPreviewEvidence()` bridge command at the local Vite URL.
+Verification completed with `npm run type-check`, `npm run test -- --run`, targeted `npm run test -- --run tests/integration/project-controls-layout.test.tsx`, `git diff --check`, and a headless browser smoke check of the active `getPreviewEvidence()` bridge command at the local Vite URL.
 
 Follow-up note: #38 should verify share/export artifacts still exclude Agent session state, permissions, activity, bridge metadata, Preview evidence, and Checkpoints. Keep Preview evidence as a live, permission-gated bridge read rather than adding it to share/export payloads.
 
@@ -693,7 +743,7 @@ Completed in this branch:
 - Added regression coverage that starts an Agent session, accepts source, Hooks, viewport, theme, and name changes that create a Checkpoint, then verifies Share URL snapshot and Export JSON output include the current project/preview state while excluding the Checkpoint id, Checkpoint summary, bridge global, Agent session state, permissions, activity, rollback history, diagnostics, and Preview evidence.
 - Preserved existing share fallback behavior, including oversize/export fallback coverage and explicit regeneration when the share button is clicked while the popover is already open.
 
-Verification completed with `npm run typecheck`, `CI=1 npm run test`, targeted share/Agent integration coverage, and a headless browser smoke check of Agent change -> preview render -> Share URL copy -> Export JSON download.
+Verification completed with `npm run type-check`, `CI=1 npm run test`, targeted share/Agent integration coverage, and a headless browser smoke check of Agent change -> preview render -> Share URL copy -> Export JSON download.
 
 Follow-up note: keep share/export as human-triggered fallback flows. If future Agent artifacts move into project-level state, extend the share/export exclusion regression checks before exposing those artifacts anywhere near fallback payloads.
 
@@ -733,7 +783,7 @@ Completed in this branch:
 - Kept Desktop capability mode Agent access available while hiding the Share URL surface.
 - Added unit coverage for the capability matrix and integration coverage for Web-vs-Desktop header behavior; moved existing Agent bridge integration coverage onto Desktop capabilities.
 
-Verification completed with `npm run typecheck`, `npm run test -- --run`, `npm run type-check`, `npm run lint` (existing hook dependency warnings only), and browser smoke checks for Web default capabilities plus `VITE_AKSEL_ARCADE_SURFACE=desktop` Desktop capabilities.
+Verification completed with `npm run type-check`, `npm run test -- --run`, `npm run type-check`, `npm run lint` (existing hook dependency warnings only), and browser smoke checks for Web default capabilities plus `VITE_AKSEL_ARCADE_SURFACE=desktop` Desktop capabilities.
 
 Next note: #56 should continue from the capability model instead of adding platform checks. Start with `src/services/shellCapabilities.ts` and `AppHeader` when proving Web Arcade has no Agent runtime, then keep Desktop transport work separate from Share URL behavior.
 
@@ -747,7 +797,7 @@ Completed in this branch:
 - Moved `AgentSessionMenu` behind a Desktop-capability-only lazy boundary in `AppHeader`, so Web Arcade does not mount or load the Agent session runtime path during normal rendering.
 - Strengthened integration coverage to prove Web Arcade can open the Share URL popover without publishing `window.__AKSEL_ARCADE_AGENT_BRIDGE__`, while Desktop capability tests still cover Agent access with Share URL absent.
 
-Verification completed with `npm run typecheck` and `npm run test`.
+Verification completed with `npm run type-check` and `npm run test`.
 
 Next note: #60 can now extract the bridge command router without needing to preserve a Web Arcade browser-global Agent surface. Keep the lazy/Desktop-only Agent menu boundary unless a later PRD explicitly reintroduces Web Agent access.
 
@@ -763,7 +813,7 @@ Completed in this branch:
 - Kept `createAgentBridge` as a compatibility wrapper over the router so Desktop capability tests and existing browser-global bridge behavior do not regress.
 - Added unit coverage for router read commands, diagnostics cloning, Preview evidence permission/unavailable failures, apply-source routing, unsupported commands, revoked sessions, and wrapper compatibility.
 
-Verification completed with `npm run typecheck` and `CI=1 npm run test -- --run`.
+Verification completed with `npm run type-check` and `CI=1 npm run test -- --run`.
 
 Next note: #61 can build the Desktop Agent session coordinator on top of this router. Transport adapters should call `routeCommand(commandName, payload)` rather than reaching through the browser-global bridge wrapper, and should continue rejecting file-system, shell, Share URL, export/import, package, and window-management commands as unsupported.
 
@@ -775,9 +825,9 @@ Fixed after the merged PR #71 broke the GitHub Pages build:
 - Annotated the `getSessionState` routed read as `AgentSessionReadState`, preserving the exact structured result shape while keeping the browser-global bridge wrapper unchanged.
 - Confirmed the original build failure no longer reproduces.
 
-Verification completed with `npm run build`, `npm run typecheck`, and `CI=1 npm run test -- --run`.
+Verification completed with `npm run build`, `npm run type-check`, and `CI=1 npm run test -- --run`.
 
-Follow-up note: Agent bridge router changes should run `npm run build`, not only `npm run typecheck`, because the build-mode referenced TypeScript config catches stricter routed-result inference.
+Follow-up note: Agent bridge router changes should run `npm run build`, not only `npm run type-check`, because the build-mode referenced TypeScript config catches stricter routed-result inference.
 
 ### 2026-05-27 - #59 Boot Desktop Arcade with narrow preload capabilities
 
@@ -792,7 +842,7 @@ Completed in this branch:
 - Added unit coverage for preload capability resolution, fallback behavior, and malformed preload payload rejection.
 - Documented local Desktop Arcade development in the README and updated the Desktop Agent transport PRD progress.
 
-Verification completed with `npm run typecheck`, `CI=1 npm run test`, `npm run build`, `npm run lint` (existing hook dependency warnings only), syntax checks for the desktop scripts, and a Desktop Arcade smoke launch through `npm run desktop:dev`.
+Verification completed with `npm run type-check`, `CI=1 npm run test`, `npm run build`, `npm run lint` (existing hook dependency warnings only), syntax checks for the desktop scripts, and a Desktop Arcade smoke launch through `npm run desktop:dev`.
 
 Next note: #61 can build the Desktop Agent session coordinator on top of this shell. Keep future desktop-only capabilities behind preload/main-process IPC and do not import Electron, Node, socket, process, or filesystem APIs into React components.
 
@@ -808,7 +858,7 @@ Completed in this branch:
 - Added coordinator unit coverage for lifecycle, one-session behavior, stop/reload/quit cleanup reasons, credential invalidation, Web Crypto credential generation, all-on permissions, and adapter startup rollback.
 - Strengthened Desktop Agent menu integration coverage to prove the published bridge still excludes the pairing credential.
 
-Verification completed with `npm run typecheck` and `CI=1 npm run test`.
+Verification completed with `npm run type-check` and `CI=1 npm run test`.
 
 Next note: #62 can attach the loopback JSON-RPC lifecycle/auth adapter to `DesktopAgentTransportAdapter` and should use `getActiveTransportSession()` only inside the transport boundary. Keep the renderer-facing bridge command contract routed through `createAgentBridgeCommandRouter`; do not expose filesystem, shell, Share URL, export/import, package, rollback, or window-management commands.
 
@@ -826,7 +876,7 @@ Completed in this branch:
 - Added loopback transport unit coverage for localhost endpoint metadata, Authorization-header auth, query credential rejection, malformed JSON-RPC, unsupported methods, and shutdown behavior.
 - Updated PRD #53 implementation progress with the #62 transport lifecycle/auth work.
 
-Verification completed with `npm run typecheck`, `CI=1 npm run test`, `npm run build`, `npm run lint` (existing warnings only), desktop script syntax checks, and a browser smoke/console check at the local Vite URL.
+Verification completed with `npm run type-check`, `CI=1 npm run test`, `npm run build`, `npm run lint` (existing warnings only), desktop script syntax checks, and a browser smoke/console check at the local Vite URL.
 
 Next note: #63 should route authenticated JSON-RPC method names through `createAgentBridgeCommandRouter` rather than adding a second command contract. Keep the main-process transport as lifecycle/auth only, continue rejecting filesystem, shell, Share URL, export/import, package, rollback, and window-management methods, and keep credentials in the Authorization header only.
 
@@ -840,7 +890,7 @@ Fixed after manual Desktop Agent testing showed copied instructions still contai
 - Left actual JSON-RPC command routing for #63 and copied-instruction product polish for #64.
 - Added regression coverage for active Desktop copied instructions containing endpoint/Auth details without visible UI leakage.
 
-Verification completed with `npm run typecheck`, `CI=1 npm run test`, `npm run build`, `npm run lint` (existing warnings only), and a Desktop Arcade dev smoke test. The desktop smoke test copied instructions from the running app, sent a JSON-RPC request with the copied Authorization header and got a structured `unsupported-method` response, verified missing/wrong auth failures, rejected query-token usage, rejected a non-loopback interface request, and confirmed the endpoint shut down after stopping Agent access.
+Verification completed with `npm run type-check`, `CI=1 npm run test`, `npm run build`, `npm run lint` (existing warnings only), and a Desktop Arcade dev smoke test. The desktop smoke test copied instructions from the running app, sent a JSON-RPC request with the copied Authorization header and got a structured `unsupported-method` response, verified missing/wrong auth failures, rejected query-token usage, rejected a non-loopback interface request, and confirmed the endpoint shut down after stopping Agent access.
 
 Next note: #63 should now be able to reuse the copied endpoint/Auth instructions and focus only on routing supported read methods through `createAgentBridgeCommandRouter`.
 
@@ -854,7 +904,7 @@ Fixed scoped issues found during PR #75 review before merge:
 - Rejected preload IPC endpoints with an empty `Bearer ` Authorization value instead of accepting endpoint metadata that can only fail later.
 - Added regression coverage for concurrent loopback starts, cancelled coordinator startup, and empty Bearer endpoint validation.
 
-Verification completed with `npm run typecheck`, `CI=1 npm run test`, `npm run lint` (existing warnings only), `npm run build`, desktop script syntax checks, and the Desktop Arcade dev smoke path.
+Verification completed with `npm run type-check`, `CI=1 npm run test`, `npm run lint` (existing warnings only), `npm run build`, desktop script syntax checks, and the Desktop Arcade dev smoke path.
 
 Next note: #63 can still focus on routing authenticated JSON-RPC read methods through `createAgentBridgeCommandRouter`; the #75 review fixes only harden #62 lifecycle/auth behavior.
 
@@ -871,7 +921,7 @@ Completed in this branch:
 - Updated copied transport instructions to name the supported read methods while keeping endpoint and credential details hidden from the visible Agent menu.
 - Added unit coverage for protocol routing, stale/revoked session errors, loopback route forwarding without credential leakage, and preload route-handler registration.
 
-Verification completed with `npm run typecheck`, `CI=1 npm run test`, `npm run build`, desktop script syntax checks, and a headless browser smoke check against the local Vite app.
+Verification completed with `npm run type-check`, `CI=1 npm run test`, `npm run build`, desktop script syntax checks, and a headless browser smoke check against the local Vite app.
 
 Next note: #64 should now polish the copied provider-neutral instructions around the working read transport. #65 should extend the same protocol path for `applySourceChange` instead of adding a second command contract, and should keep the non-project desktop methods rejected.
 
@@ -887,7 +937,7 @@ Completed in this branch:
 - Added Agent menu integration coverage for success feedback, hidden active endpoint/Auth details, provider-neutral examples, failure feedback, retry, and visible UI secret non-disclosure.
 - Updated PRD #53 implementation progress with the #64 copied-instruction work.
 
-Verification completed with `npm run typecheck`, `CI=1 npm run test`, and a desktop-surface browser smoke check for Agent menu render, start access, copy success feedback, hidden instruction copying, visible secret non-disclosure, and clean console output.
+Verification completed with `npm run type-check`, `CI=1 npm run test`, and a desktop-surface browser smoke check for Agent menu render, start access, copy success feedback, hidden instruction copying, visible secret non-disclosure, and clean console output.
 
 Next note: #65 should extend the same Desktop Agent transport protocol path for authenticated `applySourceChange` instead of adding a second command contract. Keep filesystem, shell, Share URL, export/import/package, rollback, and window-management methods rejected, and keep copied instructions/provider examples provider-neutral.
 
@@ -904,7 +954,7 @@ Completed in this branch:
 - Added unit coverage for transport `applySourceChange` success, bridge validation failure mapping, unsupported methods, stale renderer sessions, and revoked sessions.
 - Added integration coverage that simulates the Desktop preload route handler applying source, preview, and metadata changes through the transport, verifies invalid transport changes leave state unchanged, and keeps unsupported/stale-session failures structured.
 
-Verification completed with `npm run typecheck`, targeted Agent transport Vitest coverage, and the full `CI=1 npm run test -- --run` suite.
+Verification completed with `npm run type-check`, targeted Agent transport Vitest coverage, and the full `CI=1 npm run test -- --run` suite.
 
 Next note: #66 can build directly on the Checkpoint id returned by transport `applySourceChange`, but the transport must remain human-rollback-only. Do not add an agent-triggered restore/delete Checkpoint command when exposing Checkpoints in the menu.
 
@@ -923,7 +973,7 @@ Completed in this branch:
 - Updated the Desktop Agent transport PRD implementation progress with the #57 package export work.
 - Tightened build-mode test type assertions encountered during validation so `npm run build` type-checks the package export test and existing Desktop transport test harness cleanly.
 
-Verification completed with `npm run typecheck`, `CI=1 npm run test`, `npm run lint` (existing warnings only), `npm run build`, targeted package/export Vitest coverage, and a browser smoke check that rendered the default preview and downloaded an `.akselarcade` package.
+Verification completed with `npm run type-check`, `CI=1 npm run test`, `npm run lint` (existing warnings only), `npm run build`, targeted package/export Vitest coverage, and a browser smoke check that rendered the default preview and downloaded an `.akselarcade` package.
 
 Next note: #58 should add import support for this package envelope while preserving legacy `.json` import compatibility. Reuse `createArcadeProjectPackage`/the package constants from `src/services/storage.ts` instead of inventing a second package shape, and keep Agent session/transport fields ignored on import.
 
@@ -940,7 +990,7 @@ Completed in this branch:
 - Updated the shared Import file picker to accept `.akselarcade`, the package MIME type, `.json`, and `application/json`.
 - Updated the Desktop Agent transport PRD implementation progress with the #58 package import work.
 
-Verification completed with `npm run typecheck`, `CI=1 npm run test`, targeted storage/header Vitest coverage, and a browser smoke check that exported a `.akselarcade` package and imported a `.akselarcade` package back into the workspace with no console errors.
+Verification completed with `npm run type-check`, `CI=1 npm run test`, targeted storage/header Vitest coverage, and a browser smoke check that exported a `.akselarcade` package and imported a `.akselarcade` package back into the workspace with no console errors.
 
 PR #80 review follow-up: tightened package-envelope detection from partial-field matching to requiring the full `format` + `formatVersion` + `project` envelope, so legacy nested JSON with unrelated `project` metadata still imports normally. Added storage coverage for that legacy metadata case and updated the PRD history in #53.
 
@@ -957,7 +1007,7 @@ Completed in this branch:
 - Added coverage that stopping Agent access clears the local Checkpoint entries from the Agent menu.
 - Updated the Desktop Agent transport PRD implementation progress with the #66 human-controlled rollback work.
 
-Verification note: attempted `npm run typecheck` and `CI=1 npm run test -- --run`, but this environment does not have `npm` on PATH (`bash: npm: command not found`). The next person should run those two commands in a Node-enabled checkout before merging.
+Verification note: attempted `npm run type-check` and `CI=1 npm run test -- --run`, but this environment does not have `npm` on PATH (`bash: npm: command not found`). The next person should run those two commands in a Node-enabled checkout before merging.
 
 Next note: #67 is now the next Desktop Agent transport follow-up. It should prove `.akselarcade` packages remain clean after Agent transport reads, Agent changes, stop, and human rollback; do not include Agent session identifiers, pairing credentials, endpoints, permissions, Checkpoints, diagnostics, Preview evidence, or transport metadata in package exports/imports.
 
@@ -972,7 +1022,7 @@ Completed in this branch:
 - Proved package exports exclude Agent session ids, pairing credentials, loopback endpoints, permissions, Checkpoints, diagnostics, Preview evidence, transport metadata, rollback/activity/bridge keys, the bridge global, and confidential Checkpoint summaries.
 - Proved importing a package exported after Agent access recreates only the portable project content and does not recreate Agent access or stale Checkpoints. Desktop capability coverage still keeps Export/Import package controls present and Share URL absent.
 
-Verification completed with `npm run typecheck`, `CI=1 npm run test -- --run tests/integration/project-controls-layout.test.tsx tests/unit/services/storage.test.ts`, and the required full `CI=1 npm run test -- --run` suite after installing dependencies with `npm ci` because this worktree initially had no local `node_modules`.
+Verification completed with `npm run type-check`, `CI=1 npm run test -- --run tests/integration/project-controls-layout.test.tsx tests/unit/services/storage.test.ts`, and the required full `CI=1 npm run test -- --run` suite after installing dependencies with `npm ci` because this worktree initially had no local `node_modules`.
 
 Next note: package cleanliness is now covered at the Desktop transport integration boundary. If future Agent artifacts move into project state or export metadata, extend `tests/integration/project-controls-layout.test.tsx` and `tests/unit/services/storage.test.ts` before exposing those artifacts anywhere near `.akselarcade` import/export.
 
@@ -983,7 +1033,7 @@ Reviewed PR #82 before merge and found one scoped clarity issue in the new packa
 - Investigated whether the extra `crypto.randomUUID().mockReturnValueOnce(...)` was dead code; targeted validation showed it intentionally keeps the default project id distinct from the deterministic Desktop transport session id, so package-leak assertions do not fail on fixture UUID reuse.
 - Kept that behavior and named the override `deterministicProjectId` so the test makes the project-id/session-id separation explicit while still verifying the active Desktop transport session id from the preload fixture is excluded from exported package JSON.
 
-Verification completed with `npm run typecheck`, `CI=1 npm run test -- --run tests/integration/project-controls-layout.test.tsx tests/unit/services/storage.test.ts`, and the full `CI=1 npm run test -- --run` suite.
+Verification completed with `npm run type-check`, `CI=1 npm run test -- --run tests/integration/project-controls-layout.test.tsx tests/unit/services/storage.test.ts`, and the full `CI=1 npm run test -- --run` suite.
 
 ### 2026-05-27 - #68 Validate copied instructions with Copilot surfaces
 
@@ -998,7 +1048,7 @@ Completed in this branch:
 - Filed follow-up issue #84 for the sandbox render diagnostics gap observed during CLI validation: a React render failure could leave Preview evidence empty while `getDiagnostics` still reported no structured runtime error.
 - Updated the Desktop Agent transport PRD implementation progress with the #68 validation result.
 
-Verification completed with `npm run typecheck` and `CI=1 npm run test`.
+Verification completed with `npm run type-check` and `CI=1 npm run test`.
 
 Next note: #68 is validation-only. Follow-up #83 should clarify copied instructions around waiting for post-change diagnostics/evidence after `applySourceChange`, and #84 should investigate structured diagnostics for React render failures that currently only show up in sandbox console output. Both follow-ups should avoid changing the provider-neutral protocol or adding Copilot-specific behavior.
 
@@ -1014,7 +1064,7 @@ Completed in this branch:
 - Preserved existing inactive, revoked, stale-session, and unauthenticated transport failure paths, with explicit coverage for endpoint-less bridge calls and revoked instruction reads.
 - Added unit and integration coverage for command-list exposure, successful Desktop transport routing, excluded project content, and existing stale/revoked behavior.
 
-Verification completed with `npm run typecheck` and `CI=1 npm run test -- --run` after installing dependencies with `npm ci` and using `/opt/homebrew/bin` for the local Node/npm toolchain.
+Verification completed with `npm run type-check` and `CI=1 npm run test -- --run` after installing dependencies with `npm ci` and using `/opt/homebrew/bin` for the local Node/npm toolchain.
 
 Next note: #89 is now unblocked. It should replace the long copied instructions with a one-line `curl` bootstrap command that calls `getAgentInstructions`, keeps credentials in the Authorization header only, and relies on the same stop/reload invalidation boundary.
 
@@ -1030,7 +1080,7 @@ Completed in this branch:
 - Kept endpoint, Authorization header, and command text hidden in the menu UI while still allowing the short-lived command to be copied after active Desktop Agent access starts.
 - Added regression coverage for exact clipboard output, inactive no-copy behavior, no query credentials, no helper/jq/MCP dependency, active getAgentInstructions routing, and stop invalidation for the copied command path.
 
-Verification completed with `npm run typecheck`, `npm run test -- --run`, and a browser smoke check via `npm run test:e2e -- --project=chromium tests/e2e/agent-diagnostics.spec.ts --reporter=line` after installing dependencies with `npm ci` and using `/opt/homebrew/bin` for the local Node/npm toolchain.
+Verification completed with `npm run type-check`, `npm run test -- --run`, and a browser smoke check via `npm run test:e2e -- --project=chromium tests/e2e/agent-diagnostics.spec.ts --reporter=line` after installing dependencies with `npm ci` and using `/opt/homebrew/bin` for the local Node/npm toolchain.
 
 Next note: #90 can now update the Norwegian Agent menu wording and safety cues on top of the short command behavior. #91 should keep focusing on preventing the command, endpoint, Authorization header, pairing credential, and fetched instructions from becoming durable project/package/telemetry/log data.
 
@@ -1040,7 +1090,7 @@ Reviewed PR #95 before merge and fixed one scoped test gap:
 
 - Added regression coverage proving the copied Agent pairing handoff command POSIX-shell-quotes single quotes and shell metacharacters in the endpoint and Authorization header while remaining one line.
 
-Verification completed with `npm run typecheck` and targeted `npm run test -- --run tests/unit/services/agentBridge.test.ts`; full-suite verification was rerun before merge.
+Verification completed with `npm run type-check` and targeted `npm run test -- --run tests/unit/services/agentBridge.test.ts`; full-suite verification was rerun before merge.
 
 ### 2026-05-28 - #91 Prevent Agent pairing handoff secrets from durable artifacts
 
@@ -1053,7 +1103,7 @@ Completed in this branch:
 - Redacted secret-bearing route failure messages in Desktop loopback/preload transport responses so failed instruction fetches do not echo endpoint, Authorization header, credential, or copied command text.
 - Added regression coverage for redaction helpers, copy failure logging, async transport stop logging, instruction fetch failure responses, and the existing package export / rollback / import flow after an active Agent session.
 
-Verification completed with `npm run typecheck`, `CI=1 npm run test`, and `npm run lint` (passes with the existing React hook dependency warnings in `InspectionPopover` and `PreviewPane`).
+Verification completed with `npm run type-check`, `CI=1 npm run test`, and `npm run lint` (passes with the existing React hook dependency warnings in `InspectionPopover` and `PreviewPane`).
 
 ### 2026-05-28 - PR #96 review follow-up
 
@@ -1062,7 +1112,7 @@ Fixed one scoped review finding before merge:
 - Brought the Desktop CJS Agent handoff redactor to parity with the renderer redactor for stringified `pairingCredential` and `instructionsMarkdown` fields.
 - Added regression coverage proving Desktop-side redaction marks redacted content and removes stringified pairing credentials, fetched instruction markdown, endpoint, and Authorization header content.
 
-Verification completed with `npm run typecheck`, `CI=1 npm run test`, and `npm run lint` (passes with the existing React hook dependency warnings in `InspectionPopover` and `PreviewPane`).
+Verification completed with `npm run type-check`, `CI=1 npm run test`, and `npm run lint` (passes with the existing React hook dependency warnings in `InspectionPopover` and `PreviewPane`).
 
 ### 2026-05-28 - PR #96 build failure follow-up
 
@@ -1071,7 +1121,7 @@ Fixed the post-merge `npm run build` failure from PR #96:
 - Root cause: `tsc -b` selected the generic `Array.reduce` overload from the nullable `knownSecrets` item type in `src/services/agentHandoffRedaction.ts`, so the accumulator was inferred as `string | null | undefined` even though runtime always seeded it with a string.
 - Fixed by making the accumulator type explicit with `reduce<string>`, preserving the redaction behavior while satisfying the build tsconfig.
 
-Verification completed with `npm run build`, `npm run typecheck`, `CI=1 npm run test`, and `npm run lint` (passes with the existing React hook dependency warnings in `InspectionPopover` and `PreviewPane`).
+Verification completed with `npm run build`, `npm run type-check`, `CI=1 npm run test`, and `npm run lint` (passes with the existing React hook dependency warnings in `InspectionPopover` and `PreviewPane`).
 
 ### 2026-05-28 - #90 Agent pairing handoff menu wording
 
@@ -1083,7 +1133,7 @@ Completed in this branch:
 - Kept endpoint, Authorization header, Agent pairing credential, and copied command text clipboard-only/not visibly rendered in the menu; the fetched agent-facing instruction payload remains English.
 - Localized the same Agent menu checkpoint restore labels and changed integration coverage so copy success, failure, retry, safety copy, and hidden handoff details stay covered.
 
-Verification completed with `npm run typecheck`, `CI=1 npm run test`, and a Desktop Arcade browser smoke test against the dev server with a preload/clipboard stub.
+Verification completed with `npm run type-check`, `CI=1 npm run test`, and a Desktop Arcade browser smoke test against the dev server with a preload/clipboard stub.
 
 Next note: future Agent pairing work should keep the secret-bearing command, endpoint, Authorization header, and Agent pairing credential out of visible UI and durable artifacts; treat the copied command as clipboard-only handoff material.
 
@@ -1094,7 +1144,7 @@ Fixed a follow-up bug in the same #90 feature:
 - Root cause: `npm run desktop:dev` spawned Vite without `VITE_AKSEL_ARCADE_SURFACE=desktop`, so the dev renderer fell back to Web Arcade if viewed without the Electron preload bridge. That hid the Agent menu button and exposed the Share URL button.
 - Set the desktop dev Vite process to `VITE_AKSEL_ARCADE_SURFACE=desktop`, documented the behavior, and added a regression test for the desktop dev script.
 
-Verification completed with `npm run typecheck`, `CI=1 npm run test`, targeted shell capability/script tests, and a browser smoke test against a Desktop-surface dev server confirming the Agent menu is visible and Share URL is absent.
+Verification completed with `npm run type-check`, `CI=1 npm run test`, targeted shell capability/script tests, and a browser smoke test against a Desktop-surface dev server confirming the Agent menu is visible and Share URL is absent.
 
 ### 2026-05-28 - #90 Desktop Agent command copy follow-up
 
@@ -1104,7 +1154,7 @@ Fixed another follow-up bug in the same #90 feature:
 - Inlined the small preload redaction helper to keep the preload self-contained while leaving the main-process CJS redactor in place for non-preload code.
 - Added a regression test that prevents project-local `require('./...')` imports from returning to `desktop/preload.cjs`.
 
-Verification completed with `npm run typecheck`, `CI=1 npm run test`, targeted preload/script tests, and a Playwright Electron smoke test that starts Agent access and reaches `Agentkommando kopiert.`.
+Verification completed with `npm run type-check`, `CI=1 npm run test`, targeted preload/script tests, and a Playwright Electron smoke test that starts Agent access and reaches `Agentkommando kopiert.`.
 
 ### 2026-05-28 - #90 Web/Desktop surface separation follow-up
 
@@ -1114,7 +1164,7 @@ Fixed a surface-mixing bug in the same #90 feature:
 - Electron now fails closed if the Desktop preload bridge is missing instead of silently rendering Web Arcade inside the Electron app.
 - Updated tests and docs to encode the separation: browser pages show Share URL without Agent access, while Electron shows Agent access without Share URL.
 
-Verification completed with `npm run typecheck`, `CI=1 npm run test`, targeted shell/script/preload tests, and a shared-renderer smoke test proving the same Vite URL renders Web Arcade in Chromium and Desktop Arcade in Electron.
+Verification completed with `npm run type-check`, `CI=1 npm run test`, targeted shell/script/preload tests, and a shared-renderer smoke test proving the same Vite URL renders Web Arcade in Chromium and Desktop Arcade in Electron.
 
 ### 2026-05-28 - Desktop Agent menu gating
 
@@ -1126,7 +1176,7 @@ Completed in this branch:
 - Kept the helper copy, safety warning, copy action, feedback, and checkpoint restore controls hidden until `Agent-tilgang` is checked.
 - Updated the Desktop Agent menu regression coverage to assert the inactive menu is minimal and the active menu restores the handoff content.
 
-Verification completed with `npm run typecheck`, `CI=1 npm run test`, `npm run lint` (same existing hook dependency warnings), and a real Electron Desktop Arcade smoke test against the current dev renderer on port 5174.
+Verification completed with `npm run type-check`, `CI=1 npm run test`, `npm run lint` (same existing hook dependency warnings), and a real Electron Desktop Arcade smoke test against the current dev renderer on port 5174.
 
 Next note: keep future Agent pairing handoff UI Desktop-scoped and avoid showing the secret-bearing command before the user explicitly enables Agent access.
 
@@ -1152,7 +1202,7 @@ Implemented:
 
 Verification:
 
-- npm run typecheck
+- npm run type-check
 - CI=true npm run test
 - npm run lint (passes with the existing hook dependency warnings)
 - Browser smoke check at http://127.0.0.1:5173/aksel-arcade/ for app render and console output.
@@ -1173,7 +1223,7 @@ Implemented:
 Verification:
 
 - npm run lint (passes with the existing hook dependency warnings)
-- npm run typecheck
+- npm run type-check
 - CI=1 npm run test
 - Desktop-mode browser smoke check at http://127.0.0.1:5173/aksel-arcade/ confirmed reset revokes the Agent session with `project-replaced`, removes the bridge/transport handler, returns the UI to inactive, and leaves no console errors.
 
@@ -1193,7 +1243,7 @@ Implemented:
 
 Verification:
 
-- npm run typecheck
+- npm run type-check
 - CI=1 npm run test -- --run
 - npm run lint (passes with the existing hook dependency warnings)
 - Browser smoke check at http://127.0.0.1:5173/aksel-arcade/ confirmed Web Arcade renders, has no console errors, no Agent access text, and no `window.__AKSEL_ARCADE_AGENT_BRIDGE__`.
@@ -1209,7 +1259,7 @@ Fixed one scoped build-mode regression found during PR review:
 - Replaced build-mode-unsafe dynamic `window` casts in the legacy-global absence assertions with `Reflect.get` / `Reflect.deleteProperty`.
 - Swapped one nullable `window.__AKSEL_ARCADE_DESKTOP__` assertion for the existing Desktop preload fixture reference.
 
-Verification completed with `npm run typecheck`, `npm run build`, `CI=1 npm run test -- --run`, and `npm run lint` (existing hook dependency warnings only).
+Verification completed with `npm run type-check`, `npm run build`, `CI=1 npm run test -- --run`, and `npm run lint` (existing hook dependency warnings only).
 
 ### 2026-05-29 - Issue #103: Rename and version the Agent change command
 
@@ -1224,7 +1274,7 @@ Implemented:
 
 Verification:
 
-- npm run typecheck
+- npm run type-check
 - CI=1 npm run test
 - npm run lint (passes with the existing hook dependency warnings)
 
@@ -1244,7 +1294,7 @@ Implemented:
 
 Verification:
 
-- npm run typecheck
+- npm run type-check
 - npm run lint (passes with the existing hook dependency warnings)
 - CI=1 npm run test
 - Browser smoke check at http://127.0.0.1:5174/aksel-arcade/ confirmed the app renders, the Export button produces the clean v2 package shape, and the console is clear after reload.
@@ -1259,7 +1309,7 @@ Addressed one scoped review finding before merge:
 
 Verification:
 
-- npm run typecheck
+- npm run type-check
 - npm run lint (passes with the existing hook dependency warnings)
 - CI=1 npm run test
 
@@ -1278,7 +1328,7 @@ Implemented:
 
 Verification:
 
-- npm run typecheck
+- npm run type-check
 - CI=1 npm run test
 - npm run lint (passes with the existing hook dependency warnings)
 - Browser smoke check at http://127.0.0.1:5176/aksel-arcade/ imported a clean `.akselarcade` package, restored name/source/Hooks/viewport, kept default panel layout, and had no console errors.
@@ -1297,7 +1347,7 @@ Implemented:
 Verification:
 
 - npm install
-- npm run typecheck
+- npm run type-check
 - npm run lint (passes with the existing hook dependency warnings)
 - CI=1 npm run test
 - Browser smoke check at http://127.0.0.1:5177/aksel-arcade/ confirmed Export emits the strict clean v2 package shape, Import loads a clean `.akselarcade` package with fresh local project state, and the console is clear after reload.
@@ -1313,7 +1363,7 @@ Implemented:
 
 Verification:
 
-- npm run typecheck
+- npm run type-check
 - CI=1 npm run test -- tests/integration/project-controls-layout.test.tsx
 - npm run lint (passes with the existing hook dependency warnings)
 - CI=1 npm run test
@@ -1331,7 +1381,7 @@ Implemented:
 
 Verification:
 
-- npm run typecheck
+- npm run type-check
 - npm run lint (passes with the existing hook dependency warnings)
 - CI=1 npm run test
 - Browser smoke check at http://127.0.0.1:5179/aksel-arcade/ generated a v3 share URL, decoded metadata as `{ v: 1, s: "brotli-wasm-b64url" }`, verified the decoded payload checksum, and confirmed no console errors after reload.
@@ -1342,13 +1392,13 @@ Next note: #117 should replace the current ProjectSnapshot compatibility adapter
 
 Fixed:
 
-- Reproduced the merged-PR build failure with `npm run build`; `tsc -b` rejected the assertion helper in `src/utils/sharePayload.ts` even though `npm run typecheck` had passed.
+- Reproduced the merged-PR build failure with `npm run build`; `tsc -b` rejected the assertion helper in `src/utils/sharePayload.ts` even though `npm run type-check` had passed.
 - Converted the share payload record assertion helper from an inferred arrow function to a function declaration so TypeScript can apply the assertion signature under the production build project references.
 
 Verification:
 
 - npm run build
-- npm run typecheck
+- npm run type-check
 - CI=1 npm run test
 - npm run lint (passes with the existing hook dependency warnings)
 
@@ -1365,7 +1415,7 @@ Implemented:
 Verification:
 
 - npm install
-- npm run typecheck
+- npm run type-check
 - npm run lint (passes with the existing hook dependency warnings)
 - CI=1 npm run test
 - Browser smoke check at http://127.0.0.1:5175/aksel-arcade/ loaded a v3 share as a fresh Untitled Project with a new UUID, shared source, LG/light preview, default panel layout, stripped share query, and no console errors.
@@ -1385,7 +1435,7 @@ Implemented:
 Verification:
 
 - npm install
-- npm run typecheck
+- npm run type-check
 - npm run lint (passes with the existing hook dependency warnings)
 - npm run test -- --run
 - Browser smoke check at http://127.0.0.1:5176/aksel-arcade/ confirmed the app renders and the console is clear.
@@ -1405,7 +1455,7 @@ Implemented:
 Verification:
 
 - npm install
-- npm run typecheck
+- npm run type-check
 - npm run lint (passes with the existing hook dependency warnings)
 - CI=1 npm run test
 - Browser smoke check at http://127.0.0.1:5177/aksel-arcade/ confirmed the updated warning wording, no `Last updated` metadata, a working load action, and no console errors.
@@ -1424,7 +1474,7 @@ Implemented:
 Verification:
 
 - npm install
-- npm run typecheck
+- npm run type-check
 - CI=1 npm run test
 - npm run lint (passes with the existing hook dependency warnings)
 - npm run test:e2e -- share-link.spec.ts -g "hydrates a shared snapshot"
@@ -1445,13 +1495,43 @@ Implemented:
 Verification:
 
 - npm install
-- npm run typecheck
+- npm run type-check
 - npm run lint (passes with existing hook dependency warnings in `InspectionPopover` and `PreviewPane`)
 - CI=1 npm run test
 
 - Browser smoke check at http://127.0.0.1:5173/aksel-arcade/ confirmed sessionStorage reload restore, ordinary new-tab default behavior, and no runtime console errors.
 
 Next note: #129 can now scope explicit replacement flows (Web share URL, import, Reset editor) to the current Web Arcade working copy. Keep #130's UI copy cleanup separate; the Clear storage & reload affordance still exists pending that issue.
+
+### 2026-07-02 - Issue #321: Harden annotation target resilience and marker geometry
+
+Implemented:
+
+- Selected `#321` as the highest-priority open `ready-for-agent` feature from `#321`-`#326` after checking `#314`, `CONTEXT.md`, the annotation ADRs, and the current dependency chain: `#321` is the first unblocked correctness slice and it directly unlocks the later Desktop MCP and Preview evidence work in `#324` and `#326`, while `#322` only gates the cleanup/share branch.
+- Added a stored-target resolution bridge for saved annotations: `LivePreview` now re-resolves active-page open annotations through the sandbox on render success, page changes, viewport changes, and annotation-mode viewport movement, instead of rendering markers from saved geometry alone.
+- Kept the durable annotation payload compatible while making new annotations identity-first: live target snapshots now carry `targetIdentities` even for single-element annotations, and legacy saved annotations without that field fall back through a derived identity request built from their stored metadata.
+- Updated marker/count behavior to follow the PRD and `CONTEXT.md` terms:
+  - visible resolved targets render normal markers at live positions;
+  - hidden-but-resolved targets keep the active-page badge count but do not render a normal marker;
+  - dead or ambiguous targets disappear from normal marker/count work without being deleted, and they recover automatically when the target becomes uniquely resolvable again.
+- Fixed the host/sandbox scroll contract without breaking the sandbox boundary: the sandbox now emits `ANNOTATION_VIEWPORT_CHANGED` messages with scroll state, and `LivePreview` uses that transient viewport state when positioning live markers instead of trying to read the sandbox window directly.
+- Added regression coverage for the new request builder, live-count consumption in `PreviewPane`, extra target-resolution recovery/ambiguity cases in `annotationTargets`, and the new sandbox message validation.
+
+Verification:
+
+- npm run type-check
+- npm run test
+- npm run build:sandbox
+- Practical browser verification at `http://127.0.0.1:4180/aksel-arcade/` with Playwright-driven visual checks and saved screenshots in the session artifacts folder, covering:
+  - single-element marker alignment after scroll, viewport resize, and target movement;
+  - hidden-but-resolved targets keeping the badge count while hiding the marker;
+  - target removal, recovery, and ambiguous duplicate recovery hiding/restoring normal marker work;
+  - multi-element selection showing grouped outlines/popover and the saved grouped marker surviving scroll.
+
+Next note:
+
+- `#324` and `#326` should reuse the live target-resolution path that now exists in `LivePreview` rather than adding a second dead/hidden-target interpretation layer; the shared semantics are now in the saved-target request builder plus `resolveAnnotationTargetIdentity` / group resolution.
+- `#322` remains separate on purpose: Clear annotations and context-replacement cleanup should keep using total stored annotation records, not the live non-dead badge count introduced here.
 
 ### 2026-05-30 - PR #133 review follow-up
 
@@ -1474,7 +1554,7 @@ Implemented:
 Verification:
 
 - npm install
-- npm run typecheck
+- npm run type-check
 - npm run test -- --run
 - npm run lint (passes with existing hook dependency warnings in `InspectionPopover` and `PreviewPane`)
 - Browser smoke check at http://127.0.0.1:5174/aksel-arcade/ confirmed app render, Web share URL copy, Reset editor confirmation, and no runtime console errors.
@@ -1495,7 +1575,7 @@ Implemented:
 Verification:
 
 - npm install
-- npm run typecheck
+- npm run type-check
 - npm run lint (passes with existing hook dependency warnings in `InspectionPopover` and `PreviewPane`)
 - npm run test
 - Browser smoke check at http://127.0.0.1:5174/aksel-arcade/ confirmed the app renders, Settings > Editor shows Reset editor only, Clear storage & reload is absent, and there are no runtime console errors.
@@ -1516,7 +1596,7 @@ Implemented:
 Verification:
 
 - npm install
-- npm run typecheck
+- npm run type-check
 - npm run lint (passes with existing hook dependency warnings in `InspectionPopover` and `PreviewPane`)
 - CI=1 npm run test
 
@@ -1540,7 +1620,7 @@ Implemented:
 Verification:
 
 - npm run desktop:build
-- npm run typecheck
+- npm run type-check
 - npm run test -- --run
 - npm run lint (passes with existing hook dependency warnings in `InspectionPopover` and `PreviewPane`)
 - npx electron-builder --config electron-builder.config.cjs --dir --publish never
@@ -1563,7 +1643,7 @@ Implemented:
 
 Verification:
 
-- npm run typecheck
+- npm run type-check
 - npm run test -- --run
 - CI=1 npm run test
 - npm run type-check
@@ -1580,7 +1660,7 @@ Fixed:
 
 Verification:
 
-- npm run typecheck
+- npm run type-check
 - CI=1 npm run test
 - npm run type-check
 - npm run lint (passes with existing hook dependency warnings in `InspectionPopover` and `PreviewPane`)
@@ -1599,7 +1679,7 @@ Implemented:
 
 Verification:
 
-- npm run typecheck
+- npm run type-check
 - npm run lint (existing `InspectionPopover` hook dependency warning only)
 - npm run test -- --run
 - npm run build
@@ -1620,7 +1700,7 @@ Fixed after user feedback:
 
 Verification:
 
-- npm run typecheck
+- npm run type-check
 - npm run lint (existing `.eslintignore` deprecation notice and existing `InspectionPopover` hook dependency warning only)
 - npm run test -- --run
 - npm run build
@@ -1636,7 +1716,7 @@ Fixed before merge:
 
 Verification:
 
-- npm run typecheck
+- npm run type-check
 - npm run lint (existing `.eslintignore` deprecation notice and existing `InspectionPopover` hook dependency warning only)
 - npm run test -- --run
 - npm run build
@@ -1655,7 +1735,7 @@ Implemented:
 
 Verification:
 
-- npm run typecheck
+- npm run type-check
 - npm run lint (passes with existing hook dependency warnings in `InspectionPopover` and `PreviewPane`)
 - CI=1 npm run test
 - DESKTOP_RELEASE_CHANGED_FILES='src/App.tsx' npm --silent run desktop:pr-package-plan
@@ -1670,7 +1750,7 @@ Review follow-up:
 
 Verification:
 
-- npm run typecheck
+- npm run type-check
 - npm run lint (passes with existing hook dependency warnings in `InspectionPopover` and `PreviewPane`)
 - CI=1 npm run test
 
@@ -1686,7 +1766,7 @@ Verified:
 
 Verification:
 
-- npm run typecheck
+- npm run type-check
 - npm run lint
 - npm test -- --run
 
@@ -1707,7 +1787,7 @@ Implemented:
 Verification:
 
 - npm run desktop:release-env-check
-- npm run typecheck
+- npm run type-check
 - npm run lint (passes with existing hook dependency warnings in `InspectionPopover` and `PreviewPane`)
 - CI=true npm run test
 
@@ -1720,7 +1800,7 @@ Desktop release workflow (#149) review follow-up:
 Verification:
 
 - CI=1 npm run test -- --run tests/unit/desktopReleasePlan.test.ts tests/unit/desktopReleaseWorkflowPlan.test.ts tests/unit/desktopReleaseWorkflow.test.ts
-- npm run typecheck
+- npm run type-check
 - CI=1 npm run test
 - npm run lint (passes with existing hook dependency warnings in `InspectionPopover` and `PreviewPane`)
 
@@ -1734,7 +1814,7 @@ Desktop release workflow (#149):
 
 Verification:
 
-- npm run typecheck
+- npm run type-check
 - CI=1 npm run test
 - npm run lint (passes with existing hook dependency warnings in `InspectionPopover` and `PreviewPane`)
 
@@ -1752,7 +1832,7 @@ Implemented:
 
 Verification:
 
-- npm run typecheck
+- npm run type-check
 - npm run lint (passes with existing hook dependency warnings in `InspectionPopover` and `PreviewPane`)
 - CI=1 npm run test
 
@@ -1770,7 +1850,7 @@ Verification:
 
 - npm test -- --run tests/unit/desktopReleaseEnvironmentCheck.test.ts
 - npm run desktop:release-env-check
-- npm run typecheck
+- npm run type-check
 - npm run lint (passes with existing hook dependency warnings in `InspectionPopover` and `PreviewPane`)
 - CI=true npm run test
 
@@ -1787,7 +1867,7 @@ Desktop release build failure follow-up:
 Verification:
 
 - CI=1 npm run test -- --run tests/unit/desktopMacosReleaseSigning.test.ts tests/unit/desktopPackagingConfig.test.ts
-- npm run typecheck
+- npm run type-check
 - CI=1 npm run test
 - npm run lint (passes with existing hook dependency warnings in `InspectionPopover` and `PreviewPane`)
 - AKSEL_ARCADE_DESKTOP_VERSION=0.1.0 npm run desktop:package:mac
@@ -1802,7 +1882,7 @@ Desktop release publish failure follow-up:
 Verification:
 
 - CI=1 npm run test -- --run tests/unit/desktopReleaseWorkflow.test.ts
-- npm run typecheck
+- npm run type-check
 - npm run lint (passes with existing hook dependency warnings in `InspectionPopover` and `PreviewPane`)
 - CI=1 npm run test
 
@@ -1815,7 +1895,7 @@ Issue #150 documentation progress:
 
 Verification:
 
-- npm run typecheck
+- npm run type-check
 - CI=1 npm run test
 
 Desktop release duplicate draft follow-up:
@@ -1829,7 +1909,7 @@ Desktop release duplicate draft follow-up:
 Verification:
 
 - CI=1 npm run test -- --run tests/unit/desktopReleaseWorkflow.test.ts
-- npm run typecheck
+- npm run type-check
 - npm run lint (passes with existing hook dependency warnings in `InspectionPopover` and `PreviewPane`)
 - CI=1 npm run test
 
@@ -1846,7 +1926,7 @@ Completed for #163:
 
 Verification:
 
-- npm run typecheck
+- npm run type-check
 - CI=1 npm run test
 - npm run lint (passes with existing hook dependency warnings in `InspectionPopover` and `PreviewPane`)
 - Browser smoke check at `http://127.0.0.1:5173/aksel-arcade/` for app render, preview render, and no console warnings/errors.
@@ -1864,7 +1944,7 @@ Completed for #164:
 
 Verification:
 
-- npm run typecheck
+- npm run type-check
 - npm run lint (passes with existing hook dependency warnings in `InspectionPopover` and `PreviewPane`)
 - CI=1 npm run test
 - Browser smoke check at `http://127.0.0.1:5173/aksel-arcade/` for app render, preview render, and no console warnings/errors.
@@ -1882,7 +1962,7 @@ Completed for #165:
 
 Verification:
 
-- npm run typecheck
+- npm run type-check
 - npm run lint (passes with existing hook dependency warnings in `InspectionPopover` and `PreviewPane`)
 - CI=1 npm run test
 - Browser smoke check at `http://127.0.0.1:5173/aksel-arcade/` for app render, preview render, Web Arcade Agent absence, and no console warnings/errors.
@@ -1900,7 +1980,7 @@ Completed for #166:
 
 Verification:
 
-- npm run typecheck
+- npm run type-check
 - npm run lint (passes with existing hook dependency warnings in `InspectionPopover` and `PreviewPane`)
 - npm run test -- --run
 - npx playwright test tests/e2e/agent-diagnostics.spec.ts
@@ -1916,7 +1996,7 @@ Reviewed and fixed one PR-scoped build issue before merge:
 Verification:
 
 - npm run build
-- npm run typecheck
+- npm run type-check
 - npm run lint (passes with existing hook dependency warnings in `InspectionPopover` and `PreviewPane`)
 - npm run test -- --run
 - npx playwright test tests/e2e/agent-diagnostics.spec.ts
@@ -1950,7 +2030,7 @@ Fixed a background-token autocomplete gap for Aksel primitives:
 
 Verification:
 
-- npm run typecheck
+- npm run type-check
 - npm run lint (passes with existing hook dependency warnings in `InspectionPopover` and `PreviewPane`)
 - CI=1 npm run test
 - npx playwright test `tests/e2e/autocomplete.spec.ts` on an isolated local Vite port
@@ -1970,7 +2050,7 @@ Extended the same fixes to the Desktop Arcade packaged renderer path:
 
 Verification:
 
-- npm run typecheck
+- npm run type-check
 - npx playwright test tests/e2e/desktop-packaged-preview.spec.ts --reporter=line
 
 ### 2026-06-01 - Desktop dev stale renderer fix
@@ -1985,7 +2065,7 @@ Fixed the Desktop dev launcher after testing showed it could open stale code:
 Verification:
 
 - npm test -- --run tests/unit/desktopDevScript.test.ts
-- npm run typecheck
+- npm run type-check
 - npm run lint (passes with existing hook dependency warnings in `InspectionPopover` and `PreviewPane`)
 - CI=1 npm run test
 
@@ -2006,7 +2086,7 @@ Implemented:
 
 Verification:
 
-- npm run typecheck
+- npm run type-check
 - CI=1 npm run test -- --run
 
 - Browser check at `http://127.0.0.1:43183/aksel-arcade/` on an isolated local Vite port for app render, preview render, Settings menu visibility of `Enable experimental multi-page authoring`, successful toggle to `Disable experimental multi-page authoring`, and no console warnings/errors
@@ -2025,7 +2105,7 @@ Fixed one PR-scoped review issue before merge:
 
 Verification:
 
-- npm run typecheck
+- npm run type-check
 - CI=1 npm run test -- --run
 
 ### 2026-06-09 - PR #196 follow-up: Multi-page preview bug fixes after Issue #190
@@ -2040,7 +2120,7 @@ Implemented:
 
 Verification:
 
-- npm run typecheck
+- npm run type-check
 - npm run lint (existing `InspectionPopover` hook dependency warning only)
 - npm test -- --run
 - Browser check at `http://127.0.0.1:4179/aksel-arcade/` for:
@@ -2063,7 +2143,7 @@ Fixed one PR-scoped review issue before merge:
 Verification:
 
 - npm run build
-- npm run typecheck
+- npm run type-check
 - npm test -- --run
 
 ### 2026-06-09 - Issue #191: Multi-page stale page reference diagnostics
@@ -2079,7 +2159,7 @@ Implemented:
 
 Verification:
 
-- npm run typecheck
+- npm run type-check
 - npm run lint (existing `InspectionPopover` hook dependency warning only)
 - CI=1 npm run test
 - npm run build
@@ -2098,7 +2178,7 @@ Fixed one PR-scoped review issue before merge:
 
 Verification:
 
-- npm run typecheck
+- npm run type-check
 - npm run lint (existing `InspectionPopover` hook dependency warning only)
 - CI=1 npm run test
 
@@ -2115,7 +2195,7 @@ Implemented:
 
 Verification:
 
-- npm run typecheck
+- npm run type-check
 - npm run lint (existing `.eslintignore` deprecation notice and existing `InspectionPopover` hook dependency warning only)
 - npm test -- --run
 - npm run build
@@ -2134,7 +2214,7 @@ Fixed one PR-scoped issue before merge:
 
 Verification:
 
-- npm run typecheck
+- npm run type-check
 - npm run lint (existing `.eslintignore` deprecation notice and existing `InspectionPopover` hook dependency warning only)
 - npm test -- --run
 - npm run build
@@ -2155,7 +2235,7 @@ Implemented:
 Verification:
 
 - npm install
-- npm run typecheck
+- npm run type-check
 - npm run lint (existing `.eslintignore` deprecation notice and existing `InspectionPopover` hook dependency warning only)
 - CI=1 npm run test -- --run
 - npm run build
@@ -2182,7 +2262,7 @@ Implemented:
 Verification:
 
 - npm install
-- npm run typecheck
+- npm run type-check
 - npm run lint (existing `.eslintignore` deprecation notice and existing `InspectionPopover` hook dependency warning only)
 - npm run build
 - npm run test -- --run
@@ -2202,7 +2282,7 @@ Fixed one PR-scoped issue before merge:
 
 Verification:
 
-- npm run typecheck
+- npm run type-check
 - npm run lint (existing `.eslintignore` deprecation notice and existing `InspectionPopover` hook dependency warning only)
 - npm run build
 - npm run test -- --run
@@ -2222,7 +2302,7 @@ Implemented:
 Verification:
 
 - npm install
-- npm run typecheck
+- npm run type-check
 - npm run lint (existing `.eslintignore` deprecation notice and existing `InspectionPopover` hook dependency warning only)
 - npm run test -- --run
 - npm run build
@@ -2248,7 +2328,7 @@ Verification:
 
 - npm run lint (existing `.eslintignore` deprecation notice and existing `InspectionPopover` hook dependency warning only)
 - npm run build
-- npm run typecheck
+- npm run type-check
 - npm run test -- --run
 - Browser check at `http://127.0.0.1:4182/aksel-arcade/`: confirmed the Add menu still shows `Combobox`; confirmed Add inserts `<Combobox label="Select option" options={[]}>` and the preview renders a real combobox without exposing `UNSAFE_Combobox`; confirmed typing `<Comb` in the editor shows only the `Combobox` completion option and accepting it inserts `<Combobox` rather than the unsafe runtime alias.
 
@@ -2269,7 +2349,7 @@ Verification:
 
 - npm run lint (existing `.eslintignore` deprecation notice and existing `InspectionPopover` hook dependency warning only)
 - npm run build
-- npm run typecheck
+- npm run type-check
 - npm run test -- --run
 - Browser check at `http://127.0.0.1:4183/aksel-arcade/`: confirmed typing `<Comb` in the editor still shows only the public `Combobox` completion with no unsafe alias surfaced in the UI; the legacy `UNSAFE_Combobox` compatibility path is now covered by the focused unit regression because the browser editor only surfaces the public-name flow for new authoring.
 
@@ -2294,7 +2374,7 @@ Verification:
 
 - npm install
 - npm run lint (existing `.eslintignore` deprecation notice and existing `InspectionPopover` hook dependency warning only)
-- npm run typecheck
+- npm run type-check
 - npm run test -- --run
 - npm run build
 - Browser check at `http://127.0.0.1:4183/aksel-arcade/`: confirmed the default project now renders `InlineMessage` instead of `Alert`, the Add dialog opens as a dialog and shows no `Alert` or `Modal` entry, searching `modal` reports no matching component, and there were no browser console errors during the authoring flow.
@@ -2319,7 +2399,7 @@ Implemented:
 Verification:
 
 - npm run lint (existing `.eslintignore` deprecation notice and existing `InspectionPopover` hook dependency warning only)
-- npm run typecheck
+- npm run type-check
 - npm run test -- --run
 - npm run build
 - Browser check at `http://127.0.0.1:4311/aksel-arcade/`: after clearing the persisted working copy, confirmed Add -> `Pagination` inserts the fragment-wrapped Pagination JSX plus exported hook support, the preview renders pagination controls and advances from page 1 to page 2, typing `<Pagi` and accepting `Pagination` inserts the same multi-part structure with collision-safe `usePaginationState2`, and a clean reload of the saved state shows no console errors.
@@ -2340,7 +2420,7 @@ Fixed before merge:
 Verification:
 
 - npm run lint (existing `.eslintignore` deprecation notice and existing `InspectionPopover` hook dependency warning only)
-- npm run typecheck
+- npm run type-check
 - npm run test -- --run
 - npm run build
 - Browser check at `http://127.0.0.1:4311/aksel-arcade/`: confirmed typing `<Pagi` in the Hooks tab shows no `Pagination` completion, typing `<Pagi` in JSX still offers `Pagination`, accepting it still renders the preview pagination controls, the hook support code lands in the Hooks tab, and the clean verified session had no browser console errors.
@@ -2356,7 +2436,7 @@ Implemented:
 
 Verification:
 
-- npm run typecheck
+- npm run type-check
 - npm run lint (existing `.eslintignore` deprecation notice and existing `InspectionPopover` hook dependency warning only)
 - npm run build
 - npm run test -- --run
@@ -2383,7 +2463,7 @@ Implemented:
 
 Verification:
 
-- npm run typecheck
+- npm run type-check
 - npm test -- --run
 - npm run build
 - npm run lint (existing `.eslintignore` deprecation notice and existing `InspectionPopover` hook dependency warning only)
@@ -2408,7 +2488,7 @@ Implemented:
 
 Verification:
 
-- npm run typecheck
+- npm run type-check
 - npm run lint (existing `.eslintignore` deprecation notice and existing `InspectionPopover` hook dependency warning only)
 - npm run test -- --run
 - npm run build
@@ -2430,7 +2510,7 @@ Implemented:
 
 Verification:
 
-- npm run typecheck
+- npm run type-check
 - npm run lint (existing `.eslintignore` deprecation notice and existing `InspectionPopover` hook dependency warning only)
 - npm run test -- --run
 - npm run build
@@ -2449,7 +2529,7 @@ Implemented:
 
 Verification:
 
-- npm run typecheck
+- npm run type-check
 - npm run lint (existing `.eslintignore` deprecation notice and existing `InspectionPopover` hook dependency warning only)
 - npm run test -- --run
 - npm run build
@@ -2471,7 +2551,7 @@ Implemented:
 Verification:
 
 - npm run test -- --run tests/unit/services/componentInsertion.test.ts
-- npm run typecheck
+- npm run type-check
 - npm run lint (existing `.eslintignore` deprecation notice and existing `InspectionPopover` hook dependency warning only)
 - npm run test -- --run
 - npm run build
@@ -2489,7 +2569,7 @@ Implemented:
 
 Verification:
 
-- npm run typecheck
+- npm run type-check
 - npm run lint (existing `.eslintignore` deprecation notice and existing `InspectionPopover` hook dependency warning only)
 - npm run test -- --run
 - npm run build
@@ -2511,7 +2591,7 @@ Implemented:
 Verification:
 
 - npm run test -- --run tests/unit/akselAutocomplete.test.ts tests/unit/services/componentInsertion.test.ts
-- npm run typecheck
+- npm run type-check
 - npm run lint (existing `.eslintignore` deprecation notice and existing `InspectionPopover` hook dependency warning only)
 - npm run test -- --run
 - npm run build
@@ -2529,7 +2609,7 @@ Implemented:
 
 Verification:
 
-- npm run typecheck
+- npm run type-check
 - npm run lint (passes with the existing `.eslintignore` deprecation warning and existing `InspectionPopover` hook-dependency warning only)
 - npm run test -- --run
 - npm run build (passes with existing Vite/browser-compatibility and chunk-size warnings only)
@@ -2551,7 +2631,7 @@ Implemented:
 Verification:
 
 - npm run test -- --run tests/unit/services/componentInsertion.test.ts tests/unit/akselCatalog.test.ts tests/unit/akselAutocomplete.test.ts tests/integration/component-palette.test.tsx
-- npm run typecheck
+- npm run type-check
 - npm run test -- --run
 - Browser check at `http://127.0.0.1:5182/aksel-arcade/`: confirmed Add -> `Chips Toggle` inserts visible `<Chips.Toggle>` JSX into the JSX tab, confirmed Add -> `Chips Removable` inserts visible `<Chips.Removable>` JSX and suffixes the second example’s support identifiers in the Hooks tab, and confirmed the preview renders both chips examples without runtime console errors or warnings.
 
@@ -2566,7 +2646,7 @@ Fixed before merge:
 
 Verification:
 
-- npm run typecheck
+- npm run type-check
 - npm run lint (passes with the existing `.eslintignore` deprecation notice and existing `InspectionPopover` hook-dependency warning only)
 - npm run test -- --run
 - Browser check at `http://127.0.0.1:5183/aksel-arcade/`: confirmed the JSX tab shows direct `Chips.Toggle` / `Chips.Removable` markup with `data-color="neutral"` on each child, the Hooks tab still contains support state only, repeated Add -> `ProgressBar` insertions render two labeled progress bars in the preview with distinct ids, and the verified session showed no browser console errors (only the pre-existing form-field accessibility issue).
@@ -2583,7 +2663,7 @@ Implemented:
 
 Verification:
 
-- npm run typecheck
+- npm run type-check
 - npm run lint (passes with the existing `.eslintignore` deprecation notice and existing `InspectionPopover` hook-dependency warning only)
 - npm run test -- --run
 - npm run build (passes with the existing Vite/browser-compatibility and chunk-size warnings only)
@@ -2603,7 +2683,7 @@ Implemented:
 
 Verification:
 
-- npm run typecheck
+- npm run type-check
 - npm run lint (passes with the existing `.eslintignore` deprecation notice and existing `InspectionPopover` hook-dependency warning only)
 - npm run test -- --run
 - npm run build (passes with the existing Vite/browser-compatibility and chunk-size warnings only)
@@ -2619,7 +2699,7 @@ Implemented:
 
 Verification:
 
-- npm run typecheck
+- npm run type-check
 - npm run lint (passes with the existing `.eslintignore` deprecation notice and existing `InspectionPopover` hook-dependency warning only)
 - npm run test -- --run
 - npm run build (passes with the existing Vite/browser-compatibility and chunk-size warnings only)
@@ -2640,7 +2720,7 @@ Implemented:
 
 Verification:
 
-- npm run typecheck
+- npm run type-check
 - npm run lint (passes with the existing `.eslintignore` deprecation notice and existing `InspectionPopover` hook-dependency warning only)
 - npm run test -- --run
 - npm run build (passes with the existing Vite/browser-compatibility and chunk-size warnings only)
@@ -2663,7 +2743,7 @@ Implemented:
 Verification:
 
 - npm run test -- --run tests/unit/akselAudit.test.ts
-- npm run typecheck
+- npm run type-check
 - npm run lint (passes with the existing `.eslintignore` deprecation notice and existing `InspectionPopover` hook-dependency warning only)
 - npm run test -- --run
 - npm run build (passes with the existing Vite/browser-compatibility and chunk-size warnings only)
@@ -2680,7 +2760,7 @@ Implemented:
 
 Verification:
 
-- npm run typecheck
+- npm run type-check
 - npm run lint (existing `.eslintignore` deprecation notice and existing `InspectionPopover` hook dependency warning only)
 - npm run test -- --run
 - Browser check at `http://127.0.0.1:4337/aksel-arcade/`: confirmed the working copy now stores the full preference envelope including `previewFullscreen`, forced `previewFullscreen: true` into the tab-scoped working copy, reloaded the same tab, confirmed the stored preference stayed `true`, and confirmed the verified session had no browser console warnings or errors.
@@ -2701,7 +2781,7 @@ Implemented:
 
 Verification:
 
-- npm run typecheck
+- npm run type-check
 - npm run lint (passes with the existing `.eslintignore` deprecation notice and the existing `InspectionPopover` hook-dependency warning only)
 - npm test -- --run
 - Browser check at `http://127.0.0.1:5187/aksel-arcade/`: confirmed the normal preview header now shows the fullscreen toggle on the far left, entering fullscreen removes the normal header/editor from the accessibility tree, the same preview iframe survives the round trip, focus lands on the fullscreen toggle, and the URL/history stay unchanged. The checked session showed no runtime console errors; Chrome still reported the pre-existing form-field issue entry.
@@ -2720,7 +2800,7 @@ Implemented:
 
 Verification:
 
-- npm run typecheck
+- npm run type-check
 - npm run lint (passes with the existing `.eslintignore` deprecation notice and the existing `InspectionPopover` hook-dependency warning only)
 - npm run test -- --run
 - npm run build (confirmed the PR-scoped `PreviewPane` padding token issue was fixed; the remaining `tests/unit/useAutoSave.test.tsx` build/type error is outside this PR diff and was left untouched in this review follow-up)
@@ -2739,7 +2819,7 @@ Implemented:
 Verification:
 
 - Ran `npm install` in this worktree because dependencies were missing (`tsc` was not initially available on PATH through local `node_modules/.bin`).
-- `npm run typecheck`
+- `npm run type-check`
 - `CI=1 npm run test -- --run`
 - `npm run build`
 - Browser check at `http://127.0.0.1:4189/aksel-arcade/`: confirmed the app loaded without console errors, Preview fullscreen still entered/exited cleanly, the normal Share project popover still generated/copyable Web share URLs, and the verified session had no runtime warnings or page errors.
@@ -2761,7 +2841,7 @@ Implemented:
 Verification:
 
 - Ran `npm install` in this worktree before verification because local dependencies were missing initially.
-- `npm run typecheck`
+- `npm run type-check`
 - `npm run lint` (passes with the existing `.eslintignore` deprecation notice and the existing `InspectionPopover` hook-dependency warning only)
 - `npm run test -- --run`
 - `npm run build`
@@ -2824,7 +2904,7 @@ Implemented:
 
 Verification:
 
-- `npm run typecheck`
+- `npm run type-check`
 - `npm run lint` (passes with the existing `.eslintignore` deprecation notice and the existing `InspectionPopover` hook-dependency warning only)
 - `CI=1 npm run test -- --run`
 - `npm run build`
@@ -2849,7 +2929,7 @@ Implemented:
 
 Verification:
 
-- `npm run typecheck`
+- `npm run type-check`
 - `CI=1 npm run test -- --run`
 - `npm run build`
 - Browser check at `http://127.0.0.1:4189/aksel-arcade/`: generated a normal Web share URL, entered Preview fullscreen, reopened that share URL in the same tab, accepted “Load Web share URL”, and confirmed fullscreen stayed active before and after load with no console errors or page errors.
@@ -2864,7 +2944,7 @@ Implemented:
 
 Verification:
 
-- npm run typecheck
+- npm run type-check
 - npm run lint (passes with the existing `InspectionPopover` hook dependency warning and ESLint `.eslintignore` deprecation warning)
 - npm test -- --run
 - npm run build
@@ -2884,7 +2964,7 @@ Implemented:
 
 Verification:
 
-- `npm run typecheck`
+- `npm run type-check`
 - `npm run lint` (passes with the existing `InspectionPopover` hook dependency warning and ESLint `.eslintignore` deprecation warning)
 - `npm run build`
 - `CI=1 npm run test -- --run`
@@ -2904,7 +2984,7 @@ Implemented:
 
 Verification:
 
-- `npm run typecheck`
+- `npm run type-check`
 - `npm run build`
 - `CI=1 npm run test -- --run tests/integration/fullscreen-share-popover.test.tsx tests/integration/share-popover.test.tsx tests/integration/preview-fullscreen-entry.test.tsx tests/integration/app-preview-fullscreen.test.tsx`
 - Browser check at `http://127.0.0.1:4194/aksel-arcade/`: opened the fullscreen share popover, pressed `Escape`, confirmed the popover closed while fullscreen stayed active, then focused the fullscreen exit control and confirmed `Escape` still exited fullscreen; no browser console errors appeared during the verified flow.
@@ -2920,7 +3000,7 @@ Implemented:
 
 Verification:
 
-- `npm run typecheck`
+- `npm run type-check`
 - `npm run lint` (existing `InspectionPopover` hook dependency warning only)
 - `npm run build`
 - `CI=1 npm run test`
@@ -2944,7 +3024,7 @@ Implemented:
 Verification:
 
 - `npm install`
-- `npm run typecheck`
+- `npm run type-check`
 - `npm test -- --run`
 - `npm run lint` (existing `InspectionPopover` hook dependency warning only)
 - Browser check at `http://127.0.0.1:4193/aksel-arcade/`: enabled **Multiple pages** on a fresh working copy, confirmed the visible **Show pages** control with the panel closed, opened it to the `Config` / `Pages` sections plus **Add page**, and saw no browser console warnings/errors during the verified flow
@@ -2962,7 +3042,7 @@ Fixed after review:
 
 Verification:
 
-- `npm run typecheck`
+- `npm run type-check`
 - `npm test -- --run`
 
 ### 2026-06-15 - Issue #255: Make editor and preview page flows always on
@@ -2978,7 +3058,7 @@ Implemented:
 
 Verification:
 
-- `npm run typecheck`
+- `npm run type-check`
 - `npm run test -- --run`
 - `npm run build`
 - Browser check at `http://127.0.0.1:4195/aksel-arcade/`: on a fresh working copy with the legacy flag still off, confirmed **Show pages** is visible, opened the **Page panel**, selected **Global config** and saw the no-preview placeholder while the sandbox stayed mounted, added **Page 2**, switched to it, and saw no browser console warnings/errors during the verified flow.
@@ -2999,7 +3079,7 @@ Implemented:
 
 Verification:
 
-- `npm run typecheck`
+- `npm run type-check`
 - `npm run test -- --run`
 - Browser check at `http://127.0.0.1:4173/aksel-arcade/` confirming the Settings menu no longer shows **Experiments** or **Multiple pages**, and the page loaded without console errors
 
@@ -3018,7 +3098,7 @@ Fixed after PR review:
 
 Verification:
 
-- `npm run typecheck`
+- `npm run type-check`
 - `npm run test -- --run`
 - Browser check at `http://127.0.0.1:4173/aksel-arcade/` confirming the Settings menu no longer shows **Experiments** / **Multiple pages**, the editor still shows a neutral **Show pages** control, and the browser console stayed free of errors
 
@@ -3039,7 +3119,7 @@ Implemented:
 
 Verification:
 
-- `npm run typecheck`
+- `npm run type-check`
 - `npm run lint`
 - `npm run build`
 - `npm run test -- --run`
@@ -3060,7 +3140,7 @@ Fixed after code review:
 
 Verification:
 
-- `npm run typecheck`
+- `npm run type-check`
 - `npm run lint`
 - `npm run build`
 - `npm run test -- --run`
@@ -3082,7 +3162,7 @@ Implemented:
 
 Verification:
 
-- `npm run typecheck`
+- `npm run type-check`
 - `npm run lint`
 - `npm run test -- --run`
 - `npm run build`
@@ -3120,7 +3200,7 @@ Implemented:
 
 Verification:
 
-- `npm run typecheck`
+- `npm run type-check`
 - `npm run lint`
 - `npm run build`
 - `npm run test -- --run`
@@ -3140,7 +3220,7 @@ Implemented:
 
 Verification:
 
-- `npm run typecheck`
+- `npm run type-check`
 - `npm run lint`
 - `npm run test -- --run`
 - `npm run build`
@@ -3163,7 +3243,7 @@ Implemented:
 
 Verification:
 
-- `npm run typecheck`
+- `npm run type-check`
 - `npm run lint`
 - `npm run build`
 - `CI=1 npm run test`
@@ -3184,7 +3264,7 @@ Fixed after review:
 
 Verification:
 
-- `npm run typecheck`
+- `npm run type-check`
 - `npm run lint`
 - `npm run build`
 - `CI=1 npm run test`
@@ -3204,7 +3284,7 @@ Implemented:
 
 Verification:
 
-- npm run typecheck
+- npm run type-check
 - npm run lint (existing `.eslintignore` deprecation notice only)
 - CI=1 npm run test -- --run
 - npm run build
@@ -3224,7 +3304,7 @@ Fixed before merge:
 
 Verification:
 
-- npm run typecheck
+- npm run type-check
 - CI=1 npm run test -- --run
 
 ### 2026-06-16 - PR #283 review follow-up for Issue #272
@@ -3258,7 +3338,7 @@ Implemented:
 
 Verification:
 
-- `npm run typecheck`
+- `npm run type-check`
 - `npm run lint` (passes with the existing `.eslintignore` deprecation notice)
 - `CI=1 npm run test`
 - `npm run build`
@@ -3278,7 +3358,7 @@ Fixed before merge:
 
 Verification:
 
-- `npm run typecheck`
+- `npm run type-check`
 - `npm run lint` (passes with the existing `.eslintignore` deprecation notice)
 - `CI=1 npm run test`
 - Direct MCP probe against a local ephemeral `createDesktopMcpServer({ port: 0 })` instance confirmed:
@@ -3301,7 +3381,7 @@ Implemented:
 Verification:
 
 - npm install
-- npm run typecheck
+- npm run type-check
 - npm run lint
 - CI=1 npm run test -- --run
 - npm run build
@@ -3325,7 +3405,7 @@ Fixed after review:
 
 Verification:
 
-- npm run typecheck
+- npm run type-check
 - npm run lint
 - CI=1 npm run test -- --run
 - npm run build
@@ -3407,7 +3487,7 @@ Implemented:
 
 Verification:
 
-- npm run typecheck
+- npm run type-check
 - CI=1 npm run test -- --run
 - npm run lint
 - npm run test:e2e -- --project=chromium tests/e2e/desktop-mcp-apply-changes.spec.ts --reporter=line
@@ -3426,7 +3506,7 @@ Fixed after review:
 
 Verification:
 
-- npm run typecheck
+- npm run type-check
 - npm run lint
 - CI=1 npm run test -- --run
 
@@ -3443,7 +3523,7 @@ Implemented:
 Verification:
 
 - npm run build:sandbox
-- npm run typecheck
+- npm run type-check
 - npm run lint
 - CI=1 npm run test -- --run
 - npm run test:e2e -- tests/e2e/desktop-mcp-preview-capture.spec.ts --reporter=line
@@ -3466,7 +3546,7 @@ Verification:
 
 - CI=1 npm run test -- --run tests/unit/services/desktopMcpServer.test.ts
 - npm run test:e2e -- tests/e2e/desktop-mcp-preview-capture.spec.ts --reporter=line
-- npm run typecheck
+- npm run type-check
 - npm run lint
 - CI=1 npm run test -- --run
 
@@ -3488,7 +3568,7 @@ Verification:
 - CI=1 npm run test -- --run tests/unit/services/previewEvidence.test.ts tests/unit/services/desktopMcpPreviewCapture.test.ts tests/unit/services/desktopMcpServer.test.ts
 - npm run build:sandbox
 - npm run test:e2e -- tests/e2e/desktop-mcp-preview-capture.spec.ts --reporter=line
-- npm run typecheck
+- npm run type-check
 - npm run lint
 - CI=1 npm run test -- --run
 - Browser/console smoke check at `http://127.0.0.1:5173/aksel-arcade/` via `npm run dev -- --host 127.0.0.1 --port 5173 --strictPort`, confirming the app shell and live preview render cleanly with no browser-console warnings/errors
@@ -3512,7 +3592,7 @@ Verification:
 - CI=1 npm run test -- --run tests/unit/services/previewEvidence.test.ts
 - npm run build:sandbox
 - npm run test:e2e -- tests/e2e/desktop-mcp-preview-capture.spec.ts --reporter=line
-- npm run typecheck
+- npm run type-check
 - npm run lint
 - CI=1 npm run test -- --run
 - Browser/console smoke check at `http://127.0.0.1:5173/aksel-arcade/` via `npm run dev -- --host 127.0.0.1 --port 5173 --strictPort`, confirming the app shell and live preview render cleanly with no browser-console warnings/errors
@@ -3535,7 +3615,7 @@ Implemented:
 
 Verification:
 
-- npm run typecheck
+- npm run type-check
 - npm run lint
 - CI=1 npm test -- --run
 - npm run build
@@ -3562,7 +3642,7 @@ Fixed after review:
 Verification:
 
 - npm run build
-- npm run typecheck
+- npm run type-check
 - npm run lint
 - CI=1 npm test -- --run
 - npm run test:e2e -- tests/e2e/desktop-mcp-preview-capture.spec.ts --reporter=line
@@ -3595,7 +3675,7 @@ Human-testable verification notes:
 
 Verification:
 
-- npm run typecheck
+- npm run type-check
 - npm run lint
 - CI=1 npm run test -- --run
 - npm run build
@@ -3624,7 +3704,7 @@ Human-testable verification notes:
 Verification:
 
 - CI=1 npm run test -- --run tests/unit/services/desktopMcpServer.test.ts
-- npm run typecheck
+- npm run type-check
 - npm run lint
 - CI=1 npm run test -- --run
 - npm run build
@@ -3671,7 +3751,7 @@ Verification:
 
 - CI=1 npm run test -- --run tests/unit/services/previewInteractions.test.ts tests/unit/services/desktopMcpServer.test.ts tests/integration/share-popover.test.tsx
 - npm run test:e2e -- tests/e2e/issue-279-mcp-hardening.spec.ts --reporter=line
-- npm run typecheck
+- npm run type-check
 - npm run lint
 - CI=1 npm run test -- --run
 - npm run build
@@ -3703,7 +3783,7 @@ Human-testable verification notes:
 Verification:
 
 - npm install
-- npm run typecheck
+- npm run type-check
 - npm run lint
 - CI=1 npm test -- --run
 - npm run build
@@ -3733,7 +3813,7 @@ Human-testable verification notes:
 
 Verification:
 
-- npm run typecheck
+- npm run type-check
 - npm run lint
 - CI=1 npm test -- --run tests/unit/services/desktopMcpServer.test.ts
 - npm run test:e2e -- tests/e2e/desktop-mcp-smoke.spec.ts --reporter=line
@@ -3753,7 +3833,7 @@ Implemented:
 
 Verification:
 
-- npm run typecheck
+- npm run type-check
 - npm run lint
 - CI=1 npm test -- --run
 - npm run test:e2e -- tests/e2e/desktop-mcp-smoke.spec.ts tests/e2e/desktop-mcp-preview-capture.spec.ts tests/e2e/desktop-mcp-apply-changes.spec.ts tests/e2e/issue-279-mcp-hardening.spec.ts --reporter=line
@@ -3772,7 +3852,7 @@ Implemented:
 
 Verification:
 
-- npm run typecheck
+- npm run type-check
 - npm run lint
 - CI=1 npm test -- --run
 - npm run test:e2e -- tests/e2e/desktop-mcp-smoke.spec.ts tests/e2e/desktop-mcp-preview-capture.spec.ts tests/e2e/desktop-mcp-apply-changes.spec.ts tests/e2e/issue-279-mcp-hardening.spec.ts --reporter=line
@@ -3879,7 +3959,7 @@ Implemented:
 - Added regression coverage in `tests/unit/services/runtimeDiagnosticHints.test.ts`, `tests/unit/services/desktopMcpProjectResources.test.ts`, and `tests/unit/services/desktopMcpServer.test.ts` for the new hint plus the corrected start-here / initialize / authoring-guide / component-resource wording.
 
 Verification:
-- npm run typecheck
+- npm run type-check
 - npm run lint
 - CI=1 npm test -- --run
 - npm run build
@@ -3898,7 +3978,7 @@ Fixed two real review findings before merge:
 
 Verification:
 - CI=1 npm test -- --run tests/unit/services/runtimeDiagnosticHints.test.ts tests/unit/services/desktopMcpProjectResources.test.ts tests/unit/services/desktopMcpServer.test.ts
-- npm run typecheck
+- npm run type-check
 - npm run lint
 - CI=1 npm test -- --run
 - npm run build
@@ -3919,7 +3999,7 @@ Implemented:
 - Added regression coverage in `tests/unit/akselMcpCatalog.test.ts`, `tests/unit/services/desktopMcpServer.test.ts`, and `tests/e2e/desktop-mcp-aksel-resources.spec.ts` for alias resolution, hidden-root replacements, near-match suggestions, and the new authoring-guide wording.
 
 Verification:
-- npm run typecheck
+- npm run type-check
 - npm run lint
 - npm run test -- --run
 - Browser smoke check at `http://127.0.0.1:4173/aksel-arcade/` with the app shell rendered and no browser-console errors
@@ -3936,7 +4016,7 @@ Fixed one PR-scoped review issue before merge:
 - Extended `tests/unit/services/desktopMcpServer.test.ts` and `tests/e2e/desktop-mcp-aksel-resources.spec.ts` with descendant-name coverage for `Dropdown.Menu` resolving to `ActionMenu`.
 
 Verification:
-- npm run typecheck
+- npm run type-check
 - npm run lint
 - npm run test -- --run
 - Ephemeral MCP runtime probe via `createDesktopMcpServer({ port: 0 })` confirming `arcade://aksel/components/Dropdown.Menu` returns a replacement resolution with `ActionMenu`
@@ -3953,7 +4033,7 @@ Implemented:
 - Extended `tests/unit/services/desktopMcpServer.test.ts` to assert the new start-here page-independence wording and the authoring-guide sandbox/step-flow guidance.
 
 Verification:
-- npm run typecheck
+- npm run type-check
 - npm run lint
 - CI=1 npm test -- --run
 - CI=1 npm test -- --run tests/unit/services/desktopMcpServer.test.ts
@@ -3971,7 +4051,7 @@ Fixed one PR-scoped review issue before merge:
 
 Verification:
 - CI=1 npm test -- --run tests/unit/services/desktopMcpServer.test.ts
-- npm run typecheck
+- npm run type-check
 - npm run lint
 - CI=1 npm test -- --run
 - Browser smoke check at `http://127.0.0.1:4173/aksel-arcade/` with the app shell + preview rendered and no browser-console warnings/errors
@@ -3988,7 +4068,7 @@ Implemented:
 - Removed the stale parity-test sentence from `docs/adr/0017-self-teaching-mcp-entry-point.md`; `README.md` did not need an issue-301 change because its current Agent wording already describes the MCP-only direction.
 
 Verification:
-- npm run typecheck
+- npm run type-check
 - npm run lint
 - CI=1 npm test -- --run
 - npm run build
@@ -4013,7 +4093,7 @@ Implemented:
 
 Verification:
 - `npm install`
-- `npm run typecheck`
+- `npm run type-check`
 - `npm run lint`
 - `npm run test -- --run`
 - Browser smoke check at `http://127.0.0.1:5176/aksel-arcade/` with the app shell + preview rendered and no captured browser console/page errors.
@@ -4030,7 +4110,7 @@ Fixed before merge:
 - Extended annotation lifecycle filtering with explicit hidden/visible target filtering inputs while keeping hidden-but-resolved annotations included in default open/pending counts.
 
 Verification:
-- `npm run typecheck`
+- `npm run type-check`
 - `npm run lint`
 - `npm run build`
 - `npm run test -- --run`
@@ -4049,7 +4129,7 @@ Implemented:
 
 Verification:
 - `npm install`
-- `npm run typecheck`
+- `npm run type-check`
 - `npm run lint`
 - `npm run test -- --run`
 - `npm run build:sandbox`
@@ -4067,7 +4147,7 @@ Fixed before merge:
 - Fixed the CI-only `tsc -b` overload issue in the Aksel `HStack` test fixture by using the explicit `as="div"` primitive prop.
 
 Verification:
-- `npm run typecheck`
+- `npm run type-check`
 - `npm run lint`
 - `npm run test -- --run tests/unit/services/annotationTargets.test.ts`
 - `npm run test -- --run`
@@ -4088,7 +4168,7 @@ Implemented:
 
 Verification:
 - `npm install`
-- `npm run typecheck`
+- `npm run type-check`
 - `npm run lint`
 - `npm run test -- --run`
 - Browser verification at `http://127.0.0.1:5177/aksel-arcade/` for the #317 human checklist: off/default annotation toggle, active state, `Clear all` only while active, toggle-off behavior, Escape exit, Inspect/Annotation mutual exclusion both ways, zero/one/two-digit supplied badge counts, light and dark header states, and no captured console errors.
@@ -4106,7 +4186,7 @@ Fixed before merge:
 - Updated regression coverage for icon-only annotation controls, Clear all placement, capped large badge counts, and xsmall fullscreen/Inspect buttons.
 
 Verification:
-- `npm run typecheck`
+- `npm run type-check`
 - `npm run lint`
 - `npm run test -- --run`
 - `npm run test:e2e -- preview-header-layout.spec.ts`
@@ -4120,7 +4200,7 @@ Fixed before merge:
 - Updated the annotation count badge to Figma's new values: 14px badge height/min width, `var(--ax-space-4)` inline padding, 12px Source Sans 3 text, 12px line height, and `0.048px` letter spacing.
 
 Verification:
-- `npm run typecheck`
+- `npm run type-check`
 - `npm run lint`
 - `npm test -- --run tests/integration/annotation-mode-header-shell.test.tsx`
 - `npm run test -- --run`
@@ -4133,7 +4213,7 @@ Fixed before merge:
 - Wrapped the annotation badge count in an inner text span and applied a 0.5px vertical optical offset so the text center aligns with the 14px badge for both one- and two-digit counts.
 
 Verification:
-- `npm run typecheck`
+- `npm run type-check`
 - `npm run lint`
 - `npm test -- --run tests/integration/annotation-mode-header-shell.test.tsx`
 - `npm run test -- --run`
@@ -4146,7 +4226,7 @@ Fixed before merge:
 - Replaced the annotation toggle icon with the verified Aksel `ChatElipsisIcon`.
 
 Verification:
-- `npm run typecheck`
+- `npm run type-check`
 - `npm run lint`
 - `npm test -- --run tests/integration/annotation-mode-header-shell.test.tsx`
 ### 2026-07-01 - Issue #318: Single-element annotation creation
@@ -4163,7 +4243,7 @@ Implemented:
 Verification:
 
 - npm install
-- npm run typecheck
+- npm run type-check
 - npm run test -- --run
 - npm run lint
 
@@ -4181,7 +4261,7 @@ Implemented:
 Verification:
 
 - npm install
-- npm run typecheck
+- npm run type-check
 - npm run lint
 - npm run test -- --run
 - Browser verification at `http://127.0.0.1:4179/aksel-arcade/`: in dark theme, enabled Annotation mode, created a live annotation, confirmed the marker badge incremented, focused the marker to show the tooltip, opened the edit popover from the marker, saved updated text, then reopened and deleted it to confirm the badge returned to zero; in light theme, switched via Settings, recreated an annotation, and confirmed the tooltip/edit flow still rendered correctly with no captured console warnings or errors.
@@ -4200,7 +4280,7 @@ Fixed after bug report:
 
 Verification:
 
-- npm run typecheck
+- npm run type-check
 - npm run lint
 - npm test -- --run
 - Browser check at `http://127.0.0.1:4179/aksel-arcade/`: enabled Annotation mode, focused the existing marker, confirmed the preview now renders as a Popover with target label + comment text, and verified the marker number center offset measures `0px` horizontally and `-1px` vertically after the centering adjustment, with no captured console warnings or errors.
@@ -4215,7 +4295,7 @@ Fixed during pre-merge review:
 
 Verification:
 
-- npm run typecheck
+- npm run type-check
 - npm run lint
 - npm test -- --run
 - Browser/dev-server practical checks were attempted on `http://127.0.0.1:5177/aksel-arcade/`; this exposed and fixed a hidden-Popover anchor issue. Further Playwright iframe pointer checks were limited by sandbox/frame event tooling, so future work should manually re-check the full #318 Human verification checklist in a visible browser session, especially real pointer selection on an Aksel button/control and prototype navigation blocking.
@@ -4243,7 +4323,7 @@ Fixed after user feedback:
 
 Verification:
 
-- npm run typecheck
+- npm run type-check
 - npm run test -- --run
 - npm run lint
 - Browser probe at `http://127.0.0.1:5192/aksel-arcade/` confirmed Annotation mode resolves outer Box padding, VStack gap/body, InlineMessage root exposed area, InlineMessage non-strong text span, in-root custom `div`, and custom `span`, and opens the add-popover for the custom `div` without console errors.
@@ -4261,7 +4341,7 @@ Fixed after user feedback:
 
 Verification:
 
-- npm run typecheck
+- npm run type-check
 - npm run test -- --run
 - npm run lint
 - npm run build after the first pushed review-fix commit exposed a CI-only test fixture type error; fixed the Aksel `React.createElement` fixtures with explicit `as="div"` props and reran npm run build, npm run test -- --run, and npm run lint.
@@ -4275,7 +4355,7 @@ Fixed after user feedback:
 
 Verification:
 
-- npm run typecheck
+- npm run type-check
 - npm run test -- --run
 - npm run lint
 - Browser check at `http://127.0.0.1:5194/aksel-arcade/` opened Annotation mode, selected a default preview target, and measured `.live-preview__annotation-popover-content` at `280px` with no console errors.
@@ -4290,7 +4370,7 @@ Fixed after user feedback:
 
 Verification:
 
-- npm run typecheck
+- npm run type-check
 - npm run test -- --run
 - npm run lint
 - Browser check at `http://127.0.0.1:5195/aksel-arcade/` annotated near the MD right edge, switched to XS, and confirmed the marker remained fully inside the 320px preview shell at `left: 308px` with no console errors.
@@ -4306,7 +4386,7 @@ Fixed during pre-merge review:
 
 Verification:
 
-- npm run typecheck
+- npm run type-check
 - npm run test -- --run
 - npm run lint
 
@@ -4321,7 +4401,7 @@ Fixed after merged-review follow-up:
 
 Verification:
 
-- npm run typecheck
+- npm run type-check
 - npm run lint
 - npm run test -- --run
 - Browser load and console check at `http://127.0.0.1:4177/aksel-arcade/`
@@ -4339,7 +4419,7 @@ Implemented:
 Verification:
 
 - npm install
-- npm run typecheck
+- npm run type-check
 - npm run lint
 - CI=1 npm run test
 - Browser checklist at `http://127.0.0.1:5177/aksel-arcade/`: seeded annotations on two pages, visually confirmed the Clear all destructive dialog includes Page 1 plus total active-page count, cancel preserved all records, confirm removed only Page 1 annotations, deleting the annotated second page showed the normal delete dialog with annotation-count copy and removed orphan data, and Reset editor returned to a clean default project with no annotations.
@@ -4371,7 +4451,7 @@ Implemented:
 Verification:
 
 - npm run build:sandbox
-- npm run typecheck
+- npm run type-check
 - npm run lint
 - CI=1 npm test -- --run
 - Browser verification at `http://127.0.0.1:4178/aksel-arcade/` covering drag group selection, additive multi-select, grouped marker reopen, empty drag no-op, and light-theme parity
@@ -4390,7 +4470,7 @@ Review follow-up:
 Verification:
 
 - npm run build:sandbox
-- npm run typecheck
+- npm run type-check
 - npm run lint
 - CI=1 npm test -- --run
 - Browser checks at `http://127.0.0.1:4178/aksel-arcade/` for single dashed union outline, success-colored multi-select styling, rounded-square multi marker, Cmd+Shift no native text selection, and annotation cursor persistence after light/dark toggle
@@ -4406,7 +4486,7 @@ Verification:
 
 - npm run build:sandbox
 - PLAYWRIGHT_BASE_URL=http://127.0.0.1:4178/aksel-arcade npm run test:e2e -- tests/e2e/annotation-drag-selection.spec.ts --reporter=line
-- npm run typecheck
+- npm run type-check
 - npm run lint
 - CI=1 npm test -- --run
 2026-07-02 - PR #336 review follow-up
@@ -4419,6 +4499,6 @@ Fixed before merge:
 Verification:
 - PLAYWRIGHT_BASE_URL=http://127.0.0.1:4178/aksel-arcade npm run test:e2e -- tests/e2e/annotation-drag-selection.spec.ts --reporter=line
 - npm run build
-- npm run typecheck
+- npm run type-check
 - npm run lint
 - CI=1 npm test -- --run

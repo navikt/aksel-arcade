@@ -55,6 +55,7 @@ export type SandboxToMainMessage =
   | { type: 'INSPECTION_DATA'; payload: InspectionData | null }
   | { type: 'ANNOTATION_TARGET_HOVERED'; payload: AnnotationTargetResolutionResult | null }
   | { type: 'ANNOTATION_TARGET_SELECTED'; payload: AnnotationTargetResolutionResult }
+  | { type: 'ANNOTATION_VIEWPORT_CHANGED'; payload: { scrollX: number; scrollY: number } }
   | { type: 'THEME_UPDATED'; payload: { theme: 'light' | 'dark' } }
   | { type: 'CONSOLE_LOG'; payload: { level: 'log' | 'warn' | 'error'; args: unknown[] } }
   | {

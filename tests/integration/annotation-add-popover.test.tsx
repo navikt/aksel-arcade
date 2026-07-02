@@ -24,6 +24,8 @@ const selectedTarget: ResolvedAnnotationTarget = {
     fullPath: 'html > body > div#root > main > button',
     cssClasses: 'aksel-button',
     nearbyText: 'Submit',
+    clickOffsetX: 26,
+    clickOffsetY: 12,
     boundingBox: { x: 24, y: 32, width: 120, height: 40 },
   },
   visibility: 'visible',
@@ -114,7 +116,9 @@ const edgeAnnotation: ArcadeAnnotation = {
   status: 'pending',
   createdAt: '2026-07-02T00:00:00.000Z',
   updatedAt: '2026-07-02T00:00:00.000Z',
-  boundingBox: { x: 300, y: 32, width: 120, height: 40 },
+  clickOffsetX: 10,
+  clickOffsetY: 8,
+  boundingBox: { x: 100, y: 32, width: 120, height: 40 },
 }
 
 const annotation = (overrides: Partial<ArcadeAnnotation> = {}): ArcadeAnnotation => ({
@@ -318,6 +322,8 @@ describe('Annotation add popover', () => {
           expect.objectContaining({ signature: 'approve-signature' }),
           expect.objectContaining({ signature: 'reject-signature' }),
         ],
+        clickOffsetX: 26,
+        clickOffsetY: 12,
       }),
     ])
   })
@@ -340,15 +346,59 @@ describe('Annotation add popover', () => {
     expect(marker.className).toContain('live-preview__annotation-marker--multi-select')
   })
 
-  it('keeps saved marker positions visible when switching to a narrower breakpoint', () => {
+  it('hides saved markers and open-count updates until live resolution arrives after sandbox connection', async () => {
+    const onActivePageOpenAnnotationCountChange = vi.fn()
+    const { iframeRef } = renderLivePreview({
+      annotations: [annotation()],
+      onActivePageOpenAnnotationCountChange,
+    })
+    expect(iframeRef.current).toBeTruthy()
+
+    expect(
+      screen.getByRole('button', {
+        name: /open annotation 1: needs clearer copy near the primary action button/i,
+      })
+    ).toBeTruthy()
+    onActivePageOpenAnnotationCountChange.mockClear()
+
+    postSandboxMessage(iframeRef.current!, {
+      type: 'SANDBOX_CONNECTED',
+    })
+
+    await waitFor(() => {
+      expect(
+        screen.queryByRole('button', {
+          name: /open annotation 1: needs clearer copy near the primary action button/i,
+        })
+      ).toBeNull()
+    })
+    await waitFor(() => expect(onActivePageOpenAnnotationCountChange).toHaveBeenCalledWith(0))
+
+    postSandboxMessage(iframeRef.current!, {
+      type: 'ANNOTATION_TARGET_RESOLVED',
+      payload: {
+        requestId: 'annotation-resolution-1',
+        result: { status: 'resolved', target: selectedTarget, matchCount: 1 },
+      },
+    })
+
+    expect(
+      await screen.findByRole('button', {
+        name: /open annotation 1: needs clearer copy near the primary action button/i,
+      })
+    ).toBeTruthy()
+    await waitFor(() => expect(onActivePageOpenAnnotationCountChange).toHaveBeenCalledWith(1))
+  })
+
+  it('keeps saved marker positions visible when switching to a narrower breakpoint', async () => {
     renderLivePreview({
       viewportWidth: 'XS',
       annotations: [edgeAnnotation],
     })
 
     const marker = screen.getByRole('button', { name: /annotation 1: near the edge/i })
-    expect(marker.style.left).toBe('308px')
-    expect(marker.style.left).not.toBe('420px')
+    await waitFor(() => expect(marker.style.left).toBe('110px'))
+    expect(marker.style.left).not.toBe('308px')
   })
 
   it('shows marker tooltips on hover and focus and opens the edit popover from the marker', async () => {
@@ -364,6 +414,7 @@ describe('Annotation add popover', () => {
 
     await user.hover(marker)
     expect(await screen.findByText('Needs clearer copy near the primary action button.')).toBeTruthy()
+    expect(screen.getAllByTestId('annotation-outline')).toHaveLength(1)
 
     await user.unhover(marker)
     await user.tab()
@@ -390,6 +441,32 @@ describe('Annotation add popover', () => {
         status: 'pending',
       }),
     ])
+  })
+
+  it('shows grouped outlines when opening a saved multi-select annotation marker', async () => {
+    const user = userEvent.setup()
+    renderLivePreview({
+      annotations: [
+        annotation({
+          isMultiSelect: true,
+          targetIdentities: multiSelectTarget.snapshot.targetIdentities,
+          boundingBox: multiSelectTarget.snapshot.boundingBox,
+          elementBoundingBoxes: multiSelectTarget.snapshot.elementBoundingBoxes,
+        }),
+      ],
+    })
+
+    const marker = screen.getByRole('button', {
+      name: /open annotation 1: needs clearer copy near the primary action button/i,
+    })
+
+    await user.click(marker)
+
+    const outlines = screen.getAllByTestId('annotation-outline')
+    expect(outlines).toHaveLength(3)
+    expect(outlines[0].className).toContain('live-preview__annotation-outline--selected-element')
+    expect(outlines[1].className).toContain('live-preview__annotation-outline--selected-element')
+    expect(outlines[2].className).toContain('live-preview__annotation-outline--multi-select')
   })
 
   it('cancels marker edits with Escape and restores focus to the marker button', async () => {

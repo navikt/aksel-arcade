@@ -40,6 +40,8 @@ export interface AnnotationTargetSnapshot {
   drawingIndex?: number
   elementBoundingBoxes?: ArcadeAnnotation['elementBoundingBoxes']
   selectedText?: string
+  clickOffsetX?: number
+  clickOffsetY?: number
 }
 
 export interface CreateAnnotationInput {
@@ -299,6 +301,8 @@ const copyTargetSnapshot = (target: AnnotationTargetSnapshot): AnnotationTargetS
     ? { elementBoundingBoxes: target.elementBoundingBoxes.map((box) => ({ ...box })) }
     : {}),
   ...(target.selectedText !== undefined ? { selectedText: target.selectedText } : {}),
+  ...(target.clickOffsetX !== undefined ? { clickOffsetX: target.clickOffsetX } : {}),
+  ...(target.clickOffsetY !== undefined ? { clickOffsetY: target.clickOffsetY } : {}),
 })
 
 const cloneAnnotation = (annotation: ArcadeAnnotation): ArcadeAnnotation => ({
@@ -312,6 +316,8 @@ const cloneAnnotation = (annotation: ArcadeAnnotation): ArcadeAnnotation => ({
   ...(annotation.elementBoundingBoxes
     ? { elementBoundingBoxes: annotation.elementBoundingBoxes.map((box) => ({ ...box })) }
     : {}),
+  ...(annotation.clickOffsetX !== undefined ? { clickOffsetX: annotation.clickOffsetX } : {}),
+  ...(annotation.clickOffsetY !== undefined ? { clickOffsetY: annotation.clickOffsetY } : {}),
   ...(annotation.placement ? { placement: { ...annotation.placement } } : {}),
   ...(annotation.rearrange
     ? {

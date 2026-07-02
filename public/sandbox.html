@@ -336,6 +336,7 @@
     let annotationPendingAdditiveSelection = false;
     let annotationDragState = null;
     let annotationAdditiveModifierActive = false;
+    let annotationViewportChangeFrame = null;
     let lastAnnotationHoverSignature = null;
     let lastAnnotationMoveTime = 0;
     let overlayElements = null;
@@ -781,7 +782,10 @@
         document.addEventListener('selectstart', handleAnnotationSelectStart, true);
         document.addEventListener('keydown', handleAnnotationModifierKeyChange, true);
         document.addEventListener('keyup', handleAnnotationModifierKeyChange, true);
+        window.addEventListener('scroll', handleAnnotationViewportChange, { passive: true });
+        window.addEventListener('resize', handleAnnotationViewportChange);
         document.documentElement.classList.add('aksel-arcade-annotation-mode');
+        handleAnnotationViewportChange();
       } else {
         document.removeEventListener('mousemove', handleAnnotationMouseMove, true);
         document.removeEventListener('mousedown', handleAnnotationMouseDown, true);
@@ -790,10 +794,34 @@
         document.removeEventListener('selectstart', handleAnnotationSelectStart, true);
         document.removeEventListener('keydown', handleAnnotationModifierKeyChange, true);
         document.removeEventListener('keyup', handleAnnotationModifierKeyChange, true);
+        window.removeEventListener('scroll', handleAnnotationViewportChange);
+        window.removeEventListener('resize', handleAnnotationViewportChange);
+        if (annotationViewportChangeFrame !== null) {
+          cancelAnimationFrame(annotationViewportChangeFrame);
+          annotationViewportChangeFrame = null;
+        }
         document.documentElement.classList.remove('aksel-arcade-annotation-mode');
         clearAnnotationOverlays();
         sendMessage('ANNOTATION_TARGET_HOVERED', null);
       }
+    }
+
+    function handleAnnotationViewportChange() {
+      if (!annotationModeEnabled) {
+        return;
+      }
+
+      if (annotationViewportChangeFrame !== null) {
+        cancelAnimationFrame(annotationViewportChangeFrame);
+      }
+
+      annotationViewportChangeFrame = requestAnimationFrame(() => {
+        annotationViewportChangeFrame = null;
+        sendMessage('ANNOTATION_VIEWPORT_CHANGED', {
+          scrollX: window.scrollX,
+          scrollY: window.scrollY,
+        });
+      });
     }
 
     function ensureAnnotationOverlayElements() {

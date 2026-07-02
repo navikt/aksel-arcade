@@ -352,12 +352,12 @@ export const getAnnotationTargetIdentity = (
   const cssClasses = getElementClasses(element)
   const elementPath = getReadableElementPath(root, element)
   const fullPath = getFullElementPath(root, element)
-  const signature = stableStringify({
+  const signature = createAnnotationTargetIdentitySignature({
     tagName,
     role,
-    accessibleName: normalizeComparableText(accessibleName),
-    text: normalizeComparableText(text),
-    cssClasses: normalizeComparableText(cssClasses),
+    accessibleName,
+    text,
+    cssClasses,
   })
 
   void frameWindow
@@ -414,6 +414,9 @@ const createResolvedTarget = (
     y: isFixed ? pageY : pageY + frameWindow.scrollY,
     element: describeElement(element),
     elementPath: identity.elementPath,
+    targetIdentities: [{ ...identity }],
+    clickOffsetX: pageX - rect.left,
+    clickOffsetY: pageY - rect.top,
     boundingBox: {
       x: rect.left,
       y: isFixed ? rect.top : rect.top + frameWindow.scrollY,
@@ -436,6 +439,27 @@ const createResolvedTarget = (
     visibility: isElementVisibleInViewport(element, frameWindow) ? 'visible' : 'hidden',
   }
 }
+
+export const createAnnotationTargetIdentitySignature = ({
+  tagName,
+  role,
+  accessibleName,
+  text,
+  cssClasses,
+}: {
+  tagName: string
+  role?: string
+  accessibleName?: string
+  text?: string
+  cssClasses?: string
+}): string =>
+  stableStringify({
+    tagName,
+    role,
+    accessibleName: normalizeComparableText(accessibleName),
+    text: normalizeComparableText(text),
+    cssClasses: normalizeComparableText(cssClasses),
+  })
 
 const deepElementFromPoint = (
   root: Element,
