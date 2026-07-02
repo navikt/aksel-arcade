@@ -3,7 +3,7 @@ import { BodyShort, Button, Detail, HStack, Popover, Textarea, VStack } from '@n
 import type { MainToSandboxMessage, SandboxToMainMessage } from '@/types/messages'
 import type { ArcadePageId, ViewportSize } from '@/types/project'
 import type { InspectionData } from '@/types/inspection'
-import type { ArcadeAnnotation } from '@/types/annotations'
+import type { ArcadeAnnotation, AnnotationTargetIdentity } from '@/types/annotations'
 import type { SandboxConsolePayload } from '@/services/previewDiagnostics'
 import type { CompileError, RuntimeError } from '@/types/preview'
 import {

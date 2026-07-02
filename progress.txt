@@ -30,6 +30,7 @@ Follow-up before merge:
 - Fixed a saved-annotation label bug discovered during post-PR human testing in the starter Arcade project: reopening an annotation on the intro paragraph could show the sibling heading text because the edit popover preferred `nearbyText` over the persisted target identity.
 - Updated `LivePreview` to prefer the saved target identity's own text/accessibility/classes when rendering reopened annotation labels, and added a regression test that reproduces the intro paragraph vs heading mix-up.
 - Re-ran `npm run type-check`, `npm run lint`, `npm test -- --run`, and a focused Playwright browser repro confirming the reopened annotation now stays labeled as `p: A browser-based React...`.
+- Fixed the follow-up CI failure in `npm run build`: the saved-target label helper compiled under `tsc --noEmit` locally but failed the build pipeline because `LivePreview` referenced `AnnotationTargetIdentity` without importing the type. Added the missing import and re-ran the full validation set including `npm run build`.
 
 ### 2026-07-02 - PR #337 review follow-up
 
