@@ -49,6 +49,8 @@ const APPLY_CHANGES_OPERATION_TYPES = [
   'set_preview_context',
   'rename_project',
 ]
+const DEFAULT_LIST_ANNOTATIONS_STATUS = 'open'
+const LIST_ANNOTATIONS_STATUSES = ['pending', 'acknowledged', 'resolved', 'dismissed', 'all']
 const PAGE_REF_PLACEHOLDER_SYNTAX = '{{pageRef:name}}'
 const CAPABILITY_PREVIEW_CAPTURE_LAYERS = [
   'screenshot',
@@ -95,6 +97,8 @@ const CAPABILITY_V1_OMISSIONS = Object.freeze([
   'No Web Arcade MCP endpoint.',
 ])
 const PROJECT_SOURCE_PAGE_URI_PATTERN = /^arcade:\/\/project\/source\/pages\/(page\d+)\/(jsx|hooks)$/
+const PROJECT_ANNOTATIONS_RESOURCE_URI = 'arcade://project/annotations'
+const PROJECT_PAGE_ANNOTATIONS_URI_PATTERN = /^arcade:\/\/project\/pages\/(page\d+)\/annotations$/
 const PREVIEW_CAPTURE_RESOURCE_URI_PATTERN =
   /^arcade:\/\/preview\/captures\/([a-z0-9-]+)\/(manifest|screenshot|frame|accessibility|dom-layout-style)$/
 
@@ -122,6 +126,7 @@ const DESKTOP_MCP_INSTRUCTIONS = [
   'Use real Aksel components and props; do not hand-roll raw HTML or guess prop names. If an Aksel component resource resolves to a replacement payload, follow the sanctioned replacement instead of authoring the hidden/deprecated component. Per-component usage and runnable, version-matched snippets are available on demand — do not load them until you reach for a given component.',
   'Navigate between pages with goToPage("pageNN"), or an Aksel Link/LinkCard whose href/to is a bare page id; the current page id is injected read-only as currentPageId. There is no router and no <a href> navigation.',
   'Page ids are assigned by the app. Within one apply_changes batch, link pages with {{pageRef:name}} placeholders targeting any create_page.newPageRef declared in that batch.',
+  'Annotation work is Arcade-native: list open work with list_annotations, read arcade://project/annotations or arcade://project/pages/{pageId}/annotations for non-dead history, and treat hidden targets as real work even when they are outside the current viewport.',
   'Working loop: apply_changes, then read arcade://project/diagnostics, then capture_preview_evidence to inspect. Capture is an isolated throwaway render — it never changes the durable Active page.',
   'Deeper references are on demand, not required before authoring: arcade://desktop/authoring-guide (depth + Aksel snippet reach paths), arcade://desktop/apply-changes-operations, the workflow guides, and the Aksel catalog.',
 ].join('\n')
@@ -364,7 +369,7 @@ const MCP_TOOL_DEFINITIONS = Object.freeze([
   Object.freeze({
     name: 'read_resource',
     description:
-      'Read a Desktop Arcade MCP resource by URI. Use this first in tool-only MCP clients to fetch arcade://desktop/start-here, the project manifest, diagnostics, source resources, Aksel snippets, and Preview evidence resources.',
+      'Read a Desktop Arcade MCP resource by URI. Use this first in tool-only MCP clients to fetch arcade://desktop/start-here, the project manifest, annotation resources, diagnostics, source resources, Aksel snippets, and Preview evidence resources.',
     inputSchema: Object.freeze({
       type: 'object',
       additionalProperties: false,
@@ -374,6 +379,32 @@ const MCP_TOOL_DEFINITIONS = Object.freeze([
           type: 'string',
           minLength: 1,
           description: 'Resource URI to read, e.g. arcade://desktop/start-here.',
+        }),
+      }),
+    }),
+  }),
+  Object.freeze({
+    name: 'list_annotations',
+    description:
+      'List non-dead feedback annotations for the active Arcade page by default. Supports explicit page or whole-project scope plus status filters for open, pending, acknowledged, resolved, dismissed, or all.',
+    inputSchema: Object.freeze({
+      type: 'object',
+      additionalProperties: false,
+      properties: Object.freeze({
+        scope: Object.freeze({
+          type: 'string',
+          enum: ['page', 'project'],
+          description: 'Optional annotation scope. Defaults to the active Arcade page.',
+        }),
+        pageId: Object.freeze({
+          type: 'string',
+          description: 'Optional Arcade page id. Omit to use the active page when scope is "page".',
+        }),
+        status: Object.freeze({
+          type: 'string',
+          enum: LIST_ANNOTATIONS_STATUSES,
+          description:
+            'Optional status filter. Defaults to "open" (pending + acknowledged). Use "all" for full non-dead history.',
         }),
       }),
     }),
@@ -673,6 +704,13 @@ const MCP_STABLE_RESOURCE_DEFINITIONS = Object.freeze([
     mimeType: 'application/json',
   }),
   Object.freeze({
+    uri: PROJECT_ANNOTATIONS_RESOURCE_URI,
+    name: 'Active Arcade project annotations',
+    description:
+      'Project-wide non-dead feedback annotations, including resolved and dismissed history plus per-status counts.',
+    mimeType: 'application/json',
+  }),
+  Object.freeze({
     uri: 'arcade://project/preview-context',
     name: 'Active Arcade project preview context',
     description: 'Saved preview theme and viewport preferences for the active Arcade project.',
@@ -687,6 +725,7 @@ const MCP_STABLE_RESOURCE_DEFINITIONS = Object.freeze([
 ])
 
 const TOOL_EXECUTION_STATUS = Object.freeze({
+  list_annotations: 'available when an active project reader is connected',
   capture_preview_evidence: 'available when an active preview capture bridge is connected',
   apply_changes: 'available when an active project writer is connected',
 })
@@ -1039,7 +1078,7 @@ const routeDesktopMcpJsonRpcRequest = async (
       routeToolsListRequest(payload, response)
       return
     case 'resources/list':
-      routeResourcesListRequest(payload, response)
+      await routeResourcesListRequest(payload, response, { readProjectResource })
       return
     case 'tools/call':
       await routeToolsCallRequest(payload, response, {
@@ -1137,7 +1176,7 @@ const routeToolsListRequest = (payload, response) => {
   })
 }
 
-const routeResourcesListRequest = (payload, response) => {
+const routeResourcesListRequest = async (payload, response, { readProjectResource }) => {
   if (!isJsonRpcResponseId(payload.id)) {
     sendJsonRpcError(response, {
       httpStatus: 400,
@@ -1158,11 +1197,13 @@ const routeResourcesListRequest = (payload, response) => {
     return
   }
 
+  const dynamicResources = await listDynamicProjectResources(readProjectResource)
+
   sendJson(response, 200, {
     jsonrpc: '2.0',
     id: payload.id,
     result: {
-      resources: MCP_STABLE_RESOURCE_DEFINITIONS,
+      resources: [...MCP_STABLE_RESOURCE_DEFINITIONS, ...dynamicResources],
     },
   })
 }
@@ -1275,6 +1316,33 @@ const routeToolsCallRequest = async (
       return
     }
 
+    if (toolDefinition.name === 'list_annotations') {
+      const listAnnotationsResult = await listAnnotations(argumentsPayload, { readProjectResource })
+      sendJson(response, 200, {
+        jsonrpc: '2.0',
+        id: payload.id,
+        result: listAnnotationsResult.ok
+          ? createToolExecutionSuccessResult(
+              `Listed ${listAnnotationsResult.annotations.length} annotations from ${listAnnotationsResult.resourceUri}.`,
+              listAnnotationsResult
+            )
+          : createToolExecutionErrorResult(
+              toolDefinition.name,
+              listAnnotationsResult.code,
+              listAnnotationsResult.message,
+              {
+                ...(listAnnotationsResult.resourceUri !== undefined
+                  ? { resourceUri: listAnnotationsResult.resourceUri }
+                  : {}),
+                ...(listAnnotationsResult.manifestResourceUri !== undefined
+                  ? { manifestResourceUri: listAnnotationsResult.manifestResourceUri }
+                  : {}),
+              }
+            ),
+      })
+      return
+    }
+
     if (toolDefinition.name === 'capture_preview_evidence') {
       const captureResult = await capturePreviewEvidence(argumentsPayload)
       if (!isCapturePreviewResult(captureResult)) {
@@ -1362,7 +1430,9 @@ const routeToolsCallRequest = async (
     })
   } catch (error) {
     const unexpectedMessage =
-      toolDefinition.name === 'capture_preview_evidence'
+      toolDefinition.name === 'list_annotations'
+        ? 'Desktop Arcade MCP list_annotations failed unexpectedly.'
+        : toolDefinition.name === 'capture_preview_evidence'
         ? 'Desktop Arcade MCP capture_preview_evidence failed unexpectedly.'
         : 'Desktop Arcade MCP apply_changes failed unexpectedly.'
 
@@ -1477,6 +1547,201 @@ const readDesktopResource = async (uri, { previewCaptureStore, readProjectResour
   }
 }
 
+const listDynamicProjectResources = async (readProjectResource) => {
+  const manifestResult = await readProjectJsonResource(readProjectResource, 'arcade://project/manifest')
+  if (!manifestResult.ok) {
+    return []
+  }
+
+  const pages = Array.isArray(manifestResult.value?.pages) ? manifestResult.value.pages : []
+  return pages
+    .filter(
+      (page) =>
+        isPlainObject(page) &&
+        typeof page.id === 'string' &&
+        /^page\d+$/.test(page.id) &&
+        typeof page.name === 'string'
+    )
+    .map((page) =>
+      Object.freeze({
+        uri: `arcade://project/pages/${page.id}/annotations`,
+        name: `Arcade page annotations: ${page.name}`,
+        description: `Non-dead feedback annotations for Arcade page ${page.name} (${page.id}).`,
+        mimeType: 'application/json',
+      })
+    )
+}
+
+const listAnnotations = async (argumentsPayload, { readProjectResource }) => {
+  const manifestResourceUri = 'arcade://project/manifest'
+  const scope = argumentsPayload.scope ?? 'page'
+  const status = argumentsPayload.status ?? DEFAULT_LIST_ANNOTATIONS_STATUS
+  const manifestResult = await readProjectJsonResource(readProjectResource, manifestResourceUri)
+  if (!manifestResult.ok) {
+    return manifestResult
+  }
+
+  const manifest = manifestResult.value
+  const pages = Array.isArray(manifest?.pages) ? manifest.pages : []
+  const activePageId =
+    typeof manifest?.activePageId === 'string' && /^page\d+$/.test(manifest.activePageId)
+      ? manifest.activePageId
+      : null
+
+  if (scope === 'project') {
+    const resourceUri = PROJECT_ANNOTATIONS_RESOURCE_URI
+    const annotationsResult = await readProjectJsonResource(readProjectResource, resourceUri)
+    if (!annotationsResult.ok) {
+      return annotationsResult
+    }
+
+    const annotations = filterListedAnnotations(annotationsResult.value?.annotations, status)
+    if (!annotations) {
+      return {
+        ok: false,
+        code: 'project-unavailable',
+        resourceUri,
+        manifestResourceUri,
+        message: `Desktop Arcade MCP resource "${resourceUri}" returned malformed annotation data.`,
+      }
+    }
+
+    return {
+      ok: true,
+      scope,
+      status,
+      resourceUri,
+      manifestResourceUri,
+      counts: {
+        ...(isPlainObject(annotationsResult.value?.counts) ? annotationsResult.value.counts : {}),
+        matching: annotations.length,
+      },
+      annotations,
+    }
+  }
+
+  const pageId = argumentsPayload.pageId ?? activePageId
+  if (typeof pageId !== 'string') {
+    return {
+      ok: false,
+      code: 'project-unavailable',
+      manifestResourceUri,
+      message: 'Desktop Arcade MCP could not determine an active Arcade page for list_annotations.',
+    }
+  }
+
+  const pageExists = pages.some((page) => isPlainObject(page) && page.id === pageId)
+  if (!pageExists) {
+    return {
+      ok: false,
+      code: 'invalid-page-id',
+      resourceUri: manifestResourceUri,
+      manifestResourceUri,
+      message: `list_annotations could not find Arcade page "${pageId}". Re-read arcade://project/manifest before retrying.`,
+    }
+  }
+
+  const resourceUri = `arcade://project/pages/${pageId}/annotations`
+  const annotationsResult = await readProjectJsonResource(readProjectResource, resourceUri)
+  if (!annotationsResult.ok) {
+    return annotationsResult
+  }
+
+  const annotations = filterListedAnnotations(annotationsResult.value?.annotations, status)
+  if (!annotations) {
+    return {
+      ok: false,
+      code: 'project-unavailable',
+      resourceUri,
+      manifestResourceUri,
+      message: `Desktop Arcade MCP resource "${resourceUri}" returned malformed annotation data.`,
+    }
+  }
+
+  return {
+    ok: true,
+    scope,
+    status,
+    resourceUri,
+    manifestResourceUri,
+    page: isPlainObject(annotationsResult.value?.page) ? annotationsResult.value.page : undefined,
+    counts: {
+      ...(isPlainObject(annotationsResult.value?.counts) ? annotationsResult.value.counts : {}),
+      matching: annotations.length,
+    },
+    annotations,
+  }
+}
+
+const readProjectJsonResource = async (readProjectResource, resourceUri) => {
+  let resourceResult
+  try {
+    resourceResult = await readProjectResource({ uri: resourceUri })
+  } catch (error) {
+    return {
+      ok: false,
+      code: 'project-unavailable',
+      resourceUri,
+      message: error instanceof Error ? error.message : `Desktop Arcade MCP resource "${resourceUri}" is unavailable.`,
+    }
+  }
+
+  if (!isProjectResourceReadResult(resourceResult, resourceUri)) {
+    return {
+      ok: false,
+      code: 'project-unavailable',
+      resourceUri,
+      message: `Desktop Arcade MCP resource "${resourceUri}" returned an invalid project resource response.`,
+    }
+  }
+
+  if (!resourceResult.ok) {
+    return {
+      ok: false,
+      code: resourceResult.code,
+      resourceUri: resourceResult.resourceUri,
+      message: resourceResult.message,
+    }
+  }
+
+  try {
+    return {
+      ok: true,
+      resourceUri: resourceResult.uri,
+      value: JSON.parse(resourceResult.text),
+    }
+  } catch {
+    return {
+      ok: false,
+      code: 'project-unavailable',
+      resourceUri: resourceResult.uri,
+      message: `Desktop Arcade MCP resource "${resourceUri}" did not return valid JSON.`,
+    }
+  }
+}
+
+const filterListedAnnotations = (annotations, status) => {
+  if (!Array.isArray(annotations)) {
+    return null
+  }
+
+  return annotations.filter((annotation) => {
+    if (!isPlainObject(annotation)) {
+      return false
+    }
+
+    const annotationStatus = annotation.status ?? 'pending'
+    switch (status) {
+      case 'open':
+        return annotationStatus === 'pending' || annotationStatus === 'acknowledged'
+      case 'all':
+        return true
+      default:
+        return annotationStatus === status
+    }
+  })
+}
+
 const routeResourcesReadRequest = async (
   payload,
   response,
@@ -1548,10 +1813,12 @@ const routeResourcesReadRequest = async (
 
 const isKnownProjectResourceUri = (uri) =>
   uri === 'arcade://project/manifest' ||
+  uri === PROJECT_ANNOTATIONS_RESOURCE_URI ||
   uri === 'arcade://project/preview-context' ||
   uri === 'arcade://project/diagnostics' ||
   uri === 'arcade://project/source/global/jsx' ||
   uri === 'arcade://project/source/global/hooks' ||
+  PROJECT_PAGE_ANNOTATIONS_URI_PATTERN.test(uri) ||
   PROJECT_SOURCE_PAGE_URI_PATTERN.test(uri)
 
 const isPreviewCaptureResourceUri = (uri) => PREVIEW_CAPTURE_RESOURCE_URI_PATTERN.test(uri)
@@ -1584,6 +1851,8 @@ const validateToolArguments = (toolName, argumentsPayload) => {
   switch (toolName) {
     case 'read_resource':
       return validateReadResourceArguments(argumentsPayload)
+    case 'list_annotations':
+      return validateListAnnotationsArguments(argumentsPayload)
     case 'capture_preview_evidence':
       return validateCapturePreviewEvidenceArguments(argumentsPayload)
     case 'apply_changes':
@@ -1601,6 +1870,42 @@ const validateReadResourceArguments = (argumentsPayload) => {
 
   if (typeof argumentsPayload.uri !== 'string' || argumentsPayload.uri.trim().length === 0) {
     return 'read_resource uri must be a non-empty string.'
+  }
+
+  return null
+}
+
+const validateListAnnotationsArguments = (argumentsPayload) => {
+  const extraKeys = getUnexpectedKeys(argumentsPayload, ['scope', 'pageId', 'status'])
+  if (extraKeys.length > 0) {
+    return `list_annotations arguments contain unsupported fields: ${extraKeys.join(', ')}.`
+  }
+
+  if (
+    'scope' in argumentsPayload &&
+    (typeof argumentsPayload.scope !== 'string' ||
+      !['page', 'project'].includes(argumentsPayload.scope))
+  ) {
+    return 'list_annotations scope must be "page" or "project" when provided.'
+  }
+
+  if (
+    'pageId' in argumentsPayload &&
+    (typeof argumentsPayload.pageId !== 'string' || !/^page\d+$/.test(argumentsPayload.pageId))
+  ) {
+    return 'list_annotations pageId must be an Arcade page id like "page01" when provided.'
+  }
+
+  if (
+    'status' in argumentsPayload &&
+    (typeof argumentsPayload.status !== 'string' ||
+      !LIST_ANNOTATIONS_STATUSES.includes(argumentsPayload.status))
+  ) {
+    return `list_annotations status must be one of ${LIST_ANNOTATIONS_STATUSES.join(', ')}.`
+  }
+
+  if (argumentsPayload.scope === 'project' && argumentsPayload.pageId !== undefined) {
+    return 'list_annotations pageId may be provided only when scope is "page".'
   }
 
   return null
@@ -2206,10 +2511,11 @@ const createDesktopStableResourceText = (uri) => {
         '# Desktop Arcade MCP operating guide',
         '',
         '- Work through `arcade://` resources and MCP tools only; do not edit repository files, package metadata, or the local filesystem.',
-        '- `arcade://desktop/start-here` is the self-sufficient on-ramp and carries the default loop: read `arcade://project/manifest`, read the relevant source resources, `apply_changes` for durable edits, read `arcade://project/diagnostics`, then capture Preview evidence. This guide only adds the finer operating details below.',
+        '- `arcade://desktop/start-here` is the self-sufficient on-ramp and carries the default loop: read `arcade://project/manifest`, read the relevant source resources, use `list_annotations` / annotation resources when review data matters, `apply_changes` for durable edits, read `arcade://project/diagnostics`, then capture Preview evidence. This guide only adds the finer operating details below.',
         '- Start with `tools/list`, `resources/list`, and `resources/read`; tool-only clients can call `read_resource({ uri })` for the same resources.',
         '- `arcade://desktop/capabilities` is the shortest single place to inspect the published contract.',
         '- Durable project edits happen through `apply_changes`, not by patching files outside the active Arcade project.',
+        '- `list_annotations` defaults to open annotations on the active page. Read `arcade://project/annotations` for project-wide non-dead history, or `arcade://project/pages/{pageId}/annotations` for one page.',
         '- Use `create_page.newPageRef`, later lifecycle `tempPageRef` targets, and `{{pageRef:name}}` placeholders when one batch must create a page and link to it.',
         '- If the human asks to replace content, read `arcade://desktop/workflows/replace-project` and use `apply_changes.assertions` to keep the final shape scoped.',
         '- `capture_preview_evidence({ pageId })` is the normal autonomous inspection path for pages and targeted visual states.',
@@ -2438,7 +2744,7 @@ const createDesktopStableResourceText = (uri) => {
         },
         smokeChecklistRequirements: {
           requiresClientResourceReads: true,
-          note: 'Use resources/list/resources/read when available. Tool-only hosts can call read_resource for stable resources, diagnostics, source, Aksel snippets, and capture-produced evidence resources.',
+          note: 'Use resources/list/resources/read when available. Tool-only hosts can call read_resource for stable resources, annotation resources, diagnostics, source, Aksel snippets, and capture-produced evidence resources.',
         },
         toolNames: MCP_TOOL_DEFINITIONS.map((toolDefinition) => toolDefinition.name),
         stableResourceUris: MCP_STABLE_RESOURCE_DEFINITIONS.map(
@@ -2448,6 +2754,14 @@ const createDesktopStableResourceText = (uri) => {
         applyChangesOperationsReferenceUri: APPLY_CHANGES_OPERATIONS_RESOURCE_URI,
         pageRefPlaceholderSyntax: PAGE_REF_PLACEHOLDER_SYNTAX,
         dynamicSourceUriTemplates: CAPABILITY_SOURCE_URI_TEMPLATES,
+        annotationResources: {
+          projectUri: PROJECT_ANNOTATIONS_RESOURCE_URI,
+          pageUriTemplate: 'arcade://project/pages/{pageId}/annotations',
+          toolName: 'list_annotations',
+          defaultStatus: DEFAULT_LIST_ANNOTATIONS_STATUS,
+          supportedStatuses: LIST_ANNOTATIONS_STATUSES,
+          note: 'Annotation resources return non-dead feedback annotations. Hidden-but-resolved targets stay visible to MCP and still count as work.',
+        },
         akselSnippetResources: {
           akselVersion: AKSEL_CATALOG_DATA.akselVersion,
           catalogUri: AKSEL_CATALOG_RESOURCE_URI,

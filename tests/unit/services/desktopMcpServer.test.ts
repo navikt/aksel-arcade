@@ -172,6 +172,20 @@ type CapturePreviewResult = CapturePreviewSuccess | CapturePreviewFailure
 
 const activeServers: DesktopMcpServer[] = []
 const occupiedServers: Server[] = []
+const stableResourceUris = [
+  'arcade://desktop/start-here',
+  'arcade://desktop/workflows/replace-project',
+  'arcade://desktop/workflows/multi-page-navigation',
+  'arcade://desktop/operating-guide',
+  'arcade://desktop/authoring-guide',
+  'arcade://desktop/capabilities',
+  'arcade://desktop/apply-changes-operations',
+  'arcade://aksel/catalog',
+  'arcade://project/manifest',
+  'arcade://project/annotations',
+  'arcade://project/preview-context',
+  'arcade://project/diagnostics',
+]
 
 const createManagedServer = (
   options?: Partial<{
@@ -282,24 +296,30 @@ describe('desktopMcpServer', () => {
       id: 2,
       result: {
         tools: [
-          {
-           name: 'read_resource',
-            inputSchema: {
-             additionalProperties: false,
+           {
+             name: 'read_resource',
+             inputSchema: {
+              additionalProperties: false,
+             },
            },
-         },
-         {
-           name: 'capture_preview_evidence',
-           inputSchema: {
-              additionalProperties: false,
-            },
-          },
-          {
-            name: 'apply_changes',
-            inputSchema: {
-              additionalProperties: false,
-            },
-          },
+           {
+             name: 'list_annotations',
+             inputSchema: {
+               additionalProperties: false,
+             },
+           },
+           {
+             name: 'capture_preview_evidence',
+             inputSchema: {
+               additionalProperties: false,
+             },
+           },
+           {
+             name: 'apply_changes',
+             inputSchema: {
+               additionalProperties: false,
+             },
+           },
         ],
       },
     })
@@ -317,19 +337,9 @@ describe('desktopMcpServer', () => {
     const resourcesPayload = await resourcesResponse.json()
 
     expect(resourcesResponse.status).toBe(200)
-    expect(resourcesPayload.result.resources.map((resource: { uri: string }) => resource.uri)).toEqual([
-      'arcade://desktop/start-here',
-      'arcade://desktop/workflows/replace-project',
-      'arcade://desktop/workflows/multi-page-navigation',
-      'arcade://desktop/operating-guide',
-      'arcade://desktop/authoring-guide',
-      'arcade://desktop/capabilities',
-      'arcade://desktop/apply-changes-operations',
-      'arcade://aksel/catalog',
-      'arcade://project/manifest',
-      'arcade://project/preview-context',
-      'arcade://project/diagnostics',
-    ])
+    expect(resourcesPayload.result.resources.map((resource: { uri: string }) => resource.uri)).toEqual(
+      stableResourceUris
+    )
   })
 
   it('lists read_resource for tool-only hosts and reads stable resources through it', async () => {
@@ -345,6 +355,7 @@ describe('desktopMcpServer', () => {
     const toolsPayload = await toolsResponse.json()
     expect(toolsPayload.result.tools.map((tool: { name: string }) => tool.name)).toEqual([
       'read_resource',
+      'list_annotations',
       'capture_preview_evidence',
       'apply_changes',
     ])
@@ -1468,6 +1479,7 @@ describe('desktopMcpServer', () => {
       stableDesktopResourceReads: 'available',
       projectResourceReads: 'available when an active project reader is connected',
       toolExecution: {
+        list_annotations: 'available when an active project reader is connected',
         capture_preview_evidence:
           'available when an active preview capture bridge is connected',
         apply_changes: 'available when an active project writer is connected',
@@ -1508,8 +1520,16 @@ describe('desktopMcpServer', () => {
       'In tool-only clients, call read_resource({ uri }) for the same resources.'
     )
     expect(capabilities.smokeChecklistRequirements.note).toContain(
-      'Tool-only hosts can call read_resource for stable resources, diagnostics, source, Aksel snippets, and capture-produced evidence resources.'
+      'Tool-only hosts can call read_resource for stable resources, annotation resources, diagnostics, source, Aksel snippets, and capture-produced evidence resources.'
     )
+    expect(capabilities.annotationResources).toEqual({
+      projectUri: 'arcade://project/annotations',
+      pageUriTemplate: 'arcade://project/pages/{pageId}/annotations',
+      toolName: 'list_annotations',
+      defaultStatus: 'open',
+      supportedStatuses: ['pending', 'acknowledged', 'resolved', 'dismissed', 'all'],
+      note: 'Annotation resources return non-dead feedback annotations. Hidden-but-resolved targets stay visible to MCP and still count as work.',
+    })
     expect(capabilities.verificationBoundaries).toMatchObject({
       mcpVerifiable: expect.arrayContaining([
         'No token/header is required for the aksel-arcade MCP endpoint.',
@@ -1858,6 +1878,15 @@ describe('desktopMcpServer', () => {
           }
         }
 
+        if (uri === 'arcade://project/annotations') {
+          return {
+            ok: true,
+            uri,
+            mimeType: 'application/json',
+            text: '{"annotations":[]}',
+          }
+        }
+
         if (uri === 'arcade://project/source/pages/page01/jsx') {
           return {
             ok: true,
@@ -1929,6 +1958,215 @@ describe('desktopMcpServer', () => {
     })
     expect(readProjectResource).toHaveBeenNthCalledWith(2, {
       uri: 'arcade://project/source/pages/page01/jsx',
+    })
+  })
+
+  it('lists annotations from project resources with default active-page open filtering', async () => {
+    const readProjectResource = vi.fn(
+      async ({ uri }: { uri: string }): Promise<ProjectResourceReadResult> => {
+        switch (uri) {
+          case 'arcade://project/manifest':
+            return {
+              ok: true,
+              uri,
+              mimeType: 'application/json',
+              text: JSON.stringify({
+                activePageId: 'page02',
+                pages: [
+                  { id: 'page01', name: 'Overview' },
+                  { id: 'page02', name: 'Details' },
+                ],
+              }),
+            }
+          case 'arcade://project/pages/page02/annotations':
+            return {
+              ok: true,
+              uri,
+              mimeType: 'application/json',
+              text: JSON.stringify({
+                page: { id: 'page02', name: 'Details' },
+                counts: { open: 2, pending: 1, acknowledged: 1, resolved: 1, dismissed: 0 },
+                annotations: [
+                  { id: 'ann-1', status: 'pending', text: 'Pending note' },
+                  { id: 'ann-2', status: 'acknowledged', text: 'Acknowledged note' },
+                  { id: 'ann-3', status: 'resolved', text: 'Resolved note' },
+                ],
+              }),
+            }
+          default:
+            return {
+              ok: false,
+              code: 'source-not-found',
+              resourceUri: uri,
+              message: `Missing ${uri}`,
+            }
+        }
+      }
+    )
+    const server = createManagedServer({ port: 0, readProjectResource })
+    const state = await server.start()
+
+    const response = await postJson(state.url, {
+      jsonrpc: '2.0',
+      id: 16,
+      method: 'tools/call',
+      params: {
+        name: 'list_annotations',
+        arguments: {},
+      },
+    })
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toMatchObject({
+      jsonrpc: '2.0',
+      id: 16,
+      result: {
+        structuredContent: {
+          ok: true,
+          scope: 'page',
+          status: 'open',
+          resourceUri: 'arcade://project/pages/page02/annotations',
+          manifestResourceUri: 'arcade://project/manifest',
+          page: { id: 'page02', name: 'Details' },
+          counts: {
+            open: 2,
+            pending: 1,
+            acknowledged: 1,
+            resolved: 1,
+            dismissed: 0,
+            matching: 2,
+          },
+          annotations: [
+            { id: 'ann-1', status: 'pending', text: 'Pending note' },
+            { id: 'ann-2', status: 'acknowledged', text: 'Acknowledged note' },
+          ],
+        },
+      },
+    })
+    expect(readProjectResource).toHaveBeenNthCalledWith(1, { uri: 'arcade://project/manifest' })
+    expect(readProjectResource).toHaveBeenNthCalledWith(2, {
+      uri: 'arcade://project/pages/page02/annotations',
+    })
+  })
+
+  it('supports project-wide annotation listing and validates list_annotations arguments', async () => {
+    const readProjectResource = vi.fn(
+      async ({ uri }: { uri: string }): Promise<ProjectResourceReadResult> => {
+        switch (uri) {
+          case 'arcade://project/manifest':
+            return {
+              ok: true,
+              uri,
+              mimeType: 'application/json',
+              text: JSON.stringify({
+                activePageId: 'page01',
+                pages: [{ id: 'page01', name: 'Overview' }],
+              }),
+            }
+          case 'arcade://project/annotations':
+            return {
+              ok: true,
+              uri,
+              mimeType: 'application/json',
+              text: JSON.stringify({
+                counts: { open: 1, pending: 1, acknowledged: 0, resolved: 2, dismissed: 1 },
+                annotations: [
+                  { id: 'ann-1', status: 'pending' },
+                  { id: 'ann-2', status: 'resolved' },
+                  { id: 'ann-3', status: 'dismissed' },
+                ],
+              }),
+            }
+          default:
+            return {
+              ok: false,
+              code: 'source-not-found',
+              resourceUri: uri,
+              message: `Missing ${uri}`,
+            }
+        }
+      }
+    )
+    const server = createManagedServer({ port: 0, readProjectResource })
+    const state = await server.start()
+
+    const projectResponse = await postJson(state.url, {
+      jsonrpc: '2.0',
+      id: 17,
+      method: 'tools/call',
+      params: {
+        name: 'list_annotations',
+        arguments: {
+          scope: 'project',
+          status: 'resolved',
+        },
+      },
+    })
+    expect(projectResponse.status).toBe(200)
+    await expect(projectResponse.json()).resolves.toMatchObject({
+      jsonrpc: '2.0',
+      id: 17,
+      result: {
+        structuredContent: {
+          ok: true,
+          scope: 'project',
+          status: 'resolved',
+          resourceUri: 'arcade://project/annotations',
+          manifestResourceUri: 'arcade://project/manifest',
+          counts: {
+            open: 1,
+            pending: 1,
+            acknowledged: 0,
+            resolved: 2,
+            dismissed: 1,
+            matching: 1,
+          },
+          annotations: [{ id: 'ann-2', status: 'resolved' }],
+        },
+      },
+    })
+
+    const invalidResponse = await postJson(state.url, {
+      jsonrpc: '2.0',
+      id: 18,
+      method: 'tools/call',
+      params: {
+        name: 'list_annotations',
+        arguments: {
+          scope: 'project',
+          pageId: 'page01',
+        },
+      },
+    })
+    expect(invalidResponse.status).toBe(200)
+    await expect(invalidResponse.json()).resolves.toMatchObject({
+      jsonrpc: '2.0',
+      id: 18,
+      error: {
+        code: -32602,
+        message: 'list_annotations pageId may be provided only when scope is "page".',
+      },
+    })
+
+    const invalidStatusResponse = await postJson(state.url, {
+      jsonrpc: '2.0',
+      id: 19,
+      method: 'tools/call',
+      params: {
+        name: 'list_annotations',
+        arguments: {
+          status: 'open',
+        },
+      },
+    })
+    expect(invalidStatusResponse.status).toBe(200)
+    await expect(invalidStatusResponse.json()).resolves.toMatchObject({
+      jsonrpc: '2.0',
+      id: 19,
+      error: {
+        code: -32602,
+        message:
+          'list_annotations status must be one of pending, acknowledged, resolved, dismissed, all.',
+      },
     })
   })
 

@@ -16,6 +16,7 @@ const stableResourceUris = [
   'arcade://desktop/apply-changes-operations',
   'arcade://aksel/catalog',
   'arcade://project/manifest',
+  'arcade://project/annotations',
   'arcade://project/preview-context',
   'arcade://project/diagnostics',
 ]
@@ -147,18 +148,21 @@ test.describe('Desktop MCP v1 smoke flow', () => {
       const toolsPayload = await listTools()
       expect(toolsPayload.result.tools.map((tool: { name: string }) => tool.name)).toEqual([
         'read_resource',
+        'list_annotations',
         'capture_preview_evidence',
         'apply_changes',
       ])
 
       const resourcesPayload = await listResources()
-      expect(resourcesPayload.result.resources.map((resource: { uri: string }) => resource.uri)).toEqual(
-        stableResourceUris
+      const listedResourceUris = resourcesPayload.result.resources.map(
+        (resource: { uri: string }) => resource.uri
       )
+      expect(listedResourceUris).toEqual(expect.arrayContaining(stableResourceUris))
 
       const operatingGuide = await readMcpResource(3, 'arcade://desktop/operating-guide')
       expect(operatingGuide.text).toContain('`resources/read`')
       expect(operatingGuide.text).toContain('`read_resource({ uri })`')
+      expect(operatingGuide.text).toContain('`list_annotations`')
       expect(operatingGuide.text).toContain('`capture_preview_evidence({ pageId })`')
 
       const authoringGuide = await readMcpResource(4, 'arcade://desktop/authoring-guide')
@@ -175,7 +179,12 @@ test.describe('Desktop MCP v1 smoke flow', () => {
         requiresAuth: false,
         authDescription: 'No token/header required.',
       })
-      expect(capabilities.toolNames).toEqual(['read_resource', 'capture_preview_evidence', 'apply_changes'])
+      expect(capabilities.toolNames).toEqual([
+        'read_resource',
+        'list_annotations',
+        'capture_preview_evidence',
+        'apply_changes',
+      ])
       expect(capabilities.stableResourceUris).toEqual(stableResourceUris)
       expect(capabilities.v1Omissions).toContain('No Web Arcade MCP endpoint.')
 
@@ -189,9 +198,16 @@ test.describe('Desktop MCP v1 smoke flow', () => {
       expect(diagnosticsBefore.status).toBe('idle')
 
       const manifestBefore = await readJsonMcpResource(7, 'arcade://project/manifest')
+      expect(listedResourceUris).toEqual(
+        expect.arrayContaining(
+        manifestBefore.pages.map(
+          (page: { id: string }) => `arcade://project/pages/${page.id}/annotations`
+        )
+        )
+      )
       const entryPage =
         manifestBefore.pages.find(
-          (page: { id: string }) => page.id === manifestBefore.activePageId
+        (page: { id: string }) => page.id === manifestBefore.activePageId
         ) ?? manifestBefore.pages[0]
       expect(entryPage).toBeTruthy()
       const entryPageJsxUri = entryPage.source.jsx.uri as string
@@ -201,6 +217,15 @@ test.describe('Desktop MCP v1 smoke flow', () => {
       expect(entryPageJsxBefore.text.length).toBeGreaterThan(0)
       const entryPageHooksBefore = await readMcpResource(9, entryPageHooksUri)
       expect(typeof entryPageHooksBefore.text).toBe('string')
+      const defaultAnnotations = expectToolSuccess<{
+        scope: 'page'
+        status: 'open'
+        annotations: Array<Record<string, unknown>>
+        resourceUri: string
+      }>(await callTool(91, 'list_annotations', {}))
+      expect(defaultAnnotations.scope).toBe('page')
+      expect(defaultAnnotations.status).toBe('open')
+      expect(defaultAnnotations.resourceUri).toBe(`arcade://project/pages/${entryPage.id}/annotations`)
 
       const applyChanges = expectToolSuccess<{
         tempPageRefMappings: Record<
@@ -324,10 +349,7 @@ test.describe('Desktop MCP v1 smoke flow', () => {
       await expect(page.getByText('Type: HTTP (MCP Streamable HTTP)')).toBeVisible()
       await expect(page.getByText('URL: http://127.0.0.1:3846/mcp')).toBeVisible()
       await expect(page.getByText('No token/header required.')).toHaveCount(0)
-      const activityLine = page.getByText(/Last activity:/)
-      await expect(activityLine).toContainText('capture_preview_evidence')
-      await expect(activityLine).not.toContainText('Details page')
-      await expect(activityLine).not.toContainText('Smoke path ready')
+      await expect(page.getByText(/Last activity:/)).toHaveCount(0)
       await expect(page.getByRole('menuitem', { name: 'Copy VSCode json' })).toBeVisible()
     } finally {
       await app.close()

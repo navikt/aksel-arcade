@@ -21,6 +21,7 @@ import {
   prepareDesktopMcpPreviewCapture,
 } from '@/services/desktopMcpPreviewCapture'
 import { registerDesktopPreloadMcpPreviewCaptureHandler } from '@/services/desktopMcpPreviewCaptureAdapter'
+import { resolveDesktopMcpAnnotationVisibilitiesInSandbox } from '@/services/desktopMcpAnnotations'
 import { capturePreviewInIsolatedSandbox } from '@/services/desktopMcpPreviewCaptureSandbox'
 import type {
   DesktopMcpPreviewCaptureRequest,
@@ -41,6 +42,14 @@ interface UseDesktopMcpProjectResourceBridgeOptions {
   updatePreviewState: (updates: Partial<PreviewState>) => void
 }
 
+interface DesktopMcpResourceBridgeContext {
+  project: Project
+  theme: ThemeMode
+  diagnostics: ReturnType<typeof collectPreviewDiagnostics>
+  transpiledCode: string | null
+  compileError: PreviewState['compileError']
+}
+
 export const useDesktopMcpProjectResourceBridge = ({
   project,
   previewState,
@@ -51,7 +60,7 @@ export const useDesktopMcpProjectResourceBridge = ({
   replaceProjectState,
   updatePreviewState,
 }: UseDesktopMcpProjectResourceBridgeOptions): void => {
-  const resourceContextRef = useRef({
+  const resourceContextRef = useRef<DesktopMcpResourceBridgeContext>({
     project,
     theme,
     diagnostics: collectPreviewDiagnostics(previewState),
@@ -76,9 +85,23 @@ export const useDesktopMcpProjectResourceBridge = ({
   }, [workingCopyPreferences])
 
   const handleProjectResourceRead = useCallback(
-    (request: DesktopMcpProjectResourceReadRequest) =>
-      readDesktopMcpProjectResource(request, resourceContextRef.current),
-    []
+    async (request: DesktopMcpProjectResourceReadRequest) =>
+      readDesktopMcpProjectResource(request, resourceContextRef.current, {
+        resolvePageAnnotationVisibilities: async (pageId, annotations) => {
+          const currentContext = resourceContextRef.current
+          return resolveDesktopMcpAnnotationVisibilitiesInSandbox({
+            annotations,
+            transpiledCode:
+              currentContext.compileError === null ? currentContext.transpiledCode : null,
+            pageId,
+            startPageId: currentContext.project.source.startPageId,
+            theme: currentContext.theme,
+            viewportWidth: getViewportWidth(currentContext.project.viewportSize),
+            viewportHeight: Math.max(1, previewIframeRef.current?.clientHeight ?? 900),
+          })
+        },
+      }),
+    [previewIframeRef]
   )
 
   const handleApplyChanges = useCallback(

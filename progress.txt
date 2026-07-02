@@ -218,6 +218,38 @@ Implemented:
 Verification:
 
 - npm run type-check
+
+### 2026-07-02 - Issue #324: Desktop MCP annotation read resources and manifest counts
+
+Implemented:
+
+- Selected `#324` as the highest-priority `ready-for-agent` issue from `#324`-`#326` after checking parent issue `#314`, `CONTEXT.md`, and ADRs `0020`, `0021`, `0022`, and `0024`; it is the Desktop MCP read/discovery foundation that both `#325` and `#326` depend on.
+- Added Desktop MCP annotation resources on the renderer side: `arcade://project/annotations` for project-wide non-dead history plus `arcade://project/pages/{pageId}/annotations` for page-scoped annotation payloads.
+- Extended the project manifest so each page now reports annotation counts that stay useful for MCP work: open/pending counts exclude dead targets, while hidden-but-resolved annotations still remain visible/countable.
+- Added an isolated sandbox annotation-visibility resolver so Desktop MCP resource reads can classify stored targets as visible, hidden, or dead without mutating the live preview.
+- Extended the Desktop MCP server contract with `list_annotations`, dynamic page-annotation discovery in `resources/list`, updated capabilities/start-here/operating-guide guidance, and server-side filtering for `open`, `pending`, `acknowledged`, `resolved`, `dismissed`, and `all`.
+- Expanded unit and desktop smoke coverage for annotation resources, manifest counts, `list_annotations` defaults/project scope/status filtering, and the current Desktop settings MCP surface.
+
+Verification:
+
+- npm install
+- npm run typecheck
+- npm run lint
+- npm test -- --run
+- npm run test:e2e -- tests/e2e/desktop-mcp-smoke.spec.ts
+- Desktop MCP smoke flow in Electron/Playwright covering live resource discovery, active-page annotation listing defaults, project/resource reads, preview capture, and visual Desktop Settings verification
+
+Next note:
+
+- `list_annotations` defaults to open annotations on the active page. Use `scope: "project"` or read `arcade://project/annotations` when follow-up work needs cross-page review history, and expect page manifest counts to omit dead targets by design.
+
+Follow-up before merge:
+
+- Tightened the `list_annotations` MCP contract after PR review so `open` stays the implicit default only; explicit status filters are now limited to the requested set: `pending`, `acknowledged`, `resolved`, `dismissed`, and `all`.
+- Updated the README Desktop MCP contract and smoke checklist to document the shipped annotation read surface (`list_annotations`, `arcade://project/annotations`, and page annotation resources), which had drifted behind the implementation.
+- Re-ran `npm run typecheck`, `npm run lint`, `npm test -- --run`, and `npm run test:e2e -- tests/e2e/desktop-mcp-smoke.spec.ts`.
+- Fixed the PR-only CI build failure in `tests/unit/services/desktopMcpProjectResources.test.ts` by making the shared annotation-visibility stub accept a readonly annotation array, matching the production resolver contract that `tsc -b` enforces in the Validate workflow.
+- Re-ran `npm run typecheck`, `npm run lint`, `npm test -- --run`, and `npm run build`.
 - npm run lint (existing `InspectionPopover` hook dependency warning only)
 - CI=1 npm run test -- --run
 - npm run build
