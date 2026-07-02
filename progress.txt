@@ -4409,3 +4409,16 @@ Verification:
 - npm run typecheck
 - npm run lint
 - CI=1 npm test -- --run
+2026-07-02 - PR #336 review follow-up
+
+Fixed before merge:
+- Repaired the `npm run build` / Validate failure by re-exporting `AnnotationTargetIdentity` from the correct source in `src/services/previewEvidence.ts`; CI was exercising the broader `tsc -b` path that the narrower local `typecheck` command had not caught.
+- Restored persistent per-element outlines for released multi-select annotations in `public/sandbox.html`, so the selected state now keeps one dashed success union outline plus one success outline per visible selected element, matching PRD item 13 more closely.
+- Extended `tests/e2e/annotation-drag-selection.spec.ts` to cover both persistent per-element released outlines and the additive multi-select modifier-release flow that opens the group annotation popover. The modifier key in the test now follows the same platform detection as the sandbox (`Meta+Shift` on macOS, `Control+Shift` elsewhere).
+
+Verification:
+- PLAYWRIGHT_BASE_URL=http://127.0.0.1:4178/aksel-arcade npm run test:e2e -- tests/e2e/annotation-drag-selection.spec.ts --reporter=line
+- npm run build
+- npm run typecheck
+- npm run lint
+- CI=1 npm test -- --run

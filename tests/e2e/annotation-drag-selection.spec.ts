@@ -53,6 +53,9 @@ test.describe('Annotation drag selection', () => {
     const afterDrag = await frame!.evaluate(() => ({
       selection: window.getSelection()?.toString() ?? '',
       dragHighlightCount: document.querySelectorAll('.aksel-arcade-annotation-drag-highlight').length,
+      selectedElementOutlineCount: document.querySelectorAll(
+        '.aksel-arcade-annotation-box--selected-element'
+      ).length,
       unionOutlineCount: document.querySelectorAll('.aksel-arcade-annotation-box--multi-select').length,
     }))
 
@@ -61,6 +64,73 @@ test.describe('Annotation drag selection', () => {
     expect(duringDrag.highlightCount).toBeGreaterThanOrEqual(2)
     expect(afterDrag.selection).toBe('')
     expect(afterDrag.dragHighlightCount).toBe(0)
+    expect(afterDrag.selectedElementOutlineCount).toBeGreaterThanOrEqual(2)
     expect(afterDrag.unionOutlineCount).toBe(1)
+  })
+
+  test('opens the group popover when additive multi-select modifiers are released', async ({
+    page,
+  }) => {
+    await enableAnnotationMode(page)
+
+    const frame = page.frames().find((candidate) => candidate.url().includes('sandbox.html'))
+    expect(frame).toBeTruthy()
+
+    await frame!.evaluate(() => {
+      const root = document.querySelector('#root')
+      if (!root) {
+        throw new Error('Missing sandbox root')
+      }
+
+      root.innerHTML = `
+        <div style="padding:40px; display:grid; gap:16px; max-width:420px">
+          <button type="button">Approve claim</button>
+          <button type="button">Reject claim</button>
+        </div>`
+    })
+
+    const modifierKey = await frame!.evaluate(() =>
+      /(Mac|iPhone|iPod|iPad)/i.test(navigator.platform || navigator.userAgent) ? 'Meta' : 'Control'
+    )
+    await frame!.evaluate((activeModifierKey) => {
+      const buttons = Array.from(document.querySelectorAll('button'))
+      const createMouseEvent = (type: string, button: HTMLButtonElement) => {
+        const rect = button.getBoundingClientRect()
+        return new MouseEvent(type, {
+          bubbles: true,
+          cancelable: true,
+          button: 0,
+          clientX: rect.left + rect.width / 2,
+          clientY: rect.top + rect.height / 2,
+          ctrlKey: activeModifierKey === 'Control',
+          metaKey: activeModifierKey === 'Meta',
+          shiftKey: true,
+        })
+      }
+
+      for (const button of buttons) {
+        button.dispatchEvent(createMouseEvent('mousedown', button as HTMLButtonElement))
+        button.dispatchEvent(createMouseEvent('mouseup', button as HTMLButtonElement))
+        button.dispatchEvent(createMouseEvent('click', button as HTMLButtonElement))
+      }
+    }, modifierKey)
+
+    await expect(page.getByLabel(/^annotation text$/i)).not.toBeVisible()
+
+    await frame!.evaluate((activeModifierKey) => {
+      document.dispatchEvent(
+        new KeyboardEvent('keyup', {
+          key: activeModifierKey,
+          bubbles: true,
+          cancelable: true,
+          ctrlKey: false,
+          metaKey: false,
+          shiftKey: true,
+        })
+      )
+    }, modifierKey)
+
+    await expect(page.getByText('2 selected elements')).toBeVisible()
+    await expect(page.getByLabel(/^annotation text$/i)).toBeVisible()
   })
 })
