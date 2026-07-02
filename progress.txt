@@ -4166,6 +4166,58 @@ Verification:
 - npm run typecheck
 - npm run test -- --run
 - npm run lint
+
+### 2026-07-02 - Issue #319: Annotation marker tooltip, edit, and delete
+
+Implemented:
+
+- Selected `#319` as the highest-priority open `ready-for-agent` feature from `#319`-`#326` after checking parent issue `#314`, `CONTEXT.md`, ADRs `0021`/`0023`/`0024`, and the existing progress notes. `#318` is already closed, and `#319` is the next unblocked human annotation slice that later multi-select, cleanup, persistence, MCP, and Preview evidence work build on.
+- Confirmed the Aksel APIs for `Tooltip`, `Popover`, and `Button` from the Aksel MCP before changing the host preview UI.
+- Extended `src/components/Preview/LivePreview.tsx` so saved markers are keyboard-focusable Aksel buttons wrapped in an Aksel tooltip, with accessible labels, focus/hover tooltip text, active marker styling while editing, and a separate edit popover anchored to the selected marker.
+- Wired marker editing to the existing annotation lifecycle services: save now uses `editAnnotationComment`, acknowledged annotations reset to `pending`, thread history stays unchanged, cancel restores marker focus, and delete uses `hardDeleteAnnotation` so the page badge and marker disappear immediately.
+- Added visible target/class metadata to the edit popover without reintroducing the raw subtree/context text that #318 explicitly removed from the human authoring flow.
+- Expanded `tests/integration/annotation-add-popover.test.tsx` with regression coverage for tooltip-on-hover/focus, keyboard opening, edit save, Escape cancel + focus restoration, acknowledged-to-pending edits, and hard delete.
+
+Verification:
+
+- npm install
+- npm run typecheck
+- npm run lint
+- npm run test -- --run
+- Browser verification at `http://127.0.0.1:4179/aksel-arcade/`: in dark theme, enabled Annotation mode, created a live annotation, confirmed the marker badge incremented, focused the marker to show the tooltip, opened the edit popover from the marker, saved updated text, then reopened and deleted it to confirm the badge returned to zero; in light theme, switched via Settings, recreated an annotation, and confirmed the tooltip/edit flow still rendered correctly with no captured console warnings or errors.
+
+Next note:
+
+- `#320` can reuse the new marker tooltip/edit wiring and focus-restoration path for multi-element markers instead of introducing a second marker-interaction surface. Keep tooltip text sourced from the human comment preview and keep the edit popover anchored to the marker button rather than the sandbox target geometry.
+
+### 2026-07-02 - PR #333 follow-up for Issue #319
+
+Fixed after bug report:
+
+- Replaced the marker hover/focus preview from `Tooltip` to an Aksel `Popover`, matching the visual-spec component choice while keeping the separate click-to-edit popover behavior intact.
+- Added dedicated marker preview state so hover and keyboard focus open the preview popover, while edit mode suppresses the preview layer for the active marker.
+- Nudged the marker number into optical center with a dedicated inner span so the numeral sits visually centered inside the circular marker.
+
+Verification:
+
+- npm run typecheck
+- npm run lint
+- npm test -- --run
+- Browser check at `http://127.0.0.1:4179/aksel-arcade/`: enabled Annotation mode, focused the existing marker, confirmed the preview now renders as a Popover with target label + comment text, and verified the marker number center offset measures `0px` horizontally and `-1px` vertically after the centering adjustment, with no captured console warnings or errors.
+
+### 2026-07-02 - PR #333 code review follow-up
+
+Fixed during pre-merge review:
+
+- Updated `editAnnotationComment` so marker edits refresh both the top-level numeric `timestamp` and `updatedAt`, matching the issue requirement that editing updates the annotation timestamps.
+- Replaced the new test-only textarea casts with runtime element narrowing in the marker integration tests to keep the added coverage type-safe.
+- Added explicit regression coverage for the edit popover **Cancel** button path and for the active-page badge/delete path in the preview-header shell tests.
+
+Verification:
+
+- npm run typecheck
+- npm run lint
+- npm test -- --run
 - Browser/dev-server practical checks were attempted on `http://127.0.0.1:5177/aksel-arcade/`; this exposed and fixed a hidden-Popover anchor issue. Further Playwright iframe pointer checks were limited by sandbox/frame event tooling, so future work should manually re-check the full #318 Human verification checklist in a visible browser session, especially real pointer selection on an Aksel button/control and prototype navigation blocking.
 
 Next note:

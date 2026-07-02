@@ -177,11 +177,12 @@ export const editAnnotationComment = (
   annotations: readonly ArcadeAnnotation[],
   annotationId: string,
   comment: string,
-  options?: { nowIso?: string }
+  options?: { now?: number; nowIso?: string }
 ): ArcadeAnnotation[] =>
   updateAnnotation(annotations, annotationId, (annotation) => ({
     ...annotation,
     comment,
+    timestamp: options?.now ?? Date.now(),
     status: annotation.status === 'acknowledged' ? 'pending' : annotation.status,
     updatedAt: options?.nowIso ?? new Date().toISOString(),
   }))

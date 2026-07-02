@@ -59,6 +59,16 @@
   pointer-events: auto;
 }
 
+.live-preview__annotation-marker-number {
+  display: block;
+  line-height: 1;
+  transform: translateY(-0.0625rem);
+}
+
+.live-preview__annotation-marker--active {
+  box-shadow: 0 0 0 3px var(--ax-border-accent-subtle);
+}
+
 .live-preview__annotation-add-anchor {
   width: 1px;
   height: 1px;
@@ -72,6 +82,10 @@
   z-index: 10;
 }
 
+.live-preview__annotation-popover--preview {
+  z-index: 9;
+}
+
 .live-preview__annotation-popover-content {
   width: min(280px, calc(100vw - var(--ax-space-32)));
 }
@@ -79,4 +93,11 @@
 .live-preview__annotation-target-metadata,
 .live-preview__annotation-target-context {
   overflow-wrap: anywhere;
+}
+
+.live-preview__annotation-popover-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ax-space-12);
 }

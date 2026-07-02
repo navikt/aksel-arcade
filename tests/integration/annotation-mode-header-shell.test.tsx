@@ -44,9 +44,20 @@ vi.mock('@/components/Preview/LivePreview', () => ({
           {annotations
             .filter((item) => item.pageId === previewPageId)
             .map((item, index) => (
-              <button key={item.id} type="button" aria-label={`Annotation ${index + 1}: ${item.comment}`}>
-                {index + 1}
-              </button>
+              <div key={item.id}>
+                <button type="button" aria-label={`Annotation ${index + 1}: ${item.comment}`}>
+                  {index + 1}
+                </button>
+                <button
+                  type="button"
+                  aria-label={`Delete annotation ${item.comment}`}
+                  onClick={() =>
+                    onAnnotationsChange(annotations.filter((annotationItem) => annotationItem.id !== item.id))
+                  }
+                >
+                  Delete annotation
+                </button>
+              </div>
             ))}
         </>
       )}
@@ -256,5 +267,22 @@ describe('Annotation mode preview-header shell', () => {
 
     await user.click(getAnnotationToggle())
     expect(screen.getByRole('button', { name: /annotation 1: needs clearer copy/i })).toBeTruthy()
+  })
+
+  it('updates the active-page badge after deleting an annotation through the preview flow', async () => {
+    const user = userEvent.setup()
+    const initialProject = createProjectWithAnnotations([
+      annotation('annotation-1', 'page01', { comment: 'Needs clearer copy' }),
+    ])
+    const { contextValue } = renderPreviewPane(initialProject)
+
+    await user.click(getAnnotationToggle())
+    expect(screen.getByTestId('annotation-count-badge').textContent).toBe('1')
+
+    await user.click(screen.getByRole('button', { name: /delete annotation needs clearer copy/i }))
+
+    expect(contextValue.updateProject).toHaveBeenCalledWith({
+      annotations: [],
+    })
   })
 })
