@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import React from 'react'
 import { render } from '@testing-library/react'
-import { Button, Checkbox, HStack, TextField } from '@navikt/ds-react'
+import { Box, Button, Checkbox, HStack, InlineMessage, TextField, VStack } from '@navikt/ds-react'
 import {
   getAnnotationTargetIdentity,
   resolveAnnotationTargetAtPoint,
@@ -36,7 +36,7 @@ const makeRoot = (html: string): HTMLElement => {
 }
 
 describe('annotation target resolution', () => {
-  it('normalizes hover and click points to the smallest meaningful target without mutating source', () => {
+  it('normalizes hover and click points to the closest annotatable target without mutating source', () => {
     const root = makeRoot('<button class="navds-button"><span>Lagre</span></button>')
     const button = root.querySelector('button') as HTMLButtonElement
     const span = root.querySelector('span') as HTMLSpanElement
@@ -63,7 +63,7 @@ describe('annotation target resolution', () => {
     expect(root.innerHTML).toBe('<button class="navds-button"><span>Lagre</span></button>')
   })
 
-  it('captures selected text as metadata while anchoring to the containing normalized element', () => {
+  it('captures selected text as metadata while anchoring to the containing preview element', () => {
     const root = makeRoot('<article><p>Marker denne teksten for agenten.</p></article>')
     const paragraph = root.querySelector('p') as HTMLParagraphElement
     setRect(paragraph, { x: 10, y: 20, width: 240, height: 32 })
@@ -186,22 +186,74 @@ describe('annotation target resolution', () => {
   it('covers common Aksel component and layout DOM in the target matrix', () => {
     const { container } = render(
       React.createElement(
-        HStack,
-        { as: 'div', gap: 'space-4' },
-        React.createElement(Button, null, 'Send'),
-        React.createElement(TextField, { label: 'Navn' }),
-        React.createElement(Checkbox, null, 'Godta')
+        Box,
+        {
+          as: 'div',
+          padding: 'space-16',
+          background: 'raised',
+          borderRadius: '12',
+          borderWidth: '1',
+          borderColor: 'neutral-subtleA',
+        },
+        React.createElement(
+          VStack,
+          { as: 'div', gap: 'space-8' },
+          React.createElement(
+            HStack,
+            { as: 'div', gap: 'space-4' },
+            React.createElement(Button, null, 'Send'),
+            React.createElement(TextField, { label: 'Navn' }),
+            React.createElement(Checkbox, null, 'Godta')
+          ),
+          React.createElement(
+            InlineMessage,
+            { as: 'div', status: 'info' },
+            React.createElement('strong', null, 'Quick tip:'),
+            ' Delete this intro and start coding!'
+          ),
+          React.createElement(
+            'ul',
+            null,
+            React.createElement('li', null, 'First item'),
+            React.createElement('li', null, 'Second item')
+          )
+        )
       )
     )
     const root = container.firstElementChild as HTMLElement
+    const vStack = root.querySelector('.aksel-vstack') as HTMLElement
+    const hStack = root.querySelector('.aksel-hstack') as HTMLElement
     const button = root.querySelector('button') as HTMLButtonElement
     const textInput = root.querySelector('input[type="text"]') as HTMLInputElement
     const checkbox = root.querySelector('input[type="checkbox"]') as HTMLInputElement
+    const inlineMessage = root.querySelector('.aksel-inline-message') as HTMLElement
+    const inlineMessageIcon = root.querySelector('.aksel-inline-message__icon') as SVGElement | null
+    const unorderedList = root.querySelector('ul') as HTMLUListElement
 
-    setRect(root, { x: 0, y: 0, width: 420, height: 80 })
-    setRect(button, { x: 10, y: 10, width: 80, height: 40 })
-    setRect(textInput, { x: 110, y: 10, width: 160, height: 40 })
-    setRect(checkbox, { x: 290, y: 20, width: 24, height: 24 })
+    setRect(root, { x: 0, y: 0, width: 520, height: 240 })
+    setRect(vStack, { x: 16, y: 16, width: 488, height: 208 })
+    setRect(hStack, { x: 16, y: 16, width: 420, height: 80 })
+    setRect(button, { x: 32, y: 32, width: 80, height: 40 })
+    setRect(textInput, { x: 132, y: 32, width: 160, height: 40 })
+    setRect(checkbox, { x: 312, y: 42, width: 24, height: 24 })
+    setRect(inlineMessage, { x: 16, y: 112, width: 420, height: 48 })
+    if (inlineMessageIcon) {
+      setRect(inlineMessageIcon, { x: 24, y: 124, width: 20, height: 20 })
+    }
+    setRect(unorderedList, { x: 16, y: 176, width: 220, height: 48 })
+
+    Object.defineProperty(document, 'elementFromPoint', {
+      value: vi.fn((x: number, y: number) => {
+        if (x === 4 && y === 4) return root
+        if (x === 20 && y === 96) return vStack
+        if (x === 24 && y === 84) return hStack
+        if (x === 30 && y === 130) return inlineMessageIcon ?? inlineMessage
+        if (x === 24 && y === 124) return inlineMessage
+        if (x === 24 && y === 184) return unorderedList
+        return button
+      }),
+      configurable: true,
+    })
 
     const buttonTarget = resolveAnnotationTargetIdentity(
       root,
@@ -218,6 +270,20 @@ describe('annotation target resolution', () => {
       getAnnotationTargetIdentity(root, checkbox, window),
       window
     )
+    const boxTarget = resolveAnnotationTargetAtPoint(root, { mode: 'point', x: 4, y: 4 }, window)
+    const vStackTarget = resolveAnnotationTargetAtPoint(root, { mode: 'point', x: 20, y: 96 }, window)
+    const hStackTarget = resolveAnnotationTargetAtPoint(root, { mode: 'point', x: 24, y: 84 }, window)
+    const inlineMessageTarget = resolveAnnotationTargetAtPoint(
+      root,
+      { mode: 'point', x: 24, y: 124 },
+      window
+    )
+    const inlineMessageIconTarget = resolveAnnotationTargetAtPoint(
+      root,
+      { mode: 'point', x: 30, y: 130 },
+      window
+    )
+    const listTarget = resolveAnnotationTargetAtPoint(root, { mode: 'point', x: 24, y: 184 }, window)
 
     expect(buttonTarget).toMatchObject({
       status: 'resolved',
@@ -230,6 +296,86 @@ describe('annotation target resolution', () => {
     expect(checkboxTarget).toMatchObject({
       status: 'resolved',
       target: { identity: { role: 'checkbox', accessibleName: 'Godta' } },
+    })
+    expect(boxTarget).toMatchObject({
+      status: 'resolved',
+      target: { identity: { cssClasses: expect.stringContaining('aksel-box') } },
+    })
+    expect(vStackTarget).toMatchObject({
+      status: 'resolved',
+      target: { identity: { cssClasses: expect.stringContaining('aksel-vstack') } },
+    })
+    expect(hStackTarget).toMatchObject({
+      status: 'resolved',
+      target: { identity: { cssClasses: expect.stringContaining('aksel-hstack') } },
+    })
+    expect(inlineMessageTarget).toMatchObject({
+      status: 'resolved',
+      target: { identity: { cssClasses: expect.stringContaining('aksel-inline-message') } },
+    })
+    expect(inlineMessageIconTarget).toMatchObject({
+      status: 'resolved',
+      target: { identity: { cssClasses: expect.stringContaining('aksel-inline-message') } },
+    })
+    expect(listTarget).toMatchObject({
+      status: 'resolved',
+      target: { identity: { tagName: 'ul' } },
+    })
+  })
+
+  it('resolves arbitrary custom elements instead of requiring semantic or Aksel markup', () => {
+    const root = makeRoot(`
+      <div class="custom-card">
+        <div class="custom-row"></div>
+        <span class="custom-label">Custom label</span>
+        <div class="hidden-custom" style="display: none">Hidden</div>
+      </div>
+    `)
+    const card = root.querySelector('.custom-card') as HTMLDivElement
+    const row = root.querySelector('.custom-row') as HTMLDivElement
+    const label = root.querySelector('.custom-label') as HTMLSpanElement
+    const hidden = root.querySelector('.hidden-custom') as HTMLDivElement
+
+    setRect(card, { x: 0, y: 0, width: 260, height: 120 })
+    setRect(row, { x: 16, y: 16, width: 228, height: 40 })
+    setRect(label, { x: 16, y: 72, width: 120, height: 24 })
+    setRect(hidden, { x: 16, y: 100, width: 120, height: 20 })
+
+    Object.defineProperty(document, 'elementFromPoint', {
+      value: vi.fn((x: number, y: number) => {
+        if (x === 8 && y === 8) return card
+        if (x === 20 && y === 20) return row
+        if (x === 20 && y === 80) return label
+        return null
+      }),
+      configurable: true,
+    })
+
+    const cardTarget = resolveAnnotationTargetAtPoint(root, { mode: 'point', x: 8, y: 8 }, window)
+    const rowTarget = resolveAnnotationTargetAtPoint(root, { mode: 'point', x: 20, y: 20 }, window)
+    const labelTarget = resolveAnnotationTargetAtPoint(root, { mode: 'point', x: 20, y: 80 }, window)
+    const dragTarget = resolveAnnotationTargetsInRect(root, { x: 10, y: 10, width: 240, height: 54 }, window)
+    const hiddenIdentity = getAnnotationTargetIdentity(root, hidden, window)
+
+    expect(cardTarget).toMatchObject({
+      status: 'resolved',
+      target: { identity: { tagName: 'div', cssClasses: 'custom-card' } },
+    })
+    expect(rowTarget).toMatchObject({
+      status: 'resolved',
+      target: { identity: { tagName: 'div', cssClasses: 'custom-row' } },
+    })
+    expect(labelTarget).toMatchObject({
+      status: 'resolved',
+      target: { identity: { tagName: 'span', cssClasses: 'custom-label' } },
+    })
+    expect(dragTarget).toMatchObject({
+      status: 'resolved',
+      target: { identity: { cssClasses: 'custom-row' } },
+    })
+    expect(resolveAnnotationTargetIdentity(root, hiddenIdentity, window)).toMatchObject({
+      status: 'dead',
+      reason: 'no-match',
     })
   })
 })

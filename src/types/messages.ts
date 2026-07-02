@@ -20,6 +20,8 @@ export type MainToSandboxMessage =
   | { type: 'NAVIGATE_TO_PAGE'; payload: { pageId: ArcadePageId } }
   | { type: 'UPDATE_VIEWPORT'; payload: { width: number } }
   | { type: 'TOGGLE_INSPECT'; payload: { enabled: boolean } }
+  | { type: 'TOGGLE_ANNOTATION_MODE'; payload: { enabled: boolean } }
+  | { type: 'CLEAR_ANNOTATION_SELECTION' }
   | { type: 'GET_INSPECTION_DATA'; payload: { x: number; y: number } }
   | { type: 'UPDATE_THEME'; payload: { theme: 'light' | 'dark' } }
   | {
@@ -51,6 +53,8 @@ export type SandboxToMainMessage =
   | { type: 'RUNTIME_ERROR'; payload: RuntimeError }
   | { type: 'PREVIEW_PAGE_CHANGED'; payload: { pageId: ArcadePageId } }
   | { type: 'INSPECTION_DATA'; payload: InspectionData | null }
+  | { type: 'ANNOTATION_TARGET_HOVERED'; payload: AnnotationTargetResolutionResult | null }
+  | { type: 'ANNOTATION_TARGET_SELECTED'; payload: AnnotationTargetResolutionResult }
   | { type: 'THEME_UPDATED'; payload: { theme: 'light' | 'dark' } }
   | { type: 'CONSOLE_LOG'; payload: { level: 'log' | 'warn' | 'error'; args: unknown[] } }
   | {
@@ -66,6 +70,7 @@ export type SandboxToMainMessage =
 export const isMainToSandboxMessage = (msg: unknown): msg is MainToSandboxMessage => {
   if (msg === null || typeof msg !== 'object' || !('type' in msg)) return false
   if ((msg as { type: unknown }).type === 'CONNECT_SANDBOX') return true
+  if ((msg as { type: unknown }).type === 'CLEAR_ANNOTATION_SELECTION') return true
   return 'payload' in msg
 }
 

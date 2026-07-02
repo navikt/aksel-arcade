@@ -1,13 +1,17 @@
-import { useCallback, useRef, useEffect, useState } from 'react'
+import { useCallback, useRef, useEffect, useMemo, useState } from 'react'
+import { BodyShort, Button, Detail, HStack, Popover, Textarea, VStack } from '@navikt/ds-react'
 import type { MainToSandboxMessage, SandboxToMainMessage } from '@/types/messages'
 import type { ArcadePageId, ViewportSize } from '@/types/project'
 import type { InspectionData } from '@/types/inspection'
+import type { ArcadeAnnotation } from '@/types/annotations'
 import type { SandboxConsolePayload } from '@/services/previewDiagnostics'
 import type { CompileError, RuntimeError } from '@/types/preview'
+import { createAnnotation, getOpenAnnotations } from '@/services/annotations'
 import {
   registerPreviewEvidenceRequestHandler,
   type PreviewEvidenceCaptureResult,
 } from '@/services/previewEvidence'
+import type { ResolvedAnnotationTarget } from '@/services/annotationTargets'
 import { getViewportWidth } from '@/types/viewports'
 import { validateSandboxToMainMessage } from '@/utils/security'
 import {
@@ -21,6 +25,22 @@ import './LivePreview.css'
 const PREVIEW_EVIDENCE_REQUEST_TIMEOUT_MS = 5_000
 const SANDBOX_IFRAME_SRC =
   import.meta.env.MODE === 'test' ? 'about:blank' : import.meta.env.BASE_URL + 'sandbox.html'
+const ANNOTATION_TARGET_TEXT_MAX_LENGTH = 24
+const ANNOTATION_MARKER_SIZE_PX = 24
+const ANNOTATION_MARKER_SAFE_INSET_PX = ANNOTATION_MARKER_SIZE_PX / 2
+
+const AKSEL_TARGET_LABELS: Array<[className: string, label: string]> = [
+  ['aksel-inline-message', 'InlineMessage'],
+  ['aksel-button', 'Button'],
+  ['aksel-checkbox', 'Checkbox'],
+  ['aksel-text-field', 'TextField'],
+  ['aksel-textarea', 'Textarea'],
+  ['aksel-select', 'Select'],
+  ['aksel-box', 'Box'],
+  ['aksel-vstack', 'VStack'],
+  ['aksel-hstack', 'HStack'],
+  ['aksel-hgrid', 'HGrid'],
+]
 
 const getSandboxIframeSrc = (recoveryRevision: number) => {
   if (SANDBOX_IFRAME_SRC === 'about:blank' || recoveryRevision === 0) {
@@ -33,6 +53,59 @@ const getSandboxIframeSrc = (recoveryRevision: number) => {
 
 const getSandboxIframeHref = (src: string) => new URL(src, window.location.href).href
 
+const getAnnotationTargetLabel = (target: ResolvedAnnotationTarget): string => {
+  const targetName = getAnnotationTargetName(target)
+  const targetText = getAnnotationTargetText(target)
+
+  return targetText ? `${targetName}: ${targetText}` : targetName
+}
+
+const getAnnotationTargetName = (target: ResolvedAnnotationTarget): string => {
+  const classes = target.identity.cssClasses?.split(/\s+/) ?? []
+  const akselLabel = AKSEL_TARGET_LABELS.find(([className]) => classes.includes(className))?.[1]
+  if (akselLabel) {
+    return akselLabel
+  }
+
+  if (target.identity.role && target.identity.role !== target.identity.tagName) {
+    return capitalizeTargetName(target.identity.role)
+  }
+
+  return target.identity.tagName
+}
+
+const getAnnotationTargetText = (target: ResolvedAnnotationTarget): string => {
+  const text = stripAkselStatusPrefix(
+    target.identity.accessibleName || target.identity.text || extractQuotedElementText(target.snapshot.element)
+  )
+  return truncateTargetText(text, ANNOTATION_TARGET_TEXT_MAX_LENGTH)
+}
+
+const stripAkselStatusPrefix = (text: string | undefined): string =>
+  (text ?? '').replace(/^(informasjon|info|suksess|success|advarsel|warning|feil|error):\s*/i, '').trim()
+
+const extractQuotedElementText = (elementLabel: string): string => {
+  const match = elementLabel.match(/"([^"]+)"/)
+  return match?.[1] ?? ''
+}
+
+const truncateTargetText = (text: string, maxLength: number): string => {
+  if (text.length <= maxLength) {
+    return text
+  }
+
+  const candidate = text.slice(0, maxLength)
+  const lastSpace = candidate.lastIndexOf(' ')
+  const truncated = (lastSpace > 0 ? candidate.slice(0, lastSpace) : candidate).trim()
+  return `${truncated}...`
+}
+
+const capitalizeTargetName = (value: string): string =>
+  value.length === 0 ? value : `${value[0].toUpperCase()}${value.slice(1)}`
+
+const clampNumber = (value: number, min: number, max: number): number =>
+  Math.min(Math.max(value, min), max)
+
 interface LivePreviewProps {
   iframeRef: React.RefObject<HTMLIFrameElement | null>
   transpiledCode: string | null
@@ -44,6 +117,9 @@ interface LivePreviewProps {
   previewPageId: ArcadePageId | null
   viewportWidth: ViewportSize
   isInspectMode: boolean
+  isAnnotationMode: boolean
+  annotations: ArcadeAnnotation[]
+  onAnnotationsChange: (annotations: ArcadeAnnotation[]) => void
   theme: 'light' | 'dark'
 }
 
@@ -63,6 +139,9 @@ export const LivePreview = ({
   previewPageId,
   viewportWidth,
   isInspectMode,
+  isAnnotationMode,
+  annotations,
+  onAnnotationsChange,
   theme,
 }: LivePreviewProps) => {
   const [sandboxReady, setSandboxReady] = useState(false)
@@ -90,6 +169,13 @@ export const LivePreview = ({
   
   // T082: Inspection state
   const [inspectionData, setInspectionData] = useState<InspectionData | null>(null)
+  const [hoveredAnnotationTarget, setHoveredAnnotationTarget] =
+    useState<ResolvedAnnotationTarget | null>(null)
+  const [selectedAnnotationTarget, setSelectedAnnotationTarget] =
+    useState<ResolvedAnnotationTarget | null>(null)
+  const [annotationDraft, setAnnotationDraft] = useState('')
+  const [addAnnotationAnchorEl, setAddAnnotationAnchorEl] = useState<HTMLElement | null>(null)
+  const annotationTextareaRef = useRef<HTMLTextAreaElement | null>(null)
   const selectedViewportWidth = getViewportWidth(viewportWidth)
   const effectiveViewportWidth =
     viewportBounds.width > 0 ? Math.min(selectedViewportWidth, viewportBounds.width) : selectedViewportWidth
@@ -295,6 +381,19 @@ export const LivePreview = ({
             setInspectionData(null)
           }
           break
+        case 'ANNOTATION_TARGET_HOVERED':
+          setHoveredAnnotationTarget(
+            message.payload?.status === 'resolved' && message.payload.target
+              ? message.payload.target
+              : null
+          )
+          break
+        case 'ANNOTATION_TARGET_SELECTED':
+          if (message.payload.status === 'resolved' && message.payload.target) {
+            setSelectedAnnotationTarget(message.payload.target)
+            setAnnotationDraft('')
+          }
+          break
         case 'PREVIEW_EVIDENCE_CAPTURED':
           resolvePendingPreviewEvidenceRequest(
             message.payload.requestId,
@@ -429,6 +528,40 @@ export const LivePreview = ({
     postMessageToSandbox(iframeRef.current.contentWindow, message)
   }, [isInspectMode, sandboxReady, iframeRef])
 
+  useEffect(() => {
+    if (!isAnnotationMode) {
+      setHoveredAnnotationTarget(null)
+      setSelectedAnnotationTarget(null)
+      setAnnotationDraft('')
+    }
+
+    if (!iframeRef.current?.contentWindow || !sandboxReady) {
+      return
+    }
+
+    const message: MainToSandboxMessage = {
+      type: 'TOGGLE_ANNOTATION_MODE',
+      payload: { enabled: isAnnotationMode },
+    }
+
+    postMessageToSandbox(iframeRef.current.contentWindow, message)
+  }, [isAnnotationMode, sandboxReady, iframeRef])
+
+  useEffect(() => {
+    if (selectedAnnotationTarget || !iframeRef.current?.contentWindow || !sandboxReady) {
+      return
+    }
+
+    const message: MainToSandboxMessage = { type: 'CLEAR_ANNOTATION_SELECTION' }
+    postMessageToSandbox(iframeRef.current.contentWindow, message)
+  }, [selectedAnnotationTarget, sandboxReady, iframeRef])
+
+  useEffect(() => {
+    if (selectedAnnotationTarget) {
+      window.setTimeout(() => annotationTextareaRef.current?.focus(), 0)
+    }
+  }, [selectedAnnotationTarget])
+
   // Send preview navigation requests when host selection changes
   useEffect(() => {
     if (!previewPageId || !sandboxReady) {
@@ -489,6 +622,92 @@ export const LivePreview = ({
     postMessageToSandbox(iframeRef.current.contentWindow, message)
   }, [theme, sandboxReady, iframeRef])
 
+  const activePageOpenAnnotations = useMemo(
+    () =>
+      previewPageId
+        ? getOpenAnnotations(annotations, {
+            pageId: previewPageId,
+          })
+        : [],
+    [annotations, previewPageId]
+  )
+
+  const saveSelectedAnnotation = useCallback(() => {
+    if (!previewPageId || !selectedAnnotationTarget || annotationDraft.trim().length === 0) {
+      return
+    }
+
+    const nextAnnotation = createAnnotation({
+      pageId: previewPageId,
+      comment: annotationDraft.trim(),
+      target: selectedAnnotationTarget.snapshot,
+    })
+    onAnnotationsChange([...annotations, nextAnnotation])
+    setSelectedAnnotationTarget(null)
+    setAnnotationDraft('')
+  }, [annotationDraft, annotations, onAnnotationsChange, previewPageId, selectedAnnotationTarget])
+
+  const cancelSelectedAnnotation = useCallback(() => {
+    setSelectedAnnotationTarget(null)
+    setAnnotationDraft('')
+  }, [])
+
+  const handleAnnotationTextareaKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (event.key === 'Enter' && !event.shiftKey) {
+      event.preventDefault()
+      saveSelectedAnnotation()
+      return
+    }
+
+    if (event.key === 'Escape') {
+      event.preventDefault()
+      event.stopPropagation()
+      cancelSelectedAnnotation()
+    }
+  }
+
+  const getOverlayPosition = (target: ResolvedAnnotationTarget | ArcadeAnnotation) => {
+    const isResolvedTarget = 'snapshot' in target
+    const box = isResolvedTarget ? target.snapshot.boundingBox : target.boundingBox
+    const clickX = isResolvedTarget ? target.snapshot.x : target.x
+    const clickY = isResolvedTarget ? target.snapshot.y : target.y
+    const viewportWidthPx = Math.max(1, effectiveViewportWidth)
+    const viewportHeightPx = Math.max(1, viewportIntrinsicHeight)
+    const rawLeft =
+      typeof clickX === 'number' && Number.isFinite(clickX)
+        ? (clickX / 100) * viewportWidthPx
+        : box && Number.isFinite(box.x)
+          ? box.x + box.width
+          : 0
+    const rawTop =
+      typeof clickY === 'number' && Number.isFinite(clickY)
+        ? clickY
+        : box && Number.isFinite(box.y)
+          ? Math.max(0, box.y)
+          : 0
+    const left = clampNumber(
+      rawLeft,
+      ANNOTATION_MARKER_SAFE_INSET_PX,
+      Math.max(ANNOTATION_MARKER_SAFE_INSET_PX, viewportWidthPx - ANNOTATION_MARKER_SAFE_INSET_PX)
+    )
+    const top = clampNumber(
+      rawTop,
+      ANNOTATION_MARKER_SAFE_INSET_PX,
+      Math.max(ANNOTATION_MARKER_SAFE_INSET_PX, viewportHeightPx - ANNOTATION_MARKER_SAFE_INSET_PX)
+    )
+
+    return {
+      left: `${left}px`,
+      top: `${top}px`,
+    }
+  }
+
+  const selectedAnchorPosition = selectedAnnotationTarget
+    ? getOverlayPosition(selectedAnnotationTarget)
+    : hoveredAnnotationTarget
+      ? getOverlayPosition(hoveredAnnotationTarget)
+      : { left: '-9999px', top: '-9999px' }
+
   return (
     <div className="live-preview" data-testid="live-preview">
       <div
@@ -518,9 +737,78 @@ export const LivePreview = ({
             title="Live Preview Sandbox"
             data-testid="preview-iframe"
           />
+          {isAnnotationMode && (
+            <div className="live-preview__annotation-layer" data-testid="annotation-overlay-layer">
+              {activePageOpenAnnotations.map((annotation, index) => (
+                <Button
+                  key={annotation.id}
+                  type="button"
+                  size="xsmall"
+                  variant="primary"
+                  className="live-preview__annotation-marker"
+                  style={getOverlayPosition(annotation)}
+                  aria-label={`Annotation ${index + 1}: ${annotation.comment}`}
+                >
+                  {index + 1}
+                </Button>
+              ))}
+              <span
+                ref={setAddAnnotationAnchorEl}
+                className="live-preview__annotation-add-anchor"
+                style={selectedAnchorPosition}
+                aria-hidden="true"
+              />
+            </div>
+          )}
         </div>
       </div>
-      
+
+      <Popover
+        open={isAnnotationMode && Boolean(selectedAnnotationTarget)}
+        anchorEl={addAnnotationAnchorEl}
+        onClose={cancelSelectedAnnotation}
+        placement="right-start"
+        className="live-preview__annotation-popover"
+      >
+        <Popover.Content className="live-preview__annotation-popover-content">
+          <VStack gap="space-12">
+            <VStack gap="space-4">
+              <BodyShort weight="semibold">Add annotation</BodyShort>
+              {selectedAnnotationTarget && (
+                <Detail className="live-preview__annotation-target-metadata">
+                  {getAnnotationTargetLabel(selectedAnnotationTarget)}
+                </Detail>
+              )}
+            </VStack>
+            <Textarea
+              ref={annotationTextareaRef}
+              label="Annotation text"
+              hideLabel
+              size="small"
+              minRows={3}
+              resize={false}
+              value={annotationDraft}
+              onChange={(event) => setAnnotationDraft(event.target.value)}
+              onKeyDown={handleAnnotationTextareaKeyDown}
+            />
+            <HStack gap="space-8" justify="end">
+              <Button type="button" variant="secondary" size="small" onClick={cancelSelectedAnnotation}>
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                variant="primary"
+                size="small"
+                disabled={annotationDraft.trim().length === 0}
+                onClick={saveSelectedAnnotation}
+              >
+                Save
+              </Button>
+            </HStack>
+          </VStack>
+        </Popover.Content>
+      </Popover>
+       
       {inspectionData && iframeRef.current && (
         <InspectionPopover
           data={inspectionData}

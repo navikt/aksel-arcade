@@ -4149,3 +4149,111 @@ Verification:
 - `npm run typecheck`
 - `npm run lint`
 - `npm test -- --run tests/integration/annotation-mode-header-shell.test.tsx`
+### 2026-07-01 - Issue #318: Single-element annotation creation
+
+Implemented:
+
+- Selected #318 as the highest-priority `ready-for-agent` feature from #318-#326 because it is the first complete human annotation path and later annotation management, persistence, geometry, evidence, and MCP slices depend on it.
+- Read issue #314, issue #318, `CONTEXT.md`, and ADRs 0021/0023/0024 before changing code.
+- Added Annotation mode host/sandbox messages for hover/selection, sandbox-side hover/selected target overlays, and preview-interaction click interception while Annotation mode is active.
+- Added the host add-annotation UI in `LivePreview` with Aksel `Popover`, `Textarea`, and buttons: target metadata/context, blank-submit disablement, Enter-to-save, Shift+Enter newline, Escape cancel, and project-backed `feedback` annotation creation.
+- Rendered page-scoped open annotation markers only while Annotation mode is on, with the badge updating from the persisted project annotations and markers reappearing when mode is re-enabled.
+- Extended project updates to persist annotation array changes and added integration coverage for the preview creation flow plus popover keyboard behavior.
+
+Verification:
+
+- npm install
+- npm run typecheck
+- npm run test -- --run
+- npm run lint
+- Browser/dev-server practical checks were attempted on `http://127.0.0.1:5177/aksel-arcade/`; this exposed and fixed a hidden-Popover anchor issue. Further Playwright iframe pointer checks were limited by sandbox/frame event tooling, so future work should manually re-check the full #318 Human verification checklist in a visible browser session, especially real pointer selection on an Aksel button/control and prototype navigation blocking.
+
+Next note:
+
+- #319 can build on the marker rendering and `editAnnotationComment`/`hardDeleteAnnotation` services, but should first confirm marker focus/tooltip/edit behavior against the visible browser because the current #318 slice only creates and displays markers.
+
+2026-07-01 follow-up:
+
+- Fixed two #318 regressions found during review:
+  - The active-page annotation badge is now hidden when there are zero open annotations instead of showing `0`.
+  - Annotation hover no longer crashes the app; the root cause was a host-side read of `iframe.contentWindow.scrollY`, which throws for Arcade's sandboxed opaque-origin iframe during hover rendering.
+- Added regression coverage for the zero-badge state and for hover metadata from an iframe whose `contentWindow.scrollY` throws a `SecurityError`.
+- Re-ran the practical browser flow on a dedicated dev server at `http://127.0.0.1:5188/aksel-arcade/`: zero badge hidden, Annotation mode hover keeps the app visible with no console/page errors, add popover opens, blank Save is disabled, Enter saves after Shift+Enter newline, badge increments to `1`, marker hides when Annotation mode is off, and marker reappears when Annotation mode is turned back on.
+### 2026-07-01 - PR #332 annotation target follow-up
+
+Fixed after user feedback:
+
+- Broadened annotation target resolution from a semantic/Aksel allowlist to any visible rendered preview DOM element, so generic/custom `div` and `span` elements, Aksel layout wrappers (`Box`, `VStack`, `HStack`), `InlineMessage`, and text-containing inline elements can all be annotated.
+- Kept exclusions for non-preview chrome and non-rendered implementation nodes (`script`, `style`, `template`, `html`, `body`, `display: none`, `display: contents`, hidden/collapsed visibility).
+- Changed identity re-resolution to prefer the stored full DOM path before treating same-signature generic elements as ambiguous, which keeps persisted annotations usable for otherwise-identical custom elements.
+- Updated `CONTEXT.md`, ADR 0021, PRD issue #314, and issues #318/#320/#321 so future annotation work does not reintroduce “meaningful/semantic-only” target wording.
+- Regenerated `public/preview-evidence-global.js` so the sandbox iframe uses the same broad target resolver.
+
+Verification:
+
+- npm run typecheck
+- npm run test -- --run
+- npm run lint
+- Browser probe at `http://127.0.0.1:5192/aksel-arcade/` confirmed Annotation mode resolves outer Box padding, VStack gap/body, InlineMessage root exposed area, InlineMessage non-strong text span, in-root custom `div`, and custom `span`, and opens the add-popover for the custom `div` without console errors.
+
+Next note: target creation is now intentionally broad. Future drag/multi-select work should collect rendered preview DOM elements, not semantic-only or Aksel-only elements, while continuing to ignore preview chrome and non-rendered implementation nodes.
+
+### 2026-07-01 - PR #332 annotation popover target label follow-up
+
+Fixed after user feedback:
+
+- Replaced the verbose add-popover target metadata with a short human label, e.g. `InlineMessage: Quick tip: Delete this...`.
+- Removed the popover's nearby subtree/context text and raw CSS-class display; that detailed data still remains in the annotation target snapshot for persistence/agent use, but it is no longer shown to the human author while adding an annotation.
+- Normalized clicks on decorative InlineMessage icon internals back to the InlineMessage root so they do not show as `Img` targets.
+- Added regression coverage for the InlineMessage label and for InlineMessage icon internals resolving to the component root, then regenerated `public/preview-evidence-global.js`.
+
+Verification:
+
+- npm run typecheck
+- npm run test -- --run
+- npm run lint
+- npm run build after the first pushed review-fix commit exposed a CI-only test fixture type error; fixed the Aksel `React.createElement` fixtures with explicit `as="div"` props and reran npm run build, npm run test -- --run, and npm run lint.
+- Browser check at `http://127.0.0.1:5193/aksel-arcade/` selected the default InlineMessage in Annotation mode and confirmed the add-popover shows `InlineMessage: Quick tip: Delete this...` without `Features: Two tabs`, raw `.aksel-*` classes, or the `Informasjon:` status prefix.
+
+### 2026-07-02 - PR #332 annotation popover width follow-up
+
+Fixed after user feedback:
+
+- Set the add-annotation popover content to a 280px default width while preserving the existing viewport-safe max width behavior for narrow screens.
+
+Verification:
+
+- npm run typecheck
+- npm run test -- --run
+- npm run lint
+- Browser check at `http://127.0.0.1:5194/aksel-arcade/` opened Annotation mode, selected a default preview target, and measured `.live-preview__annotation-popover-content` at `280px` with no console errors.
+
+### 2026-07-02 - PR #332 annotation marker breakpoint follow-up
+
+Fixed after user feedback:
+
+- Changed annotation marker positioning to use the stored click point instead of the saved element bounding-box right edge, so markers stay close to where the user clicked when creating the annotation.
+- Clamped marker positions inside the active preview viewport with a half-marker inset, keeping edge markers visible when switching from wider breakpoints such as MD to XS.
+- Added regression coverage for an annotation saved near the MD right edge rendering inside the XS viewport instead of at the stale saved bounding-box edge.
+
+Verification:
+
+- npm run typecheck
+- npm run test -- --run
+- npm run lint
+- Browser check at `http://127.0.0.1:5195/aksel-arcade/` annotated near the MD right edge, switched to XS, and confirmed the marker remained fully inside the 320px preview shell at `left: 308px` with no console errors.
+
+### 2026-07-02 - PR #332 code review follow-up
+
+Fixed during pre-merge review:
+
+- Tightened sandbox-to-main validation for annotation target messages so hovered/selected/resolved annotation payloads must have the expected resolution, target identity, snapshot, visibility, and rectangle shapes before `LivePreview` reads them.
+- Replaced the annotation marker raw `<button>` with an Aksel `Button`, and changed the popover positioning anchor from a non-focusable raw button to a non-interactive span.
+- Added security regression coverage for malformed annotation target messages.
+- Aligned GitHub issues #314 and #318 with the human-tested short target-label popover behavior so they no longer require raw class metadata or nearby subtree context prose in the add popover.
+
+Verification:
+
+- npm run typecheck
+- npm run test -- --run
+- npm run lint

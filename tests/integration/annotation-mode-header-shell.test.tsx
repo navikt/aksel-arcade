@@ -13,7 +13,45 @@ import {
 } from '@/utils/projectDefaults'
 
 vi.mock('@/components/Preview/LivePreview', () => ({
-  LivePreview: () => <div data-testid="live-preview" />,
+  LivePreview: ({
+    isAnnotationMode,
+    annotations,
+    onAnnotationsChange,
+    previewPageId,
+  }: {
+    isAnnotationMode: boolean
+    annotations: ArcadeAnnotation[]
+    onAnnotationsChange: (annotations: ArcadeAnnotation[]) => void
+    previewPageId: ArcadePageId
+  }) => (
+    <div data-testid="live-preview">
+      {isAnnotationMode && (
+        <>
+          <button
+            type="button"
+            onClick={() =>
+              onAnnotationsChange([
+                ...annotations,
+                annotation('created-from-preview', previewPageId, {
+                  comment: 'Needs clearer copy',
+                  boundingBox: { x: 16, y: 24, width: 120, height: 40 },
+                }),
+              ])
+            }
+          >
+            Save fake annotation
+          </button>
+          {annotations
+            .filter((item) => item.pageId === previewPageId)
+            .map((item, index) => (
+              <button key={item.id} type="button" aria-label={`Annotation ${index + 1}: ${item.comment}`}>
+                {index + 1}
+              </button>
+            ))}
+        </>
+      )}
+    </div>
+  ),
 }))
 
 vi.mock('@/services/transpiler', () => ({
@@ -77,9 +115,10 @@ const createContextValue = (project: Project) => ({
 })
 
 const renderPreviewPane = (project: Project = createProjectWithAnnotations()) => {
+  const contextValue = createContextValue(project)
   const renderResult = render(
     <SettingsProvider>
-      <AppContext.Provider value={createContextValue(project)}>
+      <AppContext.Provider value={contextValue}>
         <PreviewPane />
       </AppContext.Provider>
     </SettingsProvider>
@@ -94,7 +133,7 @@ const renderPreviewPane = (project: Project = createProjectWithAnnotations()) =>
       </SettingsProvider>
     )
 
-  return { ...renderResult, rerenderProject }
+  return { ...renderResult, contextValue, rerenderProject }
 }
 
 const getAnnotationToggle = () =>
@@ -139,9 +178,9 @@ describe('Annotation mode preview-header shell', () => {
     expect(screen.queryByRole('button', { name: /clear all/i })).toBeNull()
   })
 
-  it('renders page-scoped zero, single-digit, and double-digit open annotation counts', () => {
+  it('hides zero counts and renders page-scoped single-digit and double-digit open annotation counts', () => {
     const { rerenderProject } = renderPreviewPane(createProjectWithAnnotations())
-    expect(screen.getByTestId('annotation-count-badge').textContent).toBe('0')
+    expect(screen.queryByTestId('annotation-count-badge')).toBeNull()
 
     const singleCountProject = createProjectWithAnnotations([annotation('annotation-1')])
     rerenderProject(singleCountProject)
@@ -184,5 +223,38 @@ describe('Annotation mode preview-header shell', () => {
     )
 
     expect(screen.getByTestId('annotation-count-badge').textContent).toBe('99+')
+  })
+
+  it('adds a single annotation through the preview flow and keeps markers mode-scoped', async () => {
+    const user = userEvent.setup()
+    const { contextValue, rerenderProject } = renderPreviewPane()
+
+    await user.click(getAnnotationToggle())
+    await user.click(screen.getByRole('button', { name: /save fake annotation/i }))
+
+    expect(contextValue.updateProject).toHaveBeenCalledWith({
+      annotations: [
+        expect.objectContaining({
+          id: 'created-from-preview',
+          pageId: 'page01',
+          comment: 'Needs clearer copy',
+          kind: 'feedback',
+          status: 'pending',
+        }),
+      ],
+    })
+
+    const projectWithAnnotation = createProjectWithAnnotations([
+      annotation('created-from-preview', 'page01', { comment: 'Needs clearer copy' }),
+    ])
+    rerenderProject(projectWithAnnotation)
+    expect(screen.getByRole('button', { name: /annotation 1: needs clearer copy/i })).toBeTruthy()
+    expect(screen.getByTestId('annotation-count-badge').textContent).toBe('1')
+
+    await user.click(getAnnotationToggle())
+    expect(screen.queryByRole('button', { name: /annotation 1: needs clearer copy/i })).toBeNull()
+
+    await user.click(getAnnotationToggle())
+    expect(screen.getByRole('button', { name: /annotation 1: needs clearer copy/i })).toBeTruthy()
   })
 })

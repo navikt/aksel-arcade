@@ -339,6 +339,7 @@ export const PreviewPane = ({
     : `Enter annotation mode, ${activePageOpenAnnotationCount} open annotations on this page`
   const visibleAnnotationCount =
     activePageOpenAnnotationCount > 99 ? '99+' : String(activePageOpenAnnotationCount)
+  const showAnnotationBadge = activePageOpenAnnotationCount > 0
 
   return (
     <Box
@@ -405,13 +406,15 @@ export const PreviewPane = ({
                       : 'preview-pane__icon-button preview-pane__annotation-toggle'
                   }
                 />
-                <span
-                  className="preview-pane__annotation-badge"
-                  data-testid="annotation-count-badge"
-                  aria-hidden="true"
-                >
-                  <span className="preview-pane__annotation-badge-text">{visibleAnnotationCount}</span>
-                </span>
+                {showAnnotationBadge && (
+                  <span
+                    className="preview-pane__annotation-badge"
+                    data-testid="annotation-count-badge"
+                    aria-hidden="true"
+                  >
+                    <span className="preview-pane__annotation-badge-text">{visibleAnnotationCount}</span>
+                  </span>
+                )}
               </div>
             </div>
             <InspectMode isInspectMode={isInspectMode} onInspectToggle={handleInspectToggle} />
@@ -477,6 +480,9 @@ export const PreviewPane = ({
           previewPageId={project.activePageId}
           viewportWidth={project.viewportSize}
           isInspectMode={isInspectMode}
+          isAnnotationMode={isAnnotationMode}
+          annotations={project.annotations}
+          onAnnotationsChange={(annotations) => updateProject({ annotations })}
           theme={theme}
         />
 
