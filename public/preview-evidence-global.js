@@ -27,6 +27,7 @@ var previewEvidenceUtils = (() => {
     PREVIEW_EVIDENCE_ROOT_SELECTOR: () => PREVIEW_EVIDENCE_ROOT_SELECTOR,
     capturePreviewEvidenceSnapshot: () => capturePreviewEvidenceSnapshot,
     collectPreviewEvidenceFromFrame: () => collectPreviewEvidenceFromFrame,
+    combineResolvedAnnotationTargets: () => combineResolvedAnnotationTargets,
     getAnnotationTargetIdentity: () => getAnnotationTargetIdentity,
     isAnnotationTargetResolutionRequest: () => isAnnotationTargetResolutionRequest,
     registerPreviewEvidenceRequestHandler: () => registerPreviewEvidenceRequestHandler,
@@ -279,33 +280,15 @@ var previewEvidenceUtils = (() => {
         y: normalizedRect.y + normalizedRect.height
       });
     }
-    const targets = matchingElements.map(
-      (element) => createResolvedTarget(root, element, frameWindow, {
-        x: normalizedRect.x + normalizedRect.width,
-        y: normalizedRect.y + normalizedRect.height,
-        isMultiSelect: true
-      })
+    return combineResolvedAnnotationTargets(
+      matchingElements.map(
+        (element) => createResolvedTarget(root, element, frameWindow, {
+          x: normalizedRect.x + normalizedRect.width,
+          y: normalizedRect.y + normalizedRect.height,
+          isMultiSelect: true
+        })
+      )
     );
-    const visibleTargets = targets.filter((target) => target.visibility === "visible");
-    const boxes = visibleTargets.length > 0 ? visibleTargets.map((target) => target.snapshot.boundingBox) : [];
-    const unionBox = unionRects(boxes.filter((box) => Boolean(box)));
-    return {
-      status: visibleTargets.length > 0 ? "resolved" : "hidden",
-      target: {
-        ...targets[0],
-        snapshot: {
-          ...targets[0].snapshot,
-          element: matchingElements.slice(0, 5).map((element) => describeElement(element)).join(", "),
-          elementPath: targets.map((target) => target.identity.elementPath).join(" | "),
-          fullPath: targets.map((target) => target.identity.fullPath).join(" | "),
-          isMultiSelect: true,
-          ...unionBox ? { boundingBox: unionBox } : {},
-          elementBoundingBoxes: targets.map((target) => target.snapshot.boundingBox).filter((box) => Boolean(box))
-        }
-      },
-      targets,
-      matchCount: targets.length
-    };
   };
   var resolveAnnotationTargetIdentity = (root, identity, frameWindow = root.ownerDocument.defaultView ?? window) => {
     const pathMatch = queryFullPath(root, identity.fullPath);
@@ -361,25 +344,54 @@ var previewEvidenceUtils = (() => {
       }
       resolvedTargets.push(result.target);
     }
-    const visibleTargets = resolvedTargets.filter((target) => target.visibility === "visible");
+    return combineResolvedAnnotationTargets(resolvedTargets);
+  };
+  var combineResolvedAnnotationTargets = (targets) => {
+    if (targets.length === 0) {
+      return {
+        status: "no-target",
+        reason: "empty-selection",
+        matchCount: 0
+      };
+    }
+    if (targets.length === 1) {
+      const [target] = targets;
+      return {
+        status: target.visibility === "visible" ? "resolved" : "hidden",
+        target,
+        targets: [target],
+        matchCount: 1
+      };
+    }
+    const visibleTargets = targets.filter((target) => target.visibility === "visible");
     const boxes = visibleTargets.map((target) => target.snapshot.boundingBox).filter((box) => Boolean(box));
     const unionBox = unionRects(boxes);
+    const primaryTarget = targets[0];
     return {
       status: visibleTargets.length > 0 ? "resolved" : "hidden",
-      targets: resolvedTargets,
-      target: {
-        ...resolvedTargets[0],
+      targets: targets.map((target) => ({
+        ...target,
+        identity: { ...target.identity },
         snapshot: {
-          ...resolvedTargets[0].snapshot,
-          element: resolvedTargets.map((target) => target.snapshot.element).join(", "),
-          elementPath: resolvedTargets.map((target) => target.identity.elementPath).join(" | "),
-          fullPath: resolvedTargets.map((target) => target.identity.fullPath).join(" | "),
+          ...target.snapshot,
+          ...target.snapshot.boundingBox ? { boundingBox: { ...target.snapshot.boundingBox } } : {}
+        }
+      })),
+      target: {
+        ...primaryTarget,
+        identity: { ...primaryTarget.identity },
+        snapshot: {
+          ...primaryTarget.snapshot,
+          element: targets.map((target) => target.snapshot.element).join(", "),
+          elementPath: targets.map((target) => target.identity.elementPath).join(" | "),
+          fullPath: targets.map((target) => target.identity.fullPath).join(" | "),
+          targetIdentities: targets.map((target) => ({ ...target.identity })),
           isMultiSelect: true,
           ...unionBox ? { boundingBox: unionBox } : {},
           elementBoundingBoxes: boxes
         }
       },
-      matchCount: resolvedTargets.length
+      matchCount: targets.length
     };
   };
   var getAnnotationTargetIdentity = (root, element, frameWindow = root.ownerDocument.defaultView ?? window) => {

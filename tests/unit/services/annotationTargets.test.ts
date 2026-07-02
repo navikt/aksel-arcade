@@ -145,6 +145,10 @@ describe('annotation target resolution', () => {
     expect(result.targets).toHaveLength(2)
     expect(result.target?.snapshot).toMatchObject({
       isMultiSelect: true,
+      targetIdentities: [
+        expect.objectContaining({ tagName: 'button', accessibleName: 'Approve' }),
+        expect.objectContaining({ tagName: 'button', accessibleName: 'Reject' }),
+      ],
       elementBoundingBoxes: [
         { x: 10, y: 10, width: 100, height: 40 },
         { x: 130, y: 10, width: 100, height: 40 },
@@ -170,6 +174,12 @@ describe('annotation target resolution', () => {
     const resolved = resolveAnnotationTargetGroup(root, identities, window)
     expect(resolved.status).toBe('resolved')
     expect(resolved.targets).toHaveLength(2)
+    expect(resolved.target?.snapshot.targetIdentities).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ signature: identities[0].signature }),
+        expect.objectContaining({ signature: identities[1].signature }),
+      ])
+    )
 
     const partialRoot = makeRoot('<button>One</button>')
     const partialButton = partialRoot.querySelector('button') as HTMLButtonElement

@@ -59,6 +59,15 @@
   pointer-events: auto;
 }
 
+.live-preview__annotation-marker--multi-select {
+  width: 1.625rem;
+  height: 1.625rem;
+  border-color: var(--ax-border-success);
+  border-radius: var(--ax-radius-8);
+  background: var(--ax-bg-success-strong);
+  color: var(--ax-text-success-contrast);
+}
+
 .live-preview__annotation-marker-number {
   display: block;
   line-height: 1;

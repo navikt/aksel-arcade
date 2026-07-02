@@ -176,6 +176,7 @@ export interface PreviewEvidenceCaptureTarget {
 }
 
 export {
+  combineResolvedAnnotationTargets,
   getAnnotationTargetIdentity,
   isAnnotationTargetResolutionRequest,
   resolveAnnotationTarget,
@@ -186,7 +187,6 @@ export {
 } from './annotationTargets'
 export type {
   AnnotationTargetGroupRequest,
-  AnnotationTargetIdentity,
   AnnotationTargetIdentityRequest,
   AnnotationTargetPointRequest,
   AnnotationTargetRect,
@@ -196,6 +196,7 @@ export type {
   AnnotationTargetResolutionStatus,
   ResolvedAnnotationTarget,
 } from './annotationTargets'
+export type { AnnotationTargetIdentity } from '@/types/annotations'
 
 export interface PreviewClickInteraction {
   action: 'click'

@@ -151,6 +151,7 @@ const isAnnotationTargetSnapshot = (value: unknown): boolean => {
 
   return (
     optionalRect(value.boundingBox) &&
+    optionalResolvedTargetIdentityArray(value.targetIdentities) &&
     optionalString(value.nearbyText) &&
     optionalString(value.cssClasses) &&
     optionalString(value.fullPath) &&
@@ -162,6 +163,8 @@ const isAnnotationTargetSnapshot = (value: unknown): boolean => {
 
 const optionalString = (value: unknown): boolean => value === undefined || typeof value === 'string'
 const optionalBoolean = (value: unknown): boolean => value === undefined || typeof value === 'boolean'
+const optionalResolvedTargetIdentityArray = (value: unknown): boolean =>
+  value === undefined || (Array.isArray(value) && value.every(isAnnotationTargetIdentity))
 
 const optionalRect = (value: unknown): boolean =>
   value === undefined ||

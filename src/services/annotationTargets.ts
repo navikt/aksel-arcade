@@ -1,4 +1,5 @@
 import type { AnnotationTargetSnapshot } from '@/services/annotations'
+import type { AnnotationTargetIdentity } from '@/types/annotations'
 import {
   getElementAccessibleName as getSharedElementAccessibleName,
   getElementRole as getSharedElementRole,
@@ -44,17 +45,6 @@ export type AnnotationTargetResolutionRequest =
   | AnnotationTargetRectRequest
   | AnnotationTargetIdentityRequest
   | AnnotationTargetGroupRequest
-
-export interface AnnotationTargetIdentity {
-  signature: string
-  tagName: string
-  role?: string
-  accessibleName?: string
-  text?: string
-  cssClasses?: string
-  elementPath: string
-  fullPath: string
-}
 
 export interface ResolvedAnnotationTarget {
   identity: AnnotationTargetIdentity
@@ -207,39 +197,15 @@ export const resolveAnnotationTargetsInRect = (
     })
   }
 
-  const targets = matchingElements.map((element) =>
-    createResolvedTarget(root, element, frameWindow, {
-      x: normalizedRect.x + normalizedRect.width,
-      y: normalizedRect.y + normalizedRect.height,
-      isMultiSelect: true,
-    })
-  )
-  const visibleTargets = targets.filter((target) => target.visibility === 'visible')
-  const boxes = visibleTargets.length > 0 ? visibleTargets.map((target) => target.snapshot.boundingBox) : []
-  const unionBox = unionRects(boxes.filter((box): box is AnnotationTargetRect => Boolean(box)))
-
-  return {
-    status: visibleTargets.length > 0 ? 'resolved' : 'hidden',
-    target: {
-      ...targets[0],
-      snapshot: {
-        ...targets[0].snapshot,
-        element: matchingElements
-          .slice(0, 5)
-          .map((element) => describeElement(element))
-          .join(', '),
-        elementPath: targets.map((target) => target.identity.elementPath).join(' | '),
-        fullPath: targets.map((target) => target.identity.fullPath).join(' | '),
+  return combineResolvedAnnotationTargets(
+    matchingElements.map((element) =>
+      createResolvedTarget(root, element, frameWindow, {
+        x: normalizedRect.x + normalizedRect.width,
+        y: normalizedRect.y + normalizedRect.height,
         isMultiSelect: true,
-        ...(unionBox ? { boundingBox: unionBox } : {}),
-        elementBoundingBoxes: targets
-          .map((target) => target.snapshot.boundingBox)
-          .filter((box): box is AnnotationTargetRect => Boolean(box)),
-      },
-    },
-    targets,
-    matchCount: targets.length,
-  }
+      })
+    )
+  )
 }
 
 export const resolveAnnotationTargetIdentity = (
@@ -315,28 +281,62 @@ export const resolveAnnotationTargetGroup = (
     resolvedTargets.push(result.target)
   }
 
-  const visibleTargets = resolvedTargets.filter((target) => target.visibility === 'visible')
+  return combineResolvedAnnotationTargets(resolvedTargets)
+}
+
+export const combineResolvedAnnotationTargets = (
+  targets: readonly ResolvedAnnotationTarget[]
+): AnnotationTargetResolutionResult => {
+  if (targets.length === 0) {
+    return {
+      status: 'no-target',
+      reason: 'empty-selection',
+      matchCount: 0,
+    }
+  }
+
+  if (targets.length === 1) {
+    const [target] = targets
+    return {
+      status: target.visibility === 'visible' ? 'resolved' : 'hidden',
+      target,
+      targets: [target],
+      matchCount: 1,
+    }
+  }
+
+  const visibleTargets = targets.filter((target) => target.visibility === 'visible')
   const boxes = visibleTargets
     .map((target) => target.snapshot.boundingBox)
     .filter((box): box is AnnotationTargetRect => Boolean(box))
   const unionBox = unionRects(boxes)
+  const primaryTarget = targets[0]
 
   return {
     status: visibleTargets.length > 0 ? 'resolved' : 'hidden',
-    targets: resolvedTargets,
-    target: {
-      ...resolvedTargets[0],
+    targets: targets.map((target) => ({
+      ...target,
+      identity: { ...target.identity },
       snapshot: {
-        ...resolvedTargets[0].snapshot,
-        element: resolvedTargets.map((target) => target.snapshot.element).join(', '),
-        elementPath: resolvedTargets.map((target) => target.identity.elementPath).join(' | '),
-        fullPath: resolvedTargets.map((target) => target.identity.fullPath).join(' | '),
+        ...target.snapshot,
+        ...(target.snapshot.boundingBox ? { boundingBox: { ...target.snapshot.boundingBox } } : {}),
+      },
+    })),
+    target: {
+      ...primaryTarget,
+      identity: { ...primaryTarget.identity },
+      snapshot: {
+        ...primaryTarget.snapshot,
+        element: targets.map((target) => target.snapshot.element).join(', '),
+        elementPath: targets.map((target) => target.identity.elementPath).join(' | '),
+        fullPath: targets.map((target) => target.identity.fullPath).join(' | '),
+        targetIdentities: targets.map((target) => ({ ...target.identity })),
         isMultiSelect: true,
         ...(unionBox ? { boundingBox: unionBox } : {}),
         elementBoundingBoxes: boxes,
       },
     },
-    matchCount: resolvedTargets.length,
+    matchCount: targets.length,
   }
 }
 

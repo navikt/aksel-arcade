@@ -4352,3 +4352,73 @@ Review follow-up:
 Verification:
 
 - npm test -- --run tests/integration/share-decode.test.tsx
+### 2026-07-02 - Issue #320: Drag multi-select and selected-text annotations
+
+Implemented:
+
+- Selected `#320` as the highest-priority `ready-for-agent` issue from `#320`-`#326` after reading `#314`, `CONTEXT.md`, ADRs `0021`, `0023`, and `0024`; it is the core human annotation-authoring expansion and it directly unlocks the target-resilience follow-up in `#321`.
+- Extended the durable annotation model with stored multi-target identities so grouped selections keep the full per-element target envelope instead of collapsing into joined strings. This now flows through `src/types/annotations.ts`, `src/services/annotations.ts`, `src/services/storage.ts`, and the sandbox message validation path.
+- Refactored `src/services/annotationTargets.ts` to expose a shared `combineResolvedAnnotationTargets()` helper and to attach `targetIdentities` plus union-box metadata whenever a rect/group selection resolves multiple targets.
+- Reworked the sandbox annotation gesture layer in `public/sandbox.html` to support:
+  - drag rectangle selection with its own non-animated overlay,
+  - additive Cmd+Shift / Ctrl+Shift accumulation with key-release finalization,
+  - multiple simultaneous selected-element outlines,
+  - empty-drag no-op behavior,
+  - selected-text preservation without falling back to coordinate-only annotations.
+- Updated `src/components/Preview/LivePreview.tsx` so grouped selections surface a human-readable `N selected elements` label, selected-text annotations show their captured text in add/edit popovers, and grouped annotations reopen as grouped records instead of looking like a single-target save.
+- Added regression coverage in `tests/integration/annotation-add-popover.test.tsx`, `tests/unit/services/annotationTargets.test.ts`, and `tests/unit/services/annotations.test.ts` for grouped target identity storage, selected-text rendering, and the shared multi-target combine path.
+
+Verification:
+
+- npm run build:sandbox
+- npm run typecheck
+- npm run lint
+- CI=1 npm test -- --run
+- Browser verification at `http://127.0.0.1:4178/aksel-arcade/` covering drag group selection, additive multi-select, grouped marker reopen, empty drag no-op, and light-theme parity
+
+Next note:
+
+- `#321` should reuse the new `targetIdentities` field and `combineResolvedAnnotationTargets()` helper when it switches saved markers/outlines from stored geometry to live re-resolution on render, resize, and scroll.
+- The selected-text sandbox/runtime path is wired and integration-tested end-to-end from emitted payload to popover rendering; if a later maintainer tightens browser automation around native text selection, start from the new `public/sandbox.html` mouseup logic rather than reworking the storage model again.
+
+Review follow-up:
+
+- Fixed the #320 annotation multi-select visuals to match the Agentation/Figma direction more closely: drag/multi-select overlays now use success colors, the released multi-select state renders one dashed success union outline instead of per-element accent outlines, and saved multi-object markers render as success-colored rounded squares.
+- Fixed Cmd+Shift/Ctrl+Shift additive selection so native text selection is suppressed while still opening the group popover on modifier release.
+- Fixed sandbox theme switching so `aksel-arcade-annotation-mode` remains on `<html>` when toggling light/dark, preserving the annotation cursor without requiring annotation mode to be toggled off/on again.
+
+Verification:
+
+- npm run build:sandbox
+- npm run typecheck
+- npm run lint
+- CI=1 npm test -- --run
+- Browser checks at `http://127.0.0.1:4178/aksel-arcade/` for single dashed union outline, success-colored multi-select styling, rounded-square multi marker, Cmd+Shift no native text selection, and annotation cursor persistence after light/dark toggle
+
+Review follow-up:
+
+- Fixed the remaining click-and-drag annotation regression by taking ownership of ordinary annotation drag gestures before the browser can start native text selection.
+- Added Agentation-style drag feedback while the mouse is down: the success-colored drag rectangle stays visible and each currently included element gets its own success-colored frame. Releasing still collapses the selection to one dashed success union outline.
+- Preserved selected-text annotation support for actual text-selection gestures while ensuring non-text area drags clear native selection.
+- Added `tests/e2e/annotation-drag-selection.spec.ts` to cover the iframe gesture seam: no page text selection, visible drag rectangle, included element frames during drag, cleared drag highlights after release, and one released multi-select outline.
+
+Verification:
+
+- npm run build:sandbox
+- PLAYWRIGHT_BASE_URL=http://127.0.0.1:4178/aksel-arcade npm run test:e2e -- tests/e2e/annotation-drag-selection.spec.ts --reporter=line
+- npm run typecheck
+- npm run lint
+- CI=1 npm test -- --run
+2026-07-02 - PR #336 review follow-up
+
+Fixed before merge:
+- Repaired the `npm run build` / Validate failure by re-exporting `AnnotationTargetIdentity` from the correct source in `src/services/previewEvidence.ts`; CI was exercising the broader `tsc -b` path that the narrower local `typecheck` command had not caught.
+- Restored persistent per-element outlines for released multi-select annotations in `public/sandbox.html`, so the selected state now keeps one dashed success union outline plus one success outline per visible selected element, matching PRD item 13 more closely.
+- Extended `tests/e2e/annotation-drag-selection.spec.ts` to cover both persistent per-element released outlines and the additive multi-select modifier-release flow that opens the group annotation popover. The modifier key in the test now follows the same platform detection as the sandbox (`Meta+Shift` on macOS, `Control+Shift` elsewhere).
+
+Verification:
+- PLAYWRIGHT_BASE_URL=http://127.0.0.1:4178/aksel-arcade npm run test:e2e -- tests/e2e/annotation-drag-selection.spec.ts --reporter=line
+- npm run build
+- npm run typecheck
+- npm run lint
+- CI=1 npm test -- --run

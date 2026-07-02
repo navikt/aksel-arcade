@@ -25,6 +25,7 @@ export interface AnnotationTargetSnapshot {
   y: number
   element: string
   elementPath: string
+  targetIdentities?: ArcadeAnnotation['targetIdentities']
   boundingBox?: ArcadeAnnotation['boundingBox']
   nearbyText?: string
   cssClasses?: string
@@ -277,6 +278,11 @@ const copyTargetSnapshot = (target: AnnotationTargetSnapshot): AnnotationTargetS
   y: target.y,
   element: target.element,
   elementPath: target.elementPath,
+  ...(target.targetIdentities
+    ? {
+        targetIdentities: target.targetIdentities.map((identity) => ({ ...identity })),
+      }
+    : {}),
   ...(target.boundingBox ? { boundingBox: { ...target.boundingBox } } : {}),
   ...(target.nearbyText !== undefined ? { nearbyText: target.nearbyText } : {}),
   ...(target.cssClasses !== undefined ? { cssClasses: target.cssClasses } : {}),
@@ -297,6 +303,11 @@ const copyTargetSnapshot = (target: AnnotationTargetSnapshot): AnnotationTargetS
 
 const cloneAnnotation = (annotation: ArcadeAnnotation): ArcadeAnnotation => ({
   ...annotation,
+  ...(annotation.targetIdentities
+    ? {
+        targetIdentities: annotation.targetIdentities.map((identity) => ({ ...identity })),
+      }
+    : {}),
   ...(annotation.boundingBox ? { boundingBox: { ...annotation.boundingBox } } : {}),
   ...(annotation.elementBoundingBoxes
     ? { elementBoundingBoxes: annotation.elementBoundingBoxes.map((box) => ({ ...box })) }
