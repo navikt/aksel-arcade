@@ -167,11 +167,13 @@ describe('annotation lifecycle service', () => {
     const acknowledged = annotation({ status: 'acknowledged', thread })
 
     const updated = editAnnotationComment([acknowledged], acknowledged.id, 'Updated text', {
+      now: 99,
       nowIso: '2026-07-01T09:00:00.000Z',
     })
 
     expect(updated[0]).toMatchObject({
       comment: 'Updated text',
+      timestamp: 99,
       status: 'pending',
       updatedAt: '2026-07-01T09:00:00.000Z',
     })

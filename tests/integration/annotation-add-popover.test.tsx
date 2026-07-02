@@ -142,6 +142,9 @@ describe('Annotation add popover', () => {
     })
 
     const textarea = await screen.findByLabelText(/^annotation text$/i)
+    if (!(textarea instanceof HTMLTextAreaElement)) {
+      throw new Error('Expected annotation textarea element')
+    }
     await waitFor(() => expect(document.activeElement).toBe(textarea))
     expect(screen.getByRole<HTMLButtonElement>('button', { name: /save/i }).disabled).toBe(true)
 
@@ -238,7 +241,10 @@ describe('Annotation add popover', () => {
 
     await user.keyboard('{Enter}')
     const textarea = await screen.findByLabelText(/edit annotation text/i)
-    expect((textarea as HTMLTextAreaElement).value).toBe(existingAnnotation.comment)
+    if (!(textarea instanceof HTMLTextAreaElement)) {
+      throw new Error('Expected edit annotation textarea element')
+    }
+    expect(textarea.value).toBe(existingAnnotation.comment)
     expect(screen.getByText('Button: Submit')).toBeTruthy()
     expect(screen.getByText(/Classes: aksel-button/i)).toBeTruthy()
 
@@ -273,6 +279,29 @@ describe('Annotation add popover', () => {
 
     await waitFor(() => expect(marker.getAttribute('aria-expanded')).toBe('false'))
     await waitFor(() => expect(document.activeElement).toBe(marker))
+  })
+
+  it('cancels marker edits from the cancel button without saving changes', async () => {
+    const user = userEvent.setup()
+    const existingAnnotation = annotation()
+    renderLivePreview({
+      annotations: [existingAnnotation],
+    })
+
+    const marker = screen.getByRole('button', {
+      name: /open annotation 1: needs clearer copy near the primary action button/i,
+    })
+
+    await user.click(marker)
+
+    const textarea = await screen.findByLabelText(/edit annotation text/i)
+    await user.clear(textarea)
+    await user.type(textarea, 'Do not save this')
+    await user.click(screen.getByRole('button', { name: /^cancel$/i }))
+
+    await waitFor(() => expect(marker.getAttribute('aria-expanded')).toBe('false'))
+    await waitFor(() => expect(document.activeElement).toBe(marker))
+    expect(screen.queryByText('Do not save this')).toBeNull()
   })
 
   it('saves acknowledged marker edits back to pending while preserving thread history', async () => {

@@ -4204,6 +4204,20 @@ Verification:
 - npm run lint
 - npm test -- --run
 - Browser check at `http://127.0.0.1:4179/aksel-arcade/`: enabled Annotation mode, focused the existing marker, confirmed the preview now renders as a Popover with target label + comment text, and verified the marker number center offset measures `0px` horizontally and `-1px` vertically after the centering adjustment, with no captured console warnings or errors.
+
+### 2026-07-02 - PR #333 code review follow-up
+
+Fixed during pre-merge review:
+
+- Updated `editAnnotationComment` so marker edits refresh both the top-level numeric `timestamp` and `updatedAt`, matching the issue requirement that editing updates the annotation timestamps.
+- Replaced the new test-only textarea casts with runtime element narrowing in the marker integration tests to keep the added coverage type-safe.
+- Added explicit regression coverage for the edit popover **Cancel** button path and for the active-page badge/delete path in the preview-header shell tests.
+
+Verification:
+
+- npm run typecheck
+- npm run lint
+- npm test -- --run
 - Browser/dev-server practical checks were attempted on `http://127.0.0.1:5177/aksel-arcade/`; this exposed and fixed a hidden-Popover anchor issue. Further Playwright iframe pointer checks were limited by sandbox/frame event tooling, so future work should manually re-check the full #318 Human verification checklist in a visible browser session, especially real pointer selection on an Aksel button/control and prototype navigation blocking.
 
 Next note:
