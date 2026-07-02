@@ -4,6 +4,7 @@ import { decodeShareToken } from '@/utils/shareDecoding'
 import {
   encodeSharePayload,
   createShareToken,
+  LEGACY_FULL_PROJECT_SHARE_FORMAT_VERSION,
   LEGACY_SHARE_FORMAT_VERSION,
   LEGACY_MINIMAL_SHARE_FORMAT_VERSION,
   SHARE_FULLSCREEN_INTENT_FORMAT_VERSION,
@@ -23,6 +24,22 @@ describe('shareDecoding full-project payloads', () => {
       'export default function App() { return <div>Shared JSX</div> }',
       'export function useSharedHook() { return "Shared Hooks" }'
     )
+    project.annotations = [
+      {
+        id: '11111111-1111-4111-8111-111111111111',
+        pageId: 'page01',
+        x: 10,
+        y: 20,
+        comment: 'Persist this review note',
+        element: 'div',
+        elementPath: 'main > div',
+        timestamp: 1720000000000,
+        kind: 'feedback',
+        status: 'acknowledged',
+        createdAt: '2026-07-01T08:00:00.000Z',
+        updatedAt: '2026-07-01T08:05:00.000Z',
+      },
+    ]
     const envelope = await encodeSharePayload(project, {
       previewTheme: 'light',
     })
@@ -32,6 +49,7 @@ describe('shareDecoding full-project payloads', () => {
     expect(result.checksumValid).toBe(true)
     expect(result.sharedProject).toEqual({
       project: {
+        annotations: project.annotations,
         name: 'Shared project name',
         source: project.source,
         preview: {
@@ -75,6 +93,7 @@ describe('shareDecoding full-project payloads', () => {
     expect(result.openingIntent).toEqual({ previewFullscreen: true })
     expect(result.sharedProject).toEqual({
       project: {
+        annotations: [],
         name: 'Shared fullscreen project',
         source: project.source,
         preview: {
@@ -90,6 +109,37 @@ describe('shareDecoding full-project payloads', () => {
       sandboxFlags: {},
     })
     expect(JSON.stringify(result.snapshot)).not.toContain('previewFullscreen')
+  })
+
+  it('keeps decoding legacy full-project share payloads without annotations as empty annotation sets', async () => {
+    const project = createDefaultProject()
+    project.name = 'Legacy full-project share'
+    project.viewportSize = 'LG'
+    project.source = createSinglePageProjectSource(
+      'export default function App() { return <div>Legacy full-project JSX</div> }',
+      'export function useLegacyFullProjectHook() { return "Legacy full-project Hooks" }'
+    )
+    const serialized = JSON.stringify({
+      project: {
+        name: project.name,
+        source: project.source,
+        preview: {
+          viewport: project.viewportSize,
+        },
+      },
+      theme: 'light',
+    })
+    const envelope = await encodeSharePayload(project, {
+      formatVersion: LEGACY_FULL_PROJECT_SHARE_FORMAT_VERSION,
+      serialized,
+      checksumSource: serialized,
+    })
+    const token = createShareToken(envelope)
+    const result = await decodeShareToken(token)
+
+    expect(result.checksumValid).toBe(true)
+    expect(result.sharedProject?.project.annotations).toEqual([])
+    expect(result.sharedProject?.project.source).toEqual(project.source)
   })
 
   it('keeps decoding old single-page minimal Web share URL payloads as one-page projects', async () => {

@@ -18,6 +18,7 @@ import {
 import {
   encodeSharePayload,
   createShareToken,
+  LEGACY_FULL_PROJECT_SHARE_FORMAT_VERSION,
   LEGACY_SHARE_FORMAT_VERSION,
 } from '@/utils/shareEncoding'
 import { decodeShareToken } from '@/utils/shareDecoding'
@@ -67,6 +68,7 @@ const Harness = () => {
       <div data-testid="project-start-page-id">{project.source.startPageId}</div>
       <div data-testid="project-page-count">{String(project.source.pages.length)}</div>
       <div data-testid="project-annotations-count">{String(project.annotations.length)}</div>
+      <div data-testid="project-annotations-json">{JSON.stringify(project.annotations)}</div>
       <div data-testid="project-source-json">{JSON.stringify(project.source)}</div>
       <div data-testid="global-config-jsx">{project.source.globalConfig.jsx}</div>
       <div data-testid="jsx-code">{source.jsx}</div>
@@ -239,6 +241,33 @@ const annotation = (
   updatedAt: '2026-07-01T08:00:00.000Z',
   ...overrides,
 })
+
+const createSharedAnnotations = (): ArcadeAnnotation[] => [
+  annotation('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', FIRST_PAGE_ID, {
+    comment: 'Shared feedback annotation',
+    thread: [
+      {
+        id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+        role: 'agent',
+        content: 'Threaded follow-up',
+        timestamp: 2,
+      },
+    ],
+    status: 'acknowledged',
+    updatedAt: '2026-07-01T08:05:00.000Z',
+  }),
+  annotation('cccccccc-cccc-4ccc-8ccc-cccccccccccc', 'page02', {
+    comment: 'Shared placement annotation',
+    kind: 'placement',
+    placement: {
+      componentType: 'Card',
+      width: 240,
+      height: 120,
+      scrollY: 0,
+      text: 'Placement payload',
+    },
+  }),
+]
 
 const setPrimarySource = (project: Project, jsxCode: string, hooksCode = '') => {
   project.source = createSinglePageProjectSource(jsxCode, hooksCode)
@@ -514,6 +543,20 @@ describe('share decode integration', () => {
     senderProject.name = 'Sender project name'
     senderProject.version = CURRENT_PROJECT_VERSION
     senderProject.viewportSize = 'LG'
+    senderProject.annotations = [
+      annotation('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', FIRST_PAGE_ID, {
+        comment: 'Shared feedback annotation',
+        thread: [
+          {
+            id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+            role: 'agent',
+            content: 'Threaded follow-up',
+            timestamp: 2,
+          },
+        ],
+        status: 'acknowledged',
+      }),
+    ]
     setPrimarySource(
       senderProject,
       'export default function App() { return <Heading>Shared v3 JSX</Heading> }',
@@ -553,7 +596,13 @@ describe('share decode integration', () => {
     expect(screen.getByTestId('hooks-code').textContent).toContain('Shared v3 Hooks')
     expect(screen.getByTestId('project-page-count').textContent).toBe('1')
     expect(screen.getByTestId('project-active-page-id').textContent).toBe('page01')
-    expect(screen.getByTestId('project-annotations-count').textContent).toBe('0')
+    expect(screen.getByTestId('project-annotations-count').textContent).toBe('1')
+    expect(screen.getByTestId('project-annotations-json').textContent).toContain(
+      'Shared feedback annotation'
+    )
+    expect(screen.getByTestId('project-annotations-json').textContent).not.toContain(
+      previousProject.annotations[0]!.id
+    )
     expect(screen.getByTestId('project-viewport').textContent).toBe('LG')
     expect(screen.getByTestId('preview-current-viewport').textContent).toBe('LG')
     expect(screen.getByTestId('preview-viewport-width').textContent).toBe(
@@ -767,6 +816,7 @@ describe('share decode integration', () => {
     senderProject.name = 'Lossless shared project'
     senderProject.viewportSize = 'LG'
     senderProject.activePageId = 'page01'
+    senderProject.annotations = createSharedAnnotations()
     const token = await createShareTokenForProject(senderProject, 'light')
     window.history.replaceState({}, '', `/?share=${encodeURIComponent(token)}`)
 
@@ -784,6 +834,10 @@ describe('share decode integration', () => {
     expect(screen.getByTestId('project-start-page-id').textContent).toBe('page02')
     expect(screen.getByTestId('project-active-page-id').textContent).toBe('page02')
     expect(screen.getByTestId('editor-active-tab').textContent).toBe('JSX')
+    expect(screen.getByTestId('project-annotations-count').textContent).toBe('2')
+    expect(screen.getByTestId('project-annotations-json').textContent).toContain(
+      'Shared placement annotation'
+    )
     expect(screen.getByTestId('global-config-jsx').textContent).toContain('Shared chrome')
     expect(screen.getByTestId('active-jsx-code').textContent).toContain(
       'Portable shared start page'
@@ -793,6 +847,51 @@ describe('share decode integration', () => {
     )
     expect(screen.getByTestId('project-source-json').textContent).toContain('Non-start shared page')
     expect(screen.getByTestId('project-source-json').textContent).toContain('Shared chrome')
+  })
+
+  it('loads legacy full-project Web share URLs without annotations as empty annotation sets', async () => {
+    const senderProject = createDefaultProject()
+    senderProject.name = 'Legacy full-project sender'
+    senderProject.viewportSize = 'LG'
+    senderProject.annotations = [
+      annotation('dddddddd-dddd-4ddd-8ddd-dddddddddddd', FIRST_PAGE_ID, {
+        comment: 'Should not survive legacy serialization',
+      }),
+    ]
+    setPrimarySource(
+      senderProject,
+      'export default function App() { return <Heading>Legacy full-project share</Heading> }',
+      'export function useLegacyFullProjectShare() { return "Legacy Hooks" }'
+    )
+    const serialized = JSON.stringify({
+      project: {
+        name: senderProject.name,
+        source: senderProject.source,
+        preview: {
+          viewport: senderProject.viewportSize,
+        },
+      },
+      theme: 'light',
+    })
+    const envelope = await encodeSharePayload(senderProject, {
+      formatVersion: LEGACY_FULL_PROJECT_SHARE_FORMAT_VERSION,
+      serialized,
+      checksumSource: serialized,
+    })
+    const token = createShareToken(envelope)
+    window.history.replaceState({}, '', `/?share=${encodeURIComponent(token)}`)
+
+    renderHarness()
+
+    await screen.findByText('share-ready')
+    await user.click(screen.getByRole('button', { name: /load shared project/i }))
+
+    await waitFor(() => {
+      expect(screen.getByTestId('share-status').textContent).toBe('idle')
+    })
+
+    expect(screen.getByTestId('project-name').textContent).toBe('Legacy full-project sender')
+    expect(screen.getByTestId('project-annotations-count').textContent).toBe('0')
   })
 
   it('applies a Web share URL only to the current tab working copy', async () => {

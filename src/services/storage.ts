@@ -43,7 +43,7 @@ const WEB_ARCADE_WORKING_COPY_FORMAT_VERSION = 1
 const MAX_PROJECT_SIZE_BYTES = 5 * 1024 * 1024 // 5MB
 const WARN_PROJECT_SIZE_BYTES = 4 * 1024 * 1024 // 4MB
 export const ARCADE_PROJECT_PACKAGE_FORMAT = 'aksel-arcade/project-package' as const
-export const ARCADE_PROJECT_PACKAGE_FORMAT_VERSION = 3
+export const ARCADE_PROJECT_PACKAGE_FORMAT_VERSION = 4
 export const ARCADE_PROJECT_PACKAGE_EXTENSION = '.akselarcade' as const
 const CLEAN_PACKAGE_REJECTION_MESSAGE = 'Package is not a clean .akselarcade Arcade project package'
 export const ARCADE_PROJECT_PACKAGE_MIME_TYPE =
@@ -348,11 +348,13 @@ export interface ExportProjectOptions {
 
 const LEGACY_SINGLE_PAGE_ARCADE_PROJECT_PACKAGE_FORMAT_VERSION = 2 as const
 const LEGACY_PORTABLE_ARCADE_PROJECT_PACKAGE_FORMAT_VERSION = 1 as const
+const LEGACY_ANNOTATIONLESS_ARCADE_PROJECT_PACKAGE_FORMAT_VERSION = 3 as const
 const LEGACY_PROJECT_VERSION_WITHOUT_ANNOTATIONS = '2.0.0' as const
 
 export interface PortableArcadeProjectData {
   name: string
   source: Project['source']
+  annotations: ArcadeAnnotation[]
   preview: {
     viewport: Project['viewportSize']
   }
@@ -570,6 +572,7 @@ export const createArcadeProjectPackage = (project: Project): ArcadeProjectPacka
 export const createPortableArcadeProjectData = (project: Project): PortableArcadeProjectData => ({
   name: project.name,
   source: cloneProjectSource(project.source),
+  annotations: cloneAnnotations(project.annotations),
   preview: {
     viewport: project.viewportSize,
   },
@@ -661,7 +664,7 @@ export const buildFreshProjectFromPortableArcadeProjectData = (
     name: cleanProject.name,
     source: cloneProjectSource(cleanProject.source),
     activePageId: cleanProject.source.startPageId,
-    annotations: createEmptyAnnotations(),
+    annotations: cloneAnnotations(cleanProject.annotations),
     viewportSize: cleanProject.preview.viewport,
     panelLayout: createDefaultProject().panelLayout,
     createdAt: now,
@@ -690,7 +693,9 @@ const parseCleanArcadeProjectPackage = (payload: unknown): PortableArcadeProject
 
   switch (payload.formatVersion) {
     case ARCADE_PROJECT_PACKAGE_FORMAT_VERSION:
-      return parseFullSourcePackageProject(payload.project)
+      return parseFullSourcePackageProject(payload.project, { requireAnnotations: true })
+    case LEGACY_ANNOTATIONLESS_ARCADE_PROJECT_PACKAGE_FORMAT_VERSION:
+      return parseFullSourcePackageProject(payload.project, { requireAnnotations: false })
     case LEGACY_SINGLE_PAGE_ARCADE_PROJECT_PACKAGE_FORMAT_VERSION:
       return parseLegacySinglePagePackageProject(payload.project)
     case LEGACY_PORTABLE_ARCADE_PROJECT_PACKAGE_FORMAT_VERSION:
@@ -719,12 +724,15 @@ const validateLegacyPortablePackageEnvelope = (payload: Record<string, unknown>)
   }
 }
 
-const parseFullSourcePackageProject = (payload: unknown): PortableArcadeProjectData => {
+const parseFullSourcePackageProject = (
+  payload: unknown,
+  options: { requireAnnotations: boolean }
+): PortableArcadeProjectData => {
   if (!isRecord(payload)) {
     throw new Error('Project package is missing clean project content')
   }
 
-  return parsePortableArcadeProjectData(payload, 'project')
+  return parsePortableArcadeProjectData(payload, 'project', options)
 }
 
 const parseLegacySinglePagePackageProject = (payload: unknown): PortableArcadeProjectData => {
@@ -755,6 +763,7 @@ const parseLegacySinglePagePackageProject = (payload: unknown): PortableArcadePr
   return {
     name: payload.name,
     source: createSinglePageProjectSource(payload.source.jsx, payload.source.hooks),
+    annotations: createEmptyAnnotations(),
     preview: parsePackagePreview(payload.preview, 'legacy project preview'),
   }
 }
@@ -821,6 +830,7 @@ const parseLegacyPortablePackageProject = (payload: unknown): PortableArcadeProj
   return {
     name: payload.name,
     source: createSinglePageProjectSource(payload.code.jsxCode, payload.code.hooksCode),
+    annotations: createEmptyAnnotations(),
     preview: {
       viewport: payload.ui.viewportSize,
     },
@@ -829,21 +839,31 @@ const parseLegacyPortablePackageProject = (payload: unknown): PortableArcadeProj
 
 export const parsePortableArcadeProjectData = (
   payload: unknown,
-  label = 'project'
+  label = 'project',
+  options: { requireAnnotations: boolean } = { requireAnnotations: true }
 ): PortableArcadeProjectData => {
   if (!isRecord(payload)) {
     throw new Error(`${capitalizeLabel(label)} must be an object`)
   }
 
-  assertExactKeys(payload, ['name', 'source', 'preview'], label)
+  const allowedKeys = options.requireAnnotations
+    ? ['name', 'source', 'annotations', 'preview']
+    : ['name', 'source', 'preview']
+  assertExactKeys(payload, allowedKeys, label)
 
   if (typeof payload.name !== 'string') {
     throw new Error(`${capitalizeLabel(label)} name must be a string`)
   }
 
+  const source = parsePortableProjectSource(payload.source, `${label} source`)
+  const pageIds = new Set(source.pages.map((page) => page.id))
+
   return {
     name: payload.name,
-    source: parsePortableProjectSource(payload.source, `${label} source`),
+    source,
+    annotations: options.requireAnnotations
+      ? parseProjectAnnotations(payload.annotations, pageIds)
+      : createEmptyAnnotations(),
     preview: parsePackagePreview(payload.preview, `${label} preview`),
   }
 }

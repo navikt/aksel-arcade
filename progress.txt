@@ -1,3 +1,30 @@
+### 2026-07-02 - Issue #323: Persist annotations in packages and Web share URLs
+
+Implemented:
+
+- Selected `#323` as the highest-priority `ready-for-agent` issue from `#323`-`#326` after reading parent issue `#314`, `CONTEXT.md`, and ADRs `0020`, `0021`, and `0024`; it is the persistence/share foundation that the later Desktop MCP and preview-evidence slices depend on.
+- Bumped the clean `.akselarcade` package format and the full-project Web share URL format so new portable payloads now carry the full `annotations` array instead of dropping review data.
+- Wired package export/import and Web share encode/decode to preserve complete annotation records, including ids, timestamps, status/history fields, thread data, and known non-feedback kinds, while still generating fresh local project identity on import/share apply.
+- Kept backward compatibility for legacy package/share payloads that predate portable annotations by loading them with an empty annotation set instead of rejecting them.
+- Expanded storage/share tests and integration coverage for annotation-bearing package export/import, current share encode/decode, legacy share/package migration, replacement-vs-merge behavior when applying a Web share URL, and the oversize share failure path.
+
+Verification:
+
+- npm install
+- npm run typecheck
+- npm run lint
+- npm test -- --run
+- Browser-driven manual verification on the local Vite app at `http://127.0.0.1:4180/aksel-arcade/`, including:
+  - creating annotations on two pages,
+  - exporting/importing a `.akselarcade` package and confirming page-scoped annotations/badge counts persist,
+  - editing an imported annotation and confirming normal post-import behavior,
+  - generating a small Web share URL and confirming it replaces old annotations instead of merging,
+  - importing an oversized annotated project and confirming the existing “Use Export instead” warning appears with no share-without-annotations fallback.
+
+Next note:
+
+- The new clean package/share payloads now require the `annotations` key in current formats (`.akselarcade` v4 and full-project Web share URL v7/v8). Legacy clean package v3 and full-project share v5/v6 stay supported as annotation-less migration inputs.
+
 ### 2026-07-02 - PR #337 review follow-up
 
 Implemented:

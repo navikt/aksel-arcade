@@ -291,7 +291,13 @@ describe('Share popover integration', () => {
 
     const payload = JSON.parse(serialized)
     expect(Object.keys(payload).sort()).toEqual(['project', 'theme'])
-    expect(Object.keys(payload.project).sort()).toEqual(['name', 'preview', 'source'])
+    expect(Object.keys(payload.project).sort()).toEqual([
+      'annotations',
+      'name',
+      'preview',
+      'source',
+    ])
+    expect(payload.project.annotations).toEqual([])
     expect(payload.project.name).toBe('Untitled Project')
     expect(payload.project.preview).toEqual({
       viewport: 'MD',
@@ -340,6 +346,7 @@ describe('Share popover integration', () => {
     const payload = JSON.parse(serialized)
     expect(payload).toEqual({
       project: {
+        annotations: [],
         name: 'Untitled Project',
         source: {
           globalConfig: {
@@ -413,6 +420,7 @@ describe('Share popover integration', () => {
 
     const payload = JSON.parse(serialized)
     expect(payload.project).toEqual({
+      annotations: [],
       name: 'Lossy Multi-page Project',
       source: {
         globalConfig: {

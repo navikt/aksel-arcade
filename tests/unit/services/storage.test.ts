@@ -137,6 +137,91 @@ const createLossyMultiPageProject = (overrides: Partial<Project> = {}): Project 
     ...overrides,
   })
 
+const createFeedbackAnnotation = (
+  pageId: ArcadeAnnotation['pageId'] = FIRST_PAGE_ID,
+  overrides: Partial<ArcadeAnnotation> = {}
+): ArcadeAnnotation => ({
+  id: '11111111-1111-4111-8111-111111111111',
+  pageId,
+  x: 24,
+  y: 48,
+  comment: 'Review this summary state',
+  element: 'Summary',
+  elementPath: 'main > section > div',
+  timestamp: 1720000000000,
+  selectedText: 'Pending summary',
+  clickOffsetX: 12,
+  clickOffsetY: 18,
+  targetIdentities: [
+    {
+      signature: 'summary:pending',
+      tagName: 'div',
+      role: 'status',
+      accessibleName: 'Pending summary',
+      text: 'Pending summary',
+      cssClasses: 'summary-card',
+      elementPath: 'main > section > div',
+      fullPath: 'html > body > main > section > div.summary-card',
+    },
+  ],
+  boundingBox: { x: 12, y: 20, width: 120, height: 48 },
+  elementBoundingBoxes: [{ x: 12, y: 20, width: 120, height: 48 }],
+  nearbyText: 'Pending summary body',
+  cssClasses: 'summary-card',
+  nearbyElements: 'section > div > span',
+  computedStyles: 'display:block',
+  fullPath: 'html > body > main > section > div.summary-card',
+  accessibility: 'role=status',
+  isMultiSelect: false,
+  isFixed: false,
+  reactComponents: 'SummaryCard',
+  sourceFile: 'App.tsx',
+  drawingIndex: 0,
+  kind: 'feedback',
+  status: 'resolved',
+  intent: 'change',
+  severity: 'important',
+  thread: [
+    {
+      id: '22222222-2222-4222-8222-222222222222',
+      role: 'agent',
+      content: 'Resolved in follow-up.',
+      timestamp: 1720000005000,
+    },
+  ],
+  createdAt: '2026-07-01T08:00:00.000Z',
+  updatedAt: '2026-07-01T08:05:00.000Z',
+  resolvedAt: '2026-07-01T08:05:00.000Z',
+  resolvedBy: 'agent',
+  ...overrides,
+})
+
+const createPlacementAnnotation = (
+  pageId: ArcadeAnnotation['pageId'] = FIRST_PAGE_ID,
+  overrides: Partial<ArcadeAnnotation> = {}
+): ArcadeAnnotation => ({
+  id: '33333333-3333-4333-8333-333333333333',
+  pageId,
+  x: 80,
+  y: 120,
+  comment: 'Keep this placement data for later workflows',
+  element: 'Card',
+  elementPath: 'main > div > article',
+  timestamp: 1720000010000,
+  kind: 'placement',
+  status: 'pending',
+  placement: {
+    componentType: 'Card',
+    width: 320,
+    height: 180,
+    scrollY: 0,
+    text: 'Keep placement details',
+  },
+  createdAt: '2026-07-01T09:00:00.000Z',
+  updatedAt: '2026-07-01T09:00:00.000Z',
+  ...overrides,
+})
+
 const createLegacyStoredProject = (project: Project) => ({
   version: '1.0.0',
   id: project.id,
@@ -862,6 +947,7 @@ describe('Storage Service', () => {
         format: ARCADE_PROJECT_PACKAGE_FORMAT,
         formatVersion: ARCADE_PROJECT_PACKAGE_FORMAT_VERSION,
         project: {
+          annotations: [],
           name: 'Portable Package Test',
           source: {
             globalConfig: {
@@ -914,6 +1000,7 @@ describe('Storage Service', () => {
       const serialized = JSON.stringify(packageData)
 
       expect(packageData.project).toEqual({
+        annotations: [],
         name: 'Portable Multi-page Package',
         source: {
           globalConfig: {
@@ -982,6 +1069,7 @@ describe('Storage Service', () => {
           format: string
           formatVersion: number
           project: {
+            annotations: ArcadeAnnotation[]
             name: string
             source: {
               globalConfig: { jsx: string; hooks: string }
@@ -1000,6 +1088,7 @@ describe('Storage Service', () => {
         expect(exported.format).toBe(ARCADE_PROJECT_PACKAGE_FORMAT)
         expect(exported.formatVersion).toBe(ARCADE_PROJECT_PACKAGE_FORMAT_VERSION)
         expect(exported.project).toEqual({
+          annotations: [],
           name: 'Export Shape Test',
           source: {
             globalConfig: {
@@ -1024,7 +1113,12 @@ describe('Storage Service', () => {
           },
         })
         expect(Object.keys(exported).sort()).toEqual(['format', 'formatVersion', 'project'])
-        expect(Object.keys(exported.project).sort()).toEqual(['name', 'preview', 'source'])
+        expect(Object.keys(exported.project).sort()).toEqual([
+          'annotations',
+          'name',
+          'preview',
+          'source',
+        ])
         expect(Object.keys(exported.project.source).sort()).toEqual([
           'globalConfig',
           'nextPageNumber',
@@ -1040,6 +1134,20 @@ describe('Storage Service', () => {
         global.URL.createObjectURL = originalCreateObjectURL
         global.URL.revokeObjectURL = originalRevokeObjectURL
       }
+    })
+
+    it('exports complete annotation history in clean package data', () => {
+      const project = createLossyMultiPageProject({
+        name: 'Annotated export package',
+        annotations: [
+          createFeedbackAnnotation(FIRST_PAGE_ID),
+          createPlacementAnnotation('page02'),
+        ],
+      })
+
+      const packageData = createArcadeProjectPackage(project)
+
+      expect(packageData.project.annotations).toEqual(project.annotations)
     })
   })
 
@@ -1143,6 +1251,12 @@ describe('Storage Service', () => {
       const sourceProject = createLossyMultiPageProject({
         name: 'Portable Multi-page Import',
         viewportSize: 'XL',
+        createdAt: '2026-05-20T00:00:00.000Z',
+        lastModified: '2026-05-21T00:00:00.000Z',
+        annotations: [
+          createFeedbackAnnotation(FIRST_PAGE_ID),
+          createPlacementAnnotation('page02'),
+        ],
       })
       const packageData = createArcadeProjectPackage(sourceProject)
 
@@ -1162,12 +1276,15 @@ describe('Storage Service', () => {
         activePageId: 'page02',
       })
       expect(result.project?.source).toEqual(sourceProject.source)
+      expect(result.project?.annotations).toEqual(sourceProject.annotations)
       expect(result.project?.source.pages).toHaveLength(2)
       expect(result.project?.source.startPageId).toBe('page02')
       expect(getPrimarySource(result.project!).jsx).toBe('<Box>Portable start page</Box>')
       expect(getPrimarySource(result.project!).hooks).toBe(
         'export const usePortableStartPage = () => "start"'
       )
+      expect(result.project?.id).not.toBe(sourceProject.id)
+      expect(result.project?.createdAt).not.toBe(sourceProject.createdAt)
     })
 
     it('rejects package data polluted with fullscreen-only share fields', async () => {
