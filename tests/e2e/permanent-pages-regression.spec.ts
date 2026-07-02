@@ -347,6 +347,7 @@ test.describe('Permanent pages regression', () => {
       format: ARCADE_PROJECT_PACKAGE_FORMAT,
       formatVersion: ARCADE_PROJECT_PACKAGE_FORMAT_VERSION,
       project: {
+        annotations: [],
         name: senderProject.name,
         source: senderProject.source,
         preview: {
@@ -355,7 +356,12 @@ test.describe('Permanent pages regression', () => {
       },
     })
     expect(Object.keys(exportedPackage).sort()).toEqual(['format', 'formatVersion', 'project'])
-    expect(Object.keys(exportedPackage.project).sort()).toEqual(['name', 'preview', 'source'])
+    expect(Object.keys(exportedPackage.project).sort()).toEqual([
+      'annotations',
+      'name',
+      'preview',
+      'source',
+    ])
     expect(Object.keys(exportedPackage.project.source).sort()).toEqual([
       'globalConfig',
       'nextPageNumber',

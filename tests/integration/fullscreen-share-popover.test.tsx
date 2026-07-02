@@ -270,6 +270,7 @@ describe('Fullscreen share popover integration', () => {
     const payload = JSON.parse(serialized)
     expect(payload.previewFullscreen).toBe(true)
     expect(payload.project).toEqual({
+      annotations: [],
       name: 'Lossy Multi-page Project',
       source: {
         globalConfig: {

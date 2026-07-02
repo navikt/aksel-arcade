@@ -27,10 +27,15 @@ import {
   type DecodedWebShareProject,
   extractShareUrlOpeningIntent,
   parseLegacyWebShareUrlPayload,
+  parseWebShareUrlPayloadWithOptions,
   normalizeLegacyV2FullSnapshotToWebShareSnapshot,
   parseWebShareUrlPayload,
   webShareUrlPayloadToSnapshot,
 } from '@/utils/sharePayload'
+import {
+  LEGACY_FULL_PROJECT_SHARE_FORMAT_VERSION,
+  LEGACY_FULL_PROJECT_SHARE_FULLSCREEN_INTENT_FORMAT_VERSION,
+} from '@/utils/shareEncoding'
 
 export type ShareDecodeErrorCode =
   | 'missing-token'
@@ -181,6 +186,34 @@ const decodeSharePayloadWithStrategy = async (
   if (isFullProjectWebShareFormatVersion(metadata.formatVersion)) {
     const serialized = await decodeSerializedPayload(metadata.strategyId, metadata.payload)
     const payload = parseWebShareUrlPayload(serialized)
+    const startPage =
+      payload.project.source.pages.find((page) => page.id === payload.project.source.startPageId)
+      ?? payload.project.source.pages[0]
+
+    return {
+      snapshot: webShareUrlPayloadToSnapshot({
+        source: {
+          jsx: startPage?.source.jsx ?? '',
+          hooks: startPage?.source.hooks ?? '',
+        },
+        preview: {
+          viewport: payload.project.preview.viewport,
+          theme: payload.theme,
+        },
+      }),
+      sharedProject: {
+        project: payload.project,
+        theme: payload.theme,
+      },
+      checksumPayload: serialized,
+      repairApplied: false,
+      openingIntent: extractShareUrlOpeningIntent(payload),
+    }
+  }
+
+  if (isLegacyFullProjectWebShareFormatVersion(metadata.formatVersion)) {
+    const serialized = await decodeSerializedPayload(metadata.strategyId, metadata.payload)
+    const payload = parseWebShareUrlPayloadWithOptions(serialized, { requireAnnotations: false })
     const startPage =
       payload.project.source.pages.find((page) => page.id === payload.project.source.startPageId)
       ?? payload.project.source.pages[0]
@@ -366,6 +399,8 @@ const isSupportedShareFormatVersion = (version: number): boolean =>
   version === LEGACY_SHARE_FORMAT_VERSION
   || version === LEGACY_MINIMAL_SHARE_FORMAT_VERSION
   || version === LEGACY_MINIMAL_SHARE_FULLSCREEN_INTENT_FORMAT_VERSION
+  || version === LEGACY_FULL_PROJECT_SHARE_FORMAT_VERSION
+  || version === LEGACY_FULL_PROJECT_SHARE_FULLSCREEN_INTENT_FORMAT_VERSION
   || version === SHARE_FORMAT_VERSION
   || version === SHARE_FULLSCREEN_INTENT_FORMAT_VERSION
 
@@ -375,3 +410,7 @@ const isLegacyMinimalWebShareFormatVersion = (version: number): boolean =>
 
 const isFullProjectWebShareFormatVersion = (version: number): boolean =>
   version === SHARE_FORMAT_VERSION || version === SHARE_FULLSCREEN_INTENT_FORMAT_VERSION
+
+const isLegacyFullProjectWebShareFormatVersion = (version: number): boolean =>
+  version === LEGACY_FULL_PROJECT_SHARE_FORMAT_VERSION
+  || version === LEGACY_FULL_PROJECT_SHARE_FULLSCREEN_INTENT_FORMAT_VERSION

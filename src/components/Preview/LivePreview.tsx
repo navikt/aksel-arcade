@@ -3,7 +3,7 @@ import { BodyShort, Button, Detail, HStack, Popover, Textarea, VStack } from '@n
 import type { MainToSandboxMessage, SandboxToMainMessage } from '@/types/messages'
 import type { ArcadePageId, ViewportSize } from '@/types/project'
 import type { InspectionData } from '@/types/inspection'
-import type { ArcadeAnnotation } from '@/types/annotations'
+import type { ArcadeAnnotation, AnnotationTargetIdentity } from '@/types/annotations'
 import type { SandboxConsolePayload } from '@/services/previewDiagnostics'
 import type { CompileError, RuntimeError } from '@/types/preview'
 import {
@@ -103,12 +103,19 @@ const getAnnotationTargetName = (target: ResolvedAnnotationTarget): string => {
 }
 
 const getSavedAnnotationTargetName = (annotation: ArcadeAnnotation): string => {
+  const primaryIdentity = getPrimarySavedTargetIdentity(annotation)
   return (
-    getAkselTargetLabel(annotation.cssClasses) ??
-    inferSavedAnnotationTagName(annotation.element) ??
+    getAkselTargetLabel(primaryIdentity?.cssClasses ?? annotation.cssClasses) ??
+    (primaryIdentity
+      ? getTargetRoleOrTag(primaryIdentity.role, primaryIdentity.tagName)
+      : inferSavedAnnotationTagName(annotation.element)) ??
     'Element'
   )
 }
+
+const getPrimarySavedTargetIdentity = (
+  annotation: ArcadeAnnotation
+): AnnotationTargetIdentity | undefined => annotation.targetIdentities?.[0]
 
 const getAkselTargetLabel = (cssClasses?: string): string | undefined => {
   const classes = cssClasses?.split(/\s+/) ?? []
@@ -138,8 +145,13 @@ const getAnnotationTargetText = (target: ResolvedAnnotationTarget): string => {
 }
 
 const getSavedAnnotationText = (annotation: ArcadeAnnotation): string => {
+  const primaryIdentity = getPrimarySavedTargetIdentity(annotation)
   const text = stripAkselStatusPrefix(
-    annotation.selectedText || annotation.nearbyText || extractQuotedElementText(annotation.element)
+    primaryIdentity?.accessibleName ??
+      primaryIdentity?.text ??
+      annotation.selectedText ??
+      annotation.nearbyText ??
+      extractQuotedElementText(annotation.element)
   )
   return truncateText(text, ANNOTATION_TARGET_TEXT_MAX_LENGTH)
 }

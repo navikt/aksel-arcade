@@ -18,7 +18,7 @@ export interface LegacyWebShareUrlPayloadV3 {
   previewFullscreen?: true
 }
 
-export interface WebShareUrlPayloadV5 {
+export interface WebShareUrlPayloadV7 {
   project: PortableArcadeProjectData
   theme: ProjectSnapshot['preview']['theme']
   previewFullscreen?: true
@@ -54,7 +54,7 @@ export const createWebShareUrlPayload = (
     theme: ProjectSnapshot['preview']['theme']
     openingIntent?: ShareUrlOpeningIntent
   }
-): WebShareUrlPayloadV5 => ({
+): WebShareUrlPayloadV7 => ({
   project: createPortableArcadeProjectData(project),
   theme: options.theme,
   ...(options.openingIntent?.previewFullscreen ? { previewFullscreen: true } : {}),
@@ -87,11 +87,12 @@ export const serializeLegacyWebShareUrlPayload = (payload: LegacyWebShareUrlPayl
     ...(payload.previewFullscreen ? { previewFullscreen: true } : {}),
   })
 
-export const serializeWebShareUrlPayload = (payload: WebShareUrlPayloadV5): string =>
+export const serializeWebShareUrlPayload = (payload: WebShareUrlPayloadV7): string =>
   JSON.stringify({
     project: {
       name: payload.project.name,
       source: payload.project.source,
+      annotations: payload.project.annotations,
       preview: payload.project.preview,
     },
     theme: payload.theme,
@@ -142,6 +143,15 @@ export const parseLegacyWebShareUrlPayload = (serialized: string): LegacyWebShar
 export const parseWebShareUrlPayload = (serialized: string): DecodedWebShareProject & {
   previewFullscreen?: true
 } => {
+  return parseWebShareUrlPayloadWithOptions(serialized, { requireAnnotations: true })
+}
+
+export const parseWebShareUrlPayloadWithOptions = (
+  serialized: string,
+  options: { requireAnnotations: boolean }
+): DecodedWebShareProject & {
+  previewFullscreen?: true
+} => {
   const value = JSON.parse(serialized) as unknown
   assertRecord(value, 'Web share payload')
   assertAllowedKeys(value, ['project', 'theme', 'previewFullscreen'], 'Web share payload')
@@ -156,14 +166,14 @@ export const parseWebShareUrlPayload = (serialized: string): DecodedWebShareProj
   }
 
   return {
-    project: parsePortableArcadeProjectData(value.project, 'Web share project'),
+    project: parsePortableArcadeProjectData(value.project, 'Web share project', options),
     theme: value.theme,
     ...(value.previewFullscreen === true ? { previewFullscreen: true } : {}),
   }
 }
 
 export const extractShareUrlOpeningIntent = (
-  payload: Pick<LegacyWebShareUrlPayloadV3 | WebShareUrlPayloadV5, 'previewFullscreen'>
+  payload: Pick<LegacyWebShareUrlPayloadV3 | WebShareUrlPayloadV7, 'previewFullscreen'>
 ): ShareUrlOpeningIntent | undefined =>
   payload.previewFullscreen ? { previewFullscreen: true } : undefined
 
