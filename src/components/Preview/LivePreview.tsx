@@ -821,8 +821,12 @@ export const LivePreview = ({
         const request = activePageAnnotationResolutionRequests.get(annotation.id) ?? null
         const resolution = annotationResolutionById[annotation.id]
 
-        if (!sandboxReady || !request || !resolution) {
+        if (!sandboxReady || !request) {
           return [{ annotation, target: annotation as ArcadeAnnotation | ResolvedAnnotationTarget }]
+        }
+
+        if (!resolution) {
+          return []
         }
 
         if (resolution.status !== 'resolved' || !resolution.target) {
@@ -845,8 +849,12 @@ export const LivePreview = ({
         const request = activePageAnnotationResolutionRequests.get(annotation.id) ?? null
         const resolution = annotationResolutionById[annotation.id]
 
-        if (!sandboxReady || !request || !resolution) {
+        if (!sandboxReady || !request) {
           return true
+        }
+
+        if (!resolution) {
+          return false
         }
 
         return resolution.status === 'resolved' || resolution.status === 'hidden'
@@ -962,6 +970,7 @@ export const LivePreview = ({
       return null
     }
 
+    const request = activePageAnnotationResolutionRequests.get(activeAnnotationId) ?? null
     const resolution = annotationResolutionById[activeAnnotationId]
     if (resolution?.status === 'resolved' && resolution.target) {
       return {
@@ -970,11 +979,22 @@ export const LivePreview = ({
       }
     }
 
+    if (sandboxReady && request) {
+      return null
+    }
+
     return {
       annotation,
       target: annotation as ResolvedAnnotationTarget | ArcadeAnnotation,
     }
-  }, [activePageOpenAnnotations, annotationResolutionById, editingAnnotationId, markerPreview])
+  }, [
+    activePageAnnotationResolutionRequests,
+    activePageOpenAnnotations,
+    annotationResolutionById,
+    editingAnnotationId,
+    markerPreview,
+    sandboxReady,
+  ])
 
   useEffect(() => {
     if (editingAnnotationId && !editingAnnotation) {

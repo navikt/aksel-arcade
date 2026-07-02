@@ -1,3 +1,18 @@
+### 2026-07-02 - PR #337 review follow-up
+
+Implemented:
+
+- Tightened sandbox message validation so `ANNOTATION_VIEWPORT_CHANGED` now requires numeric `scrollX` / `scrollY` payload fields instead of bypassing the postMessage contract checks.
+- Stopped rendering saved markers and open counts from stored geometry once the sandbox is connected but a live target has not resolved yet, which removes the stale pre-resolution window where dead or ambiguous targets could briefly appear as normal annotations.
+- Added regression coverage for the stricter viewport-change validation and for hiding saved markers/open counts until live resolution arrives after sandbox connection.
+
+Verification:
+
+- npm run type-check
+- npm run lint
+- npm test
+- npm run build
+
 ### 2026-07-02 - PR #337 CI follow-up
 
 Implemented:

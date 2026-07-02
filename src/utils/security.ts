@@ -84,6 +84,15 @@ export const validateSandboxToMainMessage = (data: unknown): data is SandboxToMa
     )
   }
 
+  if (type === 'ANNOTATION_VIEWPORT_CHANGED') {
+    const payload = (data as { payload?: unknown }).payload
+    return (
+      isRecord(payload) &&
+      typeof payload.scrollX === 'number' &&
+      typeof payload.scrollY === 'number'
+    )
+  }
+
   return true
 }
 

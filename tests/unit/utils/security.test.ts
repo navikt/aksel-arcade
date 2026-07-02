@@ -260,8 +260,20 @@ describe('Security Utilities', () => {
       expect(
         validateSandboxToMainMessage({
           type: 'ANNOTATION_VIEWPORT_CHANGED',
+          payload: { scrollX: 0, scrollY: 24 },
         })
       ).toBe(true)
+      expect(
+        validateSandboxToMainMessage({
+          type: 'ANNOTATION_VIEWPORT_CHANGED',
+        })
+      ).toBe(false)
+      expect(
+        validateSandboxToMainMessage({
+          type: 'ANNOTATION_VIEWPORT_CHANGED',
+          payload: { scrollX: '0', scrollY: 24 },
+        })
+      ).toBe(false)
     })
 
     it('should accept valid SANDBOX_CONNECTED message', () => {

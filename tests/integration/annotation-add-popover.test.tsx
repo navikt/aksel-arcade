@@ -346,6 +346,50 @@ describe('Annotation add popover', () => {
     expect(marker.className).toContain('live-preview__annotation-marker--multi-select')
   })
 
+  it('hides saved markers and open-count updates until live resolution arrives after sandbox connection', async () => {
+    const onActivePageOpenAnnotationCountChange = vi.fn()
+    const { iframeRef } = renderLivePreview({
+      annotations: [annotation()],
+      onActivePageOpenAnnotationCountChange,
+    })
+    expect(iframeRef.current).toBeTruthy()
+
+    expect(
+      screen.getByRole('button', {
+        name: /open annotation 1: needs clearer copy near the primary action button/i,
+      })
+    ).toBeTruthy()
+    onActivePageOpenAnnotationCountChange.mockClear()
+
+    postSandboxMessage(iframeRef.current!, {
+      type: 'SANDBOX_CONNECTED',
+    })
+
+    await waitFor(() => {
+      expect(
+        screen.queryByRole('button', {
+          name: /open annotation 1: needs clearer copy near the primary action button/i,
+        })
+      ).toBeNull()
+    })
+    await waitFor(() => expect(onActivePageOpenAnnotationCountChange).toHaveBeenCalledWith(0))
+
+    postSandboxMessage(iframeRef.current!, {
+      type: 'ANNOTATION_TARGET_RESOLVED',
+      payload: {
+        requestId: 'annotation-resolution-1',
+        result: { status: 'resolved', target: selectedTarget, matchCount: 1 },
+      },
+    })
+
+    expect(
+      await screen.findByRole('button', {
+        name: /open annotation 1: needs clearer copy near the primary action button/i,
+      })
+    ).toBeTruthy()
+    await waitFor(() => expect(onActivePageOpenAnnotationCountChange).toHaveBeenCalledWith(1))
+  })
+
   it('keeps saved marker positions visible when switching to a narrower breakpoint', async () => {
     renderLivePreview({
       viewportWidth: 'XS',
