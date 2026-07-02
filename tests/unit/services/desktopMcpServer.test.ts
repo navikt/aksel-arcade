@@ -1526,7 +1526,8 @@ describe('desktopMcpServer', () => {
       projectUri: 'arcade://project/annotations',
       pageUriTemplate: 'arcade://project/pages/{pageId}/annotations',
       toolName: 'list_annotations',
-      supportedStatuses: ['open', 'pending', 'acknowledged', 'resolved', 'dismissed', 'all'],
+      defaultStatus: 'open',
+      supportedStatuses: ['pending', 'acknowledged', 'resolved', 'dismissed', 'all'],
       note: 'Annotation resources return non-dead feedback annotations. Hidden-but-resolved targets stay visible to MCP and still count as work.',
     })
     expect(capabilities.verificationBoundaries).toMatchObject({
@@ -2143,6 +2144,28 @@ describe('desktopMcpServer', () => {
       error: {
         code: -32602,
         message: 'list_annotations pageId may be provided only when scope is "page".',
+      },
+    })
+
+    const invalidStatusResponse = await postJson(state.url, {
+      jsonrpc: '2.0',
+      id: 19,
+      method: 'tools/call',
+      params: {
+        name: 'list_annotations',
+        arguments: {
+          status: 'open',
+        },
+      },
+    })
+    expect(invalidStatusResponse.status).toBe(200)
+    await expect(invalidStatusResponse.json()).resolves.toMatchObject({
+      jsonrpc: '2.0',
+      id: 19,
+      error: {
+        code: -32602,
+        message:
+          'list_annotations status must be one of pending, acknowledged, resolved, dismissed, all.',
       },
     })
   })

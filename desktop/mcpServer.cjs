@@ -49,7 +49,8 @@ const APPLY_CHANGES_OPERATION_TYPES = [
   'set_preview_context',
   'rename_project',
 ]
-const LIST_ANNOTATIONS_STATUSES = ['open', 'pending', 'acknowledged', 'resolved', 'dismissed', 'all']
+const DEFAULT_LIST_ANNOTATIONS_STATUS = 'open'
+const LIST_ANNOTATIONS_STATUSES = ['pending', 'acknowledged', 'resolved', 'dismissed', 'all']
 const PAGE_REF_PLACEHOLDER_SYNTAX = '{{pageRef:name}}'
 const CAPABILITY_PREVIEW_CAPTURE_LAYERS = [
   'screenshot',
@@ -1574,7 +1575,7 @@ const listDynamicProjectResources = async (readProjectResource) => {
 const listAnnotations = async (argumentsPayload, { readProjectResource }) => {
   const manifestResourceUri = 'arcade://project/manifest'
   const scope = argumentsPayload.scope ?? 'page'
-  const status = argumentsPayload.status ?? 'open'
+  const status = argumentsPayload.status ?? DEFAULT_LIST_ANNOTATIONS_STATUS
   const manifestResult = await readProjectJsonResource(readProjectResource, manifestResourceUri)
   if (!manifestResult.ok) {
     return manifestResult
@@ -2757,6 +2758,7 @@ const createDesktopStableResourceText = (uri) => {
           projectUri: PROJECT_ANNOTATIONS_RESOURCE_URI,
           pageUriTemplate: 'arcade://project/pages/{pageId}/annotations',
           toolName: 'list_annotations',
+          defaultStatus: DEFAULT_LIST_ANNOTATIONS_STATUS,
           supportedStatuses: LIST_ANNOTATIONS_STATUSES,
           note: 'Annotation resources return non-dead feedback annotations. Hidden-but-resolved targets stay visible to MCP and still count as work.',
         },
