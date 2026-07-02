@@ -167,7 +167,7 @@ var previewEvidenceUtils = (() => {
     if (tagName === "button" || tagName === "option" || tagName === "summary") {
       return true;
     }
-    return includeImplicitLinkText && tagName === "a" && element.hasAttribute("href");
+    return Boolean(includeImplicitLinkText) && tagName === "a" && element.hasAttribute("href");
   };
   var isLabelableElement = (element) => {
     const tagName = element.tagName.toLowerCase();
@@ -511,7 +511,7 @@ var previewEvidenceUtils = (() => {
   var resolveSelectedTextTarget = (root, explicitSelectedText, frameWindow) => {
     const selection = frameWindow.getSelection?.();
     const selectedText = truncateText(
-      normalizeWhitespace2(explicitSelectedText ?? selection?.toString() ?? ""),
+      normalizeWhitespace(explicitSelectedText ?? selection?.toString() ?? ""),
       MAX_TEXT_LENGTH
     );
     if (!selectedText || !selection || selection.rangeCount === 0) {
@@ -681,8 +681,7 @@ var previewEvidenceUtils = (() => {
       height: bounds.bottom - bounds.top
     };
   };
-  var normalizeComparableText = (value) => normalizeWhitespace2(value ?? "").toLowerCase();
-  var normalizeWhitespace2 = (value) => value.replace(/\s+/g, " ").trim();
+  var normalizeComparableText = (value) => normalizeWhitespace(value ?? "").toLowerCase();
   var truncateText = (value, maxLength) => value.length > maxLength ? value.slice(0, maxLength) : value;
   var stableStringify = (value) => JSON.stringify(
     Object.keys(value).sort().reduce((acc, key) => {
@@ -924,7 +923,7 @@ var previewEvidenceUtils = (() => {
     };
   };
   var serializeElement = (element, frameWindow, state) => {
-    if (isExcludedElement2(element)) {
+    if (isExcludedElement(element)) {
       return null;
     }
     if (state.capturedElementCount >= MAX_PREVIEW_EVIDENCE_ELEMENTS) {
@@ -953,7 +952,7 @@ var previewEvidenceUtils = (() => {
     };
   };
   var serializeAccessibilityNodes = (element, frameWindow, state) => {
-    if (isExcludedElement2(element) || isAccessibilityHidden(element, frameWindow) || state.truncated) {
+    if (isExcludedElement(element) || isAccessibilityHidden(element, frameWindow) || state.truncated) {
       return [];
     }
     const node = createAccessibilityNode(element);
@@ -998,10 +997,6 @@ var previewEvidenceUtils = (() => {
       ...focusable ? { focusable: true } : {},
       ...states ? { states } : {}
     };
-  };
-  var isExcludedElement2 = (element) => {
-    const tagName = element.tagName.toLowerCase();
-    return tagName === "script" || tagName === "style" || tagName === "template" || tagName === "noscript";
   };
   var createPreviewScreenshot = (root, {
     screenshotScope,
@@ -1132,7 +1127,7 @@ var previewEvidenceUtils = (() => {
     return bodyColor || documentElementColor || "transparent";
   };
   var cloneStyledElementTree = (element, frameWindow) => {
-    if (isExcludedElement2(element)) {
+    if (isExcludedElement(element)) {
       return null;
     }
     const clonedElement = element.cloneNode(false);
@@ -1199,7 +1194,7 @@ var previewEvidenceUtils = (() => {
     }
     if (target.selector) {
       const element = queryPreviewTargetSelector(root, target.selector);
-      if (!element || isExcludedElement2(element)) {
+      if (!element || isExcludedElement(element)) {
         throw createTaggedPreviewCaptureError(
           "invalid-capture-target",
           "Preview region selector target did not match a preview element."
@@ -1401,7 +1396,7 @@ var previewEvidenceUtils = (() => {
   var tryResolvePreviewInteractionTarget = (root, target, kind) => {
     if (target.selector) {
       const element = queryPreviewTargetSelector(root, target.selector);
-      if (!element || isExcludedElement2(element)) {
+      if (!element || isExcludedElement(element)) {
         return null;
       }
       return {
@@ -1726,7 +1721,7 @@ var previewEvidenceUtils = (() => {
     normalizedText,
     normalizedLabel
   }) => {
-    if (isExcludedElement2(candidate)) {
+    if (isExcludedElement(candidate)) {
       return false;
     }
     if (normalizedRole && getElementRole(candidate) !== normalizedRole) {

@@ -768,8 +768,6 @@ const unionRects = (rects: readonly AnnotationTargetRect[]): AnnotationTargetRec
 const normalizeComparableText = (value: string | undefined): string =>
   normalizeWhitespace(value ?? '').toLowerCase()
 
-const normalizeWhitespace = (value: string): string => value.replace(/\s+/g, ' ').trim()
-
 const truncateText = (value: string, maxLength: number): string =>
   value.length > maxLength ? value.slice(0, maxLength) : value
 

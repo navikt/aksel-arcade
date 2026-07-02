@@ -229,7 +229,7 @@ const elementUsesContentAsAccessibleName = (
     return true
   }
 
-  return includeImplicitLinkText && tagName === 'a' && element.hasAttribute('href')
+  return Boolean(includeImplicitLinkText) && tagName === 'a' && element.hasAttribute('href')
 }
 
 const isLabelableElement = (element: HTMLElement): element is LabelableElement => {

@@ -686,13 +686,6 @@ const createAccessibilityNode = (
   }
 }
 
-const isExcludedElement = (element: Element): boolean => {
-  const tagName = element.tagName.toLowerCase()
-  return (
-    tagName === 'script' || tagName === 'style' || tagName === 'template' || tagName === 'noscript'
-  )
-}
-
 interface PreviewScreenshotResult extends PreviewEvidenceScreenshot {
   targetDescription?: string
 }
