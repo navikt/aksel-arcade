@@ -8,7 +8,6 @@ import {
   resolveAnnotationTargetGroup,
   resolveAnnotationTargetIdentity,
   resolveAnnotationTargetsInRect,
-  type AnnotationTargetIdentity,
   type AnnotationTargetRect,
 } from '@/services/annotationTargets'
 
@@ -176,11 +175,37 @@ describe('annotation target resolution', () => {
     const partialButton = partialRoot.querySelector('button') as HTMLButtonElement
     setRect(partialButton, { x: 10, y: 10, width: 80, height: 32 })
 
-    expect(resolveAnnotationTargetGroup(partialRoot, identities as AnnotationTargetIdentity[], window)).toMatchObject({
+    expect(resolveAnnotationTargetGroup(partialRoot, identities, window)).toMatchObject({
       status: 'dead',
       reason: 'partial-group',
       matchCount: 1,
     })
+  })
+
+  it('logs invalid selector paths before falling back to signature matching', () => {
+    const root = makeRoot('<div><button>Save</button></div>')
+    const button = root.querySelector('button') as HTMLButtonElement
+    setRect(button, { x: 10, y: 10, width: 80, height: 32 })
+    const identity = getAnnotationTargetIdentity(root, button, window)
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+
+    const result = resolveAnnotationTargetIdentity(
+      root,
+      { ...identity, fullPath: 'button:nth-of-type(' },
+      window
+    )
+
+    expect(result).toMatchObject({
+      status: 'resolved',
+      target: { identity: { signature: identity.signature } },
+      matchCount: 1,
+    })
+    expect(warnSpy).toHaveBeenCalledWith('Invalid annotation target selector path:', {
+      fullPath: 'button:nth-of-type(',
+      message: expect.any(String),
+    })
+
+    warnSpy.mockRestore()
   })
 
   it('covers common Aksel component and layout DOM in the target matrix', () => {
