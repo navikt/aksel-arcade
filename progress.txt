@@ -25,6 +25,12 @@ Next note:
 
 - The new clean package/share payloads now require the `annotations` key in current formats (`.akselarcade` v4 and full-project Web share URL v7/v8). Legacy clean package v3 and full-project share v5/v6 stay supported as annotation-less migration inputs.
 
+Follow-up before merge:
+
+- Fixed a saved-annotation label bug discovered during post-PR human testing in the starter Arcade project: reopening an annotation on the intro paragraph could show the sibling heading text because the edit popover preferred `nearbyText` over the persisted target identity.
+- Updated `LivePreview` to prefer the saved target identity's own text/accessibility/classes when rendering reopened annotation labels, and added a regression test that reproduces the intro paragraph vs heading mix-up.
+- Re-ran `npm run type-check`, `npm run lint`, `npm test -- --run`, and a focused Playwright browser repro confirming the reopened annotation now stays labeled as `p: A browser-based React...`.
+
 ### 2026-07-02 - PR #337 review follow-up
 
 Implemented:

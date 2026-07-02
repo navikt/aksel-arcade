@@ -443,6 +443,38 @@ describe('Annotation add popover', () => {
     ])
   })
 
+  it('prefers the saved target identity text over nearby sibling context when reopening an annotation', async () => {
+    const user = userEvent.setup()
+    renderLivePreview({
+      annotations: [
+        annotation({
+          element: 'p "A browser-based React playground for Ak"',
+          cssClasses: undefined,
+          targetIdentities: [
+            {
+              signature: 'intro-paragraph-signature',
+              tagName: 'p',
+              text: 'A browser-based React playground for Aksel v8 components.',
+              elementPath: 'div "Welcome" > p "A browser-based React playground"',
+              fullPath: ':scope > div:nth-of-type(1) > p:nth-of-type(1)',
+            },
+          ],
+          nearbyText:
+            '👋 Welcome to Aksel Arcade! A browser-based React playground for Aksel v8 components.',
+        }),
+      ],
+    })
+
+    await user.click(
+      screen.getByRole('button', {
+        name: /open annotation 1: needs clearer copy near the primary action button/i,
+      })
+    )
+
+    expect(await screen.findByText('p: A browser-based React...')).toBeTruthy()
+    expect(screen.queryByText('p: 👋 Welcome to Aksel...')).toBeNull()
+  })
+
   it('shows grouped outlines when opening a saved multi-select annotation marker', async () => {
     const user = userEvent.setup()
     renderLivePreview({
