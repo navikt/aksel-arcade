@@ -175,6 +175,50 @@ describe('Security Utilities', () => {
       expect(validateSandboxToMainMessage(message)).toBe(false)
     })
 
+    it('should validate annotation target message payload shape', () => {
+      const validTarget = {
+        identity: {
+          signature: 'target-signature',
+          tagName: 'button',
+          elementPath: 'button "Save"',
+          fullPath: ':scope > button:nth-of-type(1)',
+        },
+        snapshot: {
+          x: 50,
+          y: 32,
+          element: 'button "Save"',
+          elementPath: 'button "Save"',
+          boundingBox: { x: 10, y: 20, width: 120, height: 40 },
+        },
+        visibility: 'visible',
+      }
+
+      expect(
+        validateSandboxToMainMessage({
+          type: 'ANNOTATION_TARGET_SELECTED',
+          payload: { status: 'resolved', target: validTarget, matchCount: 1 },
+        })
+      ).toBe(true)
+      expect(
+        validateSandboxToMainMessage({
+          type: 'ANNOTATION_TARGET_HOVERED',
+          payload: null,
+        })
+      ).toBe(true)
+      expect(
+        validateSandboxToMainMessage({
+          type: 'ANNOTATION_TARGET_SELECTED',
+          payload: { status: 'resolved', target: { snapshot: { x: '50' } } },
+        })
+      ).toBe(false)
+      expect(
+        validateSandboxToMainMessage({
+          type: 'ANNOTATION_TARGET_RESOLVED',
+          payload: { requestId: 'target-1', result: { status: 'not-real' } },
+        })
+      ).toBe(false)
+    })
+
     it('should accept valid SANDBOX_CONNECTED message', () => {
       const message = {
         type: 'SANDBOX_CONNECTED',

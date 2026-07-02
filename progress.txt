@@ -4241,3 +4241,18 @@ Verification:
 - npm run test -- --run
 - npm run lint
 - Browser check at `http://127.0.0.1:5195/aksel-arcade/` annotated near the MD right edge, switched to XS, and confirmed the marker remained fully inside the 320px preview shell at `left: 308px` with no console errors.
+
+### 2026-07-02 - PR #332 code review follow-up
+
+Fixed during pre-merge review:
+
+- Tightened sandbox-to-main validation for annotation target messages so hovered/selected/resolved annotation payloads must have the expected resolution, target identity, snapshot, visibility, and rectangle shapes before `LivePreview` reads them.
+- Replaced the annotation marker raw `<button>` with an Aksel `Button`, and changed the popover positioning anchor from a non-focusable raw button to a non-interactive span.
+- Added security regression coverage for malformed annotation target messages.
+- Aligned GitHub issues #314 and #318 with the human-tested short target-label popover behavior so they no longer require raw class metadata or nearby subtree context prose in the add popover.
+
+Verification:
+
+- npm run typecheck
+- npm run test -- --run
+- npm run lint

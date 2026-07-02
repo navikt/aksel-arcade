@@ -174,7 +174,7 @@ export const LivePreview = ({
   const [selectedAnnotationTarget, setSelectedAnnotationTarget] =
     useState<ResolvedAnnotationTarget | null>(null)
   const [annotationDraft, setAnnotationDraft] = useState('')
-  const [addAnnotationAnchorEl, setAddAnnotationAnchorEl] = useState<HTMLButtonElement | null>(null)
+  const [addAnnotationAnchorEl, setAddAnnotationAnchorEl] = useState<HTMLElement | null>(null)
   const annotationTextareaRef = useRef<HTMLTextAreaElement | null>(null)
   const selectedViewportWidth = getViewportWidth(viewportWidth)
   const effectiveViewportWidth =
@@ -740,23 +740,23 @@ export const LivePreview = ({
           {isAnnotationMode && (
             <div className="live-preview__annotation-layer" data-testid="annotation-overlay-layer">
               {activePageOpenAnnotations.map((annotation, index) => (
-                <button
+                <Button
                   key={annotation.id}
                   type="button"
+                  size="xsmall"
+                  variant="primary"
                   className="live-preview__annotation-marker"
                   style={getOverlayPosition(annotation)}
                   aria-label={`Annotation ${index + 1}: ${annotation.comment}`}
                 >
                   {index + 1}
-                </button>
+                </Button>
               ))}
-              <button
+              <span
                 ref={setAddAnnotationAnchorEl}
-                type="button"
                 className="live-preview__annotation-add-anchor"
                 style={selectedAnchorPosition}
-                aria-label="Selected annotation target"
-                tabIndex={-1}
+                aria-hidden="true"
               />
             </div>
           )}

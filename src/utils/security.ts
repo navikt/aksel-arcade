@@ -54,8 +54,117 @@ export const validateSandboxToMainMessage = (data: unknown): data is SandboxToMa
     'PREVIEW_EVIDENCE_CAPTURED',
     'ANNOTATION_TARGET_RESOLVED',
   ]
-  return validTypes.includes((data as { type: string }).type)
+  const type = (data as { type: string }).type
+  if (!validTypes.includes(type)) return false
+
+  if (type === 'ANNOTATION_TARGET_HOVERED') {
+    const payload = (data as { payload?: unknown }).payload
+    return payload === null || isAnnotationTargetResolutionResult(payload)
+  }
+
+  if (type === 'ANNOTATION_TARGET_SELECTED') {
+    return isAnnotationTargetResolutionResult((data as { payload?: unknown }).payload)
+  }
+
+  if (type === 'ANNOTATION_TARGET_RESOLVED') {
+    const payload = (data as { payload?: unknown }).payload
+    return (
+      isRecord(payload) &&
+      typeof payload.requestId === 'string' &&
+      isAnnotationTargetResolutionResult(payload.result)
+    )
+  }
+
+  return true
 }
+
+const isAnnotationTargetResolutionResult = (value: unknown): boolean => {
+  if (!isRecord(value) || typeof value.status !== 'string') {
+    return false
+  }
+
+  if (!['resolved', 'hidden', 'dead', 'no-target'].includes(value.status)) {
+    return false
+  }
+
+  if ('matchCount' in value && typeof value.matchCount !== 'number') {
+    return false
+  }
+
+  if ('target' in value && value.target !== undefined && !isResolvedAnnotationTarget(value.target)) {
+    return false
+  }
+
+  if ('targets' in value) {
+    if (!Array.isArray(value.targets)) {
+      return false
+    }
+    if (!value.targets.every(isResolvedAnnotationTarget)) {
+      return false
+    }
+  }
+
+  return true
+}
+
+const isResolvedAnnotationTarget = (value: unknown): boolean => {
+  if (!isRecord(value)) {
+    return false
+  }
+
+  return (
+    isAnnotationTargetIdentity(value.identity) &&
+    isAnnotationTargetSnapshot(value.snapshot) &&
+    (value.visibility === 'visible' || value.visibility === 'hidden')
+  )
+}
+
+const isAnnotationTargetIdentity = (value: unknown): boolean =>
+  isRecord(value) &&
+  typeof value.signature === 'string' &&
+  typeof value.tagName === 'string' &&
+  typeof value.elementPath === 'string' &&
+  typeof value.fullPath === 'string' &&
+  optionalString(value.role) &&
+  optionalString(value.accessibleName) &&
+  optionalString(value.text) &&
+  optionalString(value.cssClasses)
+
+const isAnnotationTargetSnapshot = (value: unknown): boolean => {
+  if (
+    !isRecord(value) ||
+    typeof value.x !== 'number' ||
+    typeof value.y !== 'number' ||
+    typeof value.element !== 'string' ||
+    typeof value.elementPath !== 'string'
+  ) {
+    return false
+  }
+
+  return (
+    optionalRect(value.boundingBox) &&
+    optionalString(value.nearbyText) &&
+    optionalString(value.cssClasses) &&
+    optionalString(value.fullPath) &&
+    optionalString(value.accessibility) &&
+    optionalBoolean(value.isFixed) &&
+    optionalBoolean(value.isMultiSelect)
+  )
+}
+
+const optionalString = (value: unknown): boolean => value === undefined || typeof value === 'string'
+const optionalBoolean = (value: unknown): boolean => value === undefined || typeof value === 'boolean'
+
+const optionalRect = (value: unknown): boolean =>
+  value === undefined ||
+  (isRecord(value) &&
+    typeof value.x === 'number' &&
+    typeof value.y === 'number' &&
+    typeof value.width === 'number' &&
+    typeof value.height === 'number')
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  value !== null && typeof value === 'object' && !Array.isArray(value)
 
 /**
  * Sanitizes props to remove non-serializable values

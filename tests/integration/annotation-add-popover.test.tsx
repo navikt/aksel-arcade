@@ -167,7 +167,7 @@ describe('Annotation add popover', () => {
       },
     })
 
-    expect(screen.getByRole('button', { name: /selected annotation target/i })).toBeTruthy()
+    expect(document.querySelector('.live-preview__annotation-add-anchor')).toBeTruthy()
   })
 
   it('shows a short target identifier instead of element subtree context for InlineMessage targets', async () => {
