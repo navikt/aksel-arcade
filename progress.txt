@@ -4380,3 +4380,17 @@ Next note:
 
 - `#321` should reuse the new `targetIdentities` field and `combineResolvedAnnotationTargets()` helper when it switches saved markers/outlines from stored geometry to live re-resolution on render, resize, and scroll.
 - The selected-text sandbox/runtime path is wired and integration-tested end-to-end from emitted payload to popover rendering; if a later maintainer tightens browser automation around native text selection, start from the new `public/sandbox.html` mouseup logic rather than reworking the storage model again.
+
+Review follow-up:
+
+- Fixed the #320 annotation multi-select visuals to match the Agentation/Figma direction more closely: drag/multi-select overlays now use success colors, the released multi-select state renders one dashed success union outline instead of per-element accent outlines, and saved multi-object markers render as success-colored rounded squares.
+- Fixed Cmd+Shift/Ctrl+Shift additive selection so native text selection is suppressed while still opening the group popover on modifier release.
+- Fixed sandbox theme switching so `aksel-arcade-annotation-mode` remains on `<html>` when toggling light/dark, preserving the annotation cursor without requiring annotation mode to be toggled off/on again.
+
+Verification:
+
+- npm run build:sandbox
+- npm run typecheck
+- npm run lint
+- CI=1 npm test -- --run
+- Browser checks at `http://127.0.0.1:4178/aksel-arcade/` for single dashed union outline, success-colored multi-select styling, rounded-square multi marker, Cmd+Shift no native text selection, and annotation cursor persistence after light/dark toggle

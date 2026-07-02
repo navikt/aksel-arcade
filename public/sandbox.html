@@ -835,9 +835,17 @@
             box-shadow: 0 0 0 2px var(--ax-bg-accent-softA);
           }
 
+          .aksel-arcade-annotation-box--multi-select {
+            border: 2px dashed color-mix(in srgb, var(--ax-border-success) 60%, transparent);
+            border-radius: var(--ax-radius-4);
+            background: color-mix(in srgb, var(--ax-bg-success-strong) 5%, transparent);
+            box-shadow: none;
+          }
+
           .aksel-arcade-annotation-box--drag {
+            border-color: color-mix(in srgb, var(--ax-border-success) 60%, transparent);
             transition: none;
-            background: color-mix(in srgb, var(--ax-bg-accent-softA) 50%, transparent);
+            background: color-mix(in srgb, var(--ax-bg-success-strong) 8%, transparent);
           }
         `;
         document.head.appendChild(style);
@@ -859,6 +867,9 @@
       }
 
       if (annotationDragState) {
+        if (annotationAdditiveModifierActive) {
+          event.preventDefault();
+        }
         updateAnnotationDragOverlay(event.clientX, event.clientY);
         return;
       }
@@ -892,6 +903,11 @@
 
       ensureAnnotationOverlayElements();
       annotationAdditiveModifierActive = isAdditiveAnnotationModifierEvent(event);
+      if (annotationAdditiveModifierActive) {
+        event.preventDefault();
+        window.focus();
+        window.getSelection?.()?.removeAllRanges?.();
+      }
       annotationDragState = {
         startX: event.clientX,
         startY: event.clientY,
@@ -1050,16 +1066,20 @@
         return;
       }
 
-      annotationSelectionOverlayLayer.replaceChildren(
-        ...targets
-          .filter((target) => target?.snapshot?.boundingBox)
-          .map((target) => {
-            const overlay = document.createElement('div');
-            overlay.className = 'aksel-arcade-annotation-box aksel-arcade-annotation-box--selected';
-            renderAnnotationOverlay(overlay, target);
-            return overlay;
-          })
-      );
+      const resolvedSelection = combineResolvedAnnotationTargets(targets);
+      const selectedTarget = resolvedSelection.target;
+      if (!selectedTarget?.snapshot?.boundingBox) {
+        annotationSelectionOverlayLayer.replaceChildren();
+        return;
+      }
+
+      const overlay = document.createElement('div');
+      overlay.className =
+        targets.length > 1
+          ? 'aksel-arcade-annotation-box aksel-arcade-annotation-box--selected aksel-arcade-annotation-box--multi-select'
+          : 'aksel-arcade-annotation-box aksel-arcade-annotation-box--selected';
+      renderAnnotationOverlay(overlay, selectedTarget);
+      annotationSelectionOverlayLayer.replaceChildren(overlay);
     }
 
     function mergeResolvedAnnotationTargets(existingTargets, nextTargets) {
@@ -1502,8 +1522,10 @@
         console.log(`🎨 Updating theme to ${theme}`);
         currentTheme = theme;
         
-        // Update html element classes and color-scheme for background
-        document.documentElement.className = `aksel-theme ${theme}`;
+        // Update theme classes without removing transient mode classes such as annotation cursor state.
+        document.documentElement.classList.add('aksel-theme');
+        document.documentElement.classList.toggle('light', theme === 'light');
+        document.documentElement.classList.toggle('dark', theme === 'dark');
         document.documentElement.setAttribute('data-color', 'accent');
         document.documentElement.style.colorScheme = theme;
         

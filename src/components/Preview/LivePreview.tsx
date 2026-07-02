@@ -962,9 +962,15 @@ export const LivePreview = ({
                   size="xsmall"
                   variant="primary"
                   className={
-                    editingAnnotationId === annotation.id
-                      ? 'live-preview__annotation-marker live-preview__annotation-marker--active'
-                      : 'live-preview__annotation-marker'
+                    [
+                      'live-preview__annotation-marker',
+                      annotation.isMultiSelect ? 'live-preview__annotation-marker--multi-select' : null,
+                      editingAnnotationId === annotation.id
+                        ? 'live-preview__annotation-marker--active'
+                        : null,
+                    ]
+                      .filter(Boolean)
+                      .join(' ')
                   }
                   style={getOverlayPosition(annotation)}
                   aria-label={`Open annotation ${index + 1}: ${getAnnotationPreviewContent(annotation)}`}

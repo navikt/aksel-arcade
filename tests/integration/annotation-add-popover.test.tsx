@@ -322,6 +322,24 @@ describe('Annotation add popover', () => {
     ])
   })
 
+  it('renders saved multi-select annotations with the Agentation-style marker class', () => {
+    renderLivePreview({
+      annotations: [
+        annotation({
+          isMultiSelect: true,
+          targetIdentities: multiSelectTarget.snapshot.targetIdentities,
+          boundingBox: multiSelectTarget.snapshot.boundingBox,
+          elementBoundingBoxes: multiSelectTarget.snapshot.elementBoundingBoxes,
+        }),
+      ],
+    })
+
+    const marker = screen.getByRole('button', {
+      name: /open annotation 1: needs clearer copy near the primary action button/i,
+    })
+    expect(marker.className).toContain('live-preview__annotation-marker--multi-select')
+  })
+
   it('keeps saved marker positions visible when switching to a narrower breakpoint', () => {
     renderLivePreview({
       viewportWidth: 'XS',
