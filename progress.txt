@@ -4189,6 +4189,21 @@ Verification:
 Next note:
 
 - `#320` can reuse the new marker tooltip/edit wiring and focus-restoration path for multi-element markers instead of introducing a second marker-interaction surface. Keep tooltip text sourced from the human comment preview and keep the edit popover anchored to the marker button rather than the sandbox target geometry.
+
+### 2026-07-02 - PR #333 follow-up for Issue #319
+
+Fixed after bug report:
+
+- Replaced the marker hover/focus preview from `Tooltip` to an Aksel `Popover`, matching the visual-spec component choice while keeping the separate click-to-edit popover behavior intact.
+- Added dedicated marker preview state so hover and keyboard focus open the preview popover, while edit mode suppresses the preview layer for the active marker.
+- Nudged the marker number into optical center with a dedicated inner span so the numeral sits visually centered inside the circular marker.
+
+Verification:
+
+- npm run typecheck
+- npm run lint
+- npm test -- --run
+- Browser check at `http://127.0.0.1:4179/aksel-arcade/`: enabled Annotation mode, focused the existing marker, confirmed the preview now renders as a Popover with target label + comment text, and verified the marker number center offset measures `0px` horizontally and `-1px` vertically after the centering adjustment, with no captured console warnings or errors.
 - Browser/dev-server practical checks were attempted on `http://127.0.0.1:5177/aksel-arcade/`; this exposed and fixed a hidden-Popover anchor issue. Further Playwright iframe pointer checks were limited by sandbox/frame event tooling, so future work should manually re-check the full #318 Human verification checklist in a visible browser session, especially real pointer selection on an Aksel button/control and prototype navigation blocking.
 
 Next note:

@@ -1,5 +1,5 @@
 import { useCallback, useRef, useEffect, useMemo, useState } from 'react'
-import { BodyShort, Button, Detail, HStack, Popover, Textarea, Tooltip, VStack } from '@navikt/ds-react'
+import { BodyShort, Button, Detail, HStack, Popover, Textarea, VStack } from '@navikt/ds-react'
 import type { MainToSandboxMessage, SandboxToMainMessage } from '@/types/messages'
 import type { ArcadePageId, ViewportSize } from '@/types/project'
 import type { InspectionData } from '@/types/inspection'
@@ -141,7 +141,7 @@ const truncateText = (text: string, maxLength: number): string => {
 const capitalizeTargetName = (value: string): string =>
   value.length === 0 ? value : `${value[0].toUpperCase()}${value.slice(1)}`
 
-const getAnnotationTooltipContent = (annotation: ArcadeAnnotation): string =>
+const getAnnotationPreviewContent = (annotation: ArcadeAnnotation): string =>
   truncateText(annotation.comment.trim(), ANNOTATION_TOOLTIP_TEXT_MAX_LENGTH)
 
 const clampNumber = (value: number, min: number, max: number): number =>
@@ -167,6 +167,11 @@ interface LivePreviewProps {
 interface PendingPreviewEvidenceRequest {
   resolve: (result: PreviewEvidenceCaptureResult) => void
   timeoutId: number
+}
+
+interface MarkerPreviewState {
+  annotationId: string
+  anchorEl: HTMLElement
 }
 
 export const LivePreview = ({
@@ -219,6 +224,7 @@ export const LivePreview = ({
   const [editingAnnotationId, setEditingAnnotationId] = useState<string | null>(null)
   const [editAnnotationDraft, setEditAnnotationDraft] = useState('')
   const [editAnnotationAnchorEl, setEditAnnotationAnchorEl] = useState<HTMLElement | null>(null)
+  const [markerPreview, setMarkerPreview] = useState<MarkerPreviewState | null>(null)
   const annotationTextareaRef = useRef<HTMLTextAreaElement | null>(null)
   const editAnnotationTextareaRef = useRef<HTMLTextAreaElement | null>(null)
   const selectedViewportWidth = getViewportWidth(viewportWidth)
@@ -581,6 +587,7 @@ export const LivePreview = ({
       setEditingAnnotationId(null)
       setEditAnnotationDraft('')
       setEditAnnotationAnchorEl(null)
+      setMarkerPreview(null)
     }
 
     if (!iframeRef.current?.contentWindow || !sandboxReady) {
@@ -694,6 +701,14 @@ export const LivePreview = ({
     [activePageOpenAnnotations, editingAnnotationId]
   )
 
+  const previewedAnnotation = useMemo(
+    () =>
+      markerPreview
+        ? activePageOpenAnnotations.find((annotation) => annotation.id === markerPreview.annotationId) ?? null
+        : null,
+    [activePageOpenAnnotations, markerPreview]
+  )
+
   useEffect(() => {
     if (editingAnnotationId && !editingAnnotation) {
       setEditingAnnotationId(null)
@@ -701,6 +716,12 @@ export const LivePreview = ({
       setEditAnnotationAnchorEl(null)
     }
   }, [editingAnnotation, editingAnnotationId])
+
+  useEffect(() => {
+    if (markerPreview && !previewedAnnotation) {
+      setMarkerPreview(null)
+    }
+  }, [markerPreview, previewedAnnotation])
 
   const saveSelectedAnnotation = useCallback(() => {
     if (!previewPageId || !selectedAnnotationTarget || annotationDraft.trim().length === 0) {
@@ -722,6 +743,31 @@ export const LivePreview = ({
     setAnnotationDraft('')
   }, [])
 
+  const openMarkerPreview = useCallback((annotation: ArcadeAnnotation, anchorEl: HTMLElement) => {
+    if (editingAnnotationId === annotation.id) {
+      return
+    }
+
+    setMarkerPreview({
+      annotationId: annotation.id,
+      anchorEl,
+    })
+  }, [editingAnnotationId])
+
+  const closeMarkerPreview = useCallback((annotationId?: string) => {
+    setMarkerPreview((current) => {
+      if (!current) {
+        return null
+      }
+
+      if (annotationId && current.annotationId !== annotationId) {
+        return current
+      }
+
+      return null
+    })
+  }, [])
+
   const closeEditingAnnotation = useCallback(
     (restoreFocus: boolean) => {
       const anchorEl = editAnnotationAnchorEl
@@ -738,6 +784,7 @@ export const LivePreview = ({
   const openAnnotationEditor = useCallback((annotation: ArcadeAnnotation, anchorEl: HTMLElement) => {
     setSelectedAnnotationTarget(null)
     setAnnotationDraft('')
+    setMarkerPreview(null)
     setEditingAnnotationId(annotation.id)
     setEditAnnotationDraft(annotation.comment)
     setEditAnnotationAnchorEl(anchorEl)
@@ -881,29 +928,27 @@ export const LivePreview = ({
           {isAnnotationMode && (
             <div className="live-preview__annotation-layer" data-testid="annotation-overlay-layer">
               {activePageOpenAnnotations.map((annotation, index) => (
-                <Tooltip
+                <Button
                   key={annotation.id}
-                  content={getAnnotationTooltipContent(annotation)}
-                  describesChild
-                  placement="top"
+                  type="button"
+                  size="xsmall"
+                  variant="primary"
+                  className={
+                    editingAnnotationId === annotation.id
+                      ? 'live-preview__annotation-marker live-preview__annotation-marker--active'
+                      : 'live-preview__annotation-marker'
+                  }
+                  style={getOverlayPosition(annotation)}
+                  aria-label={`Open annotation ${index + 1}: ${getAnnotationPreviewContent(annotation)}`}
+                  aria-expanded={editingAnnotationId === annotation.id}
+                  onMouseEnter={(event) => openMarkerPreview(annotation, event.currentTarget)}
+                  onMouseLeave={() => closeMarkerPreview(annotation.id)}
+                  onFocus={(event) => openMarkerPreview(annotation, event.currentTarget)}
+                  onBlur={() => closeMarkerPreview(annotation.id)}
+                  onClick={(event) => openAnnotationEditor(annotation, event.currentTarget)}
                 >
-                  <Button
-                    type="button"
-                    size="xsmall"
-                    variant="primary"
-                    className={
-                      editingAnnotationId === annotation.id
-                        ? 'live-preview__annotation-marker live-preview__annotation-marker--active'
-                        : 'live-preview__annotation-marker'
-                    }
-                    style={getOverlayPosition(annotation)}
-                    aria-label={`Open annotation ${index + 1}: ${getAnnotationTooltipContent(annotation)}`}
-                    aria-expanded={editingAnnotationId === annotation.id}
-                    onClick={(event) => openAnnotationEditor(annotation, event.currentTarget)}
-                  >
-                    {index + 1}
-                  </Button>
-                </Tooltip>
+                  <span className="live-preview__annotation-marker-number">{index + 1}</span>
+                </Button>
               ))}
               <span
                 ref={setAddAnnotationAnchorEl}
@@ -915,6 +960,28 @@ export const LivePreview = ({
           )}
         </div>
       </div>
+
+      <Popover
+        open={isAnnotationMode && Boolean(previewedAnnotation && markerPreview) && editingAnnotationId !== markerPreview?.annotationId}
+        anchorEl={markerPreview?.anchorEl ?? null}
+        onClose={() => closeMarkerPreview()}
+        placement="top"
+        offset={10}
+        className="live-preview__annotation-popover live-preview__annotation-popover--preview"
+      >
+        <Popover.Content className="live-preview__annotation-popover-content">
+          <VStack gap="space-4">
+            {previewedAnnotation && (
+              <>
+                <Detail className="live-preview__annotation-target-metadata">
+                  {getSavedAnnotationTargetLabel(previewedAnnotation)}
+                </Detail>
+                <BodyShort size="small">{getAnnotationPreviewContent(previewedAnnotation)}</BodyShort>
+              </>
+            )}
+          </VStack>
+        </Popover.Content>
+      </Popover>
 
       <Popover
         open={isAnnotationMode && Boolean(selectedAnnotationTarget)}

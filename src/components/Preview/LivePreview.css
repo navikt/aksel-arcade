@@ -59,6 +59,12 @@
   pointer-events: auto;
 }
 
+.live-preview__annotation-marker-number {
+  display: block;
+  line-height: 1;
+  transform: translateY(-0.0625rem);
+}
+
 .live-preview__annotation-marker--active {
   box-shadow: 0 0 0 3px var(--ax-border-accent-subtle);
 }
@@ -74,6 +80,10 @@
 
 .live-preview__annotation-popover {
   z-index: 10;
+}
+
+.live-preview__annotation-popover--preview {
+  z-index: 9;
 }
 
 .live-preview__annotation-popover-content {
