@@ -1,12 +1,17 @@
 import { useCallback, useRef, useEffect, useMemo, useState } from 'react'
-import { BodyShort, Button, Detail, HStack, Popover, Textarea, VStack } from '@navikt/ds-react'
+import { BodyShort, Button, Detail, HStack, Popover, Textarea, Tooltip, VStack } from '@navikt/ds-react'
 import type { MainToSandboxMessage, SandboxToMainMessage } from '@/types/messages'
 import type { ArcadePageId, ViewportSize } from '@/types/project'
 import type { InspectionData } from '@/types/inspection'
 import type { ArcadeAnnotation } from '@/types/annotations'
 import type { SandboxConsolePayload } from '@/services/previewDiagnostics'
 import type { CompileError, RuntimeError } from '@/types/preview'
-import { createAnnotation, getOpenAnnotations } from '@/services/annotations'
+import {
+  createAnnotation,
+  editAnnotationComment,
+  getOpenAnnotations,
+  hardDeleteAnnotation,
+} from '@/services/annotations'
 import {
   registerPreviewEvidenceRequestHandler,
   type PreviewEvidenceCaptureResult,
@@ -26,6 +31,7 @@ const PREVIEW_EVIDENCE_REQUEST_TIMEOUT_MS = 5_000
 const SANDBOX_IFRAME_SRC =
   import.meta.env.MODE === 'test' ? 'about:blank' : import.meta.env.BASE_URL + 'sandbox.html'
 const ANNOTATION_TARGET_TEXT_MAX_LENGTH = 24
+const ANNOTATION_TOOLTIP_TEXT_MAX_LENGTH = 80
 const ANNOTATION_MARKER_SIZE_PX = 24
 const ANNOTATION_MARKER_SAFE_INSET_PX = ANNOTATION_MARKER_SIZE_PX / 2
 
@@ -60,25 +66,57 @@ const getAnnotationTargetLabel = (target: ResolvedAnnotationTarget): string => {
   return targetText ? `${targetName}: ${targetText}` : targetName
 }
 
+const getSavedAnnotationTargetLabel = (annotation: ArcadeAnnotation): string => {
+  const targetName = getSavedAnnotationTargetName(annotation)
+  const targetText = getSavedAnnotationText(annotation)
+
+  return targetText ? `${targetName}: ${targetText}` : targetName
+}
+
 const getAnnotationTargetName = (target: ResolvedAnnotationTarget): string => {
-  const classes = target.identity.cssClasses?.split(/\s+/) ?? []
+  return getAkselTargetLabel(target.identity.cssClasses) ?? getTargetRoleOrTag(target.identity.role, target.identity.tagName)
+}
+
+const getSavedAnnotationTargetName = (annotation: ArcadeAnnotation): string => {
+  return (
+    getAkselTargetLabel(annotation.cssClasses) ??
+    inferSavedAnnotationTagName(annotation.element) ??
+    'Element'
+  )
+}
+
+const getAkselTargetLabel = (cssClasses?: string): string | undefined => {
+  const classes = cssClasses?.split(/\s+/) ?? []
   const akselLabel = AKSEL_TARGET_LABELS.find(([className]) => classes.includes(className))?.[1]
   if (akselLabel) {
     return akselLabel
   }
+}
 
-  if (target.identity.role && target.identity.role !== target.identity.tagName) {
-    return capitalizeTargetName(target.identity.role)
+const getTargetRoleOrTag = (role: string | undefined, tagName: string): string =>
+  role && role !== tagName ? capitalizeTargetName(role) : tagName
+
+const inferSavedAnnotationTagName = (element: string): string | undefined => {
+  const [rawTagName] = element.trim().split(/\s+/, 1)
+  if (!rawTagName) {
+    return undefined
   }
 
-  return target.identity.tagName
+  return capitalizeTargetName(rawTagName.replace(/[^a-z0-9-]/gi, ''))
 }
 
 const getAnnotationTargetText = (target: ResolvedAnnotationTarget): string => {
   const text = stripAkselStatusPrefix(
     target.identity.accessibleName || target.identity.text || extractQuotedElementText(target.snapshot.element)
   )
-  return truncateTargetText(text, ANNOTATION_TARGET_TEXT_MAX_LENGTH)
+  return truncateText(text, ANNOTATION_TARGET_TEXT_MAX_LENGTH)
+}
+
+const getSavedAnnotationText = (annotation: ArcadeAnnotation): string => {
+  const text = stripAkselStatusPrefix(
+    annotation.selectedText || annotation.nearbyText || extractQuotedElementText(annotation.element)
+  )
+  return truncateText(text, ANNOTATION_TARGET_TEXT_MAX_LENGTH)
 }
 
 const stripAkselStatusPrefix = (text: string | undefined): string =>
@@ -89,7 +127,7 @@ const extractQuotedElementText = (elementLabel: string): string => {
   return match?.[1] ?? ''
 }
 
-const truncateTargetText = (text: string, maxLength: number): string => {
+const truncateText = (text: string, maxLength: number): string => {
   if (text.length <= maxLength) {
     return text
   }
@@ -102,6 +140,9 @@ const truncateTargetText = (text: string, maxLength: number): string => {
 
 const capitalizeTargetName = (value: string): string =>
   value.length === 0 ? value : `${value[0].toUpperCase()}${value.slice(1)}`
+
+const getAnnotationTooltipContent = (annotation: ArcadeAnnotation): string =>
+  truncateText(annotation.comment.trim(), ANNOTATION_TOOLTIP_TEXT_MAX_LENGTH)
 
 const clampNumber = (value: number, min: number, max: number): number =>
   Math.min(Math.max(value, min), max)
@@ -175,7 +216,11 @@ export const LivePreview = ({
     useState<ResolvedAnnotationTarget | null>(null)
   const [annotationDraft, setAnnotationDraft] = useState('')
   const [addAnnotationAnchorEl, setAddAnnotationAnchorEl] = useState<HTMLElement | null>(null)
+  const [editingAnnotationId, setEditingAnnotationId] = useState<string | null>(null)
+  const [editAnnotationDraft, setEditAnnotationDraft] = useState('')
+  const [editAnnotationAnchorEl, setEditAnnotationAnchorEl] = useState<HTMLElement | null>(null)
   const annotationTextareaRef = useRef<HTMLTextAreaElement | null>(null)
+  const editAnnotationTextareaRef = useRef<HTMLTextAreaElement | null>(null)
   const selectedViewportWidth = getViewportWidth(viewportWidth)
   const effectiveViewportWidth =
     viewportBounds.width > 0 ? Math.min(selectedViewportWidth, viewportBounds.width) : selectedViewportWidth
@@ -533,6 +578,9 @@ export const LivePreview = ({
       setHoveredAnnotationTarget(null)
       setSelectedAnnotationTarget(null)
       setAnnotationDraft('')
+      setEditingAnnotationId(null)
+      setEditAnnotationDraft('')
+      setEditAnnotationAnchorEl(null)
     }
 
     if (!iframeRef.current?.contentWindow || !sandboxReady) {
@@ -561,6 +609,12 @@ export const LivePreview = ({
       window.setTimeout(() => annotationTextareaRef.current?.focus(), 0)
     }
   }, [selectedAnnotationTarget])
+
+  useEffect(() => {
+    if (editingAnnotationId) {
+      window.setTimeout(() => editAnnotationTextareaRef.current?.focus(), 0)
+    }
+  }, [editingAnnotationId])
 
   // Send preview navigation requests when host selection changes
   useEffect(() => {
@@ -632,6 +686,22 @@ export const LivePreview = ({
     [annotations, previewPageId]
   )
 
+  const editingAnnotation = useMemo(
+    () =>
+      editingAnnotationId
+        ? activePageOpenAnnotations.find((annotation) => annotation.id === editingAnnotationId) ?? null
+        : null,
+    [activePageOpenAnnotations, editingAnnotationId]
+  )
+
+  useEffect(() => {
+    if (editingAnnotationId && !editingAnnotation) {
+      setEditingAnnotationId(null)
+      setEditAnnotationDraft('')
+      setEditAnnotationAnchorEl(null)
+    }
+  }, [editingAnnotation, editingAnnotationId])
+
   const saveSelectedAnnotation = useCallback(() => {
     if (!previewPageId || !selectedAnnotationTarget || annotationDraft.trim().length === 0) {
       return
@@ -652,6 +722,50 @@ export const LivePreview = ({
     setAnnotationDraft('')
   }, [])
 
+  const closeEditingAnnotation = useCallback(
+    (restoreFocus: boolean) => {
+      const anchorEl = editAnnotationAnchorEl
+      setEditingAnnotationId(null)
+      setEditAnnotationDraft('')
+      setEditAnnotationAnchorEl(null)
+      if (restoreFocus && anchorEl) {
+        window.setTimeout(() => anchorEl.focus(), 0)
+      }
+    },
+    [editAnnotationAnchorEl]
+  )
+
+  const openAnnotationEditor = useCallback((annotation: ArcadeAnnotation, anchorEl: HTMLElement) => {
+    setSelectedAnnotationTarget(null)
+    setAnnotationDraft('')
+    setEditingAnnotationId(annotation.id)
+    setEditAnnotationDraft(annotation.comment)
+    setEditAnnotationAnchorEl(anchorEl)
+  }, [])
+
+  const saveEditingAnnotation = useCallback(() => {
+    if (!editingAnnotation) {
+      return
+    }
+
+    const nextComment = editAnnotationDraft.trim()
+    if (nextComment.length === 0 || nextComment === editingAnnotation.comment) {
+      return
+    }
+
+    onAnnotationsChange(editAnnotationComment(annotations, editingAnnotation.id, nextComment))
+    closeEditingAnnotation(true)
+  }, [annotations, closeEditingAnnotation, editAnnotationDraft, editingAnnotation, onAnnotationsChange])
+
+  const deleteEditingAnnotation = useCallback(() => {
+    if (!editingAnnotation) {
+      return
+    }
+
+    onAnnotationsChange(hardDeleteAnnotation(annotations, editingAnnotation.id))
+    closeEditingAnnotation(false)
+  }, [annotations, closeEditingAnnotation, editingAnnotation, onAnnotationsChange])
+
   const handleAnnotationTextareaKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (event.key === 'Enter' && !event.shiftKey) {
       event.preventDefault()
@@ -664,6 +778,33 @@ export const LivePreview = ({
       event.stopPropagation()
       cancelSelectedAnnotation()
     }
+  }
+
+  const handleEditAnnotationTextareaKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (event.key === 'Enter' && !event.shiftKey) {
+      event.preventDefault()
+      saveEditingAnnotation()
+      return
+    }
+
+    if (event.key === 'Escape') {
+      event.preventDefault()
+      event.stopPropagation()
+      closeEditingAnnotation(true)
+    }
+  }
+
+  const handleAnnotationPopoverKeyDown = (
+    event: React.KeyboardEvent<HTMLDivElement>,
+    onEscape: () => void
+  ) => {
+    if (event.key !== 'Escape') {
+      return
+    }
+
+    event.preventDefault()
+    event.stopPropagation()
+    onEscape()
   }
 
   const getOverlayPosition = (target: ResolvedAnnotationTarget | ArcadeAnnotation) => {
@@ -740,17 +881,29 @@ export const LivePreview = ({
           {isAnnotationMode && (
             <div className="live-preview__annotation-layer" data-testid="annotation-overlay-layer">
               {activePageOpenAnnotations.map((annotation, index) => (
-                <Button
+                <Tooltip
                   key={annotation.id}
-                  type="button"
-                  size="xsmall"
-                  variant="primary"
-                  className="live-preview__annotation-marker"
-                  style={getOverlayPosition(annotation)}
-                  aria-label={`Annotation ${index + 1}: ${annotation.comment}`}
+                  content={getAnnotationTooltipContent(annotation)}
+                  describesChild
+                  placement="top"
                 >
-                  {index + 1}
-                </Button>
+                  <Button
+                    type="button"
+                    size="xsmall"
+                    variant="primary"
+                    className={
+                      editingAnnotationId === annotation.id
+                        ? 'live-preview__annotation-marker live-preview__annotation-marker--active'
+                        : 'live-preview__annotation-marker'
+                    }
+                    style={getOverlayPosition(annotation)}
+                    aria-label={`Open annotation ${index + 1}: ${getAnnotationTooltipContent(annotation)}`}
+                    aria-expanded={editingAnnotationId === annotation.id}
+                    onClick={(event) => openAnnotationEditor(annotation, event.currentTarget)}
+                  >
+                    {index + 1}
+                  </Button>
+                </Tooltip>
               ))}
               <span
                 ref={setAddAnnotationAnchorEl}
@@ -770,7 +923,10 @@ export const LivePreview = ({
         placement="right-start"
         className="live-preview__annotation-popover"
       >
-        <Popover.Content className="live-preview__annotation-popover-content">
+        <Popover.Content
+          className="live-preview__annotation-popover-content"
+          onKeyDown={(event) => handleAnnotationPopoverKeyDown(event, cancelSelectedAnnotation)}
+        >
           <VStack gap="space-12">
             <VStack gap="space-4">
               <BodyShort weight="semibold">Add annotation</BodyShort>
@@ -808,7 +964,85 @@ export const LivePreview = ({
           </VStack>
         </Popover.Content>
       </Popover>
-       
+
+      <Popover
+        open={isAnnotationMode && Boolean(editingAnnotation && editAnnotationAnchorEl)}
+        anchorEl={editAnnotationAnchorEl}
+        onClose={() => closeEditingAnnotation(true)}
+        placement="right-start"
+        className="live-preview__annotation-popover"
+      >
+        <Popover.Content
+          className="live-preview__annotation-popover-content"
+          onKeyDown={(event) =>
+            handleAnnotationPopoverKeyDown(event, () => closeEditingAnnotation(true))
+          }
+        >
+          <VStack gap="space-12">
+            <VStack gap="space-4">
+              <BodyShort weight="semibold">Edit annotation</BodyShort>
+              {editingAnnotation && (
+                <>
+                  <Detail className="live-preview__annotation-target-metadata">
+                    {getSavedAnnotationTargetLabel(editingAnnotation)}
+                  </Detail>
+                  {editingAnnotation.cssClasses && (
+                    <Detail className="live-preview__annotation-target-metadata">
+                      Classes: {editingAnnotation.cssClasses}
+                    </Detail>
+                  )}
+                </>
+              )}
+            </VStack>
+            <Textarea
+              ref={editAnnotationTextareaRef}
+              label="Edit annotation text"
+              hideLabel
+              size="small"
+              minRows={3}
+              resize={false}
+              value={editAnnotationDraft}
+              onChange={(event) => setEditAnnotationDraft(event.target.value)}
+              onKeyDown={handleEditAnnotationTextareaKeyDown}
+            />
+            <div className="live-preview__annotation-popover-actions">
+              <Button
+                type="button"
+                variant="tertiary"
+                data-color="danger"
+                size="small"
+                onClick={deleteEditingAnnotation}
+              >
+                Delete
+              </Button>
+              <HStack gap="space-8" justify="end">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="small"
+                  onClick={() => closeEditingAnnotation(true)}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="button"
+                  variant="primary"
+                  size="small"
+                  disabled={
+                    !editingAnnotation ||
+                    editAnnotationDraft.trim().length === 0 ||
+                    editAnnotationDraft.trim() === editingAnnotation.comment
+                  }
+                  onClick={saveEditingAnnotation}
+                >
+                  Save
+                </Button>
+              </HStack>
+            </div>
+          </VStack>
+        </Popover.Content>
+      </Popover>
+
       {inspectionData && iframeRef.current && (
         <InspectionPopover
           data={inspectionData}

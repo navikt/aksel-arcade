@@ -71,6 +71,24 @@ const edgeAnnotation: ArcadeAnnotation = {
   boundingBox: { x: 300, y: 32, width: 120, height: 40 },
 }
 
+const annotation = (overrides: Partial<ArcadeAnnotation> = {}): ArcadeAnnotation => ({
+  id: 'annotation-1',
+  pageId: 'page01',
+  x: 50,
+  y: 44,
+  comment: 'Needs clearer copy near the primary action button.',
+  element: 'button "Submit"',
+  elementPath: 'main > button',
+  cssClasses: 'aksel-button',
+  timestamp: 1,
+  kind: 'feedback',
+  status: 'pending',
+  createdAt: '2026-07-02T00:00:00.000Z',
+  updatedAt: '2026-07-02T00:00:00.000Z',
+  boundingBox: { x: 24, y: 32, width: 120, height: 40 },
+  ...overrides,
+})
+
 const renderLivePreview = (props: Partial<Parameters<typeof LivePreview>[0]> = {}) => {
   const iframeRef = { current: null as HTMLIFrameElement | null }
   const onAnnotationsChange = vi.fn()
@@ -123,7 +141,7 @@ describe('Annotation add popover', () => {
       },
     })
 
-    const textarea = await screen.findByLabelText(/annotation text/i)
+    const textarea = await screen.findByLabelText(/^annotation text$/i)
     await waitFor(() => expect(document.activeElement).toBe(textarea))
     expect(screen.getByRole<HTMLButtonElement>('button', { name: /save/i }).disabled).toBe(true)
 
@@ -197,5 +215,111 @@ describe('Annotation add popover', () => {
     const marker = screen.getByRole('button', { name: /annotation 1: near the edge/i })
     expect(marker.style.left).toBe('308px')
     expect(marker.style.left).not.toBe('420px')
+  })
+
+  it('shows marker tooltips on hover and focus and opens the edit popover from the marker', async () => {
+    const user = userEvent.setup()
+    const existingAnnotation = annotation()
+    const { onAnnotationsChange } = renderLivePreview({
+      annotations: [existingAnnotation],
+    })
+
+    const marker = screen.getByRole('button', {
+      name: /open annotation 1: needs clearer copy near the primary action button/i,
+    })
+
+    await user.hover(marker)
+    expect(await screen.findByText('Needs clearer copy near the primary action button.')).toBeTruthy()
+
+    await user.unhover(marker)
+    await user.tab()
+    expect(document.activeElement).toBe(marker)
+    expect(await screen.findByText('Needs clearer copy near the primary action button.')).toBeTruthy()
+
+    await user.keyboard('{Enter}')
+    const textarea = await screen.findByLabelText(/edit annotation text/i)
+    expect((textarea as HTMLTextAreaElement).value).toBe(existingAnnotation.comment)
+    expect(screen.getByText('Button: Submit')).toBeTruthy()
+    expect(screen.getByText(/Classes: aksel-button/i)).toBeTruthy()
+
+    await user.clear(textarea)
+    await user.type(textarea, 'Use a stronger CTA')
+    await user.click(screen.getByRole('button', { name: /^save$/i }))
+
+    expect(onAnnotationsChange).toHaveBeenCalledWith([
+      expect.objectContaining({
+        id: existingAnnotation.id,
+        comment: 'Use a stronger CTA',
+        status: 'pending',
+      }),
+    ])
+  })
+
+  it('cancels marker edits with Escape and restores focus to the marker button', async () => {
+    const user = userEvent.setup()
+    const existingAnnotation = annotation()
+    renderLivePreview({
+      annotations: [existingAnnotation],
+    })
+
+    const marker = screen.getByRole('button', {
+      name: /open annotation 1: needs clearer copy near the primary action button/i,
+    })
+
+    await user.click(marker)
+    const textarea = await screen.findByLabelText(/edit annotation text/i)
+    await user.type(textarea, ' Updated')
+    await user.keyboard('{Escape}')
+
+    await waitFor(() => expect(marker.getAttribute('aria-expanded')).toBe('false'))
+    await waitFor(() => expect(document.activeElement).toBe(marker))
+  })
+
+  it('saves acknowledged marker edits back to pending while preserving thread history', async () => {
+    const user = userEvent.setup()
+    const existingAnnotation = annotation({
+      status: 'acknowledged',
+      thread: [{ id: 'thread-1', role: 'agent', content: 'Acknowledged', timestamp: 4 }],
+    })
+    const { onAnnotationsChange } = renderLivePreview({
+      annotations: [existingAnnotation],
+    })
+
+    await user.click(
+      screen.getByRole('button', {
+        name: /open annotation 1: needs clearer copy near the primary action button/i,
+      })
+    )
+
+    const textarea = await screen.findByLabelText(/edit annotation text/i)
+    await user.clear(textarea)
+    await user.type(textarea, 'Updated text for the agent')
+    await user.click(screen.getByRole('button', { name: /^save$/i }))
+
+    expect(onAnnotationsChange).toHaveBeenCalledWith([
+      expect.objectContaining({
+        id: existingAnnotation.id,
+        comment: 'Updated text for the agent',
+        status: 'pending',
+        thread: existingAnnotation.thread,
+      }),
+    ])
+  })
+
+  it('hard-deletes an annotation from the edit popover', async () => {
+    const user = userEvent.setup()
+    const existingAnnotation = annotation()
+    const { onAnnotationsChange } = renderLivePreview({
+      annotations: [existingAnnotation],
+    })
+
+    await user.click(
+      screen.getByRole('button', {
+        name: /open annotation 1: needs clearer copy near the primary action button/i,
+      })
+    )
+    await user.click(await screen.findByRole('button', { name: /^delete$/i }))
+
+    expect(onAnnotationsChange).toHaveBeenCalledWith([])
   })
 })

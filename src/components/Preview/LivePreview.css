@@ -59,6 +59,10 @@
   pointer-events: auto;
 }
 
+.live-preview__annotation-marker--active {
+  box-shadow: 0 0 0 3px var(--ax-border-accent-subtle);
+}
+
 .live-preview__annotation-add-anchor {
   width: 1px;
   height: 1px;
@@ -79,4 +83,11 @@
 .live-preview__annotation-target-metadata,
 .live-preview__annotation-target-context {
   overflow-wrap: anywhere;
+}
+
+.live-preview__annotation-popover-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ax-space-12);
 }
