@@ -2,6 +2,7 @@ import type {
   ArcadeAnnotation,
   AnnotationKind,
   AnnotationStatus,
+  AnnotationTargetIdentity,
   AnnotationThreadMessage,
 } from '@/types/annotations'
 import {
@@ -142,6 +143,7 @@ const parseProjectAnnotation = (
   }
 
   const thread = parseOptionalAnnotationThread(value.thread, index)
+  const targetIdentities = parseOptionalAnnotationTargetIdentities(value.targetIdentities, index)
   const annotation: ArcadeAnnotation = {
     ...value,
     pageId: value.pageId,
@@ -155,6 +157,7 @@ const parseProjectAnnotation = (
     ...(kind ? { kind } : {}),
     ...(status ? { status } : {}),
     ...(thread ? { thread } : {}),
+    ...(targetIdentities ? { targetIdentities } : {}),
   } as ArcadeAnnotation
 
   return cloneAnnotations([annotation])[0]
@@ -237,6 +240,62 @@ const parseOptionalAnnotationThread = (
       role: message.role,
       content: message.content,
       timestamp: message.timestamp,
+    }
+  })
+}
+
+const parseOptionalAnnotationTargetIdentities = (
+  value: unknown,
+  annotationIndex: number
+): AnnotationTargetIdentity[] | undefined => {
+  if (value === undefined) {
+    return undefined
+  }
+
+  if (!Array.isArray(value)) {
+    throw new Error(`Invalid annotation targetIdentities at index ${annotationIndex}`)
+  }
+
+  return value.map((identity, identityIndex) => {
+    if (!isRecord(identity)) {
+      throw new Error(
+        `Invalid annotation target identity at index ${annotationIndex}.${identityIndex}`
+      )
+    }
+
+    if (
+      typeof identity.signature !== 'string' ||
+      typeof identity.tagName !== 'string' ||
+      typeof identity.elementPath !== 'string' ||
+      typeof identity.fullPath !== 'string'
+    ) {
+      throw new Error(
+        `Invalid annotation target identity at index ${annotationIndex}.${identityIndex}`
+      )
+    }
+
+    if (
+      !isOptionalString(identity.role) ||
+      !isOptionalString(identity.accessibleName) ||
+      !isOptionalString(identity.text) ||
+      !isOptionalString(identity.cssClasses)
+    ) {
+      throw new Error(
+        `Invalid annotation target identity at index ${annotationIndex}.${identityIndex}`
+      )
+    }
+
+    return {
+      signature: identity.signature,
+      tagName: identity.tagName,
+      ...(typeof identity.role === 'string' ? { role: identity.role } : {}),
+      ...(typeof identity.accessibleName === 'string'
+        ? { accessibleName: identity.accessibleName }
+        : {}),
+      ...(typeof identity.text === 'string' ? { text: identity.text } : {}),
+      ...(typeof identity.cssClasses === 'string' ? { cssClasses: identity.cssClasses } : {}),
+      elementPath: identity.elementPath,
+      fullPath: identity.fullPath,
     }
   })
 }
@@ -1361,6 +1420,9 @@ const isValidUUID = (uuid: string): boolean => {
 const isValidISODate = (date: string): boolean => {
   return !isNaN(Date.parse(date))
 }
+
+const isOptionalString = (value: unknown): value is string | undefined =>
+  value === undefined || typeof value === 'string'
 
 const formatBytes = (bytes: number): string => {
   if (bytes < 1024) return `${bytes} B`

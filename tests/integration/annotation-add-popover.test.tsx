@@ -29,6 +29,52 @@ const selectedTarget: ResolvedAnnotationTarget = {
   visibility: 'visible',
 }
 
+const selectedTextTarget: ResolvedAnnotationTarget = {
+  ...selectedTarget,
+  snapshot: {
+    ...selectedTarget.snapshot,
+    selectedText: 'Use an active verb',
+  },
+}
+
+const multiSelectTarget: ResolvedAnnotationTarget = {
+  ...selectedTarget,
+  snapshot: {
+    ...selectedTarget.snapshot,
+    element: 'button "Approve", button "Reject"',
+    elementPath: 'main > button:nth-of-type(1) | main > button:nth-of-type(2)',
+    fullPath:
+      'html > body > div#root > main > button:nth-of-type(1) | html > body > div#root > main > button:nth-of-type(2)',
+    isMultiSelect: true,
+    targetIdentities: [
+      {
+        signature: 'approve-signature',
+        tagName: 'button',
+        accessibleName: 'Approve',
+        text: 'Approve',
+        cssClasses: 'aksel-button',
+        elementPath: 'main > button:nth-of-type(1)',
+        fullPath: 'html > body > div#root > main > button:nth-of-type(1)',
+      },
+      {
+        signature: 'reject-signature',
+        tagName: 'button',
+        accessibleName: 'Reject',
+        text: 'Reject',
+        cssClasses: 'aksel-button',
+        elementPath: 'main > button:nth-of-type(2)',
+        fullPath: 'html > body > div#root > main > button:nth-of-type(2)',
+      },
+    ],
+    boundingBox: { x: 24, y: 32, width: 240, height: 40 },
+    elementBoundingBoxes: [
+      { x: 24, y: 32, width: 120, height: 40 },
+      { x: 144, y: 32, width: 120, height: 40 },
+    ],
+  },
+  visibility: 'visible',
+}
+
 const inlineMessageTarget: ResolvedAnnotationTarget = {
   identity: {
     signature: 'inline-message-signature',
@@ -207,6 +253,73 @@ describe('Annotation add popover', () => {
     expect(await screen.findByText('InlineMessage: Quick tip: Delete this...')).toBeTruthy()
     expect(screen.queryByText(/Features: Two tabs/i)).toBeNull()
     expect(screen.queryByText(/aksel-inline-message\\.aksel-body-long/i)).toBeNull()
+  })
+
+  it('shows selected text context in the add and edit popovers', async () => {
+    const user = userEvent.setup()
+    const existingAnnotation = annotation({
+      selectedText: 'Use an active verb',
+    })
+    const { iframeRef } = renderLivePreview({
+      annotations: [existingAnnotation],
+    })
+    expect(iframeRef.current).toBeTruthy()
+
+    postSandboxMessage(iframeRef.current!, {
+      type: 'ANNOTATION_TARGET_SELECTED',
+      payload: {
+        status: 'resolved',
+        target: selectedTextTarget,
+        matchCount: 1,
+      },
+    })
+
+    expect(await screen.findByText('Selected text')).toBeTruthy()
+    expect(screen.getByText('"Use an active verb"')).toBeTruthy()
+
+    await user.click(screen.getByRole('button', { name: /cancel/i }))
+    await user.click(
+      screen.getByRole('button', {
+        name: /open annotation 1: needs clearer copy near the primary action button/i,
+      })
+    )
+
+    expect(await screen.findAllByText('Selected text')).toHaveLength(1)
+    expect(screen.getByText('"Use an active verb"')).toBeTruthy()
+  })
+
+  it('stores grouped target identities and shows a group label for multi-select annotations', async () => {
+    const user = userEvent.setup()
+    const { iframeRef, onAnnotationsChange } = renderLivePreview()
+    expect(iframeRef.current).toBeTruthy()
+
+    postSandboxMessage(iframeRef.current!, {
+      type: 'ANNOTATION_TARGET_SELECTED',
+      payload: {
+        status: 'resolved',
+        target: multiSelectTarget,
+        targets: [multiSelectTarget],
+        matchCount: 2,
+      },
+    })
+
+    expect(await screen.findByText('2 selected elements')).toBeTruthy()
+
+    const textarea = await screen.findByLabelText(/^annotation text$/i)
+    await user.type(textarea, 'Review the grouped actions together')
+    await user.click(screen.getByRole('button', { name: /^save$/i }))
+
+    expect(onAnnotationsChange).toHaveBeenCalledWith([
+      expect.objectContaining({
+        pageId: 'page01',
+        comment: 'Review the grouped actions together',
+        isMultiSelect: true,
+        targetIdentities: [
+          expect.objectContaining({ signature: 'approve-signature' }),
+          expect.objectContaining({ signature: 'reject-signature' }),
+        ],
+      }),
+    ])
   })
 
   it('keeps saved marker positions visible when switching to a narrower breakpoint', () => {

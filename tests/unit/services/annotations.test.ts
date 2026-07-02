@@ -21,6 +21,16 @@ const target = {
   y: 120,
   element: 'Button',
   elementPath: 'main > button:nth-child(1)',
+  targetIdentities: [
+    {
+      signature: 'button-signature',
+      tagName: 'button',
+      role: 'button',
+      accessibleName: 'Save',
+      elementPath: 'main > button:nth-child(1)',
+      fullPath: ':scope > main > button:nth-child(1)',
+    },
+  ],
   boundingBox: { x: 10, y: 20, width: 100, height: 40 },
   cssClasses: 'navds-button',
 }
@@ -59,6 +69,13 @@ describe('annotation lifecycle service', () => {
       y: 120,
       element: 'Button',
       elementPath: 'main > button:nth-child(1)',
+      targetIdentities: [
+        expect.objectContaining({
+          signature: 'button-signature',
+          tagName: 'button',
+          elementPath: 'main > button:nth-child(1)',
+        }),
+      ],
       kind: 'feedback',
       status: 'pending',
       timestamp: 1234,
@@ -206,6 +223,38 @@ describe('annotation lifecycle service', () => {
 
     expect(hardDeleteAnnotation(resolved, first.id).map((item) => item.id)).toEqual([second.id])
     expect(clearPageAnnotations(resolved, 'page02').map((item) => item.id)).toEqual([first.id])
+  })
+
+  it('deep-clones stored multi-target identities instead of sharing references', () => {
+    const created = createAnnotation({
+      pageId: 'page01',
+      comment: 'Grouped feedback',
+      target: {
+        ...target,
+        targetIdentities: [
+          {
+            signature: 'first',
+            tagName: 'button',
+            elementPath: 'button:first-child',
+            fullPath: ':scope > button:first-child',
+          },
+          {
+            signature: 'second',
+            tagName: 'button',
+            elementPath: 'button:last-child',
+            fullPath: ':scope > button:last-child',
+          },
+        ],
+      },
+    })
+
+    if (!created.targetIdentities) {
+      throw new Error('Expected target identities to be present')
+    }
+
+    created.targetIdentities[0]!.tagName = 'mutated'
+
+    expect(target.targetIdentities?.[0]?.tagName).toBe('button')
   })
 
   it('documents Agentation attribution in the README acknowledgments', () => {

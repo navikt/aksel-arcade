@@ -176,6 +176,7 @@ export interface PreviewEvidenceCaptureTarget {
 }
 
 export {
+  combineResolvedAnnotationTargets,
   getAnnotationTargetIdentity,
   isAnnotationTargetResolutionRequest,
   resolveAnnotationTarget,

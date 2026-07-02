@@ -4352,3 +4352,31 @@ Review follow-up:
 Verification:
 
 - npm test -- --run tests/integration/share-decode.test.tsx
+### 2026-07-02 - Issue #320: Drag multi-select and selected-text annotations
+
+Implemented:
+
+- Selected `#320` as the highest-priority `ready-for-agent` issue from `#320`-`#326` after reading `#314`, `CONTEXT.md`, ADRs `0021`, `0023`, and `0024`; it is the core human annotation-authoring expansion and it directly unlocks the target-resilience follow-up in `#321`.
+- Extended the durable annotation model with stored multi-target identities so grouped selections keep the full per-element target envelope instead of collapsing into joined strings. This now flows through `src/types/annotations.ts`, `src/services/annotations.ts`, `src/services/storage.ts`, and the sandbox message validation path.
+- Refactored `src/services/annotationTargets.ts` to expose a shared `combineResolvedAnnotationTargets()` helper and to attach `targetIdentities` plus union-box metadata whenever a rect/group selection resolves multiple targets.
+- Reworked the sandbox annotation gesture layer in `public/sandbox.html` to support:
+  - drag rectangle selection with its own non-animated overlay,
+  - additive Cmd+Shift / Ctrl+Shift accumulation with key-release finalization,
+  - multiple simultaneous selected-element outlines,
+  - empty-drag no-op behavior,
+  - selected-text preservation without falling back to coordinate-only annotations.
+- Updated `src/components/Preview/LivePreview.tsx` so grouped selections surface a human-readable `N selected elements` label, selected-text annotations show their captured text in add/edit popovers, and grouped annotations reopen as grouped records instead of looking like a single-target save.
+- Added regression coverage in `tests/integration/annotation-add-popover.test.tsx`, `tests/unit/services/annotationTargets.test.ts`, and `tests/unit/services/annotations.test.ts` for grouped target identity storage, selected-text rendering, and the shared multi-target combine path.
+
+Verification:
+
+- npm run build:sandbox
+- npm run typecheck
+- npm run lint
+- CI=1 npm test -- --run
+- Browser verification at `http://127.0.0.1:4178/aksel-arcade/` covering drag group selection, additive multi-select, grouped marker reopen, empty drag no-op, and light-theme parity
+
+Next note:
+
+- `#321` should reuse the new `targetIdentities` field and `combineResolvedAnnotationTargets()` helper when it switches saved markers/outlines from stored geometry to live re-resolution on render, resize, and scroll.
+- The selected-text sandbox/runtime path is wired and integration-tested end-to-end from emitted payload to popover rendering; if a later maintainer tightens browser automation around native text selection, start from the new `public/sandbox.html` mouseup logic rather than reworking the storage model again.

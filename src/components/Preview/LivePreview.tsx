@@ -60,6 +60,11 @@ const getSandboxIframeSrc = (recoveryRevision: number) => {
 const getSandboxIframeHref = (src: string) => new URL(src, window.location.href).href
 
 const getAnnotationTargetLabel = (target: ResolvedAnnotationTarget): string => {
+  const multiSelectLabel = getMultiSelectTargetLabel(target.snapshot.targetIdentities)
+  if (multiSelectLabel) {
+    return multiSelectLabel
+  }
+
   const targetName = getAnnotationTargetName(target)
   const targetText = getAnnotationTargetText(target)
 
@@ -67,10 +72,26 @@ const getAnnotationTargetLabel = (target: ResolvedAnnotationTarget): string => {
 }
 
 const getSavedAnnotationTargetLabel = (annotation: ArcadeAnnotation): string => {
+  const multiSelectLabel = getMultiSelectTargetLabel(annotation.targetIdentities)
+  if (multiSelectLabel) {
+    return multiSelectLabel
+  }
+
   const targetName = getSavedAnnotationTargetName(annotation)
   const targetText = getSavedAnnotationText(annotation)
 
   return targetText ? `${targetName}: ${targetText}` : targetName
+}
+
+const getMultiSelectTargetLabel = (
+  targetIdentities: ArcadeAnnotation['targetIdentities']
+): string | null => {
+  const targetCount = targetIdentities?.length ?? 0
+  if (targetCount < 2) {
+    return null
+  }
+
+  return `${targetCount} selected elements`
 }
 
 const getAnnotationTargetName = (target: ResolvedAnnotationTarget): string => {
@@ -143,6 +164,9 @@ const capitalizeTargetName = (value: string): string =>
 
 const getAnnotationPreviewContent = (annotation: ArcadeAnnotation): string =>
   truncateText(annotation.comment.trim(), ANNOTATION_TOOLTIP_TEXT_MAX_LENGTH)
+
+const getSelectedTextPreview = (selectedText: string): string =>
+  `"${truncateText(selectedText.trim(), 80)}"`
 
 const clampNumber = (value: number, min: number, max: number): number =>
   Math.min(Math.max(value, min), max)
@@ -443,6 +467,10 @@ export const LivePreview = ({
           if (message.payload.status === 'resolved' && message.payload.target) {
             setSelectedAnnotationTarget(message.payload.target)
             setAnnotationDraft('')
+            setEditingAnnotationId(null)
+            setEditAnnotationDraft('')
+            setEditAnnotationAnchorEl(null)
+            setMarkerPreview(null)
           }
           break
         case 'PREVIEW_EVIDENCE_CAPTURED':
@@ -998,9 +1026,21 @@ export const LivePreview = ({
             <VStack gap="space-4">
               <BodyShort weight="semibold">Add annotation</BodyShort>
               {selectedAnnotationTarget && (
-                <Detail className="live-preview__annotation-target-metadata">
-                  {getAnnotationTargetLabel(selectedAnnotationTarget)}
-                </Detail>
+                <>
+                  <Detail className="live-preview__annotation-target-metadata">
+                    {getAnnotationTargetLabel(selectedAnnotationTarget)}
+                  </Detail>
+                  {selectedAnnotationTarget.snapshot.selectedText && (
+                    <VStack gap="space-2">
+                      <Detail className="live-preview__annotation-target-metadata">
+                        Selected text
+                      </Detail>
+                      <BodyShort size="small" className="live-preview__annotation-target-context">
+                        {getSelectedTextPreview(selectedAnnotationTarget.snapshot.selectedText)}
+                      </BodyShort>
+                    </VStack>
+                  )}
+                </>
               )}
             </VStack>
             <Textarea
@@ -1053,6 +1093,16 @@ export const LivePreview = ({
                   <Detail className="live-preview__annotation-target-metadata">
                     {getSavedAnnotationTargetLabel(editingAnnotation)}
                   </Detail>
+                  {editingAnnotation.selectedText && (
+                    <VStack gap="space-2">
+                      <Detail className="live-preview__annotation-target-metadata">
+                        Selected text
+                      </Detail>
+                      <BodyShort size="small" className="live-preview__annotation-target-context">
+                        {getSelectedTextPreview(editingAnnotation.selectedText)}
+                      </BodyShort>
+                    </VStack>
+                  )}
                   {editingAnnotation.cssClasses && (
                     <Detail className="live-preview__annotation-target-metadata">
                       Classes: {editingAnnotation.cssClasses}

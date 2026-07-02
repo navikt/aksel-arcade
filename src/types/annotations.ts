@@ -13,6 +13,17 @@ export interface AnnotationRect {
   height: number
 }
 
+export interface AnnotationTargetIdentity {
+  signature: string
+  tagName: string
+  role?: string
+  accessibleName?: string
+  text?: string
+  cssClasses?: string
+  elementPath: string
+  fullPath: string
+}
+
 export interface AnnotationThreadMessage {
   id: string
   role: AnnotationAuthorRole
@@ -46,6 +57,7 @@ export interface ArcadeAnnotation {
   elementPath: string
   timestamp: number
   selectedText?: string
+  targetIdentities?: AnnotationTargetIdentity[]
   boundingBox?: AnnotationRect
   nearbyText?: string
   cssClasses?: string
