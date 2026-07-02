@@ -473,6 +473,7 @@ describe('share decode integration', () => {
     const previousProject = createWorkingCopyProject({
       name: 'Pre-import working copy',
       jsxCode: 'export default function App() { return <div>Pre-import JSX</div> }',
+      annotations: [annotation('11111111-1111-4111-8111-111111111111')],
     })
     saveProject(previousProject, {
       preferences: {
@@ -493,6 +494,7 @@ describe('share decode integration', () => {
 
     await waitFor(() => {
       expect(screen.getByTestId('project-name').textContent).toBe('Imported replacement project')
+      expect(screen.getByTestId('project-annotations-count').textContent).toBe('0')
       expect(screen.getByTestId('settings-page-panel-open').textContent).toBe('false')
     })
   })
@@ -504,6 +506,7 @@ describe('share decode integration', () => {
       hooksCode: 'export function usePreviousHook() { return "Previous Hooks" }',
       viewportSize: 'XS',
       panelLayout: 'editor-right',
+      annotations: [annotation('11111111-1111-4111-8111-111111111111')],
     })
     saveProject(previousProject)
 
@@ -550,6 +553,7 @@ describe('share decode integration', () => {
     expect(screen.getByTestId('hooks-code').textContent).toContain('Shared v3 Hooks')
     expect(screen.getByTestId('project-page-count').textContent).toBe('1')
     expect(screen.getByTestId('project-active-page-id').textContent).toBe('page01')
+    expect(screen.getByTestId('project-annotations-count').textContent).toBe('0')
     expect(screen.getByTestId('project-viewport').textContent).toBe('LG')
     expect(screen.getByTestId('preview-current-viewport').textContent).toBe('LG')
     expect(screen.getByTestId('preview-viewport-width').textContent).toBe(
