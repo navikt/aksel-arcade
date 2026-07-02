@@ -4309,3 +4309,19 @@ Verification:
 - npm run typecheck
 - npm run test -- --run
 - npm run lint
+
+### 2026-07-02 - PR #330 follow-up review fixes
+
+Fixed after merged-review follow-up:
+
+- Extracted shared DOM/accessibility helpers into `src/services/domAccessibility.ts` and reused them from both `annotationTargets` and `previewEvidence` instead of keeping duplicate role/name/text logic.
+- Replaced the silent `queryFullPath()` fallback with explicit `DOMException` diagnostics before falling back to signature matching.
+- Added runtime validation for `RESOLVE_ANNOTATION_TARGET` payloads in both `src/utils/security.ts` and `public/sandbox.html`, and added regression coverage for malformed requests.
+- Removed the unnecessary annotation-target test cast and added a regression test for invalid saved selector paths.
+
+Verification:
+
+- npm run typecheck
+- npm run lint
+- npm run test -- --run
+- Browser load and console check at `http://127.0.0.1:4177/aksel-arcade/`

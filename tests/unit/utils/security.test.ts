@@ -84,6 +84,46 @@ describe('Security Utilities', () => {
       expect(validateMainToSandboxMessage(123)).toBe(false)
       expect(validateMainToSandboxMessage([])).toBe(false)
     })
+
+    it('should validate RESOLVE_ANNOTATION_TARGET payload shape', () => {
+      expect(
+        validateMainToSandboxMessage({
+          type: 'RESOLVE_ANNOTATION_TARGET',
+          payload: {
+            requestId: 'annotation-1',
+            request: {
+              mode: 'identity',
+              identity: {
+                signature: 'target-signature',
+                tagName: 'button',
+                elementPath: 'button "Save"',
+                fullPath: ':scope > button:nth-of-type(1)',
+              },
+            },
+          },
+        })
+      ).toBe(true)
+
+      expect(
+        validateMainToSandboxMessage({
+          type: 'RESOLVE_ANNOTATION_TARGET',
+          payload: {
+            requestId: '',
+            request: { mode: 'point', x: 12, y: 24 },
+          },
+        })
+      ).toBe(false)
+
+      expect(
+        validateMainToSandboxMessage({
+          type: 'RESOLVE_ANNOTATION_TARGET',
+          payload: {
+            requestId: 'annotation-2',
+            request: { mode: 'point', x: '12', y: 24 },
+          },
+        })
+      ).toBe(false)
+    })
   })
 
   describe('validateSandboxToMainMessage', () => {
