@@ -154,6 +154,7 @@
     } = window.sandboxMessaging;
     const {
       capturePreviewEvidenceSnapshot,
+      isAnnotationTargetResolutionRequest,
       PREVIEW_EVIDENCE_ROOT_SELECTOR,
       resolveAnnotationTarget,
       runPreviewInteractionSequence,
@@ -717,7 +718,11 @@
     function resolveAnnotationTargetRequest(payload) {
       const requestId = payload?.requestId;
       const request = payload?.request;
-      if (typeof requestId !== 'string' || requestId.length === 0 || !request) {
+      if (
+        typeof requestId !== 'string' ||
+        requestId.length === 0 ||
+        !isAnnotationTargetResolutionRequest(request)
+      ) {
         console.warn('Invalid Annotation target request payload:', payload);
         return;
       }

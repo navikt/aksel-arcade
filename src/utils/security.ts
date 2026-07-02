@@ -1,4 +1,5 @@
 import type { MainToSandboxMessage, SandboxToMainMessage } from '@/types/messages'
+import { isAnnotationTargetResolutionRequest } from '@/services/annotationTargets'
 
 /**
  * Validates that a message is from the expected sandbox iframe
@@ -14,23 +15,30 @@ export const isValidMessageSource = (
  * Validates message structure for main-to-sandbox messages
  */
 export const validateMainToSandboxMessage = (data: unknown): data is MainToSandboxMessage => {
-  if (!data || typeof data !== 'object') return false
-  if (!('type' in data)) return false
+  if (!isRecord(data) || typeof data.type !== 'string') return false
 
-  const validTypes = [
-    'CONNECT_SANDBOX',
-    'EXECUTE_CODE',
-    'NAVIGATE_TO_PAGE',
-    'UPDATE_VIEWPORT',
-    'TOGGLE_INSPECT',
-    'TOGGLE_ANNOTATION_MODE',
-    'CLEAR_ANNOTATION_SELECTION',
-    'GET_INSPECTION_DATA',
-    'UPDATE_THEME',
-    'CAPTURE_PREVIEW_EVIDENCE',
-    'RESOLVE_ANNOTATION_TARGET',
-  ]
-  return validTypes.includes((data as { type: string }).type)
+  switch (data.type) {
+    case 'CONNECT_SANDBOX':
+    case 'EXECUTE_CODE':
+    case 'NAVIGATE_TO_PAGE':
+    case 'UPDATE_VIEWPORT':
+    case 'TOGGLE_INSPECT':
+    case 'TOGGLE_ANNOTATION_MODE':
+    case 'CLEAR_ANNOTATION_SELECTION':
+    case 'GET_INSPECTION_DATA':
+    case 'UPDATE_THEME':
+    case 'CAPTURE_PREVIEW_EVIDENCE':
+      return true
+    case 'RESOLVE_ANNOTATION_TARGET':
+      return (
+        isRecord(data.payload) &&
+        typeof data.payload.requestId === 'string' &&
+        data.payload.requestId.length > 0 &&
+        isAnnotationTargetResolutionRequest(data.payload.request)
+      )
+    default:
+      return false
+  }
 }
 
 /**

@@ -28,6 +28,7 @@ var previewEvidenceUtils = (() => {
     capturePreviewEvidenceSnapshot: () => capturePreviewEvidenceSnapshot,
     collectPreviewEvidenceFromFrame: () => collectPreviewEvidenceFromFrame,
     getAnnotationTargetIdentity: () => getAnnotationTargetIdentity,
+    isAnnotationTargetResolutionRequest: () => isAnnotationTargetResolutionRequest,
     registerPreviewEvidenceRequestHandler: () => registerPreviewEvidenceRequestHandler,
     requestPreviewEvidenceFromFrame: () => requestPreviewEvidenceFromFrame,
     resolveAnnotationTarget: () => resolveAnnotationTarget,
@@ -39,7 +40,158 @@ var previewEvidenceUtils = (() => {
     serializePreviewEvidence: () => serializePreviewEvidence
   });
 
+  // src/services/domAccessibility.ts
+  var normalizeWhitespace = (value) => value.replace(/\s+/g, " ").trim();
+  var isExcludedElement = (element) => {
+    const tagName = element.tagName.toLowerCase();
+    return tagName === "script" || tagName === "style" || tagName === "template" || tagName === "noscript" || tagName === "html" || tagName === "body";
+  };
+  var getVisibleText = (element) => normalizeWhitespace(getSanitizedSubtreeText(element));
+  var getElementRole = (element, { ignorePresentationalRole = false, treatSummaryAsButton = false } = {}) => {
+    const explicitRole = element.getAttribute("role")?.trim().toLowerCase();
+    if (explicitRole) {
+      if (ignorePresentationalRole && (explicitRole === "none" || explicitRole === "presentation")) {
+        return "";
+      }
+      return explicitRole;
+    }
+    const tagName = element.tagName.toLowerCase();
+    if (tagName === "button") return "button";
+    if (tagName === "a" && element.hasAttribute("href")) return "link";
+    if (tagName === "textarea") return "textbox";
+    if (tagName === "select") return "combobox";
+    if (tagName === "option") return "option";
+    if (tagName === "img") return "img";
+    if (tagName === "summary" && treatSummaryAsButton) return "button";
+    if (/^h[1-6]$/.test(tagName)) return "heading";
+    if (tagName !== "input") return tagName;
+    const input = element;
+    switch (input.type) {
+      case "checkbox":
+        return "checkbox";
+      case "radio":
+        return "radio";
+      case "range":
+        return "slider";
+      case "button":
+      case "submit":
+      case "reset":
+        return "button";
+      default:
+        return "textbox";
+    }
+  };
+  var getElementAccessibleName = (element, { includeImplicitLinkText = true } = {}) => {
+    const ariaLabel = element.getAttribute("aria-label");
+    if (ariaLabel) {
+      return normalizeWhitespace(ariaLabel);
+    }
+    const labelledBy = element.getAttribute("aria-labelledby");
+    if (labelledBy) {
+      const text = labelledBy.split(/\s+/).map((id) => {
+        const referencedElement = element.ownerDocument.getElementById(id);
+        return referencedElement ? getVisibleText(referencedElement) : "";
+      }).join(" ");
+      if (text.trim()) {
+        return normalizeWhitespace(text);
+      }
+    }
+    const altText = getElementAltText(element);
+    if (altText) {
+      return altText;
+    }
+    const labelText = getElementLabelText(element);
+    if (labelText) {
+      return labelText;
+    }
+    const title = element.getAttribute("title");
+    if (title) {
+      return normalizeWhitespace(title);
+    }
+    if (element instanceof HTMLInputElement && inputUsesValueAsAccessibleName(element) && element.value) {
+      return normalizeWhitespace(element.value);
+    }
+    return elementUsesContentAsAccessibleName(element, { includeImplicitLinkText }) ? getVisibleText(element) : "";
+  };
+  var hasExplicitAccessibleName = (element) => element.hasAttribute("aria-label") || element.hasAttribute("aria-labelledby") || getElementAltText(element).length > 0 || element.hasAttribute("title") || getElementLabelText(element).length > 0 || element instanceof HTMLInputElement && inputUsesValueAsAccessibleName(element) && normalizeWhitespace(element.value).length > 0;
+  var getElementLabelText = (element) => {
+    if (!(element instanceof HTMLElement) || !isLabelableElement(element)) {
+      return "";
+    }
+    const labels = Array.from(element.labels ?? []);
+    if (labels.length > 0) {
+      return normalizeWhitespace(labels.map((label) => getVisibleText(label)).join(" "));
+    }
+    if (element.id) {
+      const label = Array.from(element.ownerDocument.querySelectorAll("label[for]")).find(
+        (candidate) => candidate.getAttribute("for") === element.id
+      );
+      if (label) {
+        return getVisibleText(label);
+      }
+    }
+    const wrappingLabel = element.closest("label");
+    return wrappingLabel ? getVisibleText(wrappingLabel) : "";
+  };
+  var getSanitizedSubtreeText = (node) => {
+    if (node.nodeType === Node.TEXT_NODE) {
+      return node.textContent ?? "";
+    }
+    if (node.nodeType === Node.ELEMENT_NODE) {
+      const element = node;
+      if (isExcludedElement(element) || element.getAttribute("aria-hidden") === "true" || element.hasAttribute("hidden")) {
+        return "";
+      }
+    }
+    return Array.from(node.childNodes).map((child) => getSanitizedSubtreeText(child)).join(" ");
+  };
+  var getElementAltText = (element) => {
+    if (element instanceof HTMLImageElement) {
+      return normalizeWhitespace(element.getAttribute("alt") ?? "");
+    }
+    if (element instanceof HTMLInputElement && element.type === "image") {
+      return normalizeWhitespace(element.getAttribute("alt") ?? "");
+    }
+    return "";
+  };
+  var inputUsesValueAsAccessibleName = (input) => input.type === "button" || input.type === "submit" || input.type === "reset";
+  var elementUsesContentAsAccessibleName = (element, { includeImplicitLinkText }) => {
+    const explicitRole = element.getAttribute("role")?.trim().toLowerCase();
+    if (explicitRole) {
+      return explicitRole === "button" || explicitRole === "cell" || explicitRole === "checkbox" || explicitRole === "columnheader" || explicitRole === "gridcell" || explicitRole === "heading" || explicitRole === "link" || explicitRole === "menuitem" || explicitRole === "menuitemcheckbox" || explicitRole === "menuitemradio" || explicitRole === "option" || explicitRole === "radio" || explicitRole === "rowheader" || explicitRole === "switch" || explicitRole === "tab" || explicitRole === "tooltip" || explicitRole === "treeitem";
+    }
+    const tagName = element.tagName.toLowerCase();
+    if (/^h[1-6]$/.test(tagName)) {
+      return true;
+    }
+    if (tagName === "button" || tagName === "option" || tagName === "summary") {
+      return true;
+    }
+    return includeImplicitLinkText && tagName === "a" && element.hasAttribute("href");
+  };
+  var isLabelableElement = (element) => {
+    const tagName = element.tagName.toLowerCase();
+    return tagName === "button" || tagName === "input" || tagName === "meter" || tagName === "output" || tagName === "progress" || tagName === "select" || tagName === "textarea";
+  };
+
   // src/services/annotationTargets.ts
+  var isAnnotationTargetResolutionRequest = (value) => {
+    if (!isRecord(value) || typeof value.mode !== "string") {
+      return false;
+    }
+    switch (value.mode) {
+      case "point":
+        return isFiniteNumber(value.x) && isFiniteNumber(value.y) && optionalString(value.selectedText);
+      case "rect":
+        return isAnnotationTargetRect(value.rect);
+      case "identity":
+        return isAnnotationTargetIdentity(value.identity);
+      case "group":
+        return Array.isArray(value.identities) && value.identities.every(isAnnotationTargetIdentity);
+      default:
+        return false;
+    }
+  };
   var INTERACTIVE_TARGET_SELECTOR = [
     "button",
     "a[href]",
@@ -232,8 +384,8 @@ var previewEvidenceUtils = (() => {
   };
   var getAnnotationTargetIdentity = (root, element, frameWindow = root.ownerDocument.defaultView ?? window) => {
     const tagName = element.tagName.toLowerCase();
-    const role = getElementRole(element);
-    const accessibleName = getElementAccessibleName(element);
+    const role = getElementRole2(element);
+    const accessibleName = getElementAccessibleName2(element);
     const text = getVisibleText(element);
     const cssClasses = getElementClasses(element);
     const elementPath = getReadableElementPath(root, element);
@@ -359,7 +511,7 @@ var previewEvidenceUtils = (() => {
   var resolveSelectedTextTarget = (root, explicitSelectedText, frameWindow) => {
     const selection = frameWindow.getSelection?.();
     const selectedText = truncateText(
-      normalizeWhitespace(explicitSelectedText ?? selection?.toString() ?? ""),
+      normalizeWhitespace2(explicitSelectedText ?? selection?.toString() ?? ""),
       MAX_TEXT_LENGTH
     );
     if (!selectedText || !selection || selection.rangeCount === 0) {
@@ -376,8 +528,15 @@ var previewEvidenceUtils = (() => {
     }
     try {
       return fullPath === ":scope" ? root : root.querySelector(fullPath);
-    } catch {
-      return null;
+    } catch (error) {
+      if (error instanceof DOMException) {
+        console.warn("Invalid annotation target selector path:", {
+          fullPath,
+          message: error.message
+        });
+        return null;
+      }
+      throw error;
     }
   };
   var getReadableElementPath = (root, element, maxDepth = 4) => {
@@ -393,7 +552,7 @@ var previewEvidenceUtils = (() => {
   };
   var getReadableElementIdentifier = (element) => {
     const tagName = element.tagName.toLowerCase();
-    const name = getElementAccessibleName(element) || getVisibleText(element);
+    const name = getElementAccessibleName2(element) || getVisibleText(element);
     if (name) {
       return `${tagName} "${truncateText(name, 35)}"`;
     }
@@ -418,8 +577,8 @@ var previewEvidenceUtils = (() => {
     return parts.join(" > ");
   };
   var describeElement = (element) => {
-    const role = getElementRole(element);
-    const name = getElementAccessibleName(element) || getVisibleText(element);
+    const role = getElementRole2(element);
+    const name = getElementAccessibleName2(element) || getVisibleText(element);
     if (role && name) {
       return `${role} "${truncateText(name, 40)}"`;
     }
@@ -428,133 +587,13 @@ var previewEvidenceUtils = (() => {
     }
     return role || element.tagName.toLowerCase();
   };
-  var getElementRole = (element) => {
-    const explicitRole = element.getAttribute("role")?.trim().toLowerCase();
-    if (explicitRole && explicitRole !== "presentation" && explicitRole !== "none") {
-      return explicitRole;
-    }
-    const tagName = element.tagName.toLowerCase();
-    if (tagName === "button") return "button";
-    if (tagName === "a" && element.hasAttribute("href")) return "link";
-    if (tagName === "textarea") return "textbox";
-    if (tagName === "select") return "combobox";
-    if (tagName === "option") return "option";
-    if (tagName === "img") return "img";
-    if (tagName === "summary") return "button";
-    if (/^h[1-6]$/.test(tagName)) return "heading";
-    if (tagName !== "input") return tagName;
-    const input = element;
-    switch (input.type) {
-      case "checkbox":
-        return "checkbox";
-      case "radio":
-        return "radio";
-      case "range":
-        return "slider";
-      case "button":
-      case "submit":
-      case "reset":
-        return "button";
-      default:
-        return "textbox";
-    }
-  };
-  var getElementAccessibleName = (element) => {
-    const ariaLabel = element.getAttribute("aria-label");
-    if (ariaLabel) {
-      return normalizeWhitespace(ariaLabel);
-    }
-    const labelledBy = element.getAttribute("aria-labelledby");
-    if (labelledBy) {
-      const text = labelledBy.split(/\s+/).map((id) => {
-        const referencedElement = element.ownerDocument.getElementById(id);
-        return referencedElement ? getVisibleText(referencedElement) : "";
-      }).join(" ");
-      if (text.trim()) {
-        return normalizeWhitespace(text);
-      }
-    }
-    if (element instanceof HTMLImageElement) {
-      return normalizeWhitespace(element.getAttribute("alt") ?? "");
-    }
-    if (element instanceof HTMLInputElement && element.type === "image") {
-      return normalizeWhitespace(element.getAttribute("alt") ?? "");
-    }
-    const labelText = getElementLabelText(element);
-    if (labelText) {
-      return labelText;
-    }
-    const title = element.getAttribute("title");
-    if (title) {
-      return normalizeWhitespace(title);
-    }
-    if (element instanceof HTMLInputElement && ["button", "submit", "reset"].includes(element.type)) {
-      return normalizeWhitespace(element.value);
-    }
-    if (elementUsesContentAsAccessibleName(element)) {
-      return getVisibleText(element);
-    }
-    return "";
-  };
-  var getElementLabelText = (element) => {
-    if (!(element instanceof HTMLElement)) {
-      return "";
-    }
-    if ("labels" in element && element.labels) {
-      const labels = Array.from(element.labels);
-      if (labels.length > 0) {
-        return normalizeWhitespace(labels.map((label) => getVisibleText(label)).join(" "));
-      }
-    }
-    if (element.id) {
-      const label = Array.from(element.ownerDocument.querySelectorAll("label[for]")).find(
-        (candidate) => candidate.getAttribute("for") === element.id
-      );
-      if (label) {
-        return getVisibleText(label);
-      }
-    }
-    const wrappingLabel = element.closest("label");
-    return wrappingLabel ? getVisibleText(wrappingLabel) : "";
-  };
-  var elementUsesContentAsAccessibleName = (element) => {
-    const role = element.getAttribute("role")?.trim().toLowerCase();
-    if (role) {
-      return [
-        "button",
-        "cell",
-        "checkbox",
-        "columnheader",
-        "gridcell",
-        "heading",
-        "link",
-        "menuitem",
-        "menuitemcheckbox",
-        "menuitemradio",
-        "option",
-        "radio",
-        "rowheader",
-        "switch",
-        "tab",
-        "treeitem"
-      ].includes(role);
-    }
-    const tagName = element.tagName.toLowerCase();
-    return /^h[1-6]$/.test(tagName) || ["button", "option", "summary"].includes(tagName);
-  };
-  var getVisibleText = (element) => normalizeWhitespace(getSanitizedSubtreeText(element));
-  var getSanitizedSubtreeText = (node) => {
-    if (node.nodeType === Node.TEXT_NODE) {
-      return node.textContent ?? "";
-    }
-    if (node.nodeType === Node.ELEMENT_NODE) {
-      const element = node;
-      if (isExcludedElement(element) || element.getAttribute("aria-hidden") === "true" || element.hasAttribute("hidden")) {
-        return "";
-      }
-    }
-    return Array.from(node.childNodes).map((child) => getSanitizedSubtreeText(child)).join(" ");
-  };
+  var getElementRole2 = (element) => getElementRole(element, {
+    ignorePresentationalRole: true,
+    treatSummaryAsButton: true
+  });
+  var getElementAccessibleName2 = (element) => getElementAccessibleName(element, {
+    includeImplicitLinkText: false
+  });
   var getNearbyText = (element) => {
     const texts = [
       element.previousElementSibling ? getVisibleText(element.previousElementSibling) : "",
@@ -581,8 +620,8 @@ var previewEvidenceUtils = (() => {
     return entries.map(([key, value]) => `${key}: ${value}`).join("; ");
   };
   var getAccessibilitySummary = (element) => {
-    const role = getElementRole(element);
-    const name = getElementAccessibleName(element);
+    const role = getElementRole2(element);
+    const name = getElementAccessibleName2(element);
     if (!role && !name) {
       return void 0;
     }
@@ -591,10 +630,6 @@ var previewEvidenceUtils = (() => {
   var closestWithinRoot = (element, root, selector) => {
     const closest = element.closest(selector);
     return closest && root.contains(closest) ? closest : null;
-  };
-  var isExcludedElement = (element) => {
-    const tagName = element.tagName.toLowerCase();
-    return tagName === "script" || tagName === "style" || tagName === "template" || tagName === "noscript" || tagName === "html" || tagName === "body";
   };
   var isElementVisibleInViewport = (element, frameWindow) => {
     const style = frameWindow.getComputedStyle(element);
@@ -646,8 +681,8 @@ var previewEvidenceUtils = (() => {
       height: bounds.bottom - bounds.top
     };
   };
-  var normalizeComparableText = (value) => normalizeWhitespace(value ?? "").toLowerCase();
-  var normalizeWhitespace = (value) => value.replace(/\s+/g, " ").trim();
+  var normalizeComparableText = (value) => normalizeWhitespace2(value ?? "").toLowerCase();
+  var normalizeWhitespace2 = (value) => value.replace(/\s+/g, " ").trim();
   var truncateText = (value, maxLength) => value.length > maxLength ? value.slice(0, maxLength) : value;
   var stableStringify = (value) => JSON.stringify(
     Object.keys(value).sort().reduce((acc, key) => {
@@ -658,6 +693,11 @@ var previewEvidenceUtils = (() => {
       return acc;
     }, {})
   );
+  var isAnnotationTargetRect = (value) => isRecord(value) && isFiniteNumber(value.x) && isFiniteNumber(value.y) && isFiniteNumber(value.width) && isFiniteNumber(value.height);
+  var isAnnotationTargetIdentity = (value) => isRecord(value) && typeof value.signature === "string" && typeof value.tagName === "string" && typeof value.elementPath === "string" && typeof value.fullPath === "string" && optionalString(value.role) && optionalString(value.accessibleName) && optionalString(value.text) && optionalString(value.cssClasses);
+  var optionalString = (value) => value === void 0 || typeof value === "string";
+  var isRecord = (value) => value !== null && typeof value === "object" && !Array.isArray(value);
+  var isFiniteNumber = (value) => typeof value === "number" && Number.isFinite(value);
 
   // src/services/previewEvidence.ts
   var PREVIEW_EVIDENCE_ROOT_SELECTOR = "#root";
@@ -943,7 +983,7 @@ var previewEvidenceUtils = (() => {
   };
   var createAccessibilityNode = (element) => {
     const explicitlyNamed = hasExplicitAccessibleName(element);
-    const name = getElementAccessibleName2(element);
+    const name = getElementAccessibleName(element);
     const role = getElementAccessibilityRole(element, explicitlyNamed);
     const focusable = isElementFocusable(element);
     const level = getElementHeadingLevel(element);
@@ -1319,7 +1359,7 @@ var previewEvidenceUtils = (() => {
       const normalizedText = normalizeComparableText2(step.text);
       const startedAt2 = Date.now();
       while (Date.now() - startedAt2 < timeoutMs) {
-        if (normalizeComparableText2(getElementVisibleText(root)).includes(normalizedText)) {
+        if (normalizeComparableText2(getVisibleText(root)).includes(normalizedText)) {
           return `text="${step.text}"`;
         }
         await waitForPreviewInteractionTick(frameWindow);
@@ -1402,7 +1442,7 @@ var previewEvidenceUtils = (() => {
     if (element instanceof HTMLLabelElement) {
       score -= 20;
     }
-    const role = getElementRole2(element);
+    const role = getElementRole(element);
     if (role !== "generic") {
       score += 10;
     }
@@ -1689,16 +1729,16 @@ var previewEvidenceUtils = (() => {
     if (isExcludedElement2(candidate)) {
       return false;
     }
-    if (normalizedRole && getElementRole2(candidate) !== normalizedRole) {
+    if (normalizedRole && getElementRole(candidate) !== normalizedRole) {
       return false;
     }
-    if (normalizedName && !normalizeComparableText2(getElementAccessibleName2(candidate)).includes(normalizedName)) {
+    if (normalizedName && !normalizeComparableText2(getElementAccessibleName(candidate)).includes(normalizedName)) {
       return false;
     }
-    if (normalizedText && !normalizeComparableText2(getElementVisibleText(candidate)).includes(normalizedText)) {
+    if (normalizedText && !normalizeComparableText2(getVisibleText(candidate)).includes(normalizedText)) {
       return false;
     }
-    if (normalizedLabel && !normalizeComparableText2(getElementLabelText2(candidate)).includes(normalizedLabel)) {
+    if (normalizedLabel && !normalizeComparableText2(getElementLabelText(candidate)).includes(normalizedLabel)) {
       return false;
     }
     return true;
@@ -1721,129 +1761,7 @@ var previewEvidenceUtils = (() => {
     ].filter(Boolean);
     return parts.length > 0 ? `${parts.join("+")} target` : "target";
   };
-  var getElementRole2 = (element) => {
-    const explicitRole = element.getAttribute("role");
-    if (explicitRole) {
-      return explicitRole.toLowerCase();
-    }
-    const tagName = element.tagName.toLowerCase();
-    if (tagName === "button") return "button";
-    if (tagName === "a" && element.hasAttribute("href")) return "link";
-    if (tagName === "textarea") return "textbox";
-    if (tagName === "select") return "combobox";
-    if (tagName === "option") return "option";
-    if (tagName === "img") return "img";
-    if (/^h[1-6]$/.test(tagName)) return "heading";
-    if (tagName !== "input") return tagName;
-    const input = element;
-    switch (input.type) {
-      case "checkbox":
-        return "checkbox";
-      case "radio":
-        return "radio";
-      case "range":
-        return "slider";
-      case "button":
-      case "submit":
-      case "reset":
-        return "button";
-      default:
-        return "textbox";
-    }
-  };
-  var getElementAccessibleName2 = (element) => {
-    const ariaLabel = element.getAttribute("aria-label");
-    if (ariaLabel) {
-      return normalizeWhitespace2(ariaLabel);
-    }
-    const labelledBy = element.getAttribute("aria-labelledby");
-    if (labelledBy) {
-      const text = labelledBy.split(/\s+/).map((id) => {
-        const referencedElement = element.ownerDocument.getElementById(id);
-        return referencedElement ? getElementVisibleText(referencedElement) : "";
-      }).join(" ");
-      if (text.trim()) {
-        return normalizeWhitespace2(text);
-      }
-    }
-    const altText = getElementAltText(element);
-    if (altText) {
-      return altText;
-    }
-    const labelText = getElementLabelText2(element);
-    if (labelText) {
-      return labelText;
-    }
-    const title = element.getAttribute("title");
-    if (title) {
-      return normalizeWhitespace2(title);
-    }
-    if (element instanceof HTMLInputElement && inputUsesValueAsAccessibleName(element) && element.value) {
-      return normalizeWhitespace2(element.value);
-    }
-    return elementUsesContentAsAccessibleName2(element) ? getElementVisibleText(element) : "";
-  };
-  var hasExplicitAccessibleName = (element) => element.hasAttribute("aria-label") || element.hasAttribute("aria-labelledby") || getElementAltText(element).length > 0 || element.hasAttribute("title") || getElementLabelText2(element).length > 0 || element instanceof HTMLInputElement && inputUsesValueAsAccessibleName(element) && normalizeWhitespace2(element.value).length > 0;
-  var getElementLabelText2 = (element) => {
-    if (!(element instanceof HTMLElement)) {
-      return "";
-    }
-    if (!isLabelableElement(element)) {
-      return "";
-    }
-    const labels = Array.from(element.labels ?? []);
-    if (labels.length > 0) {
-      return normalizeWhitespace2(labels.map((label) => getElementVisibleText(label)).join(" "));
-    }
-    if (element.id) {
-      const label = Array.from(element.ownerDocument.querySelectorAll("label[for]")).find(
-        (candidate) => candidate.getAttribute("for") === element.id
-      );
-      if (label) {
-        return getElementVisibleText(label);
-      }
-    }
-    const wrappingLabel = element.closest("label");
-    return wrappingLabel ? getElementVisibleText(wrappingLabel) : "";
-  };
-  var getElementVisibleText = (element) => normalizeWhitespace2(getSanitizedSubtreeText2(element));
-  var getSanitizedSubtreeText2 = (node) => {
-    if (node.nodeType === Node.TEXT_NODE) {
-      return node.textContent ?? "";
-    }
-    if (node.nodeType === Node.ELEMENT_NODE) {
-      const element = node;
-      if (isExcludedElement2(element) || element.getAttribute("aria-hidden") === "true" || element.hasAttribute("hidden")) {
-        return "";
-      }
-    }
-    return Array.from(node.childNodes).map((child) => getSanitizedSubtreeText2(child)).join(" ");
-  };
-  var getElementAltText = (element) => {
-    if (element instanceof HTMLImageElement) {
-      return normalizeWhitespace2(element.getAttribute("alt") ?? "");
-    }
-    if (element instanceof HTMLInputElement && element.type === "image") {
-      return normalizeWhitespace2(element.getAttribute("alt") ?? "");
-    }
-    return "";
-  };
-  var inputUsesValueAsAccessibleName = (input) => input.type === "button" || input.type === "submit" || input.type === "reset";
-  var elementUsesContentAsAccessibleName2 = (element) => {
-    const explicitRole = element.getAttribute("role")?.trim().toLowerCase();
-    if (explicitRole) {
-      return explicitRole === "button" || explicitRole === "cell" || explicitRole === "checkbox" || explicitRole === "columnheader" || explicitRole === "gridcell" || explicitRole === "heading" || explicitRole === "link" || explicitRole === "menuitem" || explicitRole === "menuitemcheckbox" || explicitRole === "menuitemradio" || explicitRole === "option" || explicitRole === "radio" || explicitRole === "rowheader" || explicitRole === "switch" || explicitRole === "tab" || explicitRole === "tooltip" || explicitRole === "treeitem";
-    }
-    const tagName = element.tagName.toLowerCase();
-    if (/^h[1-6]$/.test(tagName)) {
-      return true;
-    }
-    if (tagName === "button" || tagName === "option" || tagName === "summary") {
-      return true;
-    }
-    return tagName === "a" && element.hasAttribute("href");
-  };
-  var normalizeComparableText2 = (value) => normalizeWhitespace2(value ?? "").toLowerCase();
+  var normalizeComparableText2 = (value) => normalizeWhitespace(value ?? "").toLowerCase();
   var getElementAccessibilityRole = (element, explicitlyNamed) => {
     const explicitRole = element.getAttribute("role")?.trim().toLowerCase();
     if (explicitRole) {
@@ -2002,15 +1920,11 @@ var previewEvidenceUtils = (() => {
   var removeUndefinedAccessibilityStates = (states) => Object.fromEntries(
     Object.entries(states).filter(([, value]) => value !== void 0)
   );
-  var isLabelableElement = (element) => {
-    const tagName = element.tagName.toLowerCase();
-    return tagName === "button" || tagName === "input" || tagName === "meter" || tagName === "output" || tagName === "progress" || tagName === "select" || tagName === "textarea";
-  };
   var getAllowedAttributes = (element) => {
     const attributes = Array.from(element.attributes).filter((attribute) => isAllowedAttributeName(attribute.name)).sort((left, right) => left.name.localeCompare(right.name)).map((attribute) => [
       attribute.name,
       truncateEvidenceValue(
-        normalizeWhitespace2(attribute.value),
+        normalizeWhitespace(attribute.value),
         MAX_PREVIEW_EVIDENCE_ATTRIBUTE_LENGTH
       )
     ]);
@@ -2032,7 +1946,7 @@ var previewEvidenceUtils = (() => {
   };
   var getDirectTextContent = (element) => {
     const text = Array.from(element.childNodes).filter((node) => node.nodeType === Node.TEXT_NODE).map((node) => node.textContent ?? "").join(" ");
-    const normalizedText = normalizeWhitespace2(text);
+    const normalizedText = normalizeWhitespace(text);
     return normalizedText ? truncateEvidenceValue(normalizedText, MAX_PREVIEW_EVIDENCE_TEXT_LENGTH) : void 0;
   };
   var getBoundingBox = (element) => {
@@ -2093,7 +2007,6 @@ var previewEvidenceUtils = (() => {
   var removeEmptyStyleValues = (style) => Object.fromEntries(
     Object.entries(style).filter(([, value]) => Boolean(value))
   );
-  var normalizeWhitespace2 = (value) => value.replace(/\s+/g, " ").trim();
   var isAccessibilityHidden = (element, frameWindow) => {
     if (element.getAttribute("aria-hidden") === "true" || element.hasAttribute("hidden")) {
       return true;

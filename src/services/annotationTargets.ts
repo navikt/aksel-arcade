@@ -1,4 +1,11 @@
 import type { AnnotationTargetSnapshot } from '@/services/annotations'
+import {
+  getElementAccessibleName as getSharedElementAccessibleName,
+  getElementRole as getSharedElementRole,
+  getVisibleText,
+  isExcludedElement,
+  normalizeWhitespace,
+} from './domAccessibility'
 
 export type AnnotationTargetResolutionStatus = 'resolved' | 'hidden' | 'dead' | 'no-target'
 export type AnnotationTargetRequestMode = 'point' | 'rect' | 'identity' | 'group'
@@ -61,6 +68,31 @@ export interface AnnotationTargetResolutionResult {
   targets?: ResolvedAnnotationTarget[]
   reason?: 'empty-selection' | 'no-match' | 'ambiguous-match' | 'partial-group'
   matchCount?: number
+}
+
+export const isAnnotationTargetResolutionRequest = (
+  value: unknown
+): value is AnnotationTargetResolutionRequest => {
+  if (!isRecord(value) || typeof value.mode !== 'string') {
+    return false
+  }
+
+  switch (value.mode) {
+    case 'point':
+      return (
+        isFiniteNumber(value.x) &&
+        isFiniteNumber(value.y) &&
+        optionalString(value.selectedText)
+      )
+    case 'rect':
+      return isAnnotationTargetRect(value.rect)
+    case 'identity':
+      return isAnnotationTargetIdentity(value.identity)
+    case 'group':
+      return Array.isArray(value.identities) && value.identities.every(isAnnotationTargetIdentity)
+    default:
+      return false
+  }
 }
 
 const INTERACTIVE_TARGET_SELECTOR = [
@@ -531,8 +563,16 @@ const queryFullPath = (root: Element, fullPath: string): Element | null => {
 
   try {
     return fullPath === ':scope' ? root : root.querySelector(fullPath)
-  } catch {
-    return null
+  } catch (error) {
+    if (error instanceof DOMException) {
+      console.warn('Invalid annotation target selector path:', {
+        fullPath,
+        message: error.message,
+      })
+      return null
+    }
+
+    throw error
   }
 }
 
@@ -594,164 +634,16 @@ const describeElement = (element: Element): string => {
   return role || element.tagName.toLowerCase()
 }
 
-const getElementRole = (element: Element): string => {
-  const explicitRole = element.getAttribute('role')?.trim().toLowerCase()
-  if (explicitRole && explicitRole !== 'presentation' && explicitRole !== 'none') {
-    return explicitRole
-  }
+const getElementRole = (element: Element): string =>
+  getSharedElementRole(element, {
+    ignorePresentationalRole: true,
+    treatSummaryAsButton: true,
+  })
 
-  const tagName = element.tagName.toLowerCase()
-  if (tagName === 'button') return 'button'
-  if (tagName === 'a' && element.hasAttribute('href')) return 'link'
-  if (tagName === 'textarea') return 'textbox'
-  if (tagName === 'select') return 'combobox'
-  if (tagName === 'option') return 'option'
-  if (tagName === 'img') return 'img'
-  if (tagName === 'summary') return 'button'
-  if (/^h[1-6]$/.test(tagName)) return 'heading'
-  if (tagName !== 'input') return tagName
-
-  const input = element as HTMLInputElement
-  switch (input.type) {
-    case 'checkbox':
-      return 'checkbox'
-    case 'radio':
-      return 'radio'
-    case 'range':
-      return 'slider'
-    case 'button':
-    case 'submit':
-    case 'reset':
-      return 'button'
-    default:
-      return 'textbox'
-  }
-}
-
-const getElementAccessibleName = (element: Element): string => {
-  const ariaLabel = element.getAttribute('aria-label')
-  if (ariaLabel) {
-    return normalizeWhitespace(ariaLabel)
-  }
-
-  const labelledBy = element.getAttribute('aria-labelledby')
-  if (labelledBy) {
-    const text = labelledBy
-      .split(/\s+/)
-      .map((id) => {
-        const referencedElement = element.ownerDocument.getElementById(id)
-        return referencedElement ? getVisibleText(referencedElement) : ''
-      })
-      .join(' ')
-    if (text.trim()) {
-      return normalizeWhitespace(text)
-    }
-  }
-
-  if (element instanceof HTMLImageElement) {
-    return normalizeWhitespace(element.getAttribute('alt') ?? '')
-  }
-
-  if (element instanceof HTMLInputElement && element.type === 'image') {
-    return normalizeWhitespace(element.getAttribute('alt') ?? '')
-  }
-
-  const labelText = getElementLabelText(element)
-  if (labelText) {
-    return labelText
-  }
-
-  const title = element.getAttribute('title')
-  if (title) {
-    return normalizeWhitespace(title)
-  }
-
-  if (element instanceof HTMLInputElement && ['button', 'submit', 'reset'].includes(element.type)) {
-    return normalizeWhitespace(element.value)
-  }
-
-  if (elementUsesContentAsAccessibleName(element)) {
-    return getVisibleText(element)
-  }
-
-  return ''
-}
-
-const getElementLabelText = (element: Element): string => {
-  if (!(element instanceof HTMLElement)) {
-    return ''
-  }
-
-  if ('labels' in element && element.labels) {
-    const labels = Array.from(element.labels as NodeListOf<HTMLLabelElement>)
-    if (labels.length > 0) {
-      return normalizeWhitespace(labels.map((label) => getVisibleText(label)).join(' '))
-    }
-  }
-
-  if (element.id) {
-    const label = Array.from(element.ownerDocument.querySelectorAll('label[for]')).find(
-      (candidate) => candidate.getAttribute('for') === element.id
-    )
-    if (label) {
-      return getVisibleText(label)
-    }
-  }
-
-  const wrappingLabel = element.closest('label')
-  return wrappingLabel ? getVisibleText(wrappingLabel) : ''
-}
-
-const elementUsesContentAsAccessibleName = (element: Element): boolean => {
-  const role = element.getAttribute('role')?.trim().toLowerCase()
-  if (role) {
-    return [
-      'button',
-      'cell',
-      'checkbox',
-      'columnheader',
-      'gridcell',
-      'heading',
-      'link',
-      'menuitem',
-      'menuitemcheckbox',
-      'menuitemradio',
-      'option',
-      'radio',
-      'rowheader',
-      'switch',
-      'tab',
-      'treeitem',
-    ].includes(role)
-  }
-
-  const tagName = element.tagName.toLowerCase()
-  return /^h[1-6]$/.test(tagName) || ['button', 'option', 'summary'].includes(tagName)
-}
-
-const getVisibleText = (element: Element): string =>
-  normalizeWhitespace(getSanitizedSubtreeText(element))
-
-const getSanitizedSubtreeText = (node: Node): string => {
-  if (node.nodeType === Node.TEXT_NODE) {
-    return node.textContent ?? ''
-  }
-
-  if (node.nodeType === Node.ELEMENT_NODE) {
-    const element = node as Element
-    if (
-      isExcludedElement(element) ||
-      element.getAttribute('aria-hidden') === 'true' ||
-      element.hasAttribute('hidden')
-    ) {
-      return ''
-    }
-  }
-
-  return Array.from(node.childNodes)
-    .map((child) => getSanitizedSubtreeText(child))
-    .join(' ')
-}
+const getElementAccessibleName = (element: Element): string =>
+  getSharedElementAccessibleName(element, {
+    includeImplicitLinkText: false,
+  })
 
 const getNearbyText = (element: Element): string => {
   const texts = [
@@ -801,18 +693,6 @@ const getAccessibilitySummary = (element: Element): string | undefined => {
 const closestWithinRoot = (element: Element, root: Element, selector: string): Element | null => {
   const closest = element.closest(selector)
   return closest && root.contains(closest) ? closest : null
-}
-
-const isExcludedElement = (element: Element): boolean => {
-  const tagName = element.tagName.toLowerCase()
-  return (
-    tagName === 'script' ||
-    tagName === 'style' ||
-    tagName === 'template' ||
-    tagName === 'noscript' ||
-    tagName === 'html' ||
-    tagName === 'body'
-  )
 }
 
 const isElementVisibleInViewport = (element: Element, frameWindow: Window): boolean => {
@@ -905,3 +785,29 @@ const stableStringify = (value: Record<string, string | undefined>): string =>
         return acc
       }, {})
   )
+
+const isAnnotationTargetRect = (value: unknown): value is AnnotationTargetRect =>
+  isRecord(value) &&
+  isFiniteNumber(value.x) &&
+  isFiniteNumber(value.y) &&
+  isFiniteNumber(value.width) &&
+  isFiniteNumber(value.height)
+
+const isAnnotationTargetIdentity = (value: unknown): value is AnnotationTargetIdentity =>
+  isRecord(value) &&
+  typeof value.signature === 'string' &&
+  typeof value.tagName === 'string' &&
+  typeof value.elementPath === 'string' &&
+  typeof value.fullPath === 'string' &&
+  optionalString(value.role) &&
+  optionalString(value.accessibleName) &&
+  optionalString(value.text) &&
+  optionalString(value.cssClasses)
+
+const optionalString = (value: unknown): boolean => value === undefined || typeof value === 'string'
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  value !== null && typeof value === 'object' && !Array.isArray(value)
+
+const isFiniteNumber = (value: unknown): value is number =>
+  typeof value === 'number' && Number.isFinite(value)
