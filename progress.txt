@@ -4212,6 +4212,7 @@ Verification:
 - npm run typecheck
 - npm run test -- --run
 - npm run lint
+- npm run build after the first pushed review-fix commit exposed a CI-only test fixture type error; fixed the Aksel `React.createElement` fixtures with explicit `as="div"` props and reran npm run build, npm run test -- --run, and npm run lint.
 - Browser check at `http://127.0.0.1:5193/aksel-arcade/` selected the default InlineMessage in Annotation mode and confirmed the add-popover shows `InlineMessage: Quick tip: Delete this...` without `Features: Two tabs`, raw `.aksel-*` classes, or the `Informasjon:` status prefix.
 
 ### 2026-07-02 - PR #332 annotation popover width follow-up

@@ -188,6 +188,7 @@ describe('annotation target resolution', () => {
       React.createElement(
         Box,
         {
+          as: 'div',
           padding: 'space-16',
           background: 'raised',
           borderRadius: '12',
@@ -196,7 +197,7 @@ describe('annotation target resolution', () => {
         },
         React.createElement(
           VStack,
-          { gap: 'space-8' },
+          { as: 'div', gap: 'space-8' },
           React.createElement(
             HStack,
             { as: 'div', gap: 'space-4' },
@@ -206,7 +207,7 @@ describe('annotation target resolution', () => {
           ),
           React.createElement(
             InlineMessage,
-            { status: 'info' },
+            { as: 'div', status: 'info' },
             React.createElement('strong', null, 'Quick tip:'),
             ' Delete this intro and start coding!'
           ),
