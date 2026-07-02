@@ -57,6 +57,7 @@ export const validateSandboxToMainMessage = (data: unknown): data is SandboxToMa
     'INSPECTION_DATA',
     'ANNOTATION_TARGET_HOVERED',
     'ANNOTATION_TARGET_SELECTED',
+    'ANNOTATION_VIEWPORT_CHANGED',
     'THEME_UPDATED',
     'CONSOLE_LOG',
     'PREVIEW_EVIDENCE_CAPTURED',

@@ -402,12 +402,12 @@ var previewEvidenceUtils = (() => {
     const cssClasses = getElementClasses(element);
     const elementPath = getReadableElementPath(root, element);
     const fullPath = getFullElementPath(root, element);
-    const signature = stableStringify({
+    const signature = createAnnotationTargetIdentitySignature({
       tagName,
       role,
-      accessibleName: normalizeComparableText(accessibleName),
-      text: normalizeComparableText(text),
-      cssClasses: normalizeComparableText(cssClasses)
+      accessibleName,
+      text,
+      cssClasses
     });
     void frameWindow;
     return {
@@ -440,6 +440,7 @@ var previewEvidenceUtils = (() => {
       y: isFixed ? pageY : pageY + frameWindow.scrollY,
       element: describeElement(element),
       elementPath: identity.elementPath,
+      targetIdentities: [{ ...identity }],
       boundingBox: {
         x: rect.left,
         y: isFixed ? rect.top : rect.top + frameWindow.scrollY,
@@ -461,6 +462,19 @@ var previewEvidenceUtils = (() => {
       visibility: isElementVisibleInViewport(element, frameWindow) ? "visible" : "hidden"
     };
   };
+  var createAnnotationTargetIdentitySignature = ({
+    tagName,
+    role,
+    accessibleName,
+    text,
+    cssClasses
+  }) => stableStringify({
+    tagName,
+    role,
+    accessibleName: normalizeComparableText(accessibleName),
+    text: normalizeComparableText(text),
+    cssClasses: normalizeComparableText(cssClasses)
+  });
   var deepElementFromPoint = (root, x, y) => {
     if (typeof root.ownerDocument.elementFromPoint !== "function") {
       return null;

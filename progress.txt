@@ -1453,6 +1453,36 @@ Verification:
 
 Next note: #129 can now scope explicit replacement flows (Web share URL, import, Reset editor) to the current Web Arcade working copy. Keep #130's UI copy cleanup separate; the Clear storage & reload affordance still exists pending that issue.
 
+### 2026-07-02 - Issue #321: Harden annotation target resilience and marker geometry
+
+Implemented:
+
+- Selected `#321` as the highest-priority open `ready-for-agent` feature from `#321`-`#326` after checking `#314`, `CONTEXT.md`, the annotation ADRs, and the current dependency chain: `#321` is the first unblocked correctness slice and it directly unlocks the later Desktop MCP and Preview evidence work in `#324` and `#326`, while `#322` only gates the cleanup/share branch.
+- Added a stored-target resolution bridge for saved annotations: `LivePreview` now re-resolves active-page open annotations through the sandbox on render success, page changes, viewport changes, and annotation-mode viewport movement, instead of rendering markers from saved geometry alone.
+- Kept the durable annotation payload compatible while making new annotations identity-first: live target snapshots now carry `targetIdentities` even for single-element annotations, and legacy saved annotations without that field fall back through a derived identity request built from their stored metadata.
+- Updated marker/count behavior to follow the PRD and `CONTEXT.md` terms:
+  - visible resolved targets render normal markers at live positions;
+  - hidden-but-resolved targets keep the active-page badge count but do not render a normal marker;
+  - dead or ambiguous targets disappear from normal marker/count work without being deleted, and they recover automatically when the target becomes uniquely resolvable again.
+- Fixed the host/sandbox scroll contract without breaking the sandbox boundary: the sandbox now emits `ANNOTATION_VIEWPORT_CHANGED` messages with scroll state, and `LivePreview` uses that transient viewport state when positioning live markers instead of trying to read the sandbox window directly.
+- Added regression coverage for the new request builder, live-count consumption in `PreviewPane`, extra target-resolution recovery/ambiguity cases in `annotationTargets`, and the new sandbox message validation.
+
+Verification:
+
+- npm run typecheck
+- npm run test
+- npm run build:sandbox
+- Practical browser verification at `http://127.0.0.1:4180/aksel-arcade/` with Playwright-driven visual checks and saved screenshots in the session artifacts folder, covering:
+  - single-element marker alignment after scroll, viewport resize, and target movement;
+  - hidden-but-resolved targets keeping the badge count while hiding the marker;
+  - target removal, recovery, and ambiguous duplicate recovery hiding/restoring normal marker work;
+  - multi-element selection showing grouped outlines/popover and the saved grouped marker surviving scroll.
+
+Next note:
+
+- `#324` and `#326` should reuse the live target-resolution path that now exists in `LivePreview` rather than adding a second dead/hidden-target interpretation layer; the shared semantics are now in the saved-target request builder plus `resolveAnnotationTargetIdentity` / group resolution.
+- `#322` remains separate on purpose: Clear annotations and context-replacement cleanup should keep using total stored annotation records, not the live non-dead badge count introduced here.
+
 ### 2026-05-30 - PR #133 review follow-up
 
 Fixed one scoped ADR 0008 issue before merge:

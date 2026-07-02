@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
@@ -17,52 +18,64 @@ vi.mock('@/components/Preview/LivePreview', () => ({
     isAnnotationMode,
     annotations,
     onAnnotationsChange,
+    onActivePageOpenAnnotationCountChange,
     previewPageId,
   }: {
     isAnnotationMode: boolean
     annotations: ArcadeAnnotation[]
     onAnnotationsChange: (annotations: ArcadeAnnotation[]) => void
+    onActivePageOpenAnnotationCountChange?: (count: number) => void
     previewPageId: ArcadePageId
-  }) => (
-    <div data-testid="live-preview">
-      {isAnnotationMode && (
-        <>
-          <button
-            type="button"
-            onClick={() =>
-              onAnnotationsChange([
-                ...annotations,
-                annotation('created-from-preview', previewPageId, {
-                  comment: 'Needs clearer copy',
-                  boundingBox: { x: 16, y: 24, width: 120, height: 40 },
-                }),
-              ])
-            }
-          >
-            Save fake annotation
-          </button>
-          {annotations
-            .filter((item) => item.pageId === previewPageId)
-            .map((item, index) => (
-              <div key={item.id}>
-                <button type="button" aria-label={`Annotation ${index + 1}: ${item.comment}`}>
-                  {index + 1}
-                </button>
-                <button
-                  type="button"
-                  aria-label={`Delete annotation ${item.comment}`}
-                  onClick={() =>
-                    onAnnotationsChange(annotations.filter((annotationItem) => annotationItem.id !== item.id))
-                  }
-                >
-                  Delete annotation
-                </button>
-              </div>
-            ))}
-        </>
-      )}
-    </div>
-  ),
+  }) => {
+    useEffect(() => {
+      if (mockResolvedOpenCount !== null) {
+        queueMicrotask(() => onActivePageOpenAnnotationCountChange?.(mockResolvedOpenCount))
+      }
+    }, [onActivePageOpenAnnotationCountChange])
+
+    return (
+      <div data-testid="live-preview">
+        {isAnnotationMode && (
+          <>
+            <button
+              type="button"
+              onClick={() =>
+                onAnnotationsChange([
+                  ...annotations,
+                  annotation('created-from-preview', previewPageId, {
+                    comment: 'Needs clearer copy',
+                    boundingBox: { x: 16, y: 24, width: 120, height: 40 },
+                  }),
+                ])
+              }
+            >
+              Save fake annotation
+            </button>
+            {annotations
+              .filter((item) => item.pageId === previewPageId)
+              .map((item, index) => (
+                <div key={item.id}>
+                  <button type="button" aria-label={`Annotation ${index + 1}: ${item.comment}`}>
+                    {index + 1}
+                  </button>
+                  <button
+                    type="button"
+                    aria-label={`Delete annotation ${item.comment}`}
+                    onClick={() =>
+                      onAnnotationsChange(
+                        annotations.filter((annotationItem) => annotationItem.id !== item.id)
+                      )
+                    }
+                  >
+                    Delete annotation
+                  </button>
+                </div>
+              ))}
+          </>
+        )}
+      </div>
+    )
+  },
 }))
 
 vi.mock('@/services/transpiler', () => ({
@@ -95,6 +108,8 @@ const createProjectWithAnnotations = (annotations: ArcadeAnnotation[] = []): Pro
   activePageId: 'page01',
   annotations,
 })
+
+let mockResolvedOpenCount: number | null = null
 
 const createContextValue = (project: Project) => ({
     project,
@@ -157,6 +172,7 @@ describe('Annotation mode preview-header shell', () => {
     vi.clearAllMocks()
     window.localStorage.clear()
     window.sessionStorage.clear()
+    mockResolvedOpenCount = null
   })
 
   afterEach(() => {
@@ -234,6 +250,18 @@ describe('Annotation mode preview-header shell', () => {
     )
 
     expect(screen.getByTestId('annotation-count-badge').textContent).toBe('99+')
+  })
+
+  it('uses the live resolved count from the preview bridge for dead-target filtering', () => {
+    mockResolvedOpenCount = 0
+
+    renderPreviewPane(
+      createProjectWithAnnotations([annotation('annotation-1', 'page01', { comment: 'Dead target' })])
+    )
+
+    return waitFor(() => {
+      expect(screen.queryByTestId('annotation-count-badge')).toBeNull()
+    })
   })
 
   it('adds a single annotation through the preview flow and keeps markers mode-scoped', async () => {

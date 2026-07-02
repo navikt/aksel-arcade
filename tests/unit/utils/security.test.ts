@@ -257,6 +257,11 @@ describe('Security Utilities', () => {
           payload: { requestId: 'target-1', result: { status: 'not-real' } },
         })
       ).toBe(false)
+      expect(
+        validateSandboxToMainMessage({
+          type: 'ANNOTATION_VIEWPORT_CHANGED',
+        })
+      ).toBe(true)
     })
 
     it('should accept valid SANDBOX_CONNECTED message', () => {

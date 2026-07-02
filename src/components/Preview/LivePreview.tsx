@@ -12,11 +12,15 @@ import {
   getOpenAnnotations,
   hardDeleteAnnotation,
 } from '@/services/annotations'
+import { buildAnnotationTargetResolutionRequest } from '@/services/annotationTargetRequests'
 import {
   registerPreviewEvidenceRequestHandler,
   type PreviewEvidenceCaptureResult,
 } from '@/services/previewEvidence'
-import type { ResolvedAnnotationTarget } from '@/services/annotationTargets'
+import type {
+  AnnotationTargetResolutionResult,
+  ResolvedAnnotationTarget,
+} from '@/services/annotationTargets'
 import { getViewportWidth } from '@/types/viewports'
 import { validateSandboxToMainMessage } from '@/utils/security'
 import {
@@ -185,6 +189,7 @@ interface LivePreviewProps {
   isAnnotationMode: boolean
   annotations: ArcadeAnnotation[]
   onAnnotationsChange: (annotations: ArcadeAnnotation[]) => void
+  onActivePageOpenAnnotationCountChange?: (count: number) => void
   theme: 'light' | 'dark'
 }
 
@@ -212,6 +217,7 @@ export const LivePreview = ({
   isAnnotationMode,
   annotations,
   onAnnotationsChange,
+  onActivePageOpenAnnotationCountChange,
   theme,
 }: LivePreviewProps) => {
   const [sandboxReady, setSandboxReady] = useState(false)
@@ -222,6 +228,10 @@ export const LivePreview = ({
   const sandboxPortRef = useRef<MessagePort | null>(null)
   const previewEvidenceRequestIdRef = useRef(0)
   const previewEvidenceRequestsRef = useRef(new Map<string, PendingPreviewEvidenceRequest>())
+  const annotationResolutionRequestsRef = useRef(new Map<string, string>())
+  const annotationResolutionRequestIdRef = useRef(0)
+  const annotationResolutionFrameRef = useRef<number | null>(null)
+  const scheduleAnnotationResolutionRefreshRef = useRef<() => void>(() => {})
   const previewEvidenceUnregisterRef = useRef<(() => void) | null>(null)
   const sandboxConnectedRef = useRef(false)
   const sandboxRetiredRef = useRef(false)
@@ -249,6 +259,10 @@ export const LivePreview = ({
   const [editAnnotationDraft, setEditAnnotationDraft] = useState('')
   const [editAnnotationAnchorEl, setEditAnnotationAnchorEl] = useState<HTMLElement | null>(null)
   const [markerPreview, setMarkerPreview] = useState<MarkerPreviewState | null>(null)
+  const [previewScrollPosition, setPreviewScrollPosition] = useState({ x: 0, y: 0 })
+  const [annotationResolutionById, setAnnotationResolutionById] = useState<
+    Record<string, AnnotationTargetResolutionResult>
+  >({})
   const annotationTextareaRef = useRef<HTMLTextAreaElement | null>(null)
   const editAnnotationTextareaRef = useRef<HTMLTextAreaElement | null>(null)
   const selectedViewportWidth = getViewportWidth(viewportWidth)
@@ -406,9 +420,11 @@ export const LivePreview = ({
       previewEvidenceUnregisterRef.current?.()
       previewEvidenceUnregisterRef.current = null
       resolveAllPendingPreviewEvidenceRequests('Preview iframe disconnected before evidence settled.')
+      annotationResolutionRequestsRef.current.clear()
       sandboxPortRef.current?.close()
       sandboxPortRef.current = null
       sandboxConnectedRef.current = false
+      setPreviewScrollPosition({ x: 0, y: 0 })
       if (resetReady) {
         setSandboxReady(false)
       }
@@ -426,6 +442,7 @@ export const LivePreview = ({
         case 'SANDBOX_CONNECTED':
           setSandboxReady(true)
           sendPendingCode()
+          scheduleAnnotationResolutionRefreshRef.current()
           break
         case 'RENDER_SUCCESS':
           handlersRef.current.onRenderSuccess()
@@ -435,6 +452,7 @@ export const LivePreview = ({
           ) {
             postNavigateToPage(previewPageIdRef.current)
           }
+          scheduleAnnotationResolutionRefreshRef.current()
           break
         case 'COMPILE_ERROR':
           handlersRef.current.onCompileError(message.payload)
@@ -445,6 +463,7 @@ export const LivePreview = ({
         case 'PREVIEW_PAGE_CHANGED':
           lastReportedPageIdRef.current = message.payload.pageId
           handlersRef.current.onPreviewPageChange(message.payload.pageId)
+          scheduleAnnotationResolutionRefreshRef.current()
           break
         case 'INSPECTION_DATA':
           // T082: Update popover position and content
@@ -473,6 +492,26 @@ export const LivePreview = ({
             setMarkerPreview(null)
           }
           break
+        case 'ANNOTATION_VIEWPORT_CHANGED':
+          setPreviewScrollPosition({
+            x: message.payload.scrollX,
+            y: message.payload.scrollY,
+          })
+          scheduleAnnotationResolutionRefreshRef.current()
+          break
+        case 'ANNOTATION_TARGET_RESOLVED': {
+          const annotationId = annotationResolutionRequestsRef.current.get(message.payload.requestId)
+          if (!annotationId) {
+            break
+          }
+
+          annotationResolutionRequestsRef.current.delete(message.payload.requestId)
+          setAnnotationResolutionById((current) => ({
+            ...current,
+            [annotationId]: message.payload.result,
+          }))
+          break
+        }
         case 'PREVIEW_EVIDENCE_CAPTURED':
           resolvePendingPreviewEvidenceRequest(
             message.payload.requestId,
@@ -721,6 +760,136 @@ export const LivePreview = ({
     [annotations, previewPageId]
   )
 
+  const activePageAnnotationResolutionRequests = useMemo(
+    () =>
+      new Map(
+        activePageOpenAnnotations.map((annotation) => [
+          annotation.id,
+          buildAnnotationTargetResolutionRequest(annotation),
+        ])
+      ),
+    [activePageOpenAnnotations]
+  )
+
+  const visibleMarkerEntries = useMemo(
+    () =>
+      activePageOpenAnnotations.flatMap((annotation) => {
+        const request = activePageAnnotationResolutionRequests.get(annotation.id) ?? null
+        const resolution = annotationResolutionById[annotation.id]
+
+        if (!sandboxReady || !request || !resolution) {
+          return [{ annotation, target: annotation as ArcadeAnnotation | ResolvedAnnotationTarget }]
+        }
+
+        if (resolution.status !== 'resolved' || !resolution.target) {
+          return []
+        }
+
+        return [{ annotation, target: resolution.target as ArcadeAnnotation | ResolvedAnnotationTarget }]
+      }),
+    [
+      activePageAnnotationResolutionRequests,
+      activePageOpenAnnotations,
+      annotationResolutionById,
+      sandboxReady,
+    ]
+  )
+
+  const countableOpenAnnotationCount = useMemo(
+    () =>
+      activePageOpenAnnotations.filter((annotation) => {
+        const request = activePageAnnotationResolutionRequests.get(annotation.id) ?? null
+        const resolution = annotationResolutionById[annotation.id]
+
+        if (!sandboxReady || !request || !resolution) {
+          return true
+        }
+
+        return resolution.status === 'resolved' || resolution.status === 'hidden'
+      }).length,
+    [
+      activePageAnnotationResolutionRequests,
+      activePageOpenAnnotations,
+      annotationResolutionById,
+      sandboxReady,
+    ]
+  )
+
+  const scheduleAnnotationResolutionRefresh = useCallback(() => {
+    if (annotationResolutionFrameRef.current !== null) {
+      cancelAnimationFrame(annotationResolutionFrameRef.current)
+    }
+
+    annotationResolutionFrameRef.current = window.requestAnimationFrame(() => {
+      annotationResolutionFrameRef.current = null
+
+      const port = sandboxPortRef.current
+      if (!port) {
+        return
+      }
+
+      annotationResolutionRequestsRef.current.clear()
+      for (const annotation of activePageOpenAnnotations) {
+        const request = activePageAnnotationResolutionRequests.get(annotation.id) ?? null
+        if (!request) {
+          continue
+        }
+
+        const requestId = `annotation-resolution-${++annotationResolutionRequestIdRef.current}`
+        annotationResolutionRequestsRef.current.set(requestId, annotation.id)
+        port.postMessage({
+          type: 'RESOLVE_ANNOTATION_TARGET',
+          payload: {
+            requestId,
+            request,
+          },
+        } satisfies MainToSandboxMessage)
+      }
+    })
+  }, [activePageAnnotationResolutionRequests, activePageOpenAnnotations])
+
+  useEffect(() => {
+    scheduleAnnotationResolutionRefreshRef.current = scheduleAnnotationResolutionRefresh
+  }, [scheduleAnnotationResolutionRefresh])
+
+  useEffect(
+    () => () => {
+      if (annotationResolutionFrameRef.current !== null) {
+        cancelAnimationFrame(annotationResolutionFrameRef.current)
+      }
+    },
+    []
+  )
+
+  useEffect(() => {
+    const activeIds = new Set(activePageOpenAnnotations.map((annotation) => annotation.id))
+    setAnnotationResolutionById((current) => {
+      const nextEntries = Object.entries(current).filter(([annotationId]) => activeIds.has(annotationId))
+      return nextEntries.length === Object.keys(current).length
+        ? current
+        : Object.fromEntries(nextEntries)
+    })
+  }, [activePageOpenAnnotations])
+
+  useEffect(() => {
+    onActivePageOpenAnnotationCountChange?.(countableOpenAnnotationCount)
+  }, [countableOpenAnnotationCount, onActivePageOpenAnnotationCountChange])
+
+  useEffect(() => {
+    if (!sandboxReady) {
+      return
+    }
+
+    scheduleAnnotationResolutionRefresh()
+  }, [
+    activePageOpenAnnotations,
+    effectiveViewportWidth,
+    previewPageId,
+    sandboxReady,
+    scheduleAnnotationResolutionRefresh,
+    viewportIntrinsicHeight,
+  ])
+
   const editingAnnotation = useMemo(
     () =>
       editingAnnotationId
@@ -751,6 +920,22 @@ export const LivePreview = ({
     }
   }, [markerPreview, previewedAnnotation])
 
+  useEffect(() => {
+    const interactiveAnnotationIds = new Set(
+      visibleMarkerEntries.map(({ annotation }) => annotation.id)
+    )
+
+    if (editingAnnotationId && !interactiveAnnotationIds.has(editingAnnotationId)) {
+      setEditingAnnotationId(null)
+      setEditAnnotationDraft('')
+      setEditAnnotationAnchorEl(null)
+    }
+
+    if (markerPreview && !interactiveAnnotationIds.has(markerPreview.annotationId)) {
+      setMarkerPreview(null)
+    }
+  }, [editingAnnotationId, markerPreview, visibleMarkerEntries])
+
   const saveSelectedAnnotation = useCallback(() => {
     if (!previewPageId || !selectedAnnotationTarget || annotationDraft.trim().length === 0) {
       return
@@ -759,7 +944,13 @@ export const LivePreview = ({
     const nextAnnotation = createAnnotation({
       pageId: previewPageId,
       comment: annotationDraft.trim(),
-      target: selectedAnnotationTarget.snapshot,
+      target: {
+        ...selectedAnnotationTarget.snapshot,
+        targetIdentities:
+          selectedAnnotationTarget.snapshot.targetIdentities?.length
+            ? selectedAnnotationTarget.snapshot.targetIdentities.map((identity) => ({ ...identity }))
+            : [{ ...selectedAnnotationTarget.identity }],
+      },
     })
     onAnnotationsChange([...annotations, nextAnnotation])
     setSelectedAnnotationTarget(null)
@@ -887,6 +1078,8 @@ export const LivePreview = ({
     const box = isResolvedTarget ? target.snapshot.boundingBox : target.boundingBox
     const clickX = isResolvedTarget ? target.snapshot.x : target.x
     const clickY = isResolvedTarget ? target.snapshot.y : target.y
+    const scrollOffsetY =
+      isResolvedTarget && !target.snapshot.isFixed ? previewScrollPosition.y : 0
     const viewportWidthPx = Math.max(1, effectiveViewportWidth)
     const viewportHeightPx = Math.max(1, viewportIntrinsicHeight)
     const rawLeft =
@@ -897,9 +1090,9 @@ export const LivePreview = ({
           : 0
     const rawTop =
       typeof clickY === 'number' && Number.isFinite(clickY)
-        ? clickY
+        ? clickY - scrollOffsetY
         : box && Number.isFinite(box.y)
-          ? Math.max(0, box.y)
+          ? Math.max(0, box.y - scrollOffsetY)
           : 0
     const left = clampNumber(
       rawLeft,
@@ -955,7 +1148,7 @@ export const LivePreview = ({
           />
           {isAnnotationMode && (
             <div className="live-preview__annotation-layer" data-testid="annotation-overlay-layer">
-              {activePageOpenAnnotations.map((annotation, index) => (
+              {visibleMarkerEntries.map(({ annotation, target }, index) => (
                 <Button
                   key={annotation.id}
                   type="button"
@@ -972,7 +1165,7 @@ export const LivePreview = ({
                       .filter(Boolean)
                       .join(' ')
                   }
-                  style={getOverlayPosition(annotation)}
+                  style={getOverlayPosition(target)}
                   aria-label={`Open annotation ${index + 1}: ${getAnnotationPreviewContent(annotation)}`}
                   aria-expanded={editingAnnotationId === annotation.id}
                   onMouseEnter={(event) => openMarkerPreview(annotation, event.currentTarget)}

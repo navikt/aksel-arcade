@@ -123,6 +123,47 @@ describe('annotation target resolution', () => {
     expect(result.target?.snapshot.boundingBox).toEqual({ x: 10, y: 900, width: 120, height: 32 })
   })
 
+  it('recomputes target geometry after source edits that move and restore the same target identity', () => {
+    const originalRoot = makeRoot('<div><button class="primary">Save</button></div>')
+    const original = originalRoot.querySelector('button') as HTMLButtonElement
+    setRect(original, { x: 10, y: 10, width: 80, height: 32 })
+    const identity = getAnnotationTargetIdentity(originalRoot, original, window)
+
+    const movedRoot = makeRoot('<section><div><button class="primary">Save</button></div></section>')
+    const moved = movedRoot.querySelector('button') as HTMLButtonElement
+    setRect(moved, { x: 180, y: 220, width: 120, height: 40 })
+
+    expect(resolveAnnotationTargetIdentity(movedRoot, identity, window)).toMatchObject({
+      status: 'resolved',
+      target: {
+        visibility: 'visible',
+        snapshot: {
+          targetIdentities: [expect.objectContaining({ signature: identity.signature })],
+          boundingBox: { x: 180, y: 220, width: 120, height: 40 },
+        },
+      },
+    })
+
+    const missingRoot = makeRoot('<section><div><button class="secondary">Cancel</button></div></section>')
+    expect(resolveAnnotationTargetIdentity(missingRoot, identity, window)).toMatchObject({
+      status: 'dead',
+      reason: 'no-match',
+    })
+
+    const restoredRoot = makeRoot('<div><button class="primary">Save</button></div>')
+    const restored = restoredRoot.querySelector('button') as HTMLButtonElement
+    setRect(restored, { x: 40, y: 64, width: 96, height: 36 })
+
+    expect(resolveAnnotationTargetIdentity(restoredRoot, identity, window)).toMatchObject({
+      status: 'resolved',
+      target: {
+        snapshot: {
+          boundingBox: { x: 40, y: 64, width: 96, height: 36 },
+        },
+      },
+    })
+  })
+
   it('resolves drag multi-select targets all at once and no-ops empty drags', () => {
     const root = makeRoot(`
       <section aria-label="Actions">
@@ -355,6 +396,54 @@ describe('annotation target resolution', () => {
     expect(listTarget).toMatchObject({
       status: 'resolved',
       target: { identity: { tagName: 'ul' } },
+    })
+  })
+
+  it('covers custom div/span targets and ambiguous recovery cases', () => {
+    const originalRoot = makeRoot(`
+      <div>
+        <div class="card"><span>Primary note</span></div>
+      </div>
+    `)
+    const originalTarget = originalRoot.querySelector('.card') as HTMLDivElement
+    setRect(originalTarget, { x: 20, y: 20, width: 180, height: 64 })
+    const originalIdentity = getAnnotationTargetIdentity(originalRoot, originalTarget, window)
+
+    const movedRoot = makeRoot(`
+      <section>
+        <div class="card"><span>Primary note</span></div>
+      </section>
+    `)
+    const movedTarget = movedRoot.querySelector('.card') as HTMLDivElement
+    setRect(movedTarget, { x: 120, y: 180, width: 220, height: 72 })
+
+    expect(resolveAnnotationTargetIdentity(movedRoot, originalIdentity, window)).toMatchObject({
+      status: 'resolved',
+      target: {
+        identity: {
+          tagName: 'div',
+          text: 'Primary note',
+        },
+        snapshot: {
+          boundingBox: { x: 120, y: 180, width: 220, height: 72 },
+        },
+      },
+    })
+
+    const ambiguousRoot = makeRoot(`
+      <section>
+        <div class="card"><span>Primary note</span></div>
+        <div class="card"><span>Primary note</span></div>
+      </section>
+    `)
+    ambiguousRoot.querySelectorAll('.card').forEach((card, index) => {
+      setRect(card, { x: 20 + index * 240, y: 20, width: 180, height: 64 })
+    })
+
+    expect(resolveAnnotationTargetIdentity(ambiguousRoot, originalIdentity, window)).toMatchObject({
+      status: 'dead',
+      reason: 'ambiguous-match',
+      matchCount: 2,
     })
   })
 
