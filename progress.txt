@@ -4325,3 +4325,30 @@ Verification:
 - npm run lint
 - npm run test -- --run
 - Browser load and console check at `http://127.0.0.1:4177/aksel-arcade/`
+
+### 2026-07-02 - Issue #322: Clear annotations and context cleanup
+
+Implemented:
+
+- Selected #322 as the single highest-priority `ready-for-agent` feature from #320-#326 after checking parent PRD #314, `CONTEXT.md`, and ADRs 0020, 0021, and 0023. #322 is an independent destructive-cleanup/data-integrity slice and directly unblocks package/share annotation persistence in #323.
+- Wired the preview-header **Clear all annotations** button to an Aksel `Dialog` alertdialog that includes the active page name and total annotation-record count, including resolved/history/non-visible records, then hard-deletes only the active page's annotation records on confirmation.
+- Extended page deletion copy to mention annotation cleanup and record count when the deleted page has annotations; the existing `projectSource.deletePage` cleanup remains the source of truth for removing deleted-page annotations.
+- Updated built-in template/demo replacement actions to reset the entire annotation set while preserving ordinary source edits.
+- Added regression coverage for Clear all confirm/cancel/page scoping, page deletion copy/cleanup, Reset editor annotation reset, and built-in template/demo annotation reset.
+
+Verification:
+
+- npm install
+- npm run typecheck
+- npm run lint
+- CI=1 npm run test
+- Browser checklist at `http://127.0.0.1:5177/aksel-arcade/`: seeded annotations on two pages, visually confirmed the Clear all destructive dialog includes Page 1 plus total active-page count, cancel preserved all records, confirm removed only Page 1 annotations, deleting the annotated second page showed the normal delete dialog with annotation-count copy and removed orphan data, and Reset editor returned to a clean default project with no annotations.
+
+Review follow-up:
+
+- Code review found the context-replacement regression coverage did not explicitly assert that applying a Web share URL or importing an Arcade project package/replacement clears old annotations.
+- Extended `tests/integration/share-decode.test.tsx` so both the Web share load path and import replacement path start from an annotated working copy and assert the replacement project has zero old annotations.
+
+Verification:
+
+- npm test -- --run tests/integration/share-decode.test.tsx

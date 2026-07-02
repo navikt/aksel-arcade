@@ -14,6 +14,7 @@ import {
   updatePageSource,
 } from '@/services/projectSource'
 import { createDefaultProject } from '@/utils/projectDefaults'
+import type { ArcadeAnnotation } from '@/types/annotations'
 import {
   resetLocalStorageMock,
   resetSessionStorageMock,
@@ -61,6 +62,7 @@ const EditorHarness = () => {
       <div data-testid="page-summary">
         {project.source.pages.map((page) => `${page.id}:${page.name}`).join('|')}
       </div>
+      <div data-testid="annotations-json">{JSON.stringify(project.annotations)}</div>
       <EditorPane />
     </>
   )
@@ -106,6 +108,26 @@ const openPageActions = async (user: ReturnType<typeof userEvent.setup>, pageNam
 
 const getCodeEditor = () =>
   screen.getByRole('textbox', { name: 'Code editor' }) as HTMLTextAreaElement
+
+const annotation = (
+  id: string,
+  pageId: ArcadeAnnotation['pageId'],
+  overrides: Partial<ArcadeAnnotation> = {}
+): ArcadeAnnotation => ({
+  id,
+  pageId,
+  x: 10,
+  y: 20,
+  comment: 'Review this page',
+  element: 'Button',
+  elementPath: 'main > button',
+  timestamp: 1,
+  kind: 'feedback',
+  status: 'pending',
+  createdAt: '2026-07-01T08:00:00.000Z',
+  updatedAt: '2026-07-01T08:00:00.000Z',
+  ...overrides,
+})
 
 describe('Multi-page page panel', () => {
   beforeEach(() => {
@@ -326,6 +348,51 @@ describe('Multi-page page panel', () => {
       deleteAction.getAttribute('aria-disabled') === 'true' ||
         deleteAction.hasAttribute('data-disabled')
     ).toBe(true)
+  })
+
+  it('mentions annotation cleanup in page deletion and removes only deleted-page annotations', async () => {
+    const user = userEvent.setup()
+    const project = {
+        ...createStoredMultiPageProject(),
+        annotations: [
+          annotation('11111111-1111-4111-8111-111111111111', 'page01', {
+            comment: 'Keep page one',
+          }),
+          annotation('22222222-2222-4222-8222-222222222222', 'page02', {
+            comment: 'Delete page two',
+            status: 'resolved',
+          }),
+          annotation('33333333-3333-4333-8333-333333333333', 'page02', {
+            comment: 'Delete placement',
+            kind: 'placement',
+          }),
+        ],
+    }
+    saveProject(project, {
+        preferences: {
+          ...DEFAULT_WEB_ARCADE_WORKING_COPY_PREFERENCES,
+          multiPageEnabled: true,
+          pagePanelOpen: true,
+          selectedEditTarget: 'page',
+        },
+    })
+
+    renderHarness()
+
+    await openPageActions(user, 'Details')
+    await user.click(await screen.findByRole('menuitem', { name: /delete page/i }))
+
+    const deleteDialog = await screen.findByRole('alertdialog', { name: /delete page/i })
+    expect(deleteDialog.textContent).toMatch(/also delete 2 annotation records/i)
+
+    await user.click(screen.getByRole('button', { name: /delete page/i }))
+
+    await waitFor(() => {
+        expect(screen.getByTestId('page-summary').textContent).toBe('page01:Page 1')
+        expect(JSON.parse(screen.getByTestId('annotations-json').textContent ?? '[]')).toEqual([
+          expect.objectContaining({ id: '11111111-1111-4111-8111-111111111111', pageId: 'page01' }),
+        ])
+    })
   })
 
   it('shows delete impact counts and page-level broken-navigation indicators for stale references', async () => {

@@ -23,6 +23,7 @@ import {
 import { decodeShareToken } from '@/utils/shareDecoding'
 import { getCompressionStrategy } from '@/services/compressionStrategies'
 import { CURRENT_PROJECT_VERSION, type Project, type ProjectSnapshot } from '@/types/project'
+import type { ArcadeAnnotation } from '@/types/annotations'
 import {
   FIRST_PAGE_ID,
   getActiveSource,
@@ -43,6 +44,8 @@ const Harness = () => {
     replaceProject,
     updateEditorState,
     resetToIntro,
+    loadFormSummaryTemplate,
+    loadHooksDemo,
     shareHydration,
     applySharedSnapshot,
     dismissShareHydration,
@@ -63,6 +66,7 @@ const Harness = () => {
       <div data-testid="project-active-page-id">{project.activePageId}</div>
       <div data-testid="project-start-page-id">{project.source.startPageId}</div>
       <div data-testid="project-page-count">{String(project.source.pages.length)}</div>
+      <div data-testid="project-annotations-count">{String(project.annotations.length)}</div>
       <div data-testid="project-source-json">{JSON.stringify(project.source)}</div>
       <div data-testid="global-config-jsx">{project.source.globalConfig.jsx}</div>
       <div data-testid="jsx-code">{source.jsx}</div>
@@ -83,6 +87,8 @@ const Harness = () => {
       <div data-testid="share-status">{shareHydration.status}</div>
       <button onClick={() => updateEditorState({ activeTab: 'Hooks' })}>Set local Hooks tab</button>
       <button onClick={resetToIntro}>Reset editor</button>
+      <button onClick={loadFormSummaryTemplate}>Load form summary template</button>
+      <button onClick={loadHooksDemo}>Load Hooks demo</button>
       <button
         onClick={() =>
           replaceProject(
@@ -213,6 +219,26 @@ const createWorkingCopyProject = (
     ...projectOverrides,
   }
 }
+
+const annotation = (
+  id: string,
+  pageId: ArcadeAnnotation['pageId'] = FIRST_PAGE_ID,
+  overrides: Partial<ArcadeAnnotation> = {}
+): ArcadeAnnotation => ({
+  id,
+  pageId,
+  x: 10,
+  y: 20,
+  comment: 'Review this',
+  element: 'Button',
+  elementPath: 'main > button',
+  timestamp: 1,
+  kind: 'feedback',
+  status: 'pending',
+  createdAt: '2026-07-01T08:00:00.000Z',
+  updatedAt: '2026-07-01T08:00:00.000Z',
+  ...overrides,
+})
 
 const setPrimarySource = (project: Project, jsxCode: string, hooksCode = '') => {
   project.source = createSinglePageProjectSource(jsxCode, hooksCode)
@@ -353,6 +379,7 @@ describe('share decode integration', () => {
       hooksCode: 'export function useResetSourceHook() { return "Reset source Hooks" }',
       viewportSize: 'XL',
       panelLayout: 'editor-right',
+      annotations: [annotation('11111111-1111-4111-8111-111111111111')],
     })
     saveProject(previousProject, {
       preferences: {
@@ -380,6 +407,7 @@ describe('share decode integration', () => {
       expect(confirmSpy).toHaveBeenCalledWith(expect.stringContaining('Web Arcade working copy'))
       expect(screen.getByTestId('project-id').textContent).not.toBe(previousProject.id)
       expect(screen.getByTestId('project-name').textContent).toBe('Untitled Project')
+      expect(screen.getByTestId('project-annotations-count').textContent).toBe('0')
       expect(screen.getByTestId('jsx-code').textContent).toContain('Welcome to Aksel Arcade')
       expect(screen.getByTestId('hooks-code').textContent).toContain('Define custom hooks here')
       expect(screen.getByTestId('project-viewport').textContent).toBe('MD')
@@ -401,10 +429,51 @@ describe('share decode integration', () => {
     }
   })
 
+  it('clears annotations when loading built-in replacement templates and demos', async () => {
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true)
+
+    try {
+      saveProject(
+        createWorkingCopyProject({
+          name: 'Annotated template replacement',
+          annotations: [annotation('11111111-1111-4111-8111-111111111111')],
+        })
+      )
+      const formRender = renderHarness()
+
+      expect(screen.getByTestId('project-annotations-count').textContent).toBe('1')
+      await user.click(screen.getByRole('button', { name: /load form summary template/i }))
+
+      await waitFor(() => {
+        expect(screen.getByTestId('project-annotations-count').textContent).toBe('0')
+      })
+
+      formRender.unmount()
+      sessionStorage.clear()
+      saveProject(
+        createWorkingCopyProject({
+          name: 'Annotated demo replacement',
+          annotations: [annotation('22222222-2222-4222-8222-222222222222')],
+        })
+      )
+      renderHarness()
+
+      expect(screen.getByTestId('project-annotations-count').textContent).toBe('1')
+      await user.click(screen.getByRole('button', { name: /load hooks demo/i }))
+
+      await waitFor(() => {
+        expect(screen.getByTestId('project-annotations-count').textContent).toBe('0')
+      })
+    } finally {
+      confirmSpy.mockRestore()
+    }
+  })
+
   it('resets imported working copies to the closed page-panel default', async () => {
     const previousProject = createWorkingCopyProject({
       name: 'Pre-import working copy',
       jsxCode: 'export default function App() { return <div>Pre-import JSX</div> }',
+      annotations: [annotation('11111111-1111-4111-8111-111111111111')],
     })
     saveProject(previousProject, {
       preferences: {
@@ -425,6 +494,7 @@ describe('share decode integration', () => {
 
     await waitFor(() => {
       expect(screen.getByTestId('project-name').textContent).toBe('Imported replacement project')
+      expect(screen.getByTestId('project-annotations-count').textContent).toBe('0')
       expect(screen.getByTestId('settings-page-panel-open').textContent).toBe('false')
     })
   })
@@ -436,6 +506,7 @@ describe('share decode integration', () => {
       hooksCode: 'export function usePreviousHook() { return "Previous Hooks" }',
       viewportSize: 'XS',
       panelLayout: 'editor-right',
+      annotations: [annotation('11111111-1111-4111-8111-111111111111')],
     })
     saveProject(previousProject)
 
@@ -482,6 +553,7 @@ describe('share decode integration', () => {
     expect(screen.getByTestId('hooks-code').textContent).toContain('Shared v3 Hooks')
     expect(screen.getByTestId('project-page-count').textContent).toBe('1')
     expect(screen.getByTestId('project-active-page-id').textContent).toBe('page01')
+    expect(screen.getByTestId('project-annotations-count').textContent).toBe('0')
     expect(screen.getByTestId('project-viewport').textContent).toBe('LG')
     expect(screen.getByTestId('preview-current-viewport').textContent).toBe('LG')
     expect(screen.getByTestId('preview-viewport-width').textContent).toBe(

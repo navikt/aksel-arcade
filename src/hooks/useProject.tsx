@@ -25,6 +25,7 @@ import {
 import type { EditorState } from '@/types/editor'
 import type { ArcadeAnnotation } from '@/types/annotations'
 import type { PreviewState, SandboxConsoleMessage } from '@/types/preview'
+import { createEmptyAnnotations } from '@/services/annotations'
 import {
   createDefaultProject,
   createDefaultEditorState,
@@ -429,6 +430,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
           jsx: FORM_SUMMARY_JSX_CODE,
           hooks: '',
         }),
+        annotations: createEmptyAnnotations(),
         lastModified: new Date().toISOString(),
       }))
       // Reset editor state to JSX tab
@@ -444,6 +446,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
           jsx: HOOKS_DEMO_JSX_CODE,
           hooks: HOOKS_DEMO_HOOKS_CODE,
         }),
+        annotations: createEmptyAnnotations(),
         lastModified: new Date().toISOString(),
       }))
       // Reset editor state to JSX tab
