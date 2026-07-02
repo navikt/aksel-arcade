@@ -4394,3 +4394,18 @@ Verification:
 - npm run lint
 - CI=1 npm test -- --run
 - Browser checks at `http://127.0.0.1:4178/aksel-arcade/` for single dashed union outline, success-colored multi-select styling, rounded-square multi marker, Cmd+Shift no native text selection, and annotation cursor persistence after light/dark toggle
+
+Review follow-up:
+
+- Fixed the remaining click-and-drag annotation regression by taking ownership of ordinary annotation drag gestures before the browser can start native text selection.
+- Added Agentation-style drag feedback while the mouse is down: the success-colored drag rectangle stays visible and each currently included element gets its own success-colored frame. Releasing still collapses the selection to one dashed success union outline.
+- Preserved selected-text annotation support for actual text-selection gestures while ensuring non-text area drags clear native selection.
+- Added `tests/e2e/annotation-drag-selection.spec.ts` to cover the iframe gesture seam: no page text selection, visible drag rectangle, included element frames during drag, cleared drag highlights after release, and one released multi-select outline.
+
+Verification:
+
+- npm run build:sandbox
+- PLAYWRIGHT_BASE_URL=http://127.0.0.1:4178/aksel-arcade npm run test:e2e -- tests/e2e/annotation-drag-selection.spec.ts --reporter=line
+- npm run typecheck
+- npm run lint
+- CI=1 npm test -- --run
