@@ -16,6 +16,7 @@ import { buildAnnotationTargetResolutionRequest } from '@/services/annotationTar
 import {
   registerPreviewEvidenceRequestHandler,
   type PreviewEvidenceCaptureResult,
+  type PreviewEvidenceRequest,
 } from '@/services/previewEvidence'
 import type {
   AnnotationTargetResolutionResult,
@@ -280,6 +281,7 @@ export const LivePreview = ({
   const [viewportBounds, setViewportBounds] = useState({ width: 0, height: 0 })
   const pendingCodeRef = useRef<string | null>(null)
   const latestTranspiledCodeRef = useRef(transpiledCode)
+  const annotationsRef = useRef(annotations)
   const viewportStageRef = useRef<HTMLDivElement | null>(null)
   const sandboxPortRef = useRef<MessagePort | null>(null)
   const previewEvidenceRequestIdRef = useRef(0)
@@ -366,6 +368,10 @@ export const LivePreview = ({
   }, [transpiledCode])
 
   useEffect(() => {
+    annotationsRef.current = annotations
+  }, [annotations])
+
+  useEffect(() => {
     previewPageIdRef.current = previewPageId
   }, [previewPageId])
 
@@ -440,7 +446,9 @@ export const LivePreview = ({
       }
     }
 
-    const requestPreviewEvidence = (): Promise<PreviewEvidenceCaptureResult> => {
+    const requestPreviewEvidence = (
+      request: PreviewEvidenceRequest = {}
+    ): Promise<PreviewEvidenceCaptureResult> => {
       const port = sandboxPortRef.current
       if (!port) {
         return Promise.resolve(
@@ -463,7 +471,28 @@ export const LivePreview = ({
         })
         port.postMessage({
           type: 'CAPTURE_PREVIEW_EVIDENCE',
-          payload: { requestId },
+          payload: {
+            requestId,
+            ...(request.layers ? { layers: request.layers } : {}),
+            ...(request.interactions ? { interactions: request.interactions } : {}),
+            ...(request.screenshotScope ? { screenshotScope: request.screenshotScope } : {}),
+            ...(request.viewportFallback
+              ? {
+                  viewportWidth: request.viewportFallback.width,
+                  viewportHeight: request.viewportFallback.height,
+                }
+              : {}),
+            ...(request.target ? { target: request.target } : {}),
+            ...(request.currentPageId ? { expectedPageId: request.currentPageId } : {}),
+            ...(request.includeAnnotationOverlays
+              ? {
+                  includeAnnotationOverlays: true,
+                  annotations: (request.annotations ?? annotationsRef.current).map((annotation) => ({
+                    ...annotation,
+                  })),
+                }
+              : {}),
+          },
         } satisfies MainToSandboxMessage)
       })
     }
@@ -775,7 +804,7 @@ export const LivePreview = ({
       payload: { jsxCode: transpiledCode, hooksCode: '' },
     }
 
-    postMessageToSandbox(iframeRef.current.contentWindow, message)
+    sandboxPortRef.current?.postMessage(message)
   }, [transpiledCode, sandboxReady, iframeRef])
 
   // Send viewport update when viewport changes

@@ -364,6 +364,8 @@ const parseDesktopMcpPreviewCaptureRequest = (payload) => {
       (typeof payload.pageId !== 'string' || payload.pageId.trim().length === 0)) ||
     (payload.viewportSize !== undefined && typeof payload.viewportSize !== 'string') ||
     (payload.theme !== undefined && typeof payload.theme !== 'string') ||
+    (payload.includeAnnotationOverlays !== undefined &&
+      typeof payload.includeAnnotationOverlays !== 'boolean') ||
     (payload.layers !== undefined &&
       (!Array.isArray(payload.layers) ||
         payload.layers.some((layer) => typeof layer !== 'string'))) ||
@@ -380,6 +382,7 @@ const parseDesktopMcpPreviewCaptureRequest = (payload) => {
     ...(typeof payload.screenshotScope === 'string'
       ? { screenshotScope: payload.screenshotScope }
       : {}),
+    ...(payload.includeAnnotationOverlays === true ? { includeAnnotationOverlays: true } : {}),
     ...(target ? { target } : {}),
     ...(interactions ? { interactions } : {}),
   }

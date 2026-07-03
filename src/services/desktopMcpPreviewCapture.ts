@@ -67,6 +67,7 @@ export interface PreparedDesktopMcpPreviewCapture {
   requestedLayers: DesktopMcpPreviewCaptureLayer[]
   requestedInteractions: PreviewInteractionStep[]
   screenshotScope: PreviewEvidenceScreenshotScope
+  includeAnnotationOverlays: boolean
   target?: PreviewEvidenceCaptureTarget
   projectRevision: string
 }
@@ -128,6 +129,7 @@ export const prepareDesktopMcpPreviewCapture = (
   const target = normalizePreviewCaptureTarget(request.target)
   const screenshotScope = request.screenshotScope ?? 'viewport'
   const requestedInteractions = normalizePreviewInteractions(request.interactions)
+  const includeAnnotationOverlays = request.includeAnnotationOverlays === true
   if (screenshotScope === 'region' && !target) {
     return createPreviewCaptureFailure(
       'invalid-capture-target',
@@ -153,6 +155,12 @@ export const prepareDesktopMcpPreviewCapture = (
     request.layers && request.layers.length > 0
       ? [...request.layers]
       : [...DEFAULT_DESKTOP_MCP_PREVIEW_CAPTURE_LAYERS]
+  if (includeAnnotationOverlays && !requestedLayers.includes('screenshot')) {
+    return createPreviewCaptureFailure(
+      'invalid-capture-target',
+      'capture_preview_evidence includeAnnotationOverlays requires the screenshot layer.'
+    )
+  }
 
   return {
     ok: true,
@@ -163,6 +171,7 @@ export const prepareDesktopMcpPreviewCapture = (
     requestedLayers,
     requestedInteractions,
     screenshotScope,
+    includeAnnotationOverlays,
     ...(target ? { target } : {}),
     projectRevision: createDesktopMcpProjectRevision({
       project: context.project,
@@ -245,6 +254,9 @@ export const finalizeDesktopMcpPreviewCapture = (
   const screenshotMetadata = {
     scope: prepared.screenshotScope,
     ...(targetDescription ? { targetDescription } : {}),
+    ...(capture.captureMeta?.annotationOverlays?.included
+      ? { includesAnnotationOverlays: true }
+      : {}),
   }
 
   const frameResource = {
@@ -281,6 +293,9 @@ export const finalizeDesktopMcpPreviewCapture = (
         maxAccessibilityNodes: MAX_PREVIEW_EVIDENCE_ELEMENTS,
       },
       timeoutMs: DESKTOP_MCP_PREVIEW_CAPTURE_TIMEOUT_MS,
+      ...(capture.captureMeta?.annotationOverlays
+        ? { annotationOverlays: capture.captureMeta.annotationOverlays }
+        : {}),
       interactionLimits: {
         maxSteps: DESKTOP_MCP_PREVIEW_CAPTURE_MAX_INTERACTION_STEPS,
         maxTotalTimeMs: DESKTOP_MCP_PREVIEW_CAPTURE_MAX_INTERACTION_TOTAL_TIME_MS,
@@ -342,6 +357,9 @@ export const finalizeDesktopMcpPreviewCapture = (
         maxAccessibilityNodes: MAX_PREVIEW_EVIDENCE_ELEMENTS,
       },
       timeoutMs: DESKTOP_MCP_PREVIEW_CAPTURE_TIMEOUT_MS,
+      ...(capture.captureMeta?.annotationOverlays
+        ? { annotationOverlays: capture.captureMeta.annotationOverlays }
+        : {}),
       interactionLimits: {
         maxSteps: DESKTOP_MCP_PREVIEW_CAPTURE_MAX_INTERACTION_STEPS,
         maxTotalTimeMs: DESKTOP_MCP_PREVIEW_CAPTURE_MAX_INTERACTION_TOTAL_TIME_MS,
@@ -572,6 +590,9 @@ const createPreviewCaptureSummary = (
         : ' (region)'
       : ` (${prepared.screenshotScope.replace('_', '-')})`
     : ''
+  const annotationOverlaySummary = capture.captureMeta?.annotationOverlays?.included
+    ? ' with annotation overlays'
+    : ''
   const interactionSummary =
     prepared.requestedInteractions.length > 0
       ? ` after ${prepared.requestedInteractions.length} interaction${prepared.requestedInteractions.length === 1 ? '' : 's'}`
@@ -580,7 +601,7 @@ const createPreviewCaptureSummary = (
     ? ` Interactions navigated to ${navigatedTo.navigatedToName ?? navigatedTo.navigatedToId} (${navigatedTo.navigatedToId}); this is an isolated render, so the Active page is unchanged.`
     : ''
 
-  return `Captured ${prepared.pageName} (${prepared.pageId}) in ${prepared.theme} ${prepared.viewportSize} preview with ${layerSummary} evidence${interactionSummary}${scopeSummary}.${navigationSummary}`
+  return `Captured ${prepared.pageName} (${prepared.pageId}) in ${prepared.theme} ${prepared.viewportSize} preview with ${layerSummary} evidence${interactionSummary}${scopeSummary}${annotationOverlaySummary}.${navigationSummary}`
 }
 
 const formatPreviewCaptureLayerLabel = (layer: DesktopMcpPreviewCaptureLayer): string => {

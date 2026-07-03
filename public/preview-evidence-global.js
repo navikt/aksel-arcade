@@ -24,6 +24,7 @@ var previewEvidenceUtils = (() => {
     MAX_PREVIEW_INTERACTION_STEPS: () => MAX_PREVIEW_INTERACTION_STEPS,
     MAX_PREVIEW_INTERACTION_TOTAL_TIME_MS: () => MAX_PREVIEW_INTERACTION_TOTAL_TIME_MS,
     MAX_PREVIEW_INTERACTION_WAIT_TIMEOUT_MS: () => MAX_PREVIEW_INTERACTION_WAIT_TIMEOUT_MS,
+    PREVIEW_EVIDENCE_ANNOTATION_OVERLAY_NOTE: () => PREVIEW_EVIDENCE_ANNOTATION_OVERLAY_NOTE,
     PREVIEW_EVIDENCE_ROOT_SELECTOR: () => PREVIEW_EVIDENCE_ROOT_SELECTOR,
     capturePreviewEvidenceSnapshot: () => capturePreviewEvidenceSnapshot,
     collectPreviewEvidenceFromFrame: () => collectPreviewEvidenceFromFrame,
@@ -726,6 +727,81 @@ var previewEvidenceUtils = (() => {
   var isRecord = (value) => value !== null && typeof value === "object" && !Array.isArray(value);
   var isFiniteNumber = (value) => typeof value === "number" && Number.isFinite(value);
 
+  // src/services/annotationTargetRequests.ts
+  var extractQuotedText = (value) => {
+    if (!value) {
+      return void 0;
+    }
+    const match = value.match(/"([^"]+)"/);
+    return match?.[1]?.trim() || void 0;
+  };
+  var extractAccessibilityField = (accessibility, key) => {
+    if (!accessibility) {
+      return void 0;
+    }
+    if (key === "role") {
+      return accessibility.match(/role=([^\s]+)/)?.[1];
+    }
+    return accessibility.match(/name="([^"]+)"/)?.[1];
+  };
+  var inferTagName = (annotation) => {
+    const [fromElement] = annotation.element.trim().split(/\s+/, 1);
+    if (fromElement) {
+      return fromElement.toLowerCase().replace(/[^a-z0-9-]/g, "") || void 0;
+    }
+    const [fromPath] = annotation.elementPath.trim().split(/[\s>.#:]/, 1);
+    return fromPath?.toLowerCase() || void 0;
+  };
+  var createLegacyTargetIdentity = (annotation) => {
+    const tagName = inferTagName(annotation);
+    if (!tagName) {
+      return null;
+    }
+    const role = extractAccessibilityField(annotation.accessibility, "role");
+    const accessibleName = extractAccessibilityField(annotation.accessibility, "name") ?? extractQuotedText(annotation.element);
+    const text = annotation.selectedText ?? annotation.nearbyText ?? extractQuotedText(annotation.element);
+    const cssClasses = annotation.cssClasses;
+    return {
+      signature: createAnnotationTargetIdentitySignature({
+        tagName,
+        role,
+        accessibleName,
+        text,
+        cssClasses
+      }),
+      tagName,
+      ...role ? { role } : {},
+      ...accessibleName ? { accessibleName } : {},
+      ...text ? { text } : {},
+      ...cssClasses ? { cssClasses } : {},
+      elementPath: annotation.elementPath,
+      fullPath: annotation.fullPath ?? ""
+    };
+  };
+  var getStoredAnnotationTargetIdentities = (annotation) => {
+    if (annotation.targetIdentities && annotation.targetIdentities.length > 0) {
+      return annotation.targetIdentities.map((identity) => ({ ...identity }));
+    }
+    const legacyIdentity = createLegacyTargetIdentity(annotation);
+    return legacyIdentity ? [legacyIdentity] : [];
+  };
+  var buildAnnotationTargetResolutionRequest = (annotation) => {
+    const identities = getStoredAnnotationTargetIdentities(annotation);
+    if (identities.length === 0) {
+      return null;
+    }
+    if (identities.length === 1) {
+      return {
+        mode: "identity",
+        identity: identities[0]
+      };
+    }
+    return {
+      mode: "group",
+      identities
+    };
+  };
+
   // src/services/previewEvidence.ts
   var PREVIEW_EVIDENCE_ROOT_SELECTOR = "#root";
   var MAX_PREVIEW_EVIDENCE_ELEMENTS = 200;
@@ -740,6 +816,9 @@ var previewEvidenceUtils = (() => {
   var PREVIEW_INTERACTION_SETTLE_FRAMES = 2;
   var PREVIEW_INTERACTION_RENDER_IDLE_MS = 100;
   var PREVIEW_INTERACTION_PRINTABLE_KEY_PATTERN = /^[^\s]$/;
+  var PREVIEW_EVIDENCE_ANNOTATION_MARKER_SIZE_PX = 24;
+  var PREVIEW_EVIDENCE_ANNOTATION_MARKER_SAFE_INSET_PX = PREVIEW_EVIDENCE_ANNOTATION_MARKER_SIZE_PX / 2;
+  var PREVIEW_EVIDENCE_ANNOTATION_OVERLAY_NOTE = "Annotation overlays in Preview evidence are capture-only visual context. Durable annotation history remains in annotation resources.";
   var PREVIEW_INTERACTION_SUPPORTED_KEYS = /* @__PURE__ */ new Set([
     "Enter",
     "Escape",
@@ -792,7 +871,7 @@ var previewEvidenceUtils = (() => {
       }
     };
   };
-  var requestPreviewEvidenceFromFrame = (iframe) => {
+  var requestPreviewEvidenceFromFrame = (iframe, request) => {
     if (!iframe) {
       return Promise.resolve(createPreviewUnavailableFailure("Preview iframe is not mounted yet."));
     }
@@ -803,7 +882,7 @@ var previewEvidenceUtils = (() => {
       );
     }
     try {
-      return handler();
+      return handler(request);
     } catch (error) {
       return Promise.resolve(
         createPreviewUnavailableFailure(`Preview evidence request failed: ${getErrorMessage(error)}`)
@@ -853,14 +932,26 @@ var previewEvidenceUtils = (() => {
     target,
     currentPageId = null,
     interactionState,
-    viewportFallback
+    viewportFallback,
+    includeAnnotationOverlays = false,
+    annotations = []
   } = {}, frameWindow = root.ownerDocument.defaultView ?? window) => {
     try {
       const evidence = serializePreviewEvidence(root, frameWindow, viewportFallback);
       const normalizedLayers = layers ? [...layers] : [];
       const screenshotRequested = normalizedLayers.includes("screenshot");
       const accessibilityRequested = normalizedLayers.includes("accessibility");
-      const screenshot = screenshotRequested ? createPreviewScreenshot(root, { screenshotScope, target, viewportFallback }, frameWindow) : null;
+      const annotationOverlayModel = includeAnnotationOverlays ? createPreviewEvidenceAnnotationOverlayModel(root, annotations, currentPageId, frameWindow) : null;
+      const screenshot = screenshotRequested ? createPreviewScreenshot(
+        root,
+        {
+          screenshotScope,
+          target,
+          viewportFallback,
+          annotationOverlays: annotationOverlayModel
+        },
+        frameWindow
+      ) : null;
       const accessibility = accessibilityRequested ? serializePreviewAccessibility(root, frameWindow) : null;
       if (screenshotRequested && !screenshot) {
         return createPreviewCaptureFailure(
@@ -877,7 +968,15 @@ var previewEvidenceUtils = (() => {
           currentPageId,
           ...screenshotRequested ? { screenshotScope } : {},
           ...screenshot?.targetDescription ? { targetDescription: screenshot.targetDescription } : {},
-          ...interactionState ? { interactions: interactionState } : {}
+          ...interactionState ? { interactions: interactionState } : {},
+          ...annotationOverlayModel ? {
+            annotationOverlays: {
+              requested: true,
+              included: screenshotRequested,
+              visibleAnnotationCount: annotationOverlayModel.visibleAnnotationCount,
+              note: PREVIEW_EVIDENCE_ANNOTATION_OVERLAY_NOTE
+            }
+          } : {}
         }
       };
     } catch (error) {
@@ -1029,7 +1128,8 @@ var previewEvidenceUtils = (() => {
   var createPreviewScreenshot = (root, {
     screenshotScope,
     target,
-    viewportFallback
+    viewportFallback,
+    annotationOverlays
   }, frameWindow) => {
     const captureRegion = resolvePreviewCaptureRegion(
       root,
@@ -1048,6 +1148,7 @@ var previewEvidenceUtils = (() => {
     stage.setAttribute("xmlns", "http://www.w3.org/1999/xhtml");
     stage.style.width = `${documentWidth}px`;
     stage.style.height = `${documentHeight}px`;
+    stage.style.position = "relative";
     stage.style.overflow = "hidden";
     stage.style.boxSizing = "border-box";
     stage.style.backgroundColor = resolvePreviewCanvasBackgroundColor(frameDocument, frameWindow);
@@ -1058,6 +1159,15 @@ var previewEvidenceUtils = (() => {
       return null;
     }
     stage.appendChild(clonedRoot);
+    const overlayLayer = annotationOverlays && annotationOverlays.visibleAnnotationCount > 0 ? createPreviewEvidenceAnnotationOverlayLayer(
+      frameDocument,
+      frameWindow,
+      captureRegion.rect,
+      annotationOverlays
+    ) : null;
+    if (overlayLayer) {
+      stage.appendChild(overlayLayer);
+    }
     const serializedStage = new XMLSerializer().serializeToString(stage);
     const width = Math.max(1, roundNumber(captureRegion.rect.width));
     const height = Math.max(1, roundNumber(captureRegion.rect.height));
@@ -1118,6 +1228,244 @@ var previewEvidenceUtils = (() => {
         };
       }
     }
+  };
+  var createPreviewEvidenceAnnotationOverlayModel = (root, annotations, currentPageId, frameWindow) => {
+    if (!currentPageId) {
+      return {
+        visibleAnnotationCount: 0,
+        outlines: [],
+        markers: []
+      };
+    }
+    const overlays = {
+      visibleAnnotationCount: 0,
+      outlines: [],
+      markers: []
+    };
+    const viewport = getEffectiveViewportSize(frameWindow);
+    const pageAnnotations = getPreviewEvidenceOverlayAnnotations(annotations, currentPageId);
+    pageAnnotations.forEach((annotation) => {
+      const request = buildAnnotationTargetResolutionRequest(annotation);
+      if (!request) {
+        return;
+      }
+      const resolution = resolveAnnotationTarget(root, request, frameWindow);
+      if (resolution.status !== "resolved" || !resolution.target) {
+        return;
+      }
+      overlays.visibleAnnotationCount += 1;
+      overlays.outlines.push(...getPreviewEvidenceAnnotationOutlines(annotation.id, resolution.target));
+      overlays.markers.push({
+        annotationId: annotation.id,
+        variant: annotation.isMultiSelect ? "multi-select" : "single",
+        label: overlays.visibleAnnotationCount,
+        ...getPreviewEvidenceAnnotationMarkerPoint(
+          resolution.target.snapshot,
+          annotation,
+          viewport.width
+        )
+      });
+    });
+    return overlays;
+  };
+  var getPreviewEvidenceOverlayAnnotations = (annotations, pageId) => annotations.filter((annotation) => {
+    if (annotation.pageId !== pageId) {
+      return false;
+    }
+    if (annotation.kind && annotation.kind !== "feedback") {
+      return false;
+    }
+    return annotation.status === void 0 || annotation.status === "pending" || annotation.status === "acknowledged";
+  });
+  var getPreviewEvidenceAnnotationOutlines = (annotationId, target) => {
+    const snapshot = target.snapshot;
+    const outlines = [];
+    if (snapshot.isMultiSelect) {
+      snapshot.elementBoundingBoxes?.forEach((box) => {
+        outlines.push({
+          annotationId,
+          variant: "selected-element",
+          box
+        });
+      });
+      if (snapshot.boundingBox) {
+        outlines.push({
+          annotationId,
+          variant: "multi-select",
+          box: snapshot.boundingBox
+        });
+      }
+      return outlines;
+    }
+    if (snapshot.boundingBox) {
+      outlines.push({
+        annotationId,
+        variant: "single",
+        box: snapshot.boundingBox
+      });
+    }
+    return outlines;
+  };
+  var getPreviewEvidenceAnnotationMarkerPoint = (snapshot, annotation, viewportWidth) => {
+    const box = snapshot.boundingBox;
+    const clickX = snapshot.x;
+    const clickY = snapshot.y;
+    const markerOffsetX = annotation.clickOffsetX ?? snapshot.clickOffsetX;
+    const markerOffsetY = annotation.clickOffsetY ?? snapshot.clickOffsetY;
+    const x = box && typeof markerOffsetX === "number" && Number.isFinite(markerOffsetX) ? box.x + markerOffsetX : typeof clickX === "number" && Number.isFinite(clickX) ? clickX / 100 * Math.max(1, viewportWidth) : box && Number.isFinite(box.x) ? box.x + box.width : 0;
+    const y = box && typeof markerOffsetY === "number" && Number.isFinite(markerOffsetY) ? box.y + markerOffsetY : typeof clickY === "number" && Number.isFinite(clickY) ? clickY : box && Number.isFinite(box.y) ? box.y : 0;
+    return {
+      x: roundNumber(x),
+      y: roundNumber(y)
+    };
+  };
+  var createPreviewEvidenceAnnotationOverlayLayer = (frameDocument, frameWindow, captureRect, annotationOverlays) => {
+    const layer = frameDocument.createElement("div");
+    layer.style.position = "absolute";
+    layer.style.inset = "0";
+    layer.style.pointerEvents = "none";
+    layer.style.zIndex = "2";
+    const colors = getPreviewEvidenceAnnotationColors(frameWindow);
+    annotationOverlays.outlines.forEach((outline) => {
+      const element = frameDocument.createElement("div");
+      element.setAttribute("data-preview-evidence-annotation-overlay", "outline");
+      element.setAttribute("data-preview-evidence-annotation-id", outline.annotationId);
+      element.setAttribute("data-preview-evidence-annotation-variant", outline.variant);
+      element.style.position = "absolute";
+      element.style.boxSizing = "border-box";
+      element.style.left = `${roundNumber(outline.box.x)}px`;
+      element.style.top = `${roundNumber(outline.box.y)}px`;
+      element.style.width = `${roundNumber(outline.box.width)}px`;
+      element.style.height = `${roundNumber(outline.box.height)}px`;
+      element.style.borderStyle = "solid";
+      element.style.borderWidth = "2px";
+      element.style.borderRadius = colors.mediumRadius;
+      if (outline.variant === "selected-element") {
+        element.style.borderColor = colors.successBorder;
+        element.style.backgroundColor = colors.successFill;
+      } else {
+        element.style.borderColor = colors.accentBorder;
+        element.style.backgroundColor = outline.variant === "multi-select" ? colors.multiSelectAccentFill : colors.accentFill;
+      }
+      layer.appendChild(element);
+    });
+    annotationOverlays.markers.forEach((marker) => {
+      const element = frameDocument.createElement("div");
+      element.setAttribute("data-preview-evidence-annotation-overlay", "marker");
+      element.setAttribute("data-preview-evidence-annotation-id", marker.annotationId);
+      element.setAttribute("data-preview-evidence-annotation-variant", marker.variant);
+      element.style.position = "absolute";
+      element.style.display = "grid";
+      element.style.placeItems = "center";
+      element.style.width = `${PREVIEW_EVIDENCE_ANNOTATION_MARKER_SIZE_PX}px`;
+      element.style.height = `${PREVIEW_EVIDENCE_ANNOTATION_MARKER_SIZE_PX}px`;
+      element.style.transform = "translate(-50%, -50%)";
+      element.style.boxSizing = "border-box";
+      element.style.fontSize = "12px";
+      element.style.fontWeight = "600";
+      element.style.lineHeight = "1";
+      const clampedX = clampNumber(
+        marker.x - captureRect.x,
+        PREVIEW_EVIDENCE_ANNOTATION_MARKER_SAFE_INSET_PX,
+        Math.max(
+          PREVIEW_EVIDENCE_ANNOTATION_MARKER_SAFE_INSET_PX,
+          captureRect.width - PREVIEW_EVIDENCE_ANNOTATION_MARKER_SAFE_INSET_PX
+        )
+      );
+      const clampedY = clampNumber(
+        marker.y - captureRect.y,
+        PREVIEW_EVIDENCE_ANNOTATION_MARKER_SAFE_INSET_PX,
+        Math.max(
+          PREVIEW_EVIDENCE_ANNOTATION_MARKER_SAFE_INSET_PX,
+          captureRect.height - PREVIEW_EVIDENCE_ANNOTATION_MARKER_SAFE_INSET_PX
+        )
+      );
+      element.style.left = `${roundNumber(captureRect.x + clampedX)}px`;
+      element.style.top = `${roundNumber(captureRect.y + clampedY)}px`;
+      if (marker.variant === "multi-select") {
+        element.style.border = `2px solid ${colors.successBorder}`;
+        element.style.borderRadius = colors.mediumRadius;
+        element.style.backgroundColor = colors.successMarkerBackground;
+        element.style.color = colors.successMarkerText;
+        element.style.width = "26px";
+        element.style.height = "26px";
+      } else {
+        element.style.border = `2px solid ${colors.accentBorder}`;
+        element.style.borderRadius = colors.fullRadius;
+        element.style.backgroundColor = colors.accentMarkerBackground;
+        element.style.color = colors.accentMarkerText;
+      }
+      element.textContent = String(marker.label);
+      layer.appendChild(element);
+    });
+    return layer;
+  };
+  var getPreviewEvidenceAnnotationColors = (frameWindow) => {
+    const rootStyle = frameWindow.getComputedStyle(frameWindow.document.documentElement);
+    const accentBorder = readPreviewEvidenceCssCustomProperty(
+      rootStyle,
+      "--ax-border-accent",
+      "rgb(0, 112, 243)"
+    );
+    const successBorder = readPreviewEvidenceCssCustomProperty(
+      rootStyle,
+      "--ax-border-success",
+      "rgb(0, 158, 96)"
+    );
+    return {
+      accentBorder,
+      accentFill: withPreviewEvidenceColorAlpha(accentBorder, 0.18),
+      multiSelectAccentFill: withPreviewEvidenceColorAlpha(accentBorder, 0.12),
+      successBorder,
+      successFill: withPreviewEvidenceColorAlpha(successBorder, 0.14),
+      accentMarkerBackground: readPreviewEvidenceCssCustomProperty(
+        rootStyle,
+        "--ax-bg-accent-strong",
+        accentBorder
+      ),
+      accentMarkerText: readPreviewEvidenceCssCustomProperty(
+        rootStyle,
+        "--ax-text-accent-contrast",
+        "#ffffff"
+      ),
+      successMarkerBackground: readPreviewEvidenceCssCustomProperty(
+        rootStyle,
+        "--ax-bg-success-strong",
+        successBorder
+      ),
+      successMarkerText: readPreviewEvidenceCssCustomProperty(
+        rootStyle,
+        "--ax-text-success-contrast",
+        "#ffffff"
+      ),
+      mediumRadius: readPreviewEvidenceCssCustomProperty(rootStyle, "--ax-radius-8", "8px"),
+      fullRadius: readPreviewEvidenceCssCustomProperty(rootStyle, "--ax-radius-full", "999px")
+    };
+  };
+  var readPreviewEvidenceCssCustomProperty = (style, property, fallback) => {
+    const value = style.getPropertyValue(property).trim();
+    return value.length > 0 ? value : fallback;
+  };
+  var clampNumber = (value, min, max) => Math.min(Math.max(value, min), max);
+  var withPreviewEvidenceColorAlpha = (color, alpha) => {
+    const trimmed = color.trim();
+    const hexMatch = trimmed.match(/^#([0-9a-f]{3}|[0-9a-f]{6})$/i);
+    if (hexMatch) {
+      const hex = hexMatch[1];
+      const normalized = hex.length === 3 ? hex.split("").map((character) => character + character).join("") : hex;
+      const red = Number.parseInt(normalized.slice(0, 2), 16);
+      const green = Number.parseInt(normalized.slice(2, 4), 16);
+      const blue = Number.parseInt(normalized.slice(4, 6), 16);
+      return `rgba(${red}, ${green}, ${blue}, ${alpha})`;
+    }
+    const rgbMatch = trimmed.match(
+      /^rgba?\(\s*(\d{1,3})(?:\s*,\s*|\s+)(\d{1,3})(?:\s*,\s*|\s+)(\d{1,3})(?:\s*[,/]\s*[\d.]+)?\s*\)$/i
+    );
+    if (rgbMatch) {
+      const [, red, green, blue] = rgbMatch;
+      return `rgba(${red}, ${green}, ${blue}, ${alpha})`;
+    }
+    return trimmed;
   };
   var getCaptureDocumentWidth = (root, frameWindow, viewportFallback) => {
     const document = root.ownerDocument;

@@ -21,6 +21,7 @@ export interface DesktopMcpPreviewCaptureRequest {
   screenshotScope?: PreviewEvidenceScreenshotScope
   target?: PreviewEvidenceCaptureTarget
   interactions?: PreviewInteractionStep[]
+  includeAnnotationOverlays?: boolean
 }
 
 export type DesktopMcpPreviewCaptureErrorCode =

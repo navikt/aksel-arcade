@@ -99,4 +99,64 @@ describe('desktop preload script', () => {
       annotationId: 'ann-1',
     })
   })
+
+  it('routes Desktop MCP preview capture requests with annotation overlay flags intact', async () => {
+    const { exposedApis, ipcListeners, ipcRenderer } = runDesktopPreload()
+    const desktopApi = exposedApis.get('__AKSEL_ARCADE_DESKTOP__')
+    const setDesktopMcpPreviewCaptureHandler = desktopApi?.setDesktopMcpPreviewCaptureHandler
+    if (typeof setDesktopMcpPreviewCaptureHandler !== 'function') {
+      throw new Error('Expected Desktop preload API to expose setDesktopMcpPreviewCaptureHandler')
+    }
+
+    const handler = vi.fn(async (_request: Record<string, unknown>) => ({
+      ok: true,
+      page: { id: 'page01', name: 'Page 1' },
+      manifestResourceUri: 'arcade://preview/captures/capture-1/manifest',
+      resources: [],
+      layerResources: {
+        screenshot: 'arcade://preview/captures/capture-1/screenshot',
+        frame: 'arcade://preview/captures/capture-1/frame',
+      },
+      summary: 'Captured Preview evidence with annotation overlays.',
+    }))
+    setDesktopMcpPreviewCaptureHandler(handler)
+
+    const routeRequest = ipcListeners.get('aksel-arcade:route-desktop-mcp-preview-capture-request')
+    if (!routeRequest) {
+      throw new Error('Expected preview capture IPC listener to be registered')
+    }
+
+    routeRequest(null, {
+      requestId: 'capture-1',
+      pageId: 'page01',
+      layers: ['screenshot', 'frame'],
+      includeAnnotationOverlays: true,
+    })
+
+    await vi.waitFor(() =>
+      expect(ipcRenderer.send).toHaveBeenCalledWith(
+        'aksel-arcade:route-desktop-mcp-preview-capture-response',
+        {
+          requestId: 'capture-1',
+          response: {
+            ok: true,
+            page: { id: 'page01', name: 'Page 1' },
+            manifestResourceUri: 'arcade://preview/captures/capture-1/manifest',
+            resources: [],
+            layerResources: {
+              screenshot: 'arcade://preview/captures/capture-1/screenshot',
+              frame: 'arcade://preview/captures/capture-1/frame',
+            },
+            summary: 'Captured Preview evidence with annotation overlays.',
+          },
+        }
+      )
+    )
+
+    expect(handler).toHaveBeenCalledWith({
+      pageId: 'page01',
+      layers: ['screenshot', 'frame'],
+      includeAnnotationOverlays: true,
+    })
+  })
 })

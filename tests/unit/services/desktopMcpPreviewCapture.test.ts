@@ -7,7 +7,10 @@ import {
   prepareDesktopMcpPreviewCapture,
   type DesktopMcpSandboxCaptureSuccess,
 } from '@/services/desktopMcpPreviewCapture'
-import { MAX_PREVIEW_EVIDENCE_ELEMENTS } from '@/services/previewEvidence'
+import {
+  MAX_PREVIEW_EVIDENCE_ELEMENTS,
+  PREVIEW_EVIDENCE_ANNOTATION_OVERLAY_NOTE,
+} from '@/services/previewEvidence'
 import { createDefaultPreviewState, createDefaultProject } from '@/utils/projectDefaults'
 
 describe('desktopMcpPreviewCapture', () => {
@@ -19,6 +22,7 @@ describe('desktopMcpPreviewCapture', () => {
     }
 
     expect(prepared.requestedLayers).toEqual([...DEFAULT_DESKTOP_MCP_PREVIEW_CAPTURE_LAYERS])
+    expect(prepared.includeAnnotationOverlays).toBe(false)
   })
 
   it('finalizes all requested evidence layers with manifest docs and resource payloads', () => {
@@ -105,6 +109,79 @@ describe('desktopMcpPreviewCapture', () => {
     expect(manifest.capture.ephemeral).toBe(true)
     expect(manifest.capture.ephemeralNote).toBe(DESKTOP_MCP_PREVIEW_CAPTURE_EPHEMERAL_NOTE)
     expect(result.summary).not.toContain('Interactions navigated to')
+  })
+
+  it('surfaces annotation overlay capture metadata without changing annotation resources', () => {
+    const context = createCaptureContext()
+    const prepared = prepareDesktopMcpPreviewCapture(
+      {
+        includeAnnotationOverlays: true,
+      },
+      context
+    )
+    if (!prepared.ok) {
+      throw new Error('Expected overlay capture preparation to succeed.')
+    }
+
+    const result = finalizeDesktopMcpPreviewCapture(
+      prepared,
+      {
+        ...createSandboxCapture(),
+        captureMeta: {
+          ...createSandboxCapture().captureMeta,
+          annotationOverlays: {
+            requested: true,
+            included: true,
+            visibleAnnotationCount: 2,
+            note: PREVIEW_EVIDENCE_ANNOTATION_OVERLAY_NOTE,
+          },
+        },
+      },
+      context,
+      {
+        captureId: 'capture-overlay',
+        timestamp: '2026-06-16T12:00:00.000Z',
+      }
+    )
+    if (!result.ok) {
+      throw new Error('Expected overlay capture finalization to succeed.')
+    }
+
+    expect(result.summary).toContain('with annotation overlays')
+    const manifest = JSON.parse(findResourceText(result.resources, result.manifestResourceUri))
+    expect(manifest.capture.annotationOverlays).toEqual({
+      requested: true,
+      included: true,
+      visibleAnnotationCount: 2,
+      note: PREVIEW_EVIDENCE_ANNOTATION_OVERLAY_NOTE,
+    })
+    const frameResource = JSON.parse(
+      findResourceText(result.resources, 'arcade://preview/captures/capture-overlay/frame')
+    )
+    expect(frameResource.capture.annotationOverlays).toEqual({
+      requested: true,
+      included: true,
+      visibleAnnotationCount: 2,
+      note: PREVIEW_EVIDENCE_ANNOTATION_OVERLAY_NOTE,
+    })
+    expect(manifest.screenshot.includesAnnotationOverlays).toBe(true)
+  })
+
+  it('rejects annotation overlays when the caller omits the screenshot layer', () => {
+    const context = createCaptureContext()
+    const prepared = prepareDesktopMcpPreviewCapture(
+      {
+        layers: ['frame'],
+        includeAnnotationOverlays: true,
+      },
+      context
+    )
+
+    expect(prepared).toEqual({
+      ok: false,
+      code: 'invalid-capture-target',
+      message: 'capture_preview_evidence includeAnnotationOverlays requires the screenshot layer.',
+    })
   })
 
   it('publishes only the selected layer resources when a caller narrows the request', () => {

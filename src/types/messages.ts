@@ -1,6 +1,7 @@
 import type { ArcadePageId } from './project'
 import type { CompileError, RuntimeError } from './preview'
 import type { InspectionData } from './inspection'
+import type { ArcadeAnnotation } from './annotations'
 import type {
   PreviewEvidenceCaptureResult,
   PreviewEvidenceCaptureTarget,
@@ -35,6 +36,8 @@ export type MainToSandboxMessage =
         viewportHeight?: number
         target?: PreviewEvidenceCaptureTarget
         expectedPageId?: ArcadePageId
+        includeAnnotationOverlays?: boolean
+        annotations?: ArcadeAnnotation[]
       }
     }
   | {

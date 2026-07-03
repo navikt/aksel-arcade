@@ -2,6 +2,10 @@ import type { AnnotationAuthorRole, ArcadeAnnotation } from '@/types/annotations
 import type { ArcadePageId, ThemeMode } from '@/types/project'
 import type { MainToSandboxMessage, SandboxToMainMessage } from '@/types/messages'
 import type { Project } from '@/types/project'
+import {
+  validateSandboxReadyMessage,
+  validateSandboxToMainMessage,
+} from '@/utils/security'
 import { buildAnnotationTargetResolutionRequest } from './annotationTargetRequests'
 import {
   appendAnnotationThreadMessage,
@@ -17,6 +21,7 @@ const SANDBOX_IFRAME_SRC =
 const RESOLUTION_REQUEST_PREFIX = 'desktop-mcp-annotation-resolution'
 const RESOLUTION_SETTLE_DELAY_MS = 32
 const RESOLUTION_TIMEOUT_MS = 20_000
+const getSandboxIframeHref = (src: string) => new URL(src, window.location.href).href
 
 export type DesktopMcpAnnotationVisibility = 'visible' | 'hidden' | 'dead'
 
@@ -206,14 +211,21 @@ export const resolveDesktopMcpAnnotationVisibilitiesInSandbox = async ({
     }
 
     const handleWindowMessage = (event: MessageEvent) => {
-      if (event.source !== iframe.contentWindow || event.data?.type !== 'SANDBOX_READY') {
+      if (
+        event.source !== iframe.contentWindow ||
+        !validateSandboxReadyMessage(event.data) ||
+        event.data.payload.href !== getSandboxIframeHref(SANDBOX_IFRAME_SRC)
+      ) {
         return
       }
 
       const channel = new MessageChannel()
       port = channel.port1
-      port.onmessage = (messageEvent) =>
-        handleSandboxMessage(messageEvent.data as SandboxToMainMessage)
+      port.onmessage = (messageEvent) => {
+        if (validateSandboxToMainMessage(messageEvent.data)) {
+          handleSandboxMessage(messageEvent.data as SandboxToMainMessage)
+        }
+      }
       port.start()
       iframe.contentWindow?.postMessage({ type: 'CONNECT_SANDBOX' }, '*', [channel.port2])
     }
