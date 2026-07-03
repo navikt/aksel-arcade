@@ -1,6 +1,11 @@
 import http, { type IncomingMessage, type ServerResponse } from 'node:http'
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js'
+import type { DesktopMcpProjectResourceReadHandler } from '../src/services/desktopMcpProjectResourceProtocol'
+import {
+  createDesktopMcpPreviewCaptureStore,
+  registerDesktopMcpResources,
+} from './mcpSdkResources'
 
 export const DESKTOP_MCP_HOST = '127.0.0.1'
 export const DESKTOP_MCP_PORT = 3846
@@ -13,8 +18,8 @@ export const DESKTOP_MCP_AUTH_DESCRIPTION = 'No token/header required.'
 const MAX_MCP_BODY_BYTES = 1024 * 1024
 const DESKTOP_MCP_BOOTSTRAP_INSTRUCTIONS = [
   'Desktop Arcade MCP is running on the fixed local endpoint and now uses the official TypeScript MCP SDK for initialize/lifecycle handling.',
-  'Start by reading arcade://desktop/start-here. If your MCP host exposes only tools, call read_resource with that URI once the later SDK rebuild slices re-register the Desktop Arcade tools/resources surface.',
-  'This bootstrap slice only proves the SDK-backed endpoint, version negotiation, and Desktop availability plumbing. Desktop Arcade tools, resources, and contract-parity resource templates are being re-registered in follow-up rebuild slices.',
+  'Start by reading arcade://desktop/start-here, then use resources/list, resources/templates/list, and resources/read to discover the published Desktop Arcade resource surface.',
+  'The SDK resource surface is re-registered in this slice. Tool registration follows in later rebuild slices, so tool-only hosts still need follow-up work before they can rely on read_resource or mutation tools here.',
   'No token or authorization header is required for local use. Connect with an MCP-capable client or MCP Inspector over HTTP POST to continue the rebuild verification.',
 ].join('\n')
 
@@ -50,7 +55,7 @@ export interface DesktopMcpServerOptions {
   host?: string
   port?: number
   path?: string
-  readProjectResource?: unknown
+  readProjectResource?: DesktopMcpProjectResourceReadHandler
   mutateAnnotation?: unknown
   applyChanges?: unknown
   capturePreviewEvidence?: unknown
@@ -61,10 +66,22 @@ export const createDesktopMcpServer = ({
   host = DESKTOP_MCP_HOST,
   port = DESKTOP_MCP_PORT,
   path = DESKTOP_MCP_PATH,
+  readProjectResource,
+  previewCaptureTtlMs,
 }: DesktopMcpServerOptions = {}): DesktopMcpServer => {
   let activeServer: http.Server | null = null
   let startOperation: Promise<DesktopMcpServerState> | null = null
   const activeRequestSessions = new Set<DesktopMcpRequestSession>()
+  const projectResourceReader: DesktopMcpProjectResourceReadHandler =
+    readProjectResource ??
+    (({ uri }) => ({
+      ok: false,
+      code: 'project-unavailable',
+      resourceUri: uri,
+      message:
+        'Desktop Arcade project resources are unavailable because no active project reader is connected.',
+    }))
+  const previewCaptureStore = createDesktopMcpPreviewCaptureStore(previewCaptureTtlMs)
   let availability: DesktopMcpServerAvailability = {
     status: 'unavailable',
     reason: 'Desktop Arcade MCP has not started yet.',
@@ -91,24 +108,40 @@ export const createDesktopMcpServer = ({
   })
 
   const buildSdkServer = () =>
-    new McpServer(
-      {
-        name: DESKTOP_MCP_SERVER_NAME,
-        version: DESKTOP_MCP_SERVER_VERSION,
-      },
-      {
-        capabilities: {
-          tools: {
-            listChanged: false,
-          },
-          resources: {
-            subscribe: false,
-            listChanged: false,
-          },
+    {
+      const sdkServer = new McpServer(
+        {
+          name: DESKTOP_MCP_SERVER_NAME,
+          version: DESKTOP_MCP_SERVER_VERSION,
         },
-        instructions: DESKTOP_MCP_BOOTSTRAP_INSTRUCTIONS,
-      }
-    )
+        {
+          capabilities: {
+            tools: {
+              listChanged: false,
+            },
+            resources: {
+              subscribe: false,
+              listChanged: false,
+            },
+          },
+          instructions: DESKTOP_MCP_BOOTSTRAP_INSTRUCTIONS,
+        }
+      )
+
+      registerDesktopMcpResources(sdkServer, {
+        host,
+        port: getPort(),
+        path,
+        serverName: DESKTOP_MCP_SERVER_NAME,
+        serverVersion: DESKTOP_MCP_SERVER_VERSION,
+        transportLabel: DESKTOP_MCP_TRANSPORT_LABEL,
+        authDescription: DESKTOP_MCP_AUTH_DESCRIPTION,
+        readProjectResource: projectResourceReader,
+        previewCaptureStore,
+      })
+
+      return sdkServer
+    }
 
   const createRequestSession = async () => {
     const sdkServer = buildSdkServer()

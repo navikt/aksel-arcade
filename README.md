@@ -221,25 +221,22 @@ Desktop Arcade exposes a local MCP server only in the desktop shell. Web Arcade 
 | URL | `http://127.0.0.1:3846/mcp` |
 | Auth | No token/header required. |
 
-Desktop MCP v1 publishes nine tools — `read_resource`, `list_annotations`, `watch_annotations`, `acknowledge_annotation`, `resolve_annotation`, `dismiss_annotation`, `reply_to_annotation`, `capture_preview_evidence`, and `apply_changes` — plus `arcade://desktop/*`, `arcade://aksel/*`, `arcade://project/*`, dynamic page annotation resources at `arcade://project/pages/{pageId}/annotations`, and capture-produced `arcade://preview/captures/*` resources. Read resources through MCP `resources/list`/`resources/read`; tool-only hosts can call `read_resource({ uri })` for the same content. Arcade source is virtual `arcade://...` content, not repository-backed source content.
+The current SDK rebuild slice restores the Desktop MCP **resource** surface first: `resources/list`, `resources/templates/list`, and `resources/read` publish `arcade://desktop/*`, `arcade://aksel/*`, `arcade://project/*`, dynamic page source resources, dynamic page annotation resources at `arcade://project/pages/{pageId}/annotations`, and capture-produced `arcade://preview/captures/*` resources. `tools/list` and `tools/call` are intentionally re-registered in later rebuild slices, so tool-only MCP hosts should wait for those follow-up issues before relying on `read_resource`, annotation tools, capture tools, or `apply_changes`. Arcade source is virtual `arcade://...` content, not repository-backed source content.
 
 On connect, the server returns self-teaching `initialize.result.instructions` pointing agents to `arcade://desktop/start-here`, the import-free sandbox, `goToPage` navigation, app-assigned page ids with `{{pageRef:name}}`, and the apply→diagnostics→capture loop. Replacement and page-flow guidance is split into `arcade://desktop/workflows/replace-project` and `arcade://desktop/workflows/multi-page-navigation`. Per-component Aksel usage is pulled on demand — never preloaded — through `arcade://aksel/catalog` (a version-matched index) and one `arcade://aksel/components/{name}` snippet resource at a time.
 
-For the full smoke checklist, use an MCP client that exposes `resources/list` and `resources/read` (or an equivalent resource inspector). Tool-only MCP hosts should call `read_resource` for stable resources, annotation resources, diagnostics, source, Aksel snippets, and capture evidence.
+For the current smoke checklist, use an MCP client that exposes `resources/list`, `resources/templates/list`, and `resources/read` (or an equivalent resource inspector). Tool-only MCP hosts are not enough for this slice because the SDK tool surface is restored later in the rebuild.
 
 1. Start Desktop Arcade with a multi-page Arcade project.
 2. Add the MCP server to your client with the exact settings above.
 3. Verify `initialize` returns `instructions` that mention `goToPage`, the import-free sandbox, and `arcade://desktop/start-here`.
-4. Verify `tools/list` returns the nine tools listed above.
-5. Verify `resources/list` and `resources/read` can read `arcade://desktop/start-here`, `arcade://desktop/workflows/replace-project`, `arcade://desktop/workflows/multi-page-navigation`, `arcade://desktop/operating-guide`, `arcade://desktop/authoring-guide`, `arcade://desktop/capabilities`, `arcade://desktop/apply-changes-operations`, `arcade://aksel/catalog`, `arcade://project/manifest`, `arcade://project/annotations`, `arcade://project/preview-context`, and `arcade://project/diagnostics`, plus one page annotation resource such as `arcade://project/pages/{pageId}/annotations`.
-6. Read `arcade://aksel/catalog`, then read one `arcade://aksel/components/{name}` resource and confirm its snippet is import-free and version-matched.
-7. Read `arcade://project/manifest`, follow the source resource URIs it returns, and confirm the source matches the open Arcade project.
-8. Run `apply_changes` with one batch that updates existing source and creates/links a page by using `create_page.newPageRef`, later lifecycle `tempPageRef` targets, `{{pageRef:name}}` placeholders, and replacement-task assertions such as `{"pageCount":3,"startPage":"first","activePage":"first","forbidImports":true}`.
-9. Unless the user asked for a different workflow, read `arcade://project/diagnostics` after the batch, then confirm the visible Desktop preview reflects the durable change.
-10. Call `capture_preview_evidence({ pageId })` for the new page, then read the returned `manifest`, `screenshot`, `accessibility`, `dom-layout-style`, and `frame` resources.
-11. Verify capturing a non-active page does not change the visible Active page unless `select_active_page` was used intentionally.
-12. Open Desktop Settings and verify MCP availability plus safe last-activity metadata only.
-13. Open the same renderer in a normal browser and verify Web Arcade shows no Desktop MCP settings section and no Web MCP endpoint.
+4. Verify `resources/list` includes the stable guidance/project resources and useful concrete active-project resources such as `arcade://project/manifest`, `arcade://project/source/global/jsx`, and `arcade://project/source/global/hooks`.
+5. Verify `resources/templates/list` advertises at least `arcade://project/source/pages/{pageId}/jsx`, `arcade://project/source/pages/{pageId}/hooks`, `arcade://project/pages/{pageId}/annotations`, `arcade://aksel/components/{name}`, and `arcade://preview/captures/{captureId}/manifest`.
+6. Verify `resources/read` can read `arcade://desktop/start-here`, `arcade://desktop/workflows/replace-project`, `arcade://desktop/workflows/multi-page-navigation`, `arcade://desktop/operating-guide`, `arcade://desktop/authoring-guide`, `arcade://desktop/capabilities`, `arcade://desktop/apply-changes-operations`, `arcade://aksel/catalog`, `arcade://project/manifest`, `arcade://project/annotations`, `arcade://project/preview-context`, and `arcade://project/diagnostics`, plus one page annotation resource such as `arcade://project/pages/{pageId}/annotations`.
+7. Read `arcade://aksel/catalog`, then read one `arcade://aksel/components/{name}` resource and confirm its snippet is import-free and version-matched.
+8. Read `arcade://project/manifest`, follow the source resource URIs it returns, and confirm the source matches the open Arcade project.
+9. Open Desktop Settings and verify MCP availability only, with the fixed local endpoint still shown when the MCP server owns the port.
+10. Open the same renderer in a normal browser and verify Web Arcade shows no Desktop MCP settings section and no Web MCP endpoint.
 
 Desktop MCP v1 intentionally omits prompts, SSE/subscriptions, general filesystem/network/shell/clipboard access, import/export/share/package tools, arbitrary JavaScript execution, visual diffing, and any Web Arcade MCP endpoint.
 
