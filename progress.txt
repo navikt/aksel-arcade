@@ -22,10 +22,19 @@ Verification:
   - called `resolve_annotation` and confirmed resolved/history state,
   - called `dismiss_annotation` with reason `no to you` and confirmed dismissed/history state,
   - confirmed these annotation tool calls no longer timed out.
+- Follow-up after PR review/CI:
+  - fixed `npm run build` TypeScript failures that `npm run type-check` did not surface locally,
+  - corrected `AnnotationAuthorRole` to import from `@/types/annotations`,
+  - updated Desktop MCP test harness typings for `mutateAnnotation` and `updateProject`,
+  - aligned the annotation mutation unit test import with `desktopMcpAnnotationProtocol`,
+  - reran `npm run test:e2e -- tests/e2e/desktop-mcp-smoke.spec.ts --reporter=line` and the Desktop MCP smoke now passes, including the previous `Smoke entry` apply-changes assertion,
+  - fixed `acknowledge_annotation` to record agent actor metadata via `acknowledgedBy: 'agent'`,
+  - added explicit `watch_annotations` timeout and recovered-pending unit coverage,
+  - removed the unrelated README breakpoint-clamping wording from this PR and tightened MCP wording to match `CONTEXT.md`.
 
 Current blocker:
 
-- `npx playwright test tests/e2e/desktop-mcp-smoke.spec.ts` still fails on the existing post-`apply_changes` visible-preview assertion (`Smoke entry` does not render in the live iframe), even after updating the fixture to inline Arcade JSX. The Web Arcade exclusion case in that spec passes.
+- None for issue #325. The previously noted Desktop MCP smoke failure no longer reproduces.
 
 ### 2026-07-02 - Issue #323: Persist annotations in packages and Web share URLs
 

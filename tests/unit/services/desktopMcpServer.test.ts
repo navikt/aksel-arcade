@@ -2,40 +2,6 @@ import { createServer, type Server } from 'node:http'
 import { createRequire } from 'node:module'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-const require = createRequire(import.meta.url)
-const {
-  DESKTOP_MCP_PATH,
-  DESKTOP_MCP_PORT,
-  DESKTOP_MCP_SERVER_NAME,
-  DESKTOP_MCP_SERVER_VERSION,
-  DESKTOP_MCP_TRANSPORT_LABEL,
-  createDesktopMcpServer,
-}: {
-  DESKTOP_MCP_PATH: string
-  DESKTOP_MCP_PORT: number
-  DESKTOP_MCP_SERVER_NAME: string
-  DESKTOP_MCP_SERVER_VERSION: string
-  DESKTOP_MCP_TRANSPORT_LABEL: string
-  createDesktopMcpServer: (
-    options?: Partial<{
-      host: string
-      port: number
-      path: string
-      readProjectResource: (request: { uri: string }) => ProjectResourceReadResult | Promise<ProjectResourceReadResult>
-    mutateAnnotation: (
-        request: Record<string, unknown>
-    ) => AnnotationMutationResult | Promise<AnnotationMutationResult>
-    applyChanges: (
-      request: Record<string, unknown>
-    ) => ApplyChangesResult | Promise<ApplyChangesResult>
-      capturePreviewEvidence: (
-        request: Record<string, unknown>
-      ) => CapturePreviewResult | Promise<CapturePreviewResult>
-      previewCaptureTtlMs: number
-    }>
-  ) => DesktopMcpServer
-} = require('../../../desktop/mcpServer.cjs')
-
 interface DesktopMcpServerState {
   serverName: string
   transportLabel: string
@@ -50,6 +16,42 @@ interface DesktopMcpServer {
   start: () => Promise<DesktopMcpServerState>
   stop: () => Promise<boolean>
 }
+
+interface DesktopMcpServerOptions {
+  host: string
+  port: number
+  path: string
+  readProjectResource: (
+    request: { uri: string }
+  ) => ProjectResourceReadResult | Promise<ProjectResourceReadResult>
+  mutateAnnotation: (
+    request: Record<string, unknown>
+  ) => AnnotationMutationResult | Promise<AnnotationMutationResult>
+  applyChanges: (
+    request: Record<string, unknown>
+  ) => ApplyChangesResult | Promise<ApplyChangesResult>
+  capturePreviewEvidence: (
+    request: Record<string, unknown>
+  ) => CapturePreviewResult | Promise<CapturePreviewResult>
+  previewCaptureTtlMs: number
+}
+
+const require = createRequire(import.meta.url)
+const {
+  DESKTOP_MCP_PATH,
+  DESKTOP_MCP_PORT,
+  DESKTOP_MCP_SERVER_NAME,
+  DESKTOP_MCP_SERVER_VERSION,
+  DESKTOP_MCP_TRANSPORT_LABEL,
+  createDesktopMcpServer,
+}: {
+  DESKTOP_MCP_PATH: string
+  DESKTOP_MCP_PORT: number
+  DESKTOP_MCP_SERVER_NAME: string
+  DESKTOP_MCP_SERVER_VERSION: string
+  DESKTOP_MCP_TRANSPORT_LABEL: string
+  createDesktopMcpServer: (options?: Partial<DesktopMcpServerOptions>) => DesktopMcpServer
+} = require('../../../desktop/mcpServer.cjs')
 
 interface ProjectResourceReadSuccess {
   ok: true
@@ -215,6 +217,9 @@ const createManagedServer = (
     port: number
     path: string
     readProjectResource: (request: { uri: string }) => ProjectResourceReadResult | Promise<ProjectResourceReadResult>
+    mutateAnnotation: (
+      request: Record<string, unknown>
+    ) => AnnotationMutationResult | Promise<AnnotationMutationResult>
     applyChanges: (request: Record<string, unknown>) => ApplyChangesResult | Promise<ApplyChangesResult>
     capturePreviewEvidence: (
       request: Record<string, unknown>
@@ -1592,7 +1597,7 @@ describe('desktopMcpServer', () => {
       toolName: 'list_annotations',
       defaultStatus: 'open',
       supportedStatuses: ['pending', 'acknowledged', 'resolved', 'dismissed', 'all'],
-      note: 'Annotation resources return non-dead feedback annotations. Hidden-but-resolved targets stay visible to MCP and still count as work.',
+      note: 'Annotation resources return non-dead annotations. Hidden-but-resolved targets stay visible to MCP and still count as work.',
     })
     expect(capabilities.verificationBoundaries).toMatchObject({
       mcpVerifiable: expect.arrayContaining([
@@ -2404,6 +2409,164 @@ describe('desktopMcpServer', () => {
           status: 'pending',
           timedOut: false,
           annotations: [{ id: 'ann-2', status: 'pending', comment: 'Arrived later' }],
+        },
+      },
+    })
+  })
+
+  it('times out watch_annotations when no pending annotations arrive', async () => {
+    const readProjectResource = vi.fn(async ({ uri }: { uri: string }): Promise<ProjectResourceReadResult> => {
+      switch (uri) {
+        case 'arcade://project/manifest':
+          return {
+            ok: true,
+            uri,
+            mimeType: 'application/json',
+            text: JSON.stringify({
+              activePageId: 'page01',
+              pages: [{ id: 'page01', name: 'Overview' }],
+            }),
+          }
+        case 'arcade://project/pages/page01/annotations':
+          return {
+            ok: true,
+            uri,
+            mimeType: 'application/json',
+            text: JSON.stringify({
+              page: { id: 'page01', name: 'Overview' },
+              counts: {
+                open: 0,
+                pending: 0,
+                acknowledged: 0,
+                resolved: 0,
+                dismissed: 0,
+              },
+              annotations: [],
+            }),
+          }
+        default:
+          return {
+            ok: false,
+            code: 'source-not-found',
+            resourceUri: uri,
+            message: `Missing ${uri}`,
+          }
+      }
+    })
+    const server = createManagedServer({ port: 0, readProjectResource })
+    const state = await server.start()
+
+    const response = await postJson(state.url, {
+      jsonrpc: '2.0',
+      id: 23,
+      method: 'tools/call',
+      params: {
+        name: 'watch_annotations',
+        arguments: {
+          scope: 'page',
+          waitTimeoutSeconds: 1,
+          batchWindowSeconds: 1,
+        },
+      },
+    })
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toMatchObject({
+      jsonrpc: '2.0',
+      id: 23,
+      result: {
+        structuredContent: {
+          ok: true,
+          scope: 'page',
+          status: 'pending',
+          timedOut: true,
+          annotations: [],
+          counts: expect.objectContaining({
+            matching: 0,
+          }),
+          waitTimeoutSeconds: 1,
+          batchWindowSeconds: 1,
+        },
+      },
+    })
+  })
+
+  it('returns recovered pending annotations when they become readable again during watch_annotations', async () => {
+    let pendingAnnotations: Array<Record<string, unknown>> = []
+    const readProjectResource = vi.fn(async ({ uri }: { uri: string }): Promise<ProjectResourceReadResult> => {
+      switch (uri) {
+        case 'arcade://project/manifest':
+          return {
+            ok: true,
+            uri,
+            mimeType: 'application/json',
+            text: JSON.stringify({
+              activePageId: 'page01',
+              pages: [{ id: 'page01', name: 'Overview' }],
+            }),
+          }
+        case 'arcade://project/pages/page01/annotations':
+          return {
+            ok: true,
+            uri,
+            mimeType: 'application/json',
+            text: JSON.stringify({
+              page: { id: 'page01', name: 'Overview' },
+              counts: {
+                open: pendingAnnotations.length,
+                pending: pendingAnnotations.length,
+                acknowledged: 0,
+                resolved: 0,
+                dismissed: 0,
+              },
+              annotations: pendingAnnotations,
+            }),
+          }
+        default:
+          return {
+            ok: false,
+            code: 'source-not-found',
+            resourceUri: uri,
+            message: `Missing ${uri}`,
+          }
+      }
+    })
+    const server = createManagedServer({ port: 0, readProjectResource })
+    const state = await server.start()
+
+    setTimeout(() => {
+      pendingAnnotations = [
+        {
+          id: 'ann-recovered',
+          status: 'pending',
+          comment: 'Recovered target',
+        },
+      ]
+    }, 250)
+
+    const response = await postJson(state.url, {
+      jsonrpc: '2.0',
+      id: 24,
+      method: 'tools/call',
+      params: {
+        name: 'watch_annotations',
+        arguments: {
+          scope: 'page',
+          waitTimeoutSeconds: 2,
+          batchWindowSeconds: 1,
+        },
+      },
+    })
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toMatchObject({
+      jsonrpc: '2.0',
+      id: 24,
+      result: {
+        structuredContent: {
+          ok: true,
+          scope: 'page',
+          status: 'pending',
+          timedOut: false,
+          annotations: [{ id: 'ann-recovered', status: 'pending', comment: 'Recovered target' }],
         },
       },
     })

@@ -13,11 +13,15 @@ interface RunDesktopMainOptions {
   env?: Record<string, string | undefined>
 }
 
+interface MockDesktopMcpServerOptions {
+  mutateAnnotation?: (request: Record<string, unknown>) => Promise<unknown> | unknown
+}
+
 const runDesktopMain = async ({ isPackaged, env = {} }: RunDesktopMainOptions) => {
   const source = readFileSync(desktopMainPath, 'utf8')
   const loadedUrls: string[] = []
   const ipcListeners = new Map<string, (...args: unknown[]) => void>()
-  let desktopMcpServerOptions: Record<string, unknown> | null = null
+  let desktopMcpServerOptions: MockDesktopMcpServerOptions | null = null
   let resolveRendererLoad: (() => void) | null = null
   const rendererLoaded = new Promise<void>((resolveLoaded) => {
     resolveRendererLoad = resolveLoaded
@@ -99,7 +103,7 @@ const runDesktopMain = async ({ isPackaged, env = {} }: RunDesktopMainOptions) =
         }
         if (request === './mcpServer.cjs') {
           return {
-            createDesktopMcpServer: (options: Record<string, unknown>) => {
+            createDesktopMcpServer: (options: MockDesktopMcpServerOptions) => {
               desktopMcpServerOptions = options
               return desktopMcpServer
             },
@@ -128,7 +132,14 @@ const runDesktopMain = async ({ isPackaged, env = {} }: RunDesktopMainOptions) =
     ),
   ])
 
-  return {
+  const result: {
+    app: typeof app
+    browserWindows: MockBrowserWindow[]
+    desktopMcpServerOptions: MockDesktopMcpServerOptions | null
+    ipcListeners: Map<string, (...args: unknown[]) => void>
+    loadedUrls: string[]
+    protocol: typeof protocol
+  } = {
     app,
     browserWindows,
     desktopMcpServerOptions,
@@ -136,6 +147,7 @@ const runDesktopMain = async ({ isPackaged, env = {} }: RunDesktopMainOptions) =
     loadedUrls,
     protocol,
   }
+  return result
 }
 
 describe('desktop main process', () => {
@@ -168,12 +180,17 @@ describe('desktop main process', () => {
       const { browserWindows, desktopMcpServerOptions, ipcListeners } = await runDesktopMain({
         isPackaged: true,
       })
-      const mutateAnnotation = desktopMcpServerOptions?.mutateAnnotation
-      if (typeof mutateAnnotation !== 'function') {
+      if (!desktopMcpServerOptions) {
+        throw new Error('Expected Desktop MCP server options to be registered')
+      }
+
+      const maybeMutateAnnotation: MockDesktopMcpServerOptions['mutateAnnotation'] =
+        desktopMcpServerOptions.mutateAnnotation
+      if (typeof maybeMutateAnnotation !== 'function') {
         throw new Error('Expected Desktop MCP annotation mutator to be registered')
       }
 
-      const mutationPromise = mutateAnnotation({
+      const mutationPromise = maybeMutateAnnotation({
         toolName: 'acknowledge_annotation',
         annotationId: 'ann-1',
       })

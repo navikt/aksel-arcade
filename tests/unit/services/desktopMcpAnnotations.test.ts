@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { createDefaultProject } from '@/utils/projectDefaults'
+import type { DesktopMcpAnnotationMutationRequest } from '@/services/desktopMcpAnnotationProtocol'
 import {
   mutateDesktopMcpAnnotation,
-  type DesktopMcpAnnotationMutationRequest,
 } from '@/services/desktopMcpAnnotations'
 
 const createProject = () => {
@@ -53,6 +53,7 @@ describe('desktopMcpAnnotations', () => {
       throw new Error(acknowledgeResult.message)
     }
     expect(acknowledgeResult.annotation.status).toBe('acknowledged')
+    expect(acknowledgeResult.annotation.acknowledgedBy).toBe('agent')
 
     const replyResult = mutateDesktopMcpAnnotation(
       { ...project, annotations: acknowledgeResult.annotations },

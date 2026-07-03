@@ -392,7 +392,7 @@ const MCP_TOOL_DEFINITIONS = Object.freeze([
   Object.freeze({
     name: 'list_annotations',
     description:
-      'List non-dead feedback annotations for the active Arcade page by default. Supports explicit page or whole-project scope plus status filters for open, pending, acknowledged, resolved, dismissed, or all.',
+      'List non-dead annotations for the active Arcade page by default. Supports explicit page or whole-project scope plus status filters for open, pending, acknowledged, resolved, dismissed, or all.',
     inputSchema: Object.freeze({
       type: 'object',
       additionalProperties: false,
@@ -418,7 +418,7 @@ const MCP_TOOL_DEFINITIONS = Object.freeze([
   Object.freeze({
     name: 'watch_annotations',
     description:
-      'Watch for pending feedback annotations on the active Arcade page by default. Supports explicit page or whole-project scope, returns existing pending annotations immediately, waits for the first pending annotation for up to 120 seconds by default, then batches for 10 seconds after the first hit. Maximum wait is 300 seconds and maximum batch window is 60 seconds.',
+      'Watch for pending annotations on the active Arcade page by default. Supports explicit page or whole-project scope, returns existing pending annotations immediately, waits for the first pending annotation for up to 120 seconds by default, then batches for 10 seconds after the first hit. Maximum wait is 300 seconds and maximum batch window is 60 seconds.',
     inputSchema: Object.freeze({
       type: 'object',
       additionalProperties: false,
@@ -452,7 +452,7 @@ const MCP_TOOL_DEFINITIONS = Object.freeze([
   Object.freeze({
     name: 'acknowledge_annotation',
     description:
-      'Acknowledge a single non-dead annotation by annotationId. Updates status and timestamps only.',
+      'Acknowledge a single non-dead annotation by annotationId. Updates status, timestamps, and agent actor metadata only.',
     inputSchema: Object.freeze({
       type: 'object',
       additionalProperties: false,
@@ -829,7 +829,7 @@ const MCP_STABLE_RESOURCE_DEFINITIONS = Object.freeze([
     uri: PROJECT_ANNOTATIONS_RESOURCE_URI,
     name: 'Active Arcade project annotations',
     description:
-      'Project-wide non-dead feedback annotations, including resolved and dismissed history plus per-status counts.',
+      'Project-wide non-dead annotations, including resolved and dismissed history plus per-status counts.',
     mimeType: 'application/json',
   }),
   Object.freeze({
@@ -1773,7 +1773,7 @@ const listDynamicProjectResources = async (readProjectResource) => {
       Object.freeze({
         uri: `arcade://project/pages/${page.id}/annotations`,
         name: `Arcade page annotations: ${page.name}`,
-        description: `Non-dead feedback annotations for Arcade page ${page.name} (${page.id}).`,
+        description: `Non-dead annotations for Arcade page ${page.name} (${page.id}).`,
         mimeType: 'application/json',
       })
     )
@@ -3159,7 +3159,7 @@ const createDesktopStableResourceText = (uri) => {
           toolName: 'list_annotations',
           defaultStatus: DEFAULT_LIST_ANNOTATIONS_STATUS,
           supportedStatuses: LIST_ANNOTATIONS_STATUSES,
-          note: 'Annotation resources return non-dead feedback annotations. Hidden-but-resolved targets stay visible to MCP and still count as work.',
+          note: 'Annotation resources return non-dead annotations. Hidden-but-resolved targets stay visible to MCP and still count as work.',
         },
         akselSnippetResources: {
           akselVersion: AKSEL_CATALOG_DATA.akselVersion,

@@ -84,6 +84,7 @@ export interface ArcadeAnnotation {
   thread?: AnnotationThreadMessage[]
   createdAt?: string
   updatedAt?: string
+  acknowledgedBy?: AnnotationAuthorRole
   resolvedAt?: string
   resolvedBy?: AnnotationAuthorRole
   authorId?: string

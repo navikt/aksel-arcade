@@ -1,4 +1,4 @@
-import type { ArcadeAnnotation } from '@/types/annotations'
+import type { AnnotationAuthorRole, ArcadeAnnotation } from '@/types/annotations'
 import type { ArcadePageId, ThemeMode } from '@/types/project'
 import type { MainToSandboxMessage, SandboxToMainMessage } from '@/types/messages'
 import type { Project } from '@/types/project'
@@ -6,7 +6,6 @@ import { buildAnnotationTargetResolutionRequest } from './annotationTargetReques
 import {
   appendAnnotationThreadMessage,
   setAnnotationStatus,
-  type AnnotationAuthorRole,
 } from './annotations'
 import type {
   DesktopMcpAnnotationMutationRequest,
@@ -284,6 +283,7 @@ export const mutateDesktopMcpAnnotation = (
   switch (request.toolName) {
     case 'acknowledge_annotation': {
       const annotations = setAnnotationStatus(project.annotations, annotation.id, 'acknowledged', {
+        acknowledgedBy: resolvedBy,
         nowIso,
       })
       return {
