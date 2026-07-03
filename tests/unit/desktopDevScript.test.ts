@@ -6,8 +6,12 @@ describe('desktop dev script', () => {
   it('starts a browser-neutral Vite renderer on the selected Desktop Arcade URL', () => {
     const script = readFileSync(resolve(process.cwd(), 'scripts/desktop-dev.mjs'), 'utf8')
 
+    expect(script).toContain("const DESKTOP_MCP_HOST = '127.0.0.1'")
+    expect(script).toContain('const DESKTOP_MCP_PORT = 3846')
     expect(script).toContain('findAvailablePort(DEFAULT_RENDERER_HOST, DEFAULT_RENDERER_PORT)')
     expect(script).toContain('Starting Desktop Arcade renderer at ${RENDERER_URL}')
+    expect(script).toContain('await assertDesktopMcpPortAvailable()')
+    expect(script).toContain('Stop the existing Desktop Arcade/Electron process before running desktop:dev again.')
     expect(script).toMatch(/'--host', rendererConfig\.viteHost/)
     expect(script).toMatch(/'--port', String\(rendererConfig\.port\)/)
     expect(script).toContain("'--strictPort'")

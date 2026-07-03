@@ -1,3 +1,110 @@
+### 2026-07-03 - Issue #344 review follow-up: bootstrap guidance + baseline test compatibility
+
+Implemented:
+
+- Reviewed PR #353 against the issue #344 acceptance criteria and Desktop MCP contract docs before merge.
+- Restored the bootstrap `initialize.result.instructions` pointer to `arcade://desktop/start-here` so the SDK bootstrap still preserves the documented guidance entry point while tools/resources are temporarily absent.
+- Updated the Desktop MCP contract baseline E2E seam so it remains runnable on the issue #344 branch:
+  - it now sends the SDK-required `Accept: application/json, text/event-stream` header,
+  - parses Streamable HTTP SSE initialize/error responses,
+  - and explicitly recognizes the documented temporary issue #344 gaps (`tools/list` and `resources/list` returning `Method not found`) instead of failing as if the handwritten contract were still fully present.
+- Tightened the SDK bootstrap unit/E2E checks so they assert the bootstrap instructions still mention `arcade://desktop/start-here`.
+- Fixed a follow-up CI-only build failure in `tests/unit/desktopMain.test.ts` by making the mocked Desktop MCP server options type explicit enough for the production `tsc -b` build path.
+
+Verification:
+
+- `npm run typecheck`
+- `npm run lint`
+- `npm test -- --run`
+- `npm run build`
+- `npm run desktop:build`
+- `npm run test:e2e -- tests/e2e/desktop-mcp-sdk-bootstrap.spec.ts tests/e2e/desktop-mcp-contract-baseline.spec.ts --reporter=line`
+
+Next note:
+
+- The baseline E2E now intentionally has two valid modes: the full handwritten-contract expectations for pre-rebuild work, and the explicit issue #344 bootstrap-gap expectations while the SDK rebuild slices are still in progress.
+
+### 2026-07-03 - Issue #344 follow-up: Desktop dev repeated initialize fix
+
+Implemented:
+
+- Reproduced the remaining Desktop MCP bug at the server seam: two `initialize` POSTs against the same running SDK-backed endpoint returned `200` then `500`.
+- Traced the failure to the MCP SDK stateless transport contract: `StreamableHTTPServerTransport` with `sessionIdGenerator: undefined` cannot be reused across requests.
+- Reworked `desktop/mcpSdkServer.ts` so the Desktop bootstrap creates a fresh SDK server/transport pair per HTTP request and cleans it up when the response finishes, instead of connecting one stateless transport at process startup and reusing it forever.
+- Added a regression test in `tests/unit/services/desktopMcpSdkServer.test.ts` that exercises repeated `initialize` requests against the same running endpoint.
+- Made the occupied-port unit test use an ephemeral bound port so it still validates the explicit unavailable reason without depending on `3846` being free in the shared dev environment.
+
+Verification:
+
+- `npm test -- --run tests/unit/services/desktopMcpSdkServer.test.ts`
+- `npm run typecheck`
+- `npm run lint`
+- `npm test -- --run`
+- Direct SDK server probe: repeated `initialize` requests now return `200 text/event-stream` twice instead of `200` then `500`
+
+Next note:
+
+- If the agent still reports a Desktop dev initialize failure after this commit, restart `npm run desktop:dev` so the Electron main process picks up the new per-request transport wiring before retrying the MCP connection.
+
+### 2026-07-03 - Issue #344 follow-up: Desktop dev MCP stale-port guard
+
+Implemented:
+
+- Investigated the reported `desktop:dev` `initialize` 500 and narrowed it to a stale Electron listener still owning the fixed MCP port `3846`, not to a clean current dev boot of the SDK-backed server.
+- Added a dev-only preflight in `scripts/desktop-dev.mjs` that refuses to launch when `127.0.0.1:3846` is already occupied, with an explicit message telling the next person to stop the existing Desktop Arcade/Electron process first.
+- Added the matching script expectation in `tests/unit/desktopDevScript.test.ts`.
+- Updated `eslint.config.js` to ignore the generated `desktop/dist` bundle so running Desktop build/dev flows before `npm run lint` does not produce false lint failures from bundled output.
+
+Verification:
+
+- `npm run typecheck`
+- `npm run lint`
+- `npm test -- --run`
+- Fresh `npm run desktop:dev` + direct `initialize` POST to `http://127.0.0.1:3846/mcp` now returns `200 OK` with `text/event-stream`
+- Occupied-port probe: holding `127.0.0.1:3846` open before `npm run desktop:dev` now fails fast with the explicit stale-process guidance instead of launching into a misleading broken state
+
+Next note:
+
+- If someone reports another dev-only MCP initialize failure, first confirm whether an older Electron/Desktop Arcade process is still listening on `127.0.0.1:3846`; this follow-up specifically closes that stale-port path.
+
+### 2026-07-03 - Issue #344: Introduce typed Desktop MCP SDK bootstrap
+
+Implemented:
+
+- Read issue `#344` as the highest-priority `ready-for-agent` slice from `#344`-`#350` because it is the root blocker for the rest of the SDK rebuild chain, then used issue `#342`, `CONTEXT.md`, ADRs `0017`, `0018`, and `0025`, plus `docs/desktop-mcp-contract.md`, to keep the bootstrap aligned with the documented Desktop MCP contract boundary.
+- Added an exact runtime dependency on `@modelcontextprotocol/sdk@1.29.0`.
+- Introduced the first dedicated Desktop main/MCP TypeScript build path:
+  - new `desktop/main.ts` entry,
+  - new `desktop/main-process.ts` runtime,
+  - new `desktop/mcpSdkServer.ts` SDK-backed server,
+  - new `scripts/build-desktop-main.mjs` esbuild step,
+  - `desktop/main.cjs` reduced to the packaging bootstrap that loads the compiled bundle.
+- Kept the fixed Desktop MCP setup contract intact in the app shell: same `http://127.0.0.1:3846/mcp` endpoint, same no-auth status text, same explicit unavailable reason when the fixed port is already occupied, and endpoint shutdown when Desktop Arcade quits.
+- Switched initialize/lifecycle handling to the official MCP SDK with SDK-managed protocol negotiation while intentionally leaving tool/resource re-registration for follow-up issues.
+- Documented the temporary issue `#344` contract gaps in `docs/desktop-mcp-contract.md` so later slices have one explicit place to remove as tools/resources/templates come back.
+- Added focused coverage for the new bootstrap path:
+  - `tests/unit/services/desktopMcpSdkServer.test.ts` for fixed config, SDK initialize negotiation, and port-conflict unavailable state,
+  - `tests/unit/desktopMain.test.ts` rewritten for the TypeScript main-process entry,
+  - `tests/e2e/desktop-mcp-sdk-bootstrap.spec.ts` for the issue checklist and visual Desktop verification.
+
+Verification:
+
+- `npm run typecheck`
+- `npm run lint`
+- `npm test -- --run`
+- `npm run desktop:build`
+- `npm run test:e2e -- tests/e2e/desktop-mcp-sdk-bootstrap.spec.ts --reporter=line`
+- Human-style/visual Desktop checklist via the real Electron app and the new Playwright bootstrap flow:
+  - launched Desktop Arcade and confirmed the app opened normally,
+  - opened Desktop settings and confirmed the MCP section still showed the fixed local endpoint,
+  - initialized the endpoint successfully through the SDK-backed server with no auth header,
+  - confirmed the app shows a clear unavailable status when port `3846` is already occupied,
+  - closed Desktop Arcade and confirmed the local MCP endpoint stops responding.
+
+Next note:
+
+- Issue `#344` only establishes the SDK-backed endpoint, initialize negotiation, and Desktop availability plumbing. The next person should expect `tools/resources/templates` to be intentionally absent until `#345` and later slices re-register the actual Desktop Arcade contract on top of this SDK bootstrap.
+
 ### 2026-07-03 - Issue #343: Lock Desktop MCP public contract baseline
 
 Implemented:

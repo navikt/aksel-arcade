@@ -133,6 +133,7 @@ describe('Desktop Arcade packaging contract', () => {
     const packageJson = readPackageJson()
 
     expect(packageJson.main).toBe('desktop/main.cjs')
+    expect(packageJson.scripts['desktop:build']).toContain('node scripts/build-desktop-main.mjs')
     expect(packageJson.scripts['desktop:build']).toContain(
       'vite build --config vite.desktop.config.ts'
     )
@@ -148,15 +149,17 @@ describe('Desktop Arcade packaging contract', () => {
     const desktopViteConfig = readText('vite.desktop.config.ts')
     const webViteConfig = readText('vite.config.ts')
     const desktopMain = readText('desktop/main.cjs')
+    const desktopMainProcess = readText('desktop/main-process.ts')
     const indexHtml = readText('index.html')
 
     expect(webViteConfig).toContain("base: '/aksel-arcade/'")
     expect(desktopViteConfig).toContain("base: './'")
     expect(desktopViteConfig).toContain("outDir: 'dist-desktop'")
-    expect(desktopMain).toContain("'dist-desktop'")
-    expect(desktopMain).toContain("DESKTOP_RENDERER_PROTOCOL = 'aksel-arcade'")
-    expect(desktopMain).toContain('registerSchemesAsPrivileged')
-    expect(desktopMain).toContain('protocol.handle(DESKTOP_RENDERER_PROTOCOL')
+    expect(desktopMain).toContain("path.resolve(__dirname, 'dist/main.cjs')")
+    expect(desktopMainProcess).toContain("DESKTOP_RENDERER_PROTOCOL = 'aksel-arcade'")
+    expect(desktopMainProcess).toContain("'dist-desktop'")
+    expect(desktopMainProcess).toContain('registerSchemesAsPrivileged')
+    expect(desktopMainProcess).toContain('protocol.handle(DESKTOP_RENDERER_PROTOCOL')
     expect(indexHtml).toContain('%BASE_URL%aksel-favicon.svg')
   })
 
