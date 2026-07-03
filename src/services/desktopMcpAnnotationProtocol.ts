@@ -48,7 +48,12 @@ export interface DesktopMcpAnnotationMutationSuccess {
 
 export interface DesktopMcpAnnotationMutationFailure {
   ok: false
-  code: 'annotation-not-found' | 'dead-target-annotation' | 'invalid-annotation-payload'
+  code:
+    | 'project-unavailable'
+    | 'annotation-not-found'
+    | 'dead-target-annotation'
+    | 'invalid-annotation-payload'
+    | 'persistence-failed'
   annotationId: string
   message: string
 }
@@ -56,6 +61,10 @@ export interface DesktopMcpAnnotationMutationFailure {
 export type DesktopMcpAnnotationMutationResult =
   | DesktopMcpAnnotationMutationSuccess
   | DesktopMcpAnnotationMutationFailure
+
+export type DesktopMcpAnnotationMutationHandler = (
+  request: DesktopMcpAnnotationMutationRequest
+) => DesktopMcpAnnotationMutationResult | Promise<DesktopMcpAnnotationMutationResult>
 
 export interface DesktopMcpWatchAnnotationsRequest {
   scope?: 'page' | 'project'

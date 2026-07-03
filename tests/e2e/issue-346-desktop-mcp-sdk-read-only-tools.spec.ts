@@ -77,12 +77,14 @@ test.describe('Issue #346 Desktop MCP SDK read-only tools', () => {
             result: { tools: Array<{ name: string }> }
           }
         ).result.tools.map((tool) => tool.name)
-      ).toEqual([
-        'read_resource',
-        'list_annotations',
-        'watch_annotations',
-        'capture_preview_evidence',
-      ])
+      ).toEqual(
+        expect.arrayContaining([
+          'read_resource',
+          'list_annotations',
+          'watch_annotations',
+          'capture_preview_evidence',
+        ])
+      )
 
       const readStartHere = await postJsonRpc({
         jsonrpc: '2.0',

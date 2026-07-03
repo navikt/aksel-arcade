@@ -19,8 +19,11 @@ import type {
 import { registerDesktopPreloadMcpAnnotationHandler } from '@/services/desktopMcpAnnotationAdapter'
 import {
   mutateDesktopMcpAnnotation,
-  type DesktopMcpAnnotationMutationHandler,
 } from '@/services/desktopMcpAnnotations'
+import type {
+  DesktopMcpAnnotationMutationFailure,
+  DesktopMcpAnnotationMutationHandler,
+} from '@/services/desktopMcpAnnotationProtocol'
 import {
   finalizeDesktopMcpPreviewCapture,
   prepareDesktopMcpPreviewCapture,
@@ -191,13 +194,26 @@ export const useDesktopMcpProjectResourceBridge = ({
       })
 
       if (result.ok) {
+        const nextProject = {
+          ...currentContext.project,
+          annotations: result.annotations,
+          lastModified: new Date().toISOString(),
+        }
+        const saveResult = saveProject(nextProject, {
+          preferences: workingCopyPreferencesRef.current,
+          updateLastModified: false,
+        })
+        if (!saveResult.success) {
+          return createAnnotationMutationPersistenceFailure(request.annotationId, saveResult)
+        }
+
+        if (saveResult.warning) {
+          console.warn(saveResult.warning)
+        }
+
         resourceContextRef.current = {
           ...currentContext,
-          project: {
-            ...currentContext.project,
-            annotations: result.annotations,
-            lastModified: new Date().toISOString(),
-          },
+          project: nextProject,
         }
         updateProject({ annotations: result.annotations })
       }
@@ -285,5 +301,20 @@ const createApplyChangesPersistenceFailure = ({
     ok: false,
     code: detail && /exceeds 5MB limit/i.test(detail) ? 'payload-too-large' : 'persistence-failed',
     message,
+  }
+}
+
+const createAnnotationMutationPersistenceFailure = (
+  annotationId: string,
+  { error }: Pick<SaveResult, 'error'>
+): DesktopMcpAnnotationMutationFailure => {
+  const baseMessage = `Desktop MCP annotation "${annotationId}" could not be persisted.`
+  const detail = error?.trim()
+
+  return {
+    ok: false,
+    code: 'persistence-failed',
+    annotationId,
+    message: detail ? `${baseMessage} ${detail}` : baseMessage,
   }
 }

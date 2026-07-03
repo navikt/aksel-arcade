@@ -1,5 +1,5 @@
 import { getDesktopPreloadApi, type DesktopArcadePreloadApi } from './shellCapabilities'
-import type { DesktopMcpAnnotationMutationHandler } from './desktopMcpAnnotations'
+import type { DesktopMcpAnnotationMutationHandler } from './desktopMcpAnnotationProtocol'
 
 export const registerDesktopPreloadMcpAnnotationHandler = (
   handler: DesktopMcpAnnotationMutationHandler,

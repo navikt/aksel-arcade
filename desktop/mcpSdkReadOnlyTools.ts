@@ -21,6 +21,7 @@ import {
   type DesktopMcpResourceRegistrationOptions,
   readDesktopMcpResource,
 } from './mcpSdkResources'
+import { createToolErrorResult, createToolSuccessResult } from './mcpSdkToolResults'
 
 const VALID_VIEWPORT_SIZES = ['2XL', 'XL', 'LG', 'MD', 'SM', 'XS'] as const
 const VALID_THEMES = ['light', 'dark'] as const
@@ -75,8 +76,6 @@ export const DESKTOP_MCP_READ_ONLY_TOOL_NAMES = [
   'watch_annotations',
   'capture_preview_evidence',
 ] as const
-
-type DesktopMcpReadOnlyToolName = (typeof DESKTOP_MCP_READ_ONLY_TOOL_NAMES)[number]
 type ListAnnotationsStatus = (typeof LIST_ANNOTATIONS_STATUSES)[number] | typeof DEFAULT_LIST_ANNOTATIONS_STATUS
 
 interface DesktopMcpReadOnlyToolOptions {
@@ -84,13 +83,6 @@ interface DesktopMcpReadOnlyToolOptions {
   capturePreviewEvidence: DesktopMcpPreviewCaptureHandler
   previewCaptureStore: DesktopMcpPreviewCaptureStore
   stableResourceOptions: DesktopMcpResourceRegistrationOptions
-}
-
-interface DesktopMcpToolErrorContent {
-  code: string
-  toolName: DesktopMcpReadOnlyToolName
-  message: string
-  [key: string]: unknown
 }
 
 interface DesktopMcpListAnnotationsSuccess extends Record<string, unknown> {
@@ -477,6 +469,17 @@ export const registerDesktopMcpReadOnlyTools = (
     }
   )
 
+  server.server.registerCapabilities({
+    tools: {
+      listChanged: false,
+    },
+  })
+}
+
+export const registerDesktopMcpPreviewCaptureTool = (
+  server: McpServer,
+  options: DesktopMcpReadOnlyToolOptions
+) => {
   server.registerTool(
     'capture_preview_evidence',
     {
@@ -523,44 +526,7 @@ export const registerDesktopMcpReadOnlyTools = (
       )
     }
   )
-
-  server.server.registerCapabilities({
-    tools: {
-      listChanged: false,
-    },
-  })
 }
-
-const createToolSuccessResult = <T extends object>(message: string, structuredContent: T) => ({
-  content: [
-    {
-      type: 'text' as const,
-      text: message,
-    },
-  ],
-  structuredContent,
-})
-
-const createToolErrorResult = (
-  toolName: DesktopMcpReadOnlyToolName,
-  code: string,
-  message: string,
-  extras: Record<string, unknown> = {}
-) => ({
-  content: [
-    {
-      type: 'text' as const,
-      text: message,
-    },
-  ],
-  isError: true,
-  structuredContent: {
-    code,
-    toolName,
-    message,
-    ...extras,
-  } satisfies DesktopMcpToolErrorContent,
-})
 
 const listAnnotations = async (
   argumentsPayload: z.infer<typeof listAnnotationsInputSchema>,
