@@ -1,3 +1,27 @@
+### 2026-07-03 - Issue #344 review follow-up: bootstrap guidance + baseline test compatibility
+
+Implemented:
+
+- Reviewed PR #353 against the issue #344 acceptance criteria and Desktop MCP contract docs before merge.
+- Restored the bootstrap `initialize.result.instructions` pointer to `arcade://desktop/start-here` so the SDK bootstrap still preserves the documented guidance entry point while tools/resources are temporarily absent.
+- Updated the Desktop MCP contract baseline E2E seam so it remains runnable on the issue #344 branch:
+  - it now sends the SDK-required `Accept: application/json, text/event-stream` header,
+  - parses Streamable HTTP SSE initialize/error responses,
+  - and explicitly recognizes the documented temporary issue #344 gaps (`tools/list` and `resources/list` returning `Method not found`) instead of failing as if the handwritten contract were still fully present.
+- Tightened the SDK bootstrap unit/E2E checks so they assert the bootstrap instructions still mention `arcade://desktop/start-here`.
+
+Verification:
+
+- `npm run typecheck`
+- `npm run lint`
+- `npm test -- --run`
+- `npm run desktop:build`
+- `npm run test:e2e -- tests/e2e/desktop-mcp-sdk-bootstrap.spec.ts tests/e2e/desktop-mcp-contract-baseline.spec.ts --reporter=line`
+
+Next note:
+
+- The baseline E2E now intentionally has two valid modes: the full handwritten-contract expectations for pre-rebuild work, and the explicit issue #344 bootstrap-gap expectations while the SDK rebuild slices are still in progress.
+
 ### 2026-07-03 - Issue #344 follow-up: Desktop dev repeated initialize fix
 
 Implemented:

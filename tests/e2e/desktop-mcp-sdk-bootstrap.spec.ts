@@ -102,6 +102,9 @@ test.describe('Issue #344 Desktop MCP SDK bootstrap', () => {
           instructions: expect.stringContaining('official TypeScript MCP SDK'),
         },
       })
+      expect((initialize.payload as { result: { instructions: string } }).result.instructions).toContain(
+        'arcade://desktop/start-here'
+      )
       expect(
         (initialize.payload as { result: { protocolVersion: string } }).result.protocolVersion
       ).not.toBe('2024-11-05')

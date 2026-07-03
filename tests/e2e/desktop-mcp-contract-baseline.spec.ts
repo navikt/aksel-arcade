@@ -541,6 +541,15 @@ const waitForDefaultPreview = async (page: Page) => {
 
 const parseResponseBody = async (response: Response) => {
   const text = await response.text()
+  if (text.startsWith('event:')) {
+    const dataLines = text
+      .split('\n')
+      .filter((line) => line.startsWith('data: '))
+      .map((line) => line.slice('data: '.length))
+
+    return JSON.parse(dataLines.join('\n')) as Record<string, unknown>
+  }
+
   try {
     return JSON.parse(text) as Record<string, unknown>
   } catch {
@@ -577,6 +586,7 @@ const sendJsonRpcRequest = async (
 ) =>
   sendRequest({
     headers: {
+      accept: 'application/json, text/event-stream',
       'content-type': 'application/json',
       ...headers,
     },
@@ -607,8 +617,151 @@ test.describe('Issue #343 Desktop MCP contract baseline', () => {
         jsonrpc: '2.0',
         id: 1,
         method: 'initialize',
+        params: {
+          protocolVersion: '2025-06-18',
+          capabilities: {},
+          clientInfo: {
+            name: 'playwright',
+            version: '1.0.0',
+          },
+        },
       })
       expect(initialize.response.status).toBe(200)
+      const initializeInstructions = (initialize.payload as { result: { instructions: string } }).result
+        .instructions
+
+      if (initializeInstructions.includes('official TypeScript MCP SDK')) {
+        expect(initialize.payload).toMatchObject({
+          jsonrpc: '2.0',
+          id: 1,
+          result: {
+            protocolVersion: '2025-06-18',
+            capabilities: {
+              tools: {
+                listChanged: false,
+              },
+              resources: {
+                subscribe: false,
+                listChanged: false,
+              },
+            },
+            serverInfo: {
+              name: 'aksel-arcade',
+              version: expect.any(String),
+            },
+            instructions: expect.stringContaining('arcade://desktop/start-here'),
+          },
+        })
+
+        const toolsList = await sendJsonRpcRequest({
+          jsonrpc: '2.0',
+          id: 2,
+          method: 'tools/list',
+        })
+        expect(toolsList.response.status).toBe(200)
+        expect(toolsList.payload).toMatchObject({
+          jsonrpc: '2.0',
+          id: 2,
+          error: {
+            code: -32601,
+            message: 'Method not found',
+          },
+        })
+
+        const resourcesList = await sendJsonRpcRequest({
+          jsonrpc: '2.0',
+          id: 3,
+          method: 'resources/list',
+        })
+        expect(resourcesList.response.status).toBe(200)
+        expect(resourcesList.payload).toMatchObject({
+          jsonrpc: '2.0',
+          id: 3,
+          error: {
+            code: -32601,
+            message: 'Method not found',
+          },
+        })
+
+        const wrongPath = await sendRequest({
+          path: '/not-mcp',
+          method: 'POST',
+          headers: {
+            'content-type': 'application/json',
+            accept: 'application/json, text/event-stream',
+          },
+          body: JSON.stringify({
+            jsonrpc: '2.0',
+            id: 10,
+            method: 'tools/list',
+          }),
+        })
+        expect(wrongPath.response.status).toBe(404)
+        expect(wrongPath.payload).toBe('Desktop Arcade MCP endpoint not found.')
+
+        const getRequest = await sendRequest({
+          method: 'GET',
+          headers: {
+            accept: 'application/json, text/event-stream',
+          },
+        })
+        expect(getRequest.response.status).toBe(405)
+        expect(getRequest.response.headers.get('allow')).toBe('POST')
+        expect(getRequest.payload).toBe(
+          'Desktop Arcade MCP SDK bootstrap currently supports POST JSON-RPC requests only.'
+        )
+
+        const malformedJson = await sendRequest({
+          headers: {
+            'content-type': 'application/json',
+            accept: 'application/json, text/event-stream',
+          },
+          body: '{invalid',
+        })
+        expect(malformedJson.response.status).toBe(400)
+        expect(malformedJson.payload).toMatchObject({
+          jsonrpc: '2.0',
+          id: null,
+          error: {
+            code: -32700,
+            message: expect.any(String),
+          },
+        })
+
+        const oversizedRequest = await sendRequest({
+          headers: {
+            'content-type': 'application/json',
+            accept: 'application/json, text/event-stream',
+          },
+          body: `${'x'.repeat(1024 * 1024 + 1)}`,
+        })
+        expect(oversizedRequest.response.status).toBe(413)
+        expect(oversizedRequest.payload).toEqual({
+          jsonrpc: '2.0',
+          id: null,
+          error: {
+            code: -32000,
+            message: 'Desktop Arcade MCP request body exceeds the 1MB limit.',
+          },
+        })
+
+        const browserOrigin = await sendJsonRpcRequest(
+          {
+            jsonrpc: '2.0',
+            id: 11,
+            method: 'tools/list',
+          },
+          {
+            origin: 'https://example.com',
+          }
+        )
+        expect(browserOrigin.response.status).toBe(403)
+        expect(browserOrigin.payload).toBe(
+          'Desktop Arcade MCP accepts only non-browser local MCP clients. Remove the Origin header and use POST JSON-RPC requests.'
+        )
+        return
+      }
+
       expect(initialize.payload).toMatchObject({
         jsonrpc: '2.0',
         id: 1,
@@ -624,8 +777,6 @@ test.describe('Issue #343 Desktop MCP contract baseline', () => {
           },
         },
       })
-      const initializeInstructions = (initialize.payload as { result: { instructions: string } }).result
-        .instructions
       for (const line of expectedInstructionLines) {
         expect(initializeInstructions).toContain(line)
       }

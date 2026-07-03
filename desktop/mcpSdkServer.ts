@@ -13,6 +13,7 @@ export const DESKTOP_MCP_AUTH_DESCRIPTION = 'No token/header required.'
 const MAX_MCP_BODY_BYTES = 1024 * 1024
 const DESKTOP_MCP_BOOTSTRAP_INSTRUCTIONS = [
   'Desktop Arcade MCP is running on the fixed local endpoint and now uses the official TypeScript MCP SDK for initialize/lifecycle handling.',
+  'Start by reading arcade://desktop/start-here. If your MCP host exposes only tools, call read_resource with that URI once the later SDK rebuild slices re-register the Desktop Arcade tools/resources surface.',
   'This bootstrap slice only proves the SDK-backed endpoint, version negotiation, and Desktop availability plumbing. Desktop Arcade tools, resources, and contract-parity resource templates are being re-registered in follow-up rebuild slices.',
   'No token or authorization header is required for local use. Connect with an MCP-capable client or MCP Inspector over HTTP POST to continue the rebuild verification.',
 ].join('\n')
