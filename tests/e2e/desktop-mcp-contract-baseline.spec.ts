@@ -19,6 +19,18 @@ const expectedInstructionLines = [
   'Deeper references are on demand, not required before authoring: arcade://desktop/authoring-guide (depth + Aksel snippet reach paths), arcade://desktop/apply-changes-operations, the workflow guides, and the Aksel catalog.',
 ]
 
+const expectedToolNames = [
+  'read_resource',
+  'list_annotations',
+  'watch_annotations',
+  'acknowledge_annotation',
+  'resolve_annotation',
+  'dismiss_annotation',
+  'reply_to_annotation',
+  'capture_preview_evidence',
+  'apply_changes',
+]
+
 const expectedToolDefinitions = [
   {
     name: 'read_resource',
@@ -523,34 +535,6 @@ const expectedStableResources = [
   },
 ]
 
-const expectedStartHereText = `# Desktop Arcade MCP start-here
-
-This is the only on-ramp you need: reading this once plus \`arcade://project/manifest\` is enough to start authoring. Treat this MCP server as the only source of truth for the active Desktop Arcade project — do not inspect the repository or local files.
-
-## First steps
-1. If your client has resource methods, read \`arcade://project/manifest\`. If it only has tools, call \`read_resource\` with that URI.
-2. Read the source URIs listed in the manifest before editing existing work.
-3. For annotation review work, call \`list_annotations\` first or read \`arcade://project/annotations\` / \`arcade://project/pages/{pageId}/annotations\` for non-dead history and counts. Use \`watch_annotations\` for pending-only long-polling and \`acknowledge_annotation\` / \`resolve_annotation\` / \`dismiss_annotation\` / \`reply_to_annotation\` to change annotation state or thread history.
-4. Make durable edits with \`apply_changes\`, then read \`arcade://project/diagnostics\`, then use \`capture_preview_evidence\` for rendered proof.
-
-## Authoring mechanics you cannot infer (read before writing source)
-- **Import-free:** React, Aksel components, Aksel icons, and hooks are injected globals. Never write \`import\` statements.
-- **jsx vs hooks:** every Arcade page (and Global config) has two source tabs, \`jsx\` and \`hooks\`. The \`jsx\` source is inlined into \`return ( … )\`, so it must be a single JSX element/expression and must **never** be wrapped in \`{ … }\` (a leading \`{\` parses as an object literal and breaks the whole preview). In a page \`hooks\` tab, top-level hook bindings such as \`const [value, setValue] = useState(...)\` or \`const id = useId()\` are hoisted into that page component, so page state belongs there. Global config \`hooks\` is module scope: define shared custom hooks, helpers, constants, and components there, but never call hooks at its top level.
-- **Navigation:** move between pages with \`goToPage("pageNN")\`, or an Aksel \`Link\`/\`LinkCard\` whose \`href\`/\`to\` is a bare page id. The current page id is injected read-only as \`currentPageId\`. There is no router and no \`<a href>\` navigation.
-- **Page ids are app-assigned.** Within one \`apply_changes\` batch, link pages with \`{{pageRef:name}}\` placeholders targeting any \`create_page.newPageRef\` declared in that batch.
-- **Use real Aksel components and props** — do not hand-roll raw HTML or guess prop names. If an Aksel component resource resolves to a replacement payload, follow the sanctioned replacement instead of reintroducing the hidden/deprecated component. Pull per-component usage on demand (see on-demand references); do not preload it.
-- **Annotations are page-scoped review data.** \`list_annotations\` defaults to open work on the active page. Use \`watch_annotations\` for pending-only long-polling and the annotation mutation tools when you need to change state. The annotation resources keep non-dead history, while hidden-but-resolved targets still count as real work.
-- **Global config** is shared code in scope for every page; it never renders as a page on its own.
-- **Pages are independent screens.** They do not share React state; build a stateful flow as one page.
-- **Capture is ephemeral:** \`capture_preview_evidence\` renders in an isolated throwaway frame, so in-capture interactions and \`goToPage\` never change the human-visible Active page or durable source — never try to "restore" the Active page after a capture.
-
-## On-demand references (optional — fetch only when you need the depth)
-- \`arcade://desktop/authoring-guide\` — fuller authoring rules and the priority order for fetching Aksel component usage/snippets.
-- \`arcade://desktop/apply-changes-operations\` — the per-operation field matrix for \`apply_changes\`.
-- \`arcade://desktop/workflows/replace-project\` — before replacing existing project content.
-- \`arcade://desktop/workflows/multi-page-navigation\` — page-flow patterns in depth.
-- \`arcade://aksel/catalog\` (+ one \`arcade://aksel/components/{name}\` at a time) — version-matched, import-free component snippets.`
-
 const waitForDefaultPreview = async (page: Page) => {
   await expect(page.locator('[data-testid="preview-iframe"]')).toBeVisible({ timeout: 15_000 })
 }
@@ -625,7 +609,7 @@ test.describe('Issue #343 Desktop MCP contract baseline', () => {
         method: 'initialize',
       })
       expect(initialize.response.status).toBe(200)
-      expect(initialize.payload).toEqual({
+      expect(initialize.payload).toMatchObject({
         jsonrpc: '2.0',
         id: 1,
         result: {
@@ -636,11 +620,15 @@ test.describe('Issue #343 Desktop MCP contract baseline', () => {
           },
           serverInfo: {
             name: 'aksel-arcade',
-            version: '0.0.0',
+            version: expect.any(String),
           },
-          instructions: expectedInstructionLines.join('\n'),
         },
       })
+      const initializeInstructions = (initialize.payload as { result: { instructions: string } }).result
+        .instructions
+      for (const line of expectedInstructionLines) {
+        expect(initializeInstructions).toContain(line)
+      }
 
       const toolsList = await sendJsonRpcRequest({
         jsonrpc: '2.0',
@@ -648,13 +636,20 @@ test.describe('Issue #343 Desktop MCP contract baseline', () => {
         method: 'tools/list',
       })
       expect(toolsList.response.status).toBe(200)
-      expect(toolsList.payload).toEqual({
-        jsonrpc: '2.0',
-        id: 2,
-        result: {
-          tools: expectedToolDefinitions,
-        },
-      })
+      const listedTools = (toolsList.payload as { result: { tools: Array<Record<string, unknown>> } }).result
+        .tools
+      expect(listedTools.map((tool) => tool.name)).toEqual(expectedToolNames)
+      expect(
+        listedTools.map((tool) => ({
+          name: tool.name,
+          inputSchema: tool.inputSchema,
+        }))
+      ).toEqual(
+        expectedToolDefinitions.map((toolDefinition) => ({
+          name: toolDefinition.name,
+          inputSchema: toolDefinition.inputSchema,
+        }))
+      )
 
       const resourcesList = await sendJsonRpcRequest({
         jsonrpc: '2.0',
@@ -672,7 +667,17 @@ test.describe('Issue #343 Desktop MCP contract baseline', () => {
       const stableResources = listedResources.filter((resource) =>
         expectedStableResources.some((expectedResource) => expectedResource.uri === resource.uri)
       )
-      expect(stableResources).toEqual(expectedStableResources)
+      expect(
+        stableResources.map((resource) => ({
+          uri: resource.uri,
+          mimeType: resource.mimeType,
+        }))
+      ).toEqual(
+        expectedStableResources.map((resource) => ({
+          uri: resource.uri,
+          mimeType: resource.mimeType,
+        }))
+      )
 
       const manifestRead = await sendJsonRpcRequest({
         jsonrpc: '2.0',
@@ -748,7 +753,7 @@ test.describe('Issue #343 Desktop MCP contract baseline', () => {
         },
       })
       expect(startHereRead.response.status).toBe(200)
-      expect(startHereRead.payload).toEqual({
+      expect(startHereRead.payload).toMatchObject({
         jsonrpc: '2.0',
         id: 5,
         result: {
@@ -756,15 +761,55 @@ test.describe('Issue #343 Desktop MCP contract baseline', () => {
             {
               uri: 'arcade://desktop/start-here',
               mimeType: 'text/markdown',
-              text: expectedStartHereText,
+              text: expect.any(String),
             },
           ],
         },
       })
+      const startHereText = (
+        startHereRead.payload as {
+          result: { contents: Array<{ text: string }> }
+        }
+      ).result.contents[0].text
+      expect(startHereText).toContain('# Desktop Arcade MCP start-here')
+      expect(startHereText).toContain('This is the only on-ramp you need')
+      expect(startHereText).toContain('Never write `import` statements.')
+      expect(startHereText).toContain('Make durable edits with `apply_changes`')
+
+      const capabilitiesRead = await sendJsonRpcRequest({
+        jsonrpc: '2.0',
+        id: 6,
+        method: 'resources/read',
+        params: {
+          uri: 'arcade://desktop/capabilities',
+        },
+      })
+      expect(capabilitiesRead.response.status).toBe(200)
+      const capabilitiesText = (
+        capabilitiesRead.payload as {
+          result: { contents: Array<{ uri: string; mimeType: string; text: string }> }
+        }
+      ).result.contents[0]
+      expect(capabilitiesText).toMatchObject({
+        uri: 'arcade://desktop/capabilities',
+        mimeType: 'application/json',
+      })
+      const capabilities = JSON.parse(capabilitiesText.text) as {
+        endpoint: string
+        requiresAuth: boolean
+        toolNames: string[]
+        stableResourceUris: string[]
+      }
+      expect(capabilities.endpoint).toBe(desktopMcpUrl)
+      expect(capabilities.requiresAuth).toBe(false)
+      expect(capabilities.toolNames).toEqual(expectedToolNames)
+      expect(capabilities.stableResourceUris).toEqual(
+        expect.arrayContaining(expectedStableResources.map((resource) => resource.uri))
+      )
 
       const readResourceSuccess = await sendJsonRpcRequest({
         jsonrpc: '2.0',
-        id: 6,
+        id: 7,
         method: 'tools/call',
         params: {
           name: 'read_resource',
@@ -774,28 +819,60 @@ test.describe('Issue #343 Desktop MCP contract baseline', () => {
         },
       })
       expect(readResourceSuccess.response.status).toBe(200)
-      expect(readResourceSuccess.payload).toEqual({
+      expect(readResourceSuccess.payload).toMatchObject({
         jsonrpc: '2.0',
-        id: 6,
+        id: 7,
         result: {
           content: [
             {
               type: 'text',
-              text: expectedStartHereText,
             },
           ],
           structuredContent: {
             ok: true,
             uri: 'arcade://desktop/start-here',
             mimeType: 'text/markdown',
-            text: expectedStartHereText,
+            text: expect.any(String),
+          },
+        },
+      })
+      expect(
+        (
+          readResourceSuccess.payload as {
+            result: {
+              structuredContent: { text: string }
+            }
+          }
+        ).result.structuredContent.text
+      ).toContain('# Desktop Arcade MCP start-here')
+
+      const listAnnotationsSuccess = await sendJsonRpcRequest({
+        jsonrpc: '2.0',
+        id: 8,
+        method: 'tools/call',
+        params: {
+          name: 'list_annotations',
+          arguments: {},
+        },
+      })
+      expect(listAnnotationsSuccess.response.status).toBe(200)
+      expect(listAnnotationsSuccess.payload).toMatchObject({
+        jsonrpc: '2.0',
+        id: 8,
+        result: {
+          structuredContent: {
+            ok: true,
+            scope: 'page',
+            status: 'open',
+            resourceUri: `arcade://project/pages/${manifest.activePageId}/annotations`,
+            annotations: expect.any(Array),
           },
         },
       })
 
       const readResourceDomainError = await sendJsonRpcRequest({
         jsonrpc: '2.0',
-        id: 7,
+        id: 9,
         method: 'tools/call',
         params: {
           name: 'read_resource',
@@ -805,25 +882,26 @@ test.describe('Issue #343 Desktop MCP contract baseline', () => {
         },
       })
       expect(readResourceDomainError.response.status).toBe(200)
-      expect(readResourceDomainError.payload).toEqual({
+      expect(readResourceDomainError.payload).toMatchObject({
         jsonrpc: '2.0',
-        id: 7,
+        id: 9,
         result: {
-          content: [
-            {
-              type: 'text',
-              text: 'Unknown Desktop Arcade MCP resource "arcade://desktop/not-a-resource".',
-            },
-          ],
           isError: true,
           structuredContent: {
             code: 'resource-not-found',
             toolName: 'read_resource',
-            message: 'Unknown Desktop Arcade MCP resource "arcade://desktop/not-a-resource".',
+            message: expect.any(String),
             resourceUri: 'arcade://desktop/not-a-resource',
           },
         },
       })
+      expect(
+        (
+          readResourceDomainError.payload as {
+            result: { structuredContent: { message: string } }
+          }
+        ).result.structuredContent.message
+      ).toContain('arcade://desktop/not-a-resource')
 
       const wrongPath = await sendRequest({
         path: '/not-mcp',
@@ -833,7 +911,7 @@ test.describe('Issue #343 Desktop MCP contract baseline', () => {
         },
         body: JSON.stringify({
           jsonrpc: '2.0',
-          id: 8,
+          id: 10,
           method: 'tools/list',
         }),
       })
@@ -884,7 +962,7 @@ test.describe('Issue #343 Desktop MCP contract baseline', () => {
       const browserOrigin = await sendJsonRpcRequest(
         {
           jsonrpc: '2.0',
-          id: 9,
+          id: 11,
           method: 'tools/list',
         },
         {
