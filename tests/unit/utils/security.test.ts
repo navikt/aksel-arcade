@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   validateMainToSandboxMessage,
+  validateSandboxReadyMessage,
   validateSandboxToMainMessage,
   sanitizeProps,
 } from '@/utils/security'
@@ -297,6 +298,33 @@ describe('Security Utilities', () => {
       expect(validateSandboxToMainMessage(undefined)).toBe(false)
       expect(validateSandboxToMainMessage('string')).toBe(false)
       expect(validateSandboxToMainMessage(123)).toBe(false)
+    })
+  })
+
+  describe('validateSandboxReadyMessage', () => {
+    it('accepts a valid sandbox ready handshake', () => {
+      expect(
+        validateSandboxReadyMessage({
+          type: 'SANDBOX_READY',
+          payload: {
+            href: 'http://127.0.0.1:5173/aksel-arcade/sandbox.html',
+          },
+        })
+      ).toBe(true)
+    })
+
+    it('rejects malformed sandbox ready handshakes', () => {
+      expect(validateSandboxReadyMessage(null)).toBe(false)
+      expect(validateSandboxReadyMessage({ type: 'SANDBOX_READY' })).toBe(false)
+      expect(
+        validateSandboxReadyMessage({
+          type: 'SANDBOX_READY',
+          payload: {
+            href: 123,
+          },
+        })
+      ).toBe(false)
+      expect(validateSandboxReadyMessage({ type: 'RENDER_SUCCESS' })).toBe(false)
     })
   })
 

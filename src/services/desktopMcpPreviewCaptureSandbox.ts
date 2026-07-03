@@ -17,9 +17,14 @@ import type {
   PreviewInteractionStep,
   PreviewEvidenceScreenshotScope,
 } from './previewEvidence'
+import {
+  validateSandboxReadyMessage,
+  validateSandboxToMainMessage,
+} from '@/utils/security'
 
 const SANDBOX_IFRAME_SRC =
   import.meta.env.MODE === 'test' ? 'about:blank' : `${import.meta.env.BASE_URL}sandbox.html`
+const getSandboxIframeHref = (src: string) => new URL(src, window.location.href).href
 
 interface CapturePreviewInSandboxOptions {
   transpiledCode: string
@@ -225,14 +230,20 @@ export const capturePreviewInIsolatedSandbox = async ({
         return
       }
 
-      if (event.data?.type !== 'SANDBOX_READY') {
+      if (
+        !validateSandboxReadyMessage(event.data) ||
+        event.data.payload.href !== getSandboxIframeHref(SANDBOX_IFRAME_SRC)
+      ) {
         return
       }
 
       const channel = new MessageChannel()
       port = channel.port1
-      port.onmessage = (messageEvent) =>
-        handleSandboxMessage(messageEvent.data as SandboxToMainMessage)
+      port.onmessage = (messageEvent) => {
+        if (validateSandboxToMainMessage(messageEvent.data)) {
+          handleSandboxMessage(messageEvent.data as SandboxToMainMessage)
+        }
+      }
       port.start()
       iframe.contentWindow?.postMessage({ type: 'CONNECT_SANDBOX' }, '*', [channel.port2])
     }

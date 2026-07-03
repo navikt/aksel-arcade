@@ -39,6 +39,12 @@ Follow-up after human checklist:
   - hidden target remains in resources with `targetVisibility: "hidden"` but has no misleading capture marker.
 - Final verification: `npm run type-check`, `npm run lint`, `npm test -- --run`, `npm run build`, and the issue #326 visual verification harness.
 
+Review follow-up before merge:
+
+- Fixed a documented security gap flagged during PR #341 review: the hidden Desktop MCP sandbox bridges in `desktopMcpAnnotations` and `desktopMcpPreviewCaptureSandbox` now validate `SANDBOX_READY` handshake payloads against the expected iframe href and validate MessagePort payloads before handling them, aligning those paths with the repo rule to validate postMessage communications.
+- Added unit coverage for the new `validateSandboxReadyMessage` helper in `tests/unit/utils/security.test.ts`.
+- Re-ran focused sandbox/security tests plus the full validation set: `npm run type-check`, `npm run lint`, `npm test -- --run`, and `npm run build`.
+
 ### 2026-07-02 - Issue #325 follow-up: Desktop MCP annotation mutation runtime fix
 
 Implemented:

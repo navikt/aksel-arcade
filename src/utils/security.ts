@@ -1,6 +1,13 @@
 import type { MainToSandboxMessage, SandboxToMainMessage } from '@/types/messages'
 import { isAnnotationTargetResolutionRequest } from '@/services/annotationTargets'
 
+interface SandboxReadyMessage {
+  type: 'SANDBOX_READY'
+  payload: {
+    href: string
+  }
+}
+
 /**
  * Validates that a message is from the expected sandbox iframe
  */
@@ -95,6 +102,12 @@ export const validateSandboxToMainMessage = (data: unknown): data is SandboxToMa
 
   return true
 }
+
+export const validateSandboxReadyMessage = (data: unknown): data is SandboxReadyMessage =>
+  isRecord(data) &&
+  data.type === 'SANDBOX_READY' &&
+  isRecord(data.payload) &&
+  typeof data.payload.href === 'string'
 
 const isAnnotationTargetResolutionResult = (value: unknown): boolean => {
   if (!isRecord(value) || typeof value.status !== 'string') {
