@@ -172,9 +172,13 @@ _Avoid_: Chat, bot session, automation session
 The pre-MCP in-app on/off consent toggle. Desktop Arcade MCP v1 does not use a separate Agent access switch; consent happens in the MCP client configuration instead.
 _Avoid_: Local server, transport, pairing token, Share URL
 
-**Agent bridge**:
-The Desktop Arcade local MCP server surface that lets an **External agent** read **Arcade-scoped state** and submit **Agent changes** for the active **Arcade project** through narrow resources and tools.
-_Avoid_: Provider integration, backend API, browser extension
+**Agent bridge** _(legacy, superseded)_:
+The pre-MCP local agent surface. Desktop Arcade MCP v1 uses the **Desktop Arcade MCP server** instead.
+_Avoid_: Desktop Arcade MCP server, provider integration, backend API, browser extension
+
+**Desktop Arcade MCP server**:
+The local MCP server surface in **Desktop Arcade** that lets an **External agent** read **Arcade-scoped state** and submit **Agent changes** for the active **Arcade project** through narrow resources and tools.
+_Avoid_: Agent bridge, provider integration, backend API, browser extension
 
 **Agent transport** _(legacy, superseded)_:
 The pre-MCP same-device pairing transport. Desktop Arcade MCP v1 uses the fixed local MCP endpoint instead of the old random loopback pairing transport.
@@ -197,7 +201,7 @@ The old short-lived pairing secret. Desktop Arcade MCP v1 requires no token or a
 _Avoid_: API key, installation token, persistent trust
 
 **External agent**:
-A user-directed AI agent outside Desktop Arcade that works on an active **Arcade project** through the **Agent bridge**.
+A user-directed AI agent outside Desktop Arcade that works on an active **Arcade project** through the **Desktop Arcade MCP server**.
 _Avoid_: In-app chat, provider integration, browser automation
 
 **Copilot agent surface**:
@@ -249,14 +253,14 @@ A code autocomplete suggestion for a general renderable Aksel choice, including 
 _Avoid_: Compound subcomponent suggestion, prop suggestion
 
 **Agent change**:
-An agent-authored change applied to one or more parts of the active **Arcade project** through the Desktop Arcade local MCP bridge — the **Global config** code, an individual **Arcade page**'s code, or the project's page set itself (adding, renaming, or removing an **Arcade page**, or changing the **Start page**). The app assigns page ids; an agent never chooses them.
+An agent-authored change applied to one or more parts of the active **Arcade project** through the **Desktop Arcade MCP server** — the **Global config** code, an individual **Arcade page**'s code, or the project's page set itself (adding, renaming, or removing an **Arcade page**, or changing the **Start page**). The app assigns page ids; an agent never chooses them.
 _Avoid_: Proposed change, patch, command, cursor edit
 
 ## Example dialogue
 
 Developer: "The human added Desktop Arcade as an MCP server in the external agent client."
 
-Domain expert: "Good. The local MCP bridge now targets this active Arcade project. Desktop Arcade v1 does not need a separate Agent access toggle or pairing handoff."
+Domain expert: "Good. The Desktop Arcade MCP server now targets this active Arcade project. Desktop Arcade v1 does not need a separate Agent access toggle or pairing handoff."
 
 Developer: "The agent applied a batch change to the Arcade project through `apply_changes`."
 
@@ -348,7 +352,7 @@ Domain expert: "The Web share URL should carry the full Arcade project source pl
 
 Developer: "An agent wants to add a page to a one-page Arcade project."
 
-Domain expert: "The local MCP bridge always works against the full pages-based Arcade project source, even when there is only one Arcade page. The agent can call the page lifecycle operations directly; the app still assigns the stable page id."
+Domain expert: "The Desktop Arcade MCP server always works against the full pages-based Arcade project source, even when there is only one Arcade page. The agent can call the page lifecycle operations directly; the app still assigns the stable page id."
 
 Developer: "The agent needs to add a page and link to it."
 
