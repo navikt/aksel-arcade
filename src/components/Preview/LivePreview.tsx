@@ -281,6 +281,7 @@ export const LivePreview = ({
   const [viewportBounds, setViewportBounds] = useState({ width: 0, height: 0 })
   const pendingCodeRef = useRef<string | null>(null)
   const latestTranspiledCodeRef = useRef(transpiledCode)
+  const annotationsRef = useRef(annotations)
   const viewportStageRef = useRef<HTMLDivElement | null>(null)
   const sandboxPortRef = useRef<MessagePort | null>(null)
   const previewEvidenceRequestIdRef = useRef(0)
@@ -365,6 +366,10 @@ export const LivePreview = ({
   useEffect(() => {
     latestTranspiledCodeRef.current = transpiledCode
   }, [transpiledCode])
+
+  useEffect(() => {
+    annotationsRef.current = annotations
+  }, [annotations])
 
   useEffect(() => {
     previewPageIdRef.current = previewPageId
@@ -482,7 +487,7 @@ export const LivePreview = ({
             ...(request.includeAnnotationOverlays
               ? {
                   includeAnnotationOverlays: true,
-                  annotations: (request.annotations ?? annotations).map((annotation) => ({
+                  annotations: (request.annotations ?? annotationsRef.current).map((annotation) => ({
                     ...annotation,
                   })),
                 }
@@ -706,7 +711,7 @@ export const LivePreview = ({
       window.removeEventListener('message', handleMessage)
       disconnectSandbox(false)
     }
-  }, [annotations, iframeRef, postNavigateToPage])
+  }, [iframeRef, postNavigateToPage])
 
   // T083: Clear inspection popover when inspect mode disabled
   useEffect(() => {
@@ -799,7 +804,7 @@ export const LivePreview = ({
       payload: { jsxCode: transpiledCode, hooksCode: '' },
     }
 
-    postMessageToSandbox(iframeRef.current.contentWindow, message)
+    sandboxPortRef.current?.postMessage(message)
   }, [transpiledCode, sandboxReady, iframeRef])
 
   // Send viewport update when viewport changes

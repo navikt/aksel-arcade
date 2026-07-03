@@ -26,6 +26,19 @@ Next note:
 
 - The manual verification artifacts live in the session artifact folder (`issue-326-annotation-mode.png`, `issue-326-capture.svg`, `issue-326-capture.png`, `issue-326-summary.json`) if anyone needs to inspect the exact Desktop capture output that reproduced and then verified the preload-bridge fix.
 
+Follow-up after human checklist:
+
+- Fixed the live preview refresh bug discovered while running the issue #326 checklist: updating annotations recreated the `LivePreview` sandbox-connection effect because it closed over `annotations`, which disconnected the `MessageChannel` while leaving `sandboxReady` true. Subsequent Desktop MCP `apply_changes` source updates reached the editor and transpiler but were posted into the disconnected sandbox path, so the visible iframe stayed stale.
+- Kept the sandbox connection effect stable by reading the latest annotations through a ref for Preview evidence requests, and added a regression in `tests/integration/live-preview-sandbox-connection.test.tsx` proving annotation replacement no longer unregisters/closes the connected sandbox port.
+- Re-ran the live Electron/Desktop MCP repro and confirmed `apply_changes` visibly updates the preview iframe.
+- Re-ran the issue #326 human verification checklist with real Electron/Desktop MCP capture and screenshot artifacts:
+  - visible single annotation marker appears in Annotation mode and capture output,
+  - visible multi-element annotation shows the grouped marker/outline in capture output,
+  - dead target is absent from capture overlays after source removal,
+  - annotation resources retain the expected non-dead visible + hidden annotations,
+  - hidden target remains in resources with `targetVisibility: "hidden"` but has no misleading capture marker.
+- Final verification: `npm run type-check`, `npm run lint`, `npm test -- --run`, `npm run build`, and the issue #326 visual verification harness.
+
 ### 2026-07-02 - Issue #325 follow-up: Desktop MCP annotation mutation runtime fix
 
 Implemented:
