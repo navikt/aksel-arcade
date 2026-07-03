@@ -11,6 +11,15 @@ import type {
   DesktopMcpProjectResourceReadHandler,
   DesktopMcpProjectResourceReadResult,
 } from '../src/services/desktopMcpProjectResourceProtocol'
+import {
+  AKSEL_COMPONENT_RESOURCE_URI_PREFIX,
+  akselComponentResourceUri,
+  type DesktopMcpAkselCatalogData,
+  type DesktopMcpAkselComponentIndexEntry,
+  type DesktopMcpAkselComponentDetail,
+  type DesktopMcpAkselHiddenRootMigrationRule,
+} from '../src/shared/desktopMcp/akselCatalog'
+import { AKSEL_MCP_CATALOG_DATA } from '../src/shared/desktopMcp/akselCatalogData.generated'
 
 const require = createRequire(__filename)
 const desktopRuntimeDir =
@@ -32,7 +41,6 @@ const MAX_MCP_BODY_BYTES = 1024 * 1024
 const PROJECT_PAGE_ID_PATTERN = /^page\d+$/
 const PREVIEW_CAPTURE_RESOURCE_URI_PATTERN =
   /^arcade:\/\/preview\/captures\/([a-z0-9-]+)\/(manifest|screenshot|frame|accessibility|dom-layout-style)$/
-const AKSEL_COMPONENT_RESOURCE_URI_PREFIX = 'arcade://aksel/components/'
 const AKSEL_COMPONENT_RESOURCE_URI_TEMPLATE = `${AKSEL_COMPONENT_RESOURCE_URI_PREFIX}{name}`
 const AKSEL_COMPONENT_RESOURCE_URI_PATTERN = /^arcade:\/\/aksel\/components\/([A-Za-z0-9.%\- ]+)$/
 const AKSEL_CATALOG_RESOURCE_URI = 'arcade://aksel/catalog'
@@ -164,44 +172,9 @@ interface DesktopMcpProjectManifestPayload {
   pages?: DesktopMcpProjectManifestPageEntry[]
 }
 
-type AkselCatalogComponentIndexEntry = {
-  name: string
-  resourceUri: string
-}
-
-type AkselCatalogComponentDetail = Record<string, unknown> & {
-  name: string
-  snippet?: {
-    jsx?: string
-    hooks?: string
-  }
-}
-
-type AkselCatalogMigrationRule = Record<string, unknown> & {
-  when: string
-  target: string
-  match?: string
-  preservesCloseButton?: boolean
-  note?: string
-  propMappings?: Array<{
-    sourceProp: string
-    targetProp: string
-    valueMap: Record<string, string>
-  }>
-}
-
-type AkselCatalogHiddenRootReplacement = {
-  reason: string
-  replacements: string[]
-  migrationRules?: AkselCatalogMigrationRule[]
-}
-
-type AkselCatalogData = {
-  akselVersion: string
-  components: AkselCatalogComponentIndexEntry[]
-  componentsByName: Record<string, AkselCatalogComponentDetail>
-  componentAliases: Record<string, string>
-  hiddenRootReplacements: Record<string, AkselCatalogHiddenRootReplacement>
+type AkselCatalogMigrationRule = DesktopMcpAkselHiddenRootMigrationRule
+type AkselResolvedMigrationRule = Omit<AkselCatalogMigrationRule, 'target'> & {
+  target: DesktopMcpAkselComponentIndexEntry
 }
 
 type AkselComponentResolution =
@@ -210,7 +183,7 @@ type AkselComponentResolution =
       requestedName: string
       matchedName: string
       resourceUri: string
-      component: AkselCatalogComponentDetail
+      component: DesktopMcpAkselComponentDetail
     }
   | {
       kind: 'alias'
@@ -218,7 +191,7 @@ type AkselComponentResolution =
       aliasName: string
       matchedName: string
       resourceUri: string
-      component: AkselCatalogComponentDetail
+      component: DesktopMcpAkselComponentDetail
     }
   | {
       kind: 'replacement'
@@ -226,7 +199,7 @@ type AkselComponentResolution =
       hiddenRootName: string
       reason: string
       replacements: Array<{ name: string; resourceUri: string }>
-      migrationRules?: Array<Record<string, unknown>>
+      migrationRules?: AkselResolvedMigrationRule[]
     }
   | {
       kind: 'did-you-mean'
@@ -362,46 +335,9 @@ const DESKTOP_RESOURCE_TEMPLATES = Object.freeze([
   },
 ] satisfies readonly Omit<DesktopMcpResourceTemplateDefinition, 'list' | 'read'>[])
 
-const createEmptyAkselCatalogData = (): AkselCatalogData => ({
-  akselVersion: 'unknown',
-  components: [],
-  componentsByName: {},
-  componentAliases: {},
-  hiddenRootReplacements: {},
-})
-
 const isObjectRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value)
-
-const loadAkselCatalogData = (): AkselCatalogData => {
-  try {
-    const data = require(path.join(desktopRuntimeDir, 'akselCatalogData.generated.cjs')) as unknown
-    if (
-      isObjectRecord(data) &&
-      typeof data.akselVersion === 'string' &&
-      Array.isArray(data.components) &&
-      isObjectRecord(data.componentsByName)
-    ) {
-      return {
-        akselVersion: data.akselVersion,
-        components: data.components as AkselCatalogComponentIndexEntry[],
-        componentsByName: data.componentsByName as Record<string, AkselCatalogComponentDetail>,
-        componentAliases: isObjectRecord(data.componentAliases)
-          ? (data.componentAliases as Record<string, string>)
-          : {},
-        hiddenRootReplacements: isObjectRecord(data.hiddenRootReplacements)
-          ? (data.hiddenRootReplacements as Record<string, AkselCatalogHiddenRootReplacement>)
-          : {},
-      }
-    }
-  } catch {
-    // Artifact is generated at build time; local test environments may not have refreshed it yet.
-  }
-
-  return createEmptyAkselCatalogData()
-}
-
-const AKSEL_CATALOG_DATA = loadAkselCatalogData()
+const AKSEL_CATALOG_DATA: DesktopMcpAkselCatalogData = AKSEL_MCP_CATALOG_DATA
 
 export const createDesktopMcpPreviewCaptureStore = (
   ttlMs = DEFAULT_PREVIEW_CAPTURE_TTL_MS
@@ -955,9 +891,9 @@ const listPageAnnotationResources = async (
     }))
 }
 
-const createAkselComponentLink = (name: string) => ({
+const createAkselComponentLink = (name: string): DesktopMcpAkselComponentIndexEntry => ({
   name,
-  resourceUri: `${AKSEL_COMPONENT_RESOURCE_URI_PREFIX}${encodeURIComponent(name)}`,
+  resourceUri: akselComponentResourceUri(name),
 })
 
 const getAkselComponentRootName = (name: string) => name.split('.')[0] ?? name

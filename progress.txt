@@ -4968,3 +4968,30 @@ Verification:
 Next note:
 
 - PR #356 now includes a follow-up commit on top of the original issue #347 implementation. The important review-driven fixes were build-path typing parity, README contract accuracy, and annotation persistence failure handling.
+### 2026-07-03 - Issue #349: Move generated Aksel MCP catalog data into shared Desktop MCP contracts
+
+Implemented:
+
+- Reviewed `#349`, `#350`, `#342`, `CONTEXT.md`, ADR `0025`, the Desktop MCP contract doc, and ADR `0017`, then chose `#349` as the highest-priority `ready-for-agent` slice because `#350` is explicitly blocked by `#349`/`#347`/`#348`, while `#349` is the last remaining catalog-contract blocker on the path to final Desktop MCP parity.
+- Added `src/shared/desktopMcp/akselCatalog.ts` as the pure shared contract home for Desktop MCP Aksel catalog types plus the shared component-resource URI helper.
+- Changed the catalog generator so `npm run aksel:refresh-mcp-catalog` now writes the primary typed shared artifact to `src/shared/desktopMcp/akselCatalogData.generated.ts`, while still refreshing `desktop/akselCatalogData.generated.cjs` as a legacy CommonJS compatibility mirror for handwritten-server parity tests.
+- Rewired `desktop/mcpSdkResources.ts` to consume the typed shared generated catalog instead of loading a Desktop-local generated CJS artifact, preserving the existing `arcade://aksel/catalog` and `arcade://aksel/components/{name}` behavior.
+- Updated drift coverage in `tests/unit/akselMcpCatalog.test.ts` so it now guards both the shared typed artifact and the legacy CJS mirror against the builder output.
+- Updated the live Desktop MCP Aksel resource E2E seam in `tests/e2e/desktop-mcp-aksel-resources.spec.ts` to send the SDK-required `Accept: application/json, text/event-stream` header and to assert the current authoring-guide/apply-changes copy instead of older strings.
+- Updated ADR `0017` so the docs point at the shared generated contract artifact instead of the old Desktop-only location.
+
+Verification:
+
+- `npm run typecheck`
+- `npm test -- --run`
+- `npm run test:e2e -- tests/e2e/desktop-mcp-aksel-resources.spec.ts --reporter=line`
+- Human-style/Desktop verification through the live Electron MCP resource flow above:
+  - launched Desktop Arcade and confirmed the app/preview opened,
+  - read `arcade://aksel/catalog` and representative component resources through the real local MCP endpoint,
+  - confirmed alias resolution (`RadioGroup`), hidden-root replacement guidance (`Alert`, `Dropdown.Menu`), and misspelling suggestions (`Buton`),
+  - confirmed the authoring guide and apply-changes operations resources stayed readable and useful,
+  - and confirmed the generated catalog refresh/build path stayed clean during the Desktop build.
+
+Next note:
+
+- The SDK-backed runtime now reads its generated Aksel MCP catalog data from `src/shared/desktopMcp/akselCatalogData.generated.ts`. If issue `#350` removes the handwritten server next, it can likely drop the `desktop/akselCatalogData.generated.cjs` compatibility mirror and the remaining legacy parity references at the same time.

@@ -15,12 +15,26 @@ const postMcpRequest = async (payload: Record<string, unknown>) => {
     method: 'POST',
     headers: {
       'content-type': 'application/json',
+      accept: 'application/json, text/event-stream',
     },
     body: JSON.stringify(payload),
   })
 
   expect(response.status).toBe(200)
-  return response.json()
+  return parseJsonOrSse(await response.text())
+}
+
+const parseJsonOrSse = (bodyText: string) => {
+  if (!bodyText.startsWith('event:')) {
+    return JSON.parse(bodyText) as Record<string, unknown>
+  }
+
+  const dataLines = bodyText
+    .split('\n')
+    .filter((line) => line.startsWith('data: '))
+    .map((line) => line.slice('data: '.length))
+
+  return JSON.parse(dataLines.join('\n')) as Record<string, unknown>
 }
 
 const readMcpResource = async (id: number, uri: string) => {
@@ -156,15 +170,16 @@ test.describe('Desktop MCP on-demand Aksel resources', () => {
 
       const authoringGuide = await readMcpResource(8, 'arcade://desktop/authoring-guide')
       expect(authoringGuide.text).toContain(
-        'Read `arcade://aksel/catalog` before guessing a component name'
+        '## Getting Aksel component usage (on demand — fetch only the components you need)'
       )
+      expect(authoringGuide.text).toContain('`arcade://aksel/catalog`')
       expect(authoringGuide.text).toContain('`Alert` is deprecated')
 
       const operations = await readMcpResource(9, 'arcade://desktop/apply-changes-operations')
       expect(operations.mimeType).toBe('text/markdown')
       expect(operations.text).toContain('`create_page`')
       expect(operations.text).toContain('`replace_source`')
-      expect(operations.text).toContain('may target any matching')
+      expect(operations.text).toContain('Target the page with either `pageId` or `tempPageRef`.')
       expect(operations.text).toContain('Final-state assertions')
     } finally {
       await app.close()

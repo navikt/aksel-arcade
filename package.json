@@ -30,7 +30,7 @@
     "format": "prettier --write \"src/**/*.{ts,tsx,css}\"",
     "share-strategy-bench": "node scripts/share-strategy-bench.mjs",
     "aksel:refresh-docs": "tsx --tsconfig tsconfig.node.json scripts/generate-aksel-autocomplete-data.ts --write src/data/akselAutocompleteData.ts",
-    "aksel:refresh-mcp-catalog": "tsx --tsconfig tsconfig.node.json scripts/generate-mcp-aksel-catalog.ts --write desktop/akselCatalogData.generated.cjs",
+    "aksel:refresh-mcp-catalog": "tsx --tsconfig tsconfig.node.json scripts/generate-mcp-aksel-catalog.ts --write",
     "aksel:audit": "tsx --tsconfig tsconfig.node.json scripts/aksel-audit.ts"
   },
   "dependencies": {
