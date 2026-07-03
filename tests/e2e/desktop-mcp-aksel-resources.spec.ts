@@ -37,13 +37,27 @@ const parseJsonOrSse = (bodyText: string) => {
   return JSON.parse(dataLines.join('\n')) as Record<string, unknown>
 }
 
+interface JsonRpcSuccessResult<T> {
+  jsonrpc: '2.0'
+  id: number
+  result: T
+}
+
+interface ResourceReadResultPayload {
+  contents: Array<{
+    uri: string
+    mimeType: string
+    text: string
+  }>
+}
+
 const readMcpResource = async (id: number, uri: string) => {
-  const payload = await postMcpRequest({
+  const payload = (await postMcpRequest({
     jsonrpc: '2.0',
     id,
     method: 'resources/read',
     params: { uri },
-  })
+  })) as unknown as JsonRpcSuccessResult<ResourceReadResultPayload>
 
   return payload.result.contents[0] as {
     uri: string
@@ -75,7 +89,7 @@ test.describe('Desktop MCP on-demand Aksel resources', () => {
       const page = await app.firstWindow()
       await waitForDefaultPreview(page)
 
-      const initialize = await postMcpRequest({
+      const initialize = (await postMcpRequest({
         jsonrpc: '2.0',
         id: 1,
         method: 'initialize',
@@ -84,7 +98,9 @@ test.describe('Desktop MCP on-demand Aksel resources', () => {
           capabilities: {},
           clientInfo: { name: 'e2e-client', version: '1.0.0' },
         },
-      })
+      })) as unknown as JsonRpcSuccessResult<{
+        instructions: string
+      }>
       expect(typeof initialize.result.instructions).toBe('string')
       expect(initialize.result.instructions).toContain('goToPage')
       expect(initialize.result.instructions).toContain('import-free')

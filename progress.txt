@@ -4995,3 +4995,24 @@ Verification:
 Next note:
 
 - The SDK-backed runtime now reads its generated Aksel MCP catalog data from `src/shared/desktopMcp/akselCatalogData.generated.ts`. If issue `#350` removes the handwritten server next, it can likely drop the `desktop/akselCatalogData.generated.cjs` compatibility mirror and the remaining legacy parity references at the same time.
+### 2026-07-03 - PR #358 review follow-up: fix build-only shared-catalog typing regressions
+
+Implemented:
+
+- Reviewed PR `#358` against `origin/release-candidate`, issue `#349`, `.github/copilot-instructions.md`, and `docs/desktop-mcp-contract.md`.
+- Reproduced the failing CI `Validate` job locally with `npm run build` instead of relying on the already-green no-emit/typecheck path.
+- Fixed the shared Desktop MCP catalog typing mismatches that only surfaced in the production build:
+  - relaxed `DesktopMcpAkselHiddenRootMigrationMatch.variants` to `readonly string[]` so the shared contract matches the frozen authoring-policy source data,
+  - narrowed `desktop/mcpSdkResources.ts` component-link payloads to the actual `{ name, resourceUri }` shape used for suggestions/replacements instead of incorrectly typing them as full catalog index entries,
+  - and tightened the Aksel-resource Playwright helper casts so the E2E file also passes the stricter `tsc -b` build path.
+
+Verification:
+
+- `npm run build`
+- `npm run typecheck`
+- `npm test -- --run`
+- `npm run test:e2e -- tests/e2e/desktop-mcp-aksel-resources.spec.ts --reporter=line`
+
+Next note:
+
+- This was another build-only regression: `npm run typecheck` stayed green while `npm run build` failed because `tsc -b` checks the stricter project references, including the E2E TypeScript files. For future Desktop MCP slices, run `npm run build` before opening the PR even if the no-emit checks already pass.

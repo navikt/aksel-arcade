@@ -15,7 +15,6 @@ import {
   AKSEL_COMPONENT_RESOURCE_URI_PREFIX,
   akselComponentResourceUri,
   type DesktopMcpAkselCatalogData,
-  type DesktopMcpAkselComponentIndexEntry,
   type DesktopMcpAkselComponentDetail,
   type DesktopMcpAkselHiddenRootMigrationRule,
 } from '../src/shared/desktopMcp/akselCatalog'
@@ -173,8 +172,12 @@ interface DesktopMcpProjectManifestPayload {
 }
 
 type AkselCatalogMigrationRule = DesktopMcpAkselHiddenRootMigrationRule
+type AkselComponentLink = {
+  name: string
+  resourceUri: string
+}
 type AkselResolvedMigrationRule = Omit<AkselCatalogMigrationRule, 'target'> & {
-  target: DesktopMcpAkselComponentIndexEntry
+  target: AkselComponentLink
 }
 
 type AkselComponentResolution =
@@ -198,13 +201,13 @@ type AkselComponentResolution =
       requestedName: string
       hiddenRootName: string
       reason: string
-      replacements: Array<{ name: string; resourceUri: string }>
+      replacements: AkselComponentLink[]
       migrationRules?: AkselResolvedMigrationRule[]
     }
   | {
       kind: 'did-you-mean'
       requestedName: string
-      suggestions: Array<{ name: string; resourceUri: string }>
+      suggestions: AkselComponentLink[]
     }
 
 const ADDITIONAL_STABLE_RESOURCE_DEFINITIONS = Object.freeze([
@@ -891,7 +894,7 @@ const listPageAnnotationResources = async (
     }))
 }
 
-const createAkselComponentLink = (name: string): DesktopMcpAkselComponentIndexEntry => ({
+const createAkselComponentLink = (name: string): AkselComponentLink => ({
   name,
   resourceUri: akselComponentResourceUri(name),
 })

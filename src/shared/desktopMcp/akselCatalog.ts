@@ -37,7 +37,7 @@ export interface DesktopMcpAkselHiddenRootMigrationMatch {
   fullWidth?: boolean
   closeButton?: boolean
   inline?: boolean
-  variants?: string[]
+  variants?: readonly string[]
 }
 
 export interface DesktopMcpAkselHiddenRootPropMapping {
