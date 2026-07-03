@@ -249,6 +249,11 @@ Verification:
 Next note:
 
 - The SDK endpoint now has the resource contract back, but `tools/list` / `tools/call` remain intentionally unregistered on this branch. The next person should pick up `#346` to restore `read_resource`, annotation read tools, and Preview capture as SDK tools while keeping the capabilities resource aligned with what is actually live.
+
+Review follow-up before merge:
+
+- Code review for PR #354 surfaced one real docs issue: `README.md` still described the old full Desktop MCP tool surface even though this PR intentionally restores only the SDK resource/template surface.
+- Updated the README Desktop MCP section and smoke checklist so it now matches the live branch state: resources/templates/read are available, while `tools/list` / `tools/call` are intentionally deferred to the follow-up rebuild slices.
   - confirmed these annotation tool calls no longer timed out.
 - Follow-up after PR review/CI:
   - fixed `npm run build` TypeScript failures that `npm run type-check` did not surface locally,
