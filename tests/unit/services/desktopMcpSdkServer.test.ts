@@ -9,6 +9,8 @@ import {
   DESKTOP_MCP_TRANSPORT_LABEL,
   createDesktopMcpServer,
 } from '../../../desktop/mcpSdkServer'
+import type { DesktopMcpApplyChangesHandler } from '../../../src/services/desktopMcpApplyChangesProtocol'
+import type { DesktopMcpAnnotationMutationHandler } from '../../../src/services/desktopMcpAnnotationProtocol'
 import type { DesktopMcpPreviewCaptureHandler } from '../../../src/services/desktopMcpPreviewCaptureProtocol'
 import type {
   DesktopMcpProjectResourceReadHandler,
@@ -36,22 +38,31 @@ const occupiedServers: Server[] = []
 const createManagedServer = (options?: {
   port?: number
   readProjectResource?: DesktopMcpProjectResourceReadHandler
+  mutateAnnotation?: DesktopMcpAnnotationMutationHandler
+  applyChanges?: DesktopMcpApplyChangesHandler
   capturePreviewEvidence?: DesktopMcpPreviewCaptureHandler
 }): DesktopMcpServer => {
   const server = createDesktopMcpServer({
     port: options?.port ?? 0,
     readProjectResource: options?.readProjectResource,
+    mutateAnnotation: options?.mutateAnnotation,
+    applyChanges: options?.applyChanges,
     capturePreviewEvidence: options?.capturePreviewEvidence,
   })
   activeServers.push(server)
   return server
 }
 
-const expectedReadOnlyToolNames = [
+const expectedToolNames = [
   'read_resource',
   'list_annotations',
   'watch_annotations',
+  'acknowledge_annotation',
+  'resolve_annotation',
+  'dismiss_annotation',
+  'reply_to_annotation',
   'capture_preview_evidence',
+  'apply_changes',
 ]
 
 describe('desktopMcpSdkServer', () => {
@@ -112,7 +123,7 @@ describe('desktopMcpSdkServer', () => {
             listChanged: false,
           },
         },
-        instructions: expect.stringContaining('official TypeScript MCP SDK'),
+        instructions: expect.stringContaining('Desktop Arcade is a live sandbox'),
       },
     })
     expect(
@@ -283,7 +294,7 @@ describe('desktopMcpSdkServer', () => {
       omittedFeatures: string[]
     }
     expect(capabilities.endpoint).toBe(state.url)
-    expect(capabilities.toolNames).toEqual(expectedReadOnlyToolNames)
+    expect(capabilities.toolNames).toEqual(expectedToolNames)
     expect(capabilities.resourceTemplateUris).toEqual(
       expect.arrayContaining([
         'arcade://project/source/pages/{pageId}/jsx',
@@ -378,7 +389,7 @@ describe('desktopMcpSdkServer', () => {
           result: { tools: Array<{ name: string }> }
         }
       ).result.tools.map((tool) => tool.name)
-    ).toEqual(expectedReadOnlyToolNames)
+    ).toEqual(expectedToolNames)
   })
 
   it('bridges read_resource, list_annotations, and watch_annotations through SDK tools', async () => {
@@ -774,6 +785,249 @@ describe('desktopMcpSdkServer', () => {
             ),
           },
         ],
+      },
+    })
+  })
+
+  it('routes SDK mutation tools through the injected renderer handlers', async () => {
+    const mutateAnnotation = vi.fn<DesktopMcpAnnotationMutationHandler>().mockImplementation(
+      async (request) => ({
+        ok: true,
+        toolName: request.toolName,
+        annotationId: request.annotationId,
+        pageId: 'page01',
+        message: `${request.toolName} updated ${request.annotationId}.`,
+        annotation: { id: request.annotationId, status: request.toolName },
+        annotations: [{ id: request.annotationId, status: request.toolName }],
+      })
+    )
+    const applyChanges = vi
+      .fn<DesktopMcpApplyChangesHandler>()
+      .mockResolvedValueOnce({
+        ok: true,
+        summary: 'Create a landing page',
+        projectRevision: 'rev-1234abcd',
+        changedResources: [
+          'arcade://project/manifest',
+          'arcade://project/source/pages/page02/jsx',
+          'arcade://project/source/pages/page02/hooks',
+        ],
+        nextRecommendedResources: [
+          'arcade://project/manifest',
+          'arcade://project/diagnostics',
+          'arcade://project/source/pages/page02/jsx',
+          'arcade://project/source/pages/page02/hooks',
+        ],
+        operationResults: [
+          {
+            index: 0,
+            type: 'create_page',
+            pageId: 'page02',
+            name: 'Page 2',
+            newPageRef: 'landing',
+            sourceResources: {
+              jsxResourceUri: 'arcade://project/source/pages/page02/jsx',
+              hooksResourceUri: 'arcade://project/source/pages/page02/hooks',
+            },
+          },
+          {
+            index: 1,
+            type: 'select_active_page',
+            pageId: 'page02',
+          },
+        ],
+        postChangeSummary: {
+          pageCount: 2,
+          startPageId: 'page01',
+          activePageId: 'page02',
+          pages: [
+            {
+              id: 'page01',
+              name: 'Page 1',
+              sourceResources: {
+                jsxResourceUri: 'arcade://project/source/pages/page01/jsx',
+                hooksResourceUri: 'arcade://project/source/pages/page01/hooks',
+              },
+            },
+            {
+              id: 'page02',
+              name: 'Landing',
+              sourceResources: {
+                jsxResourceUri: 'arcade://project/source/pages/page02/jsx',
+                hooksResourceUri: 'arcade://project/source/pages/page02/hooks',
+              },
+            },
+          ],
+          warnings: [],
+        },
+        tempPageRefMappings: {
+          landing: {
+            pageId: 'page02',
+            sourceResources: {
+              jsxResourceUri: 'arcade://project/source/pages/page02/jsx',
+              hooksResourceUri: 'arcade://project/source/pages/page02/hooks',
+            },
+          },
+        },
+        safeActivity: {
+          toolName: 'apply_changes',
+          operationTypes: ['create_page', 'select_active_page'],
+          timestamp: '2026-06-16T12:00:00.000Z',
+        },
+      })
+      .mockResolvedValueOnce({
+        ok: false,
+        code: 'persistence-failed',
+        message: 'Working copy save failed.',
+      })
+    const server = createManagedServer({
+      port: 0,
+      mutateAnnotation,
+      applyChanges,
+    })
+    const state = await server.start()
+    const url = new URL(state.url)
+
+    const toolsList = await postJsonRpc(url, {
+      jsonrpc: '2.0',
+      id: 20,
+      method: 'tools/list',
+    })
+    expect(
+      (
+        toolsList.payload as {
+          result: { tools: Array<{ name: string }> }
+        }
+      ).result.tools.map((tool) => tool.name)
+    ).toEqual(expectedToolNames)
+
+    const acknowledgeResponse = await postJsonRpc(url, {
+      jsonrpc: '2.0',
+      id: 21,
+      method: 'tools/call',
+      params: {
+        name: 'acknowledge_annotation',
+        arguments: {
+          annotationId: 'ann-1',
+        },
+      },
+    })
+    expect(acknowledgeResponse.status).toBe(200)
+    expect(acknowledgeResponse.payload).toMatchObject({
+      jsonrpc: '2.0',
+      id: 21,
+      result: {
+        structuredContent: {
+          ok: true,
+          toolName: 'acknowledge_annotation',
+          annotationId: 'ann-1',
+        },
+      },
+    })
+    expect(mutateAnnotation).toHaveBeenCalledWith({
+      toolName: 'acknowledge_annotation',
+      annotationId: 'ann-1',
+    })
+
+    for (const [toolName, argumentsPayload] of [
+      ['resolve_annotation', { annotationId: 'ann-1', summary: 'Done' }],
+      ['dismiss_annotation', { annotationId: 'ann-1', reason: 'Not needed' }],
+      ['reply_to_annotation', { annotationId: 'ann-1', message: 'Thanks' }],
+    ] as const) {
+      const response = await postJsonRpc(url, {
+        jsonrpc: '2.0',
+        id: toolName,
+        method: 'tools/call',
+        params: {
+          name: toolName,
+          arguments: argumentsPayload,
+        },
+      })
+      expect(response.status).toBe(200)
+      expect(response.payload).toMatchObject({
+        jsonrpc: '2.0',
+        id: toolName,
+        result: {
+          structuredContent: {
+            ok: true,
+            toolName,
+            annotationId: 'ann-1',
+          },
+        },
+      })
+      expect(mutateAnnotation).toHaveBeenCalledWith({
+        toolName,
+        ...argumentsPayload,
+      })
+    }
+
+    const applyChangesSuccess = await postJsonRpc(url, {
+      jsonrpc: '2.0',
+      id: 22,
+      method: 'tools/call',
+      params: {
+        name: 'apply_changes',
+        arguments: {
+          summary: 'Create a landing page',
+          operations: [
+            {
+              type: 'create_page',
+              newPageRef: 'landing',
+              jsxCode: 'export default function LandingPage() { return <div>Landing</div> }',
+            },
+            {
+              type: 'select_active_page',
+              tempPageRef: 'landing',
+            },
+          ],
+        },
+      },
+    })
+    expect(applyChangesSuccess.status).toBe(200)
+    expect(applyChangesSuccess.payload).toMatchObject({
+      jsonrpc: '2.0',
+      id: 22,
+      result: {
+        structuredContent: {
+          ok: true,
+          summary: 'Create a landing page',
+          nextSteps: [
+            'Read arcade://project/diagnostics to confirm the batch is healthy.',
+            'Run capture_preview_evidence({ pageId }) to inspect the rendered result.',
+          ],
+        },
+      },
+    })
+
+    const applyChangesFailure = await postJsonRpc(url, {
+      jsonrpc: '2.0',
+      id: 23,
+      method: 'tools/call',
+      params: {
+        name: 'apply_changes',
+        arguments: {
+          summary: 'Retry with stale revision',
+          expectedProjectRevision: 'rev-old',
+          operations: [
+            {
+              type: 'rename_project',
+              name: 'Renamed project',
+            },
+          ],
+        },
+      },
+    })
+    expect(applyChangesFailure.status).toBe(200)
+    expect(applyChangesFailure.payload).toMatchObject({
+      jsonrpc: '2.0',
+      id: 23,
+      result: {
+        isError: true,
+        structuredContent: {
+          code: 'persistence-failed',
+          toolName: 'apply_changes',
+          message: 'Working copy save failed.',
+        },
       },
     })
   })

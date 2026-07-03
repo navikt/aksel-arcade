@@ -19,8 +19,8 @@ import type {
 import { registerDesktopPreloadMcpAnnotationHandler } from '@/services/desktopMcpAnnotationAdapter'
 import {
   mutateDesktopMcpAnnotation,
-  type DesktopMcpAnnotationMutationHandler,
 } from '@/services/desktopMcpAnnotations'
+import type { DesktopMcpAnnotationMutationHandler } from '@/services/desktopMcpAnnotationProtocol'
 import {
   finalizeDesktopMcpPreviewCapture,
   prepareDesktopMcpPreviewCapture,

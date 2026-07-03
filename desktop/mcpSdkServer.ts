@@ -1,10 +1,24 @@
 import http, { type IncomingMessage, type ServerResponse } from 'node:http'
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js'
+import type {
+  DesktopMcpApplyChangesHandler,
+  DesktopMcpApplyChangesResult,
+} from '../src/services/desktopMcpApplyChangesProtocol'
+import type {
+  DesktopMcpAnnotationMutationHandler,
+  DesktopMcpAnnotationMutationResult,
+} from '../src/services/desktopMcpAnnotationProtocol'
 import type { DesktopMcpPreviewCaptureHandler } from '../src/services/desktopMcpPreviewCaptureProtocol'
 import type { DesktopMcpProjectResourceReadHandler } from '../src/services/desktopMcpProjectResourceProtocol'
 import {
+  DESKTOP_MCP_MUTATION_TOOL_NAMES,
+  registerDesktopMcpApplyChangesTool,
+  registerDesktopMcpMutationTools,
+} from './mcpSdkMutationTools'
+import {
   DESKTOP_MCP_READ_ONLY_TOOL_NAMES,
+  registerDesktopMcpPreviewCaptureTool,
   registerDesktopMcpReadOnlyTools,
 } from './mcpSdkReadOnlyTools'
 import {
@@ -22,11 +36,29 @@ export const DESKTOP_MCP_AUTH_DESCRIPTION = 'No token/header required.'
 
 const MAX_MCP_BODY_BYTES = 1024 * 1024
 const DESKTOP_MCP_BOOTSTRAP_INSTRUCTIONS = [
-  'Desktop Arcade MCP is running on the fixed local endpoint and now uses the official TypeScript MCP SDK for initialize/lifecycle handling.',
-  'Start by reading arcade://desktop/start-here, then use resources/list, resources/templates/list, resources/read, or read_resource({ uri }) to discover the published Desktop Arcade surface.',
-  'The SDK resource surface and read-only tools are re-registered in this slice. Mutation tools follow in later rebuild slices, so apply_changes and annotation mutations still need follow-up work here.',
-  'No token or authorization header is required for local use. Connect with an MCP-capable client or MCP Inspector over HTTP POST to continue the rebuild verification.',
+  'Desktop Arcade is a live sandbox for prototyping any UI with the Aksel design system. Build whatever the task needs — it is not limited to any one kind of screen.',
+  'Start by reading arcade://desktop/start-here — it is self-sufficient: one read plus arcade://project/manifest is enough to author. If your MCP host exposes only tools, call read_resource({ uri: "arcade://desktop/start-here" }).',
+  'Source is import-free: React, Aksel components, Aksel icons, and hooks are injected globals — never add import statements.',
+  'Each Arcade page (and Global config) has two source tabs: jsx and hooks. The jsx source is inlined into return ( … ), so it must be a single JSX element/expression and must never be wrapped in { … }; put page-level top-level hook bindings such as const [value, setValue] = useState(...) in the page Hooks tab, and treat Global config hooks as module scope where you define shared custom hooks, helpers, constants, and components and never call hooks at the top level.',
+  'Use real Aksel components and props; do not hand-roll raw HTML or guess prop names. If an Aksel component resource resolves to a replacement payload, follow the sanctioned replacement instead of authoring the hidden/deprecated component. Per-component usage and runnable, version-matched snippets are available on demand — do not load them until you reach for a given component.',
+  'Navigate between pages with goToPage("pageNN"), or an Aksel Link/LinkCard whose href/to is a bare page id; the current page id is injected read-only as currentPageId. There is no router and no <a href> navigation.',
+  'Page ids are assigned by the app. Within one apply_changes batch, link pages with {{pageRef:name}} placeholders targeting any create_page.newPageRef declared in that batch.',
+  'Annotation work is Arcade-native: list open work with list_annotations, read arcade://project/annotations or arcade://project/pages/{pageId}/annotations for non-dead history, and treat hidden targets as real work even when they are outside the current viewport.',
+  'Working loop: apply_changes, then read arcade://project/diagnostics, then capture_preview_evidence to inspect. Capture is an isolated throwaway render — it never changes the durable Active page.',
+  'Deeper references are on demand, not required before authoring: arcade://desktop/authoring-guide (depth + Aksel snippet reach paths), arcade://desktop/apply-changes-operations, the workflow guides, and the Aksel catalog.',
 ].join('\n')
+
+const DESKTOP_MCP_TOOL_NAMES = [
+  DESKTOP_MCP_READ_ONLY_TOOL_NAMES[0],
+  DESKTOP_MCP_READ_ONLY_TOOL_NAMES[1],
+  DESKTOP_MCP_READ_ONLY_TOOL_NAMES[2],
+  DESKTOP_MCP_MUTATION_TOOL_NAMES[0],
+  DESKTOP_MCP_MUTATION_TOOL_NAMES[1],
+  DESKTOP_MCP_MUTATION_TOOL_NAMES[2],
+  DESKTOP_MCP_MUTATION_TOOL_NAMES[3],
+  DESKTOP_MCP_READ_ONLY_TOOL_NAMES[3],
+  DESKTOP_MCP_MUTATION_TOOL_NAMES[4],
+] as const
 
 export interface DesktopMcpServerAvailabilityAvailable {
   status: 'available'
@@ -61,8 +93,8 @@ export interface DesktopMcpServerOptions {
   port?: number
   path?: string
   readProjectResource?: DesktopMcpProjectResourceReadHandler
-  mutateAnnotation?: unknown
-  applyChanges?: unknown
+  mutateAnnotation?: DesktopMcpAnnotationMutationHandler
+  applyChanges?: DesktopMcpApplyChangesHandler
   capturePreviewEvidence?: DesktopMcpPreviewCaptureHandler
   previewCaptureTtlMs?: number
 }
@@ -72,6 +104,8 @@ export const createDesktopMcpServer = ({
   port = DESKTOP_MCP_PORT,
   path = DESKTOP_MCP_PATH,
   readProjectResource,
+  mutateAnnotation,
+  applyChanges,
   capturePreviewEvidence,
   previewCaptureTtlMs,
 }: DesktopMcpServerOptions = {}): DesktopMcpServer => {
@@ -86,6 +120,23 @@ export const createDesktopMcpServer = ({
       resourceUri: uri,
       message:
         'Desktop Arcade project resources are unavailable because no active project reader is connected.',
+    }))
+  const annotationMutationHandler: DesktopMcpAnnotationMutationHandler =
+    mutateAnnotation ??
+    (({ annotationId }): DesktopMcpAnnotationMutationResult => ({
+    ok: false,
+    code: 'project-unavailable',
+    annotationId,
+    message:
+      'Desktop Arcade annotation mutations are unavailable because no active project writer is connected.',
+    }))
+  const applyChangesHandler: DesktopMcpApplyChangesHandler =
+    applyChanges ??
+    ((): DesktopMcpApplyChangesResult => ({
+    ok: false,
+    code: 'project-unavailable',
+    message:
+      'Desktop Arcade MCP apply_changes is unavailable because no active project writer is connected.',
     }))
   const previewCaptureStore = createDesktopMcpPreviewCaptureStore(previewCaptureTtlMs)
   const previewCaptureHandler: DesktopMcpPreviewCaptureHandler =
@@ -152,7 +203,7 @@ export const createDesktopMcpServer = ({
         authDescription: DESKTOP_MCP_AUTH_DESCRIPTION,
         readProjectResource: projectResourceReader,
         previewCaptureStore,
-        toolNames: DESKTOP_MCP_READ_ONLY_TOOL_NAMES,
+        toolNames: DESKTOP_MCP_TOOL_NAMES,
       })
       registerDesktopMcpReadOnlyTools(sdkServer, {
         readProjectResource: projectResourceReader,
@@ -168,8 +219,32 @@ export const createDesktopMcpServer = ({
           authDescription: DESKTOP_MCP_AUTH_DESCRIPTION,
           readProjectResource: projectResourceReader,
           previewCaptureStore,
-          toolNames: DESKTOP_MCP_READ_ONLY_TOOL_NAMES,
+          toolNames: DESKTOP_MCP_TOOL_NAMES,
         },
+      })
+      registerDesktopMcpMutationTools(sdkServer, {
+        mutateAnnotation: annotationMutationHandler,
+        applyChanges: applyChangesHandler,
+      })
+      registerDesktopMcpPreviewCaptureTool(sdkServer, {
+        readProjectResource: projectResourceReader,
+        capturePreviewEvidence: previewCaptureHandler,
+        previewCaptureStore,
+        stableResourceOptions: {
+          host,
+          port: getPort(),
+          path,
+          serverName: DESKTOP_MCP_SERVER_NAME,
+          serverVersion: DESKTOP_MCP_SERVER_VERSION,
+          transportLabel: DESKTOP_MCP_TRANSPORT_LABEL,
+          authDescription: DESKTOP_MCP_AUTH_DESCRIPTION,
+          readProjectResource: projectResourceReader,
+          previewCaptureStore,
+          toolNames: DESKTOP_MCP_TOOL_NAMES,
+        },
+      })
+      registerDesktopMcpApplyChangesTool(sdkServer, {
+        applyChanges: applyChangesHandler,
       })
 
       return sdkServer

@@ -99,7 +99,7 @@ test.describe('Issue #344 Desktop MCP SDK bootstrap', () => {
               listChanged: false,
             },
           },
-          instructions: expect.stringContaining('official TypeScript MCP SDK'),
+          instructions: expect.stringContaining('Desktop Arcade is a live sandbox'),
         },
       })
       expect((initialize.payload as { result: { instructions: string } }).result.instructions).toContain(

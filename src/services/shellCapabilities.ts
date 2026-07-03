@@ -1,5 +1,5 @@
 import type { DesktopMcpApplyChangesHandler } from './desktopMcpApplyChangesProtocol'
-import type { DesktopMcpAnnotationMutationHandler } from './desktopMcpAnnotations'
+import type { DesktopMcpAnnotationMutationHandler } from './desktopMcpAnnotationProtocol'
 import type { DesktopMcpPreviewCaptureHandler } from './desktopMcpPreviewCaptureProtocol'
 import type { DesktopMcpProjectResourceReadHandler } from './desktopMcpProjectResourceProtocol'
 

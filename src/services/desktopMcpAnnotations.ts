@@ -25,10 +25,6 @@ const getSandboxIframeHref = (src: string) => new URL(src, window.location.href)
 
 export type DesktopMcpAnnotationVisibility = 'visible' | 'hidden' | 'dead'
 
-export type DesktopMcpAnnotationMutationHandler = (
-  request: DesktopMcpAnnotationMutationRequest
-) => DesktopMcpAnnotationMutationResult | Promise<DesktopMcpAnnotationMutationResult>
-
 interface ResolveDesktopMcpAnnotationVisibilitiesOptions {
   annotations: readonly ArcadeAnnotation[]
   transpiledCode: string | null

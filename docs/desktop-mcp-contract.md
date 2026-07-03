@@ -41,5 +41,6 @@ Current expectations on the SDK-backed endpoint:
 
 - `resources/list`, `resources/read`, and `resources/templates/list` are available again for the stable Desktop/project resources and the published URI templates.
 - The read-only public tools are re-registered through the SDK: `read_resource`, `list_annotations`, `watch_annotations`, and `capture_preview_evidence`.
-- Mutation tools are still pending later slices, so `apply_changes`, `create_annotations`, `update_annotations`, and `delete_annotations` are not yet part of the SDK-backed surface.
+- The public mutation tools are re-registered through the SDK: `apply_changes`, `acknowledge_annotation`, `resolve_annotation`, `dismiss_annotation`, and `reply_to_annotation`.
+- Legacy bulk annotation mutation tool names remain out of scope for the SDK-backed surface; the public contract uses the Arcade-native mutation tools above.
 - The baseline contract suite from issue #343 remains the reference for the handwritten pre-rebuild surface, while the SDK bootstrap/read-only tests explicitly describe the current partial-SDK mode until the remaining rebuild issues land.

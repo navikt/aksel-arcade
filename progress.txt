@@ -4902,3 +4902,16 @@ Verification:
 - CI=1 npm test -- --run
 
 - Implemented Desktop MCP annotation mutations/watch plumbing for issue #325: added `acknowledge_annotation`, `resolve_annotation`, `dismiss_annotation`, `reply_to_annotation`, and `watch_annotations` to the MCP server, bridged mutation handling through the Desktop renderer, and updated guidance text/tests.
+
+2026-07-03 - Issue #347 SDK mutation tools
+
+- Selected issue #347 as the highest-priority ready-for-agent slice because the SDK endpoint was still missing the core public edit/mutation workflow (`apply_changes` plus annotation mutation tools), while #348 was internal router work and #349 was narrower catalog work.
+- Added SDK-backed registration for `acknowledge_annotation`, `resolve_annotation`, `dismiss_annotation`, `reply_to_annotation`, and `apply_changes`, including Zod schemas, structured success/error payloads, and contract-order tool registration so `tools/list`/capabilities stay stable.
+- Updated the shared annotation protocol to include the `project-unavailable` bridge failure mode and moved the handler type onto the protocol seam so preload/renderer wiring no longer depends on the implementation module.
+- Restored the full contract-style initialize instructions on the SDK endpoint, updated the Desktop MCP contract doc, and added regression coverage for the SDK mutation tool layer plus a live Electron/Playwright flow that applies changes, creates annotations visually, mutates them through MCP, and verifies dead-target failures.
+
+Verification:
+- npm run typecheck
+- npm test
+- npm run lint
+- npx playwright test tests/e2e/issue-347-desktop-mcp-sdk-mutation-tools.spec.ts
