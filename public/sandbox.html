@@ -642,6 +642,8 @@
         typeof payload?.viewportHeight === 'number' ? payload.viewportHeight : undefined;
       const target =
         payload?.target && typeof payload.target === 'object' ? payload.target : undefined;
+      const includeAnnotationOverlays = payload?.includeAnnotationOverlays === true;
+      const annotations = Array.isArray(payload?.annotations) ? payload.annotations : [];
       const maxFrames = 30;
 
       const captureWhenReady = async (remainingFrames = maxFrames) => {
@@ -706,6 +708,8 @@
                 target,
                 currentPageId: getCurrentPreviewPageId(),
                 interactionState: interactionResult.interactionState,
+                includeAnnotationOverlays,
+                annotations,
               },
               window
             )

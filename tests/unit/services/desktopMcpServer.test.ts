@@ -693,6 +693,7 @@ describe('desktopMcpServer', () => {
           viewportSize: 'MD',
           layers: ['screenshot', 'accessibility', 'dom_layout_style', 'frame'],
           screenshotScope: 'region',
+          includeAnnotationOverlays: true,
           target: {
             role: 'button',
             name: 'Continue',
@@ -920,6 +921,7 @@ describe('desktopMcpServer', () => {
       viewportSize: 'MD',
       layers: ['screenshot', 'accessibility', 'dom_layout_style', 'frame'],
       screenshotScope: 'region',
+      includeAnnotationOverlays: true,
       target: {
         role: 'button',
         name: 'Continue',
@@ -967,6 +969,40 @@ describe('desktopMcpServer', () => {
         code: -32602,
         message:
           'capture_preview_evidence interactions[0] waitFor steps require exactly one of text, target, or renderIdle.',
+        data: {
+          code: 'invalid-tool-arguments',
+          toolName: 'capture_preview_evidence',
+        },
+      },
+    })
+    expect(capturePreviewEvidence).not.toHaveBeenCalled()
+  })
+
+  it('rejects includeAnnotationOverlays without the screenshot layer', async () => {
+    const capturePreviewEvidence = vi.fn()
+    const server = createManagedServer({ port: 0, capturePreviewEvidence })
+    const state = await server.start()
+
+    const response = await postJson(state.url, {
+      jsonrpc: '2.0',
+      id: 681,
+      method: 'tools/call',
+      params: {
+        name: 'capture_preview_evidence',
+        arguments: {
+          layers: ['frame'],
+          includeAnnotationOverlays: true,
+        },
+      },
+    })
+
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toEqual({
+      jsonrpc: '2.0',
+      id: 681,
+      error: {
+        code: -32602,
+        message: 'capture_preview_evidence includeAnnotationOverlays requires the screenshot layer.',
         data: {
           code: 'invalid-tool-arguments',
           toolName: 'capture_preview_evidence',

@@ -568,6 +568,11 @@ const MCP_TOOL_DEFINITIONS = Object.freeze([
           enum: VALID_PREVIEW_SCREENSHOT_SCOPES,
           description: 'Optional screenshot scope for the capture.',
         }),
+        includeAnnotationOverlays: Object.freeze({
+          type: 'boolean',
+          description:
+            'When true, screenshot evidence includes visible Annotation mode markers/outlines for the captured page and viewport. Durable annotation history still lives in annotation resources.',
+        }),
         target: Object.freeze({
           type: 'object',
           additionalProperties: false,
@@ -2317,6 +2322,7 @@ const validateCapturePreviewEvidenceArguments = (argumentsPayload) => {
     'theme',
     'layers',
     'screenshotScope',
+    'includeAnnotationOverlays',
     'target',
     'interactions',
   ])
@@ -2344,6 +2350,13 @@ const validateCapturePreviewEvidenceArguments = (argumentsPayload) => {
 
   if ('theme' in argumentsPayload && !VALID_THEMES.includes(argumentsPayload.theme)) {
     return `capture_preview_evidence theme must be one of ${VALID_THEMES.join(', ')}.`
+  }
+
+  if (
+    'includeAnnotationOverlays' in argumentsPayload &&
+    typeof argumentsPayload.includeAnnotationOverlays !== 'boolean'
+  ) {
+    return 'capture_preview_evidence includeAnnotationOverlays must be a boolean when provided.'
   }
 
   if ('layers' in argumentsPayload) {
@@ -2393,6 +2406,14 @@ const validateCapturePreviewEvidenceArguments = (argumentsPayload) => {
 
   if (argumentsPayload.screenshotScope !== 'region' && argumentsPayload.target !== undefined) {
     return 'capture_preview_evidence target may be provided only when screenshotScope is "region".'
+  }
+
+  if (
+    argumentsPayload.includeAnnotationOverlays === true &&
+    Array.isArray(argumentsPayload.layers) &&
+    !argumentsPayload.layers.includes('screenshot')
+  ) {
+    return 'capture_preview_evidence includeAnnotationOverlays requires the screenshot layer.'
   }
 
   if ('interactions' in argumentsPayload) {

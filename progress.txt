@@ -1,3 +1,31 @@
+### 2026-07-03 - Issue #326: Include annotation overlays in Preview evidence captures
+
+Implemented:
+
+- Read issue `#326`, parent issue `#314`, `CONTEXT.md`, and ADRs `0021`, `0022`, and `0023` before changing the Preview evidence/Desktop MCP flow.
+- Added Preview evidence support for capture-only annotation overlays behind a new `includeAnnotationOverlays` flag, including visible single-target markers/outlines, visible multi-target marker + per-element/union outlines, and explicit metadata noting that durable annotation state still lives in annotation resources.
+- Kept hidden targets out of screenshot overlays while leaving them available in annotation resources, and kept dead targets out of both capture overlays and non-dead annotation resources.
+- Threaded the new flag end-to-end through the Desktop MCP tool schema, request validation, renderer bridge, sandbox message contract, isolated sandbox capture path, finalized manifest/frame metadata, and the checked-in sandbox bundle.
+- Added focused unit coverage for overlay inclusion/exclusion, hidden/dead handling, resource/capture separation, Desktop MCP preparation/finalization, Desktop MCP server validation, and the Desktop preload bridge regression that had been silently dropping `includeAnnotationOverlays` before the request reached the renderer.
+- Fixed the live Desktop regression found during human verification: `desktop/preload.cjs` parsed `capture_preview_evidence` requests but accidentally omitted `includeAnnotationOverlays`, so real Desktop captures ignored the new overlay path even though the lower-level unit tests were green.
+
+Verification:
+
+- npm run type-check
+- npm run lint
+- npm test -- --run
+- npm run build
+- Human-style Desktop verification against a dedicated renderer on `http://127.0.0.1:4181/aksel-arcade/`, using the real Electron/Desktop MCP flow to:
+  - create visible single, visible multi-target, hidden, and dead-target candidate annotations on the live preview,
+  - remove the dead target from source and confirm the annotation resource kept the hidden annotation but dropped the dead one,
+  - call `capture_preview_evidence` with `includeAnnotationOverlays: true`,
+  - confirm the captured frame metadata reported `annotationOverlays.requested === true`, `included === true`, and `visibleAnnotationCount === 2`,
+  - confirm the captured screenshot included only the visible single + visible multi annotation ids and omitted the hidden/dead ids.
+
+Next note:
+
+- The manual verification artifacts live in the session artifact folder (`issue-326-annotation-mode.png`, `issue-326-capture.svg`, `issue-326-capture.png`, `issue-326-summary.json`) if anyone needs to inspect the exact Desktop capture output that reproduced and then verified the preload-bridge fix.
+
 ### 2026-07-02 - Issue #325 follow-up: Desktop MCP annotation mutation runtime fix
 
 Implemented:

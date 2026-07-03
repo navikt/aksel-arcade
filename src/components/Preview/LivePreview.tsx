@@ -16,6 +16,7 @@ import { buildAnnotationTargetResolutionRequest } from '@/services/annotationTar
 import {
   registerPreviewEvidenceRequestHandler,
   type PreviewEvidenceCaptureResult,
+  type PreviewEvidenceRequest,
 } from '@/services/previewEvidence'
 import type {
   AnnotationTargetResolutionResult,
@@ -440,7 +441,9 @@ export const LivePreview = ({
       }
     }
 
-    const requestPreviewEvidence = (): Promise<PreviewEvidenceCaptureResult> => {
+    const requestPreviewEvidence = (
+      request: PreviewEvidenceRequest = {}
+    ): Promise<PreviewEvidenceCaptureResult> => {
       const port = sandboxPortRef.current
       if (!port) {
         return Promise.resolve(
@@ -463,7 +466,28 @@ export const LivePreview = ({
         })
         port.postMessage({
           type: 'CAPTURE_PREVIEW_EVIDENCE',
-          payload: { requestId },
+          payload: {
+            requestId,
+            ...(request.layers ? { layers: request.layers } : {}),
+            ...(request.interactions ? { interactions: request.interactions } : {}),
+            ...(request.screenshotScope ? { screenshotScope: request.screenshotScope } : {}),
+            ...(request.viewportFallback
+              ? {
+                  viewportWidth: request.viewportFallback.width,
+                  viewportHeight: request.viewportFallback.height,
+                }
+              : {}),
+            ...(request.target ? { target: request.target } : {}),
+            ...(request.currentPageId ? { expectedPageId: request.currentPageId } : {}),
+            ...(request.includeAnnotationOverlays
+              ? {
+                  includeAnnotationOverlays: true,
+                  annotations: (request.annotations ?? annotations).map((annotation) => ({
+                    ...annotation,
+                  })),
+                }
+              : {}),
+          },
         } satisfies MainToSandboxMessage)
       })
     }
@@ -682,7 +706,7 @@ export const LivePreview = ({
       window.removeEventListener('message', handleMessage)
       disconnectSandbox(false)
     }
-  }, [iframeRef, postNavigateToPage])
+  }, [annotations, iframeRef, postNavigateToPage])
 
   // T083: Clear inspection popover when inspect mode disabled
   useEffect(() => {

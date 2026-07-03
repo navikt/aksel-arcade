@@ -237,6 +237,8 @@ export const useDesktopMcpProjectResourceBridge = ({
         layers: prepared.requestedLayers,
         interactions: prepared.requestedInteractions,
         screenshotScope: prepared.screenshotScope,
+        includeAnnotationOverlays: prepared.includeAnnotationOverlays,
+        annotations: currentContext.project.annotations,
         ...(prepared.target ? { target: prepared.target } : {}),
       })
 

@@ -1,3 +1,4 @@
+import type { ArcadeAnnotation } from '@/types/annotations'
 import type { ArcadePageId, ThemeMode } from '@/types/project'
 import type { MainToSandboxMessage, SandboxToMainMessage } from '@/types/messages'
 import {
@@ -31,6 +32,8 @@ interface CapturePreviewInSandboxOptions {
   interactions: PreviewInteractionStep[]
   screenshotScope: PreviewEvidenceScreenshotScope
   target?: PreviewEvidenceCaptureTarget
+  includeAnnotationOverlays?: boolean
+  annotations?: readonly ArcadeAnnotation[]
   timeoutMs?: number
 }
 
@@ -47,6 +50,8 @@ export const capturePreviewInIsolatedSandbox = async ({
   interactions,
   screenshotScope,
   target,
+  includeAnnotationOverlays = false,
+  annotations = [],
   timeoutMs = DESKTOP_MCP_PREVIEW_CAPTURE_TIMEOUT_MS,
 }: CapturePreviewInSandboxOptions): Promise<DesktopMcpSandboxCaptureResult> => {
   if (typeof document === 'undefined' || typeof window === 'undefined' || !document.body) {
@@ -124,6 +129,12 @@ export const capturePreviewInIsolatedSandbox = async ({
           viewportHeight,
           ...(target ? { target } : {}),
           expectedPageId: pageId,
+          ...(includeAnnotationOverlays
+            ? {
+                includeAnnotationOverlays: true,
+                annotations: annotations.map((annotation) => ({ ...annotation })),
+              }
+            : {}),
         },
       }
       port.postMessage(message)
