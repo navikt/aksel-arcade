@@ -9,12 +9,14 @@ Implemented:
   - parses Streamable HTTP SSE initialize/error responses,
   - and explicitly recognizes the documented temporary issue #344 gaps (`tools/list` and `resources/list` returning `Method not found`) instead of failing as if the handwritten contract were still fully present.
 - Tightened the SDK bootstrap unit/E2E checks so they assert the bootstrap instructions still mention `arcade://desktop/start-here`.
+- Fixed a follow-up CI-only build failure in `tests/unit/desktopMain.test.ts` by making the mocked Desktop MCP server options type explicit enough for the production `tsc -b` build path.
 
 Verification:
 
 - `npm run typecheck`
 - `npm run lint`
 - `npm test -- --run`
+- `npm run build`
 - `npm run desktop:build`
 - `npm run test:e2e -- tests/e2e/desktop-mcp-sdk-bootstrap.spec.ts tests/e2e/desktop-mcp-contract-baseline.spec.ts --reporter=line`
 

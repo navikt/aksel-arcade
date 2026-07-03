@@ -9,7 +9,32 @@ interface MockDesktopMcpServerOptions {
   mutateAnnotation?: (request: Record<string, unknown>) => Promise<unknown> | unknown
 }
 
-const runDesktopMain = async ({ isPackaged, env = {} }: RunDesktopMainOptions) => {
+const runDesktopMain = async ({
+  isPackaged,
+  env = {},
+}: RunDesktopMainOptions): Promise<{
+  app: {
+    isPackaged: boolean
+    setName: ReturnType<typeof vi.fn>
+    whenReady: ReturnType<typeof vi.fn>
+    on: ReturnType<typeof vi.fn>
+    quit: ReturnType<typeof vi.fn>
+    exit: ReturnType<typeof vi.fn>
+  }
+  browserWindows: Array<{
+    webContents: {
+      id: number
+      send: ReturnType<typeof vi.fn>
+    }
+  }>
+  desktopMcpServerOptions: MockDesktopMcpServerOptions | null
+  ipcListeners: Map<string, (...args: unknown[]) => void>
+  loadedUrls: string[]
+  protocol: {
+    registerSchemesAsPrivileged: ReturnType<typeof vi.fn>
+    handle: ReturnType<typeof vi.fn>
+  }
+}> => {
   vi.resetModules()
 
   const loadedUrls: string[] = []
@@ -138,17 +163,18 @@ describe('desktop main process', () => {
         isPackaged: true,
       })
 
-      if (!desktopMcpServerOptions?.mutateAnnotation) {
+      const mutateAnnotation = desktopMcpServerOptions?.mutateAnnotation
+      if (!mutateAnnotation) {
         throw new Error('Expected Desktop MCP annotation mutator to be registered')
       }
 
-      const mutationPromise = desktopMcpServerOptions.mutateAnnotation({
+      const mutationPromise = mutateAnnotation({
         toolName: 'acknowledge_annotation',
         annotationId: 'ann-1',
       })
 
       const routeRequest = browserWindows[0].webContents.send.mock.calls.find(
-        ([channel]) => channel === 'aksel-arcade:route-desktop-mcp-annotation-mutation-request'
+        (call) => call[0] === 'aksel-arcade:route-desktop-mcp-annotation-mutation-request'
       )
       expect(routeRequest).toBeTruthy()
 
