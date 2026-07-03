@@ -30,27 +30,77 @@ const stableResourceUris = [
   'arcade://project/annotations',
   'arcade://project/preview-context',
   'arcade://project/diagnostics',
+  'arcade://project/source/global/jsx',
+  'arcade://project/source/global/hooks',
 ]
 
 const waitForDefaultPreview = async (page: Page) => {
   await expect(page.locator('[data-testid="preview-iframe"]')).toBeVisible({ timeout: 15_000 })
 }
 
-const postMcpRequest = async (payload: Record<string, unknown>) => {
+const postMcpRequest = async <TPayload>(payload: Record<string, unknown>) => {
   const response = await fetch(desktopMcpUrl, {
     method: 'POST',
     headers: {
       'content-type': 'application/json',
+      accept: 'application/json, text/event-stream',
     },
     body: JSON.stringify(payload),
   })
 
   expect(response.status).toBe(200)
-  return response.json()
+  return parseJsonOrSse<TPayload>(await response.text())
+}
+
+const parseJsonOrSse = <TPayload>(bodyText: string): TPayload => {
+  if (!bodyText.startsWith('event:')) {
+    return JSON.parse(bodyText) as TPayload
+  }
+
+  const dataLines = bodyText
+    .split('\n')
+    .filter((line) => line.startsWith('data: '))
+    .map((line) => line.slice('data: '.length))
+
+  return JSON.parse(dataLines.join('\n')) as TPayload
+}
+
+interface JsonRpcResourceReadPayload {
+  result: {
+    contents: Array<{
+      uri: string
+      mimeType: string
+      text: string
+    }>
+  }
+}
+
+interface JsonRpcToolsListPayload {
+  result: {
+    tools: Array<{
+      name: string
+    }>
+  }
+}
+
+interface JsonRpcResourcesListPayload {
+  result: {
+    resources: Array<{
+      uri: string
+    }>
+  }
+}
+
+interface JsonRpcToolPayload<TStructuredContent> {
+  jsonrpc: '2.0'
+  id: number
+  result: {
+    structuredContent: TStructuredContent
+  }
 }
 
 const callTool = async (id: number, name: string, argumentsPayload: Record<string, unknown>) =>
-  postMcpRequest({
+  postMcpRequest<JsonRpcToolPayload<{ ok: true; [key: string]: unknown }>>({
     jsonrpc: '2.0',
     id,
     method: 'tools/call',
@@ -61,21 +111,21 @@ const callTool = async (id: number, name: string, argumentsPayload: Record<strin
   })
 
 const listTools = async () =>
-  postMcpRequest({
+  postMcpRequest<JsonRpcToolsListPayload>({
     jsonrpc: '2.0',
     id: 1,
     method: 'tools/list',
   })
 
 const listResources = async () =>
-  postMcpRequest({
+  postMcpRequest<JsonRpcResourcesListPayload>({
     jsonrpc: '2.0',
     id: 2,
     method: 'resources/list',
   })
 
 const readMcpResource = async (id: number, uri: string) => {
-  const payload = await postMcpRequest({
+  const payload = await postMcpRequest<JsonRpcResourceReadPayload>({
     jsonrpc: '2.0',
     id,
     method: 'resources/read',
@@ -96,11 +146,7 @@ const readMcpResource = async (id: number, uri: string) => {
     },
   })
 
-  return payload.result.contents[0] as {
-    uri: string
-    mimeType: string
-    text: string
-  }
+  return payload.result.contents[0]
 }
 
 const readJsonMcpResource = async (id: number, uri: string) =>
@@ -157,21 +203,19 @@ test.describe('Desktop MCP v1 smoke flow', () => {
       await waitForDefaultPreview(page)
 
       const toolsPayload = await listTools()
-      expect(toolsPayload.result.tools.map((tool: { name: string }) => tool.name)).toEqual(
+      expect(toolsPayload.result.tools.map((tool) => tool.name)).toEqual(
         desktopMcpToolNames
       )
 
       const resourcesPayload = await listResources()
-      const listedResourceUris = resourcesPayload.result.resources.map(
-        (resource: { uri: string }) => resource.uri
-      )
+      const listedResourceUris = resourcesPayload.result.resources.map((resource) => resource.uri)
       expect(listedResourceUris).toEqual(expect.arrayContaining(stableResourceUris))
 
       const operatingGuide = await readMcpResource(3, 'arcade://desktop/operating-guide')
       expect(operatingGuide.text).toContain('`resources/read`')
       expect(operatingGuide.text).toContain('`read_resource({ uri })`')
-      expect(operatingGuide.text).toContain('`list_annotations`')
-      expect(operatingGuide.text).toContain('`capture_preview_evidence({ pageId })`')
+      expect(operatingGuide.text).toContain('annotation discovery')
+      expect(operatingGuide.text).toContain('Preview evidence capture')
 
       const authoringGuide = await readMcpResource(4, 'arcade://desktop/authoring-guide')
       expect(authoringGuide.text).toContain('Global config')
@@ -189,7 +233,7 @@ test.describe('Desktop MCP v1 smoke flow', () => {
       })
       expect(capabilities.toolNames).toEqual(desktopMcpToolNames)
       expect(capabilities.stableResourceUris).toEqual(stableResourceUris)
-      expect(capabilities.v1Omissions).toContain('No Web Arcade MCP endpoint.')
+      expect(capabilities.omittedFeatures).toContain('No Web Arcade MCP endpoint.')
 
       const previewContextBefore = await readJsonMcpResource(6, 'arcade://project/preview-context')
       expect(previewContextBefore).toEqual({
@@ -312,7 +356,11 @@ test.describe('Desktop MCP v1 smoke flow', () => {
           dom_layout_style: string
           frame: string
         }
-      }>(await callTool(15, 'capture_preview_evidence', { pageId: newPage.pageId }))
+      }>(
+        await callTool(15, 'capture_preview_evidence', {
+          pageId: newPage.pageId,
+        })
+      )
       expect(capture.page).toEqual({ id: newPage.pageId, name: 'Details' })
 
       const captureManifest = await readJsonMcpResource(16, capture.manifestResourceUri)

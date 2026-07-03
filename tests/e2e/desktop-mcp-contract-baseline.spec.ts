@@ -31,13 +31,6 @@ const expectedToolNames = [
   'apply_changes',
 ]
 
-const expectedSdkReadOnlyToolNames = [
-  'read_resource',
-  'list_annotations',
-  'watch_annotations',
-  'capture_preview_evidence',
-]
-
 const expectedToolDefinitions = [
   {
     name: 'read_resource',
@@ -222,7 +215,6 @@ const expectedToolDefinitions = [
         },
         layers: {
           type: 'array',
-          uniqueItems: true,
           items: {
             type: 'string',
             enum: ['screenshot', 'accessibility', 'dom_layout_style', 'frame'],
@@ -443,7 +435,7 @@ const expectedToolDefinitions = [
             'Optional final-state assertions. Use for replacement tasks to prevent wasteful or incoherent output.',
           properties: {
             pageCount: {
-              type: 'number',
+              type: 'integer',
               description: 'Expected final number of Arcade pages.',
             },
             startPage: {
@@ -464,6 +456,22 @@ const expectedToolDefinitions = [
     },
   },
 ]
+
+const stripSchemaMetadata = (value: unknown): unknown => {
+  if (Array.isArray(value)) {
+    return value.map(stripSchemaMetadata)
+  }
+
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(
+      Object.entries(value)
+        .filter(([key]) => key !== '$schema' && key !== 'description')
+        .map(([key, entryValue]) => [key, stripSchemaMetadata(entryValue)])
+    )
+  }
+
+  return value
+}
 
 const expectedStableResources = [
   {
@@ -636,447 +644,28 @@ test.describe('Issue #343 Desktop MCP contract baseline', () => {
       expect(initialize.response.status).toBe(200)
       const initializeInstructions = (initialize.payload as { result: { instructions: string } }).result
         .instructions
-
-      if (initializeInstructions.includes('official TypeScript MCP SDK')) {
-        expect(initialize.payload).toMatchObject({
-          jsonrpc: '2.0',
-          id: 1,
-          result: {
-            protocolVersion: '2025-06-18',
-            capabilities: {
-              tools: {
-                listChanged: false,
-              },
-              resources: {
-                subscribe: false,
-                listChanged: false,
-              },
-            },
-            serverInfo: {
-              name: 'aksel-arcade',
-              version: expect.any(String),
-            },
-            instructions: expect.stringContaining('arcade://desktop/start-here'),
-          },
-        })
-
-        const toolsList = await sendJsonRpcRequest({
-          jsonrpc: '2.0',
-          id: 2,
-          method: 'tools/list',
-        })
-        expect(toolsList.response.status).toBe(200)
-        if (typeof toolsList.payload === 'object' && toolsList.payload !== null && 'error' in toolsList.payload) {
-          expect(toolsList.payload).toMatchObject({
-            jsonrpc: '2.0',
-            id: 2,
-            error: {
-              code: -32601,
-              message: 'Method not found',
-            },
-          })
-
-          const resourcesList = await sendJsonRpcRequest({
-            jsonrpc: '2.0',
-            id: 3,
-            method: 'resources/list',
-          })
-          expect(resourcesList.response.status).toBe(200)
-          expect(resourcesList.payload).toMatchObject({
-            jsonrpc: '2.0',
-            id: 3,
-            error: {
-              code: -32601,
-              message: 'Method not found',
-            },
-          })
-
-          const wrongPath = await sendRequest({
-            path: '/not-mcp',
-            method: 'POST',
-            headers: {
-              'content-type': 'application/json',
-              accept: 'application/json, text/event-stream',
-            },
-            body: JSON.stringify({
-              jsonrpc: '2.0',
-              id: 10,
-              method: 'tools/list',
-            }),
-          })
-          expect(wrongPath.response.status).toBe(404)
-          expect(wrongPath.payload).toBe('Desktop Arcade MCP endpoint not found.')
-
-          const getRequest = await sendRequest({
-            method: 'GET',
-            headers: {
-              accept: 'application/json, text/event-stream',
-            },
-          })
-          expect(getRequest.response.status).toBe(405)
-          expect(getRequest.response.headers.get('allow')).toBe('POST')
-          expect(getRequest.payload).toBe(
-            'Desktop Arcade MCP SDK bootstrap currently supports POST JSON-RPC requests only.'
-          )
-
-          const malformedJson = await sendRequest({
-            headers: {
-              'content-type': 'application/json',
-              accept: 'application/json, text/event-stream',
-            },
-            body: '{invalid',
-          })
-          expect(malformedJson.response.status).toBe(400)
-          expect(malformedJson.payload).toMatchObject({
-            jsonrpc: '2.0',
-            id: null,
-            error: {
-              code: -32700,
-              message: expect.any(String),
-            },
-          })
-
-          const oversizedRequest = await sendRequest({
-            headers: {
-              'content-type': 'application/json',
-              accept: 'application/json, text/event-stream',
-            },
-            body: `${'x'.repeat(1024 * 1024 + 1)}`,
-          })
-          expect(oversizedRequest.response.status).toBe(413)
-          expect(oversizedRequest.payload).toEqual({
-            jsonrpc: '2.0',
-            id: null,
-            error: {
-              code: -32000,
-              message: 'Desktop Arcade MCP request body exceeds the 1MB limit.',
-            },
-          })
-
-          const browserOrigin = await sendJsonRpcRequest(
-            {
-              jsonrpc: '2.0',
-              id: 11,
-              method: 'tools/list',
-            },
-            {
-              origin: 'https://example.com',
-            }
-          )
-          expect(browserOrigin.response.status).toBe(403)
-          expect(browserOrigin.payload).toBe(
-            'Desktop Arcade MCP accepts only non-browser local MCP clients. Remove the Origin header and use POST JSON-RPC requests.'
-          )
-          return
-        }
-
-        const listedTools = (toolsList.payload as { result: { tools: Array<Record<string, unknown>> } }).result
-          .tools
-        expect(listedTools.map((tool) => tool.name)).toEqual(expectedSdkReadOnlyToolNames)
-        expect(
-          listedTools.map((tool) => ({
-            name: tool.name,
-            inputSchema: tool.inputSchema,
-          }))
-        ).toMatchObject([
-          {
-            name: 'read_resource',
-            inputSchema: {
-              type: 'object',
-              additionalProperties: false,
-              required: ['uri'],
-              properties: {
-                uri: {
-                  type: 'string',
-                  minLength: 1,
-                },
-              },
-            },
-          },
-          {
-            name: 'list_annotations',
-            inputSchema: {
-              type: 'object',
-              additionalProperties: false,
-              properties: {
-                scope: {
-                  type: 'string',
-                  enum: ['page', 'project'],
-                },
-                pageId: {
-                  type: 'string',
-                },
-                status: {
-                  type: 'string',
-                  enum: ['pending', 'acknowledged', 'resolved', 'dismissed', 'all'],
-                },
-              },
-            },
-          },
-          {
-            name: 'watch_annotations',
-            inputSchema: {
-              type: 'object',
-              additionalProperties: false,
-              properties: {
-                scope: {
-                  type: 'string',
-                  enum: ['page', 'project'],
-                },
-                pageId: {
-                  type: 'string',
-                },
-                waitTimeoutSeconds: {
-                  type: 'integer',
-                  minimum: 1,
-                  maximum: 300,
-                },
-                batchWindowSeconds: {
-                  type: 'integer',
-                  minimum: 1,
-                  maximum: 60,
-                },
-              },
-            },
-          },
-          {
-            name: 'capture_preview_evidence',
-            inputSchema: {
-              type: 'object',
-              additionalProperties: false,
-              properties: {
-                pageId: {
-                  type: 'string',
-                },
-                viewportSize: {
-                  type: 'string',
-                  enum: ['2XL', 'XL', 'LG', 'MD', 'SM', 'XS'],
-                },
-                theme: {
-                  type: 'string',
-                  enum: ['light', 'dark'],
-                },
-                layers: {
-                  type: 'array',
-                  items: {
-                    type: 'string',
-                    enum: ['screenshot', 'accessibility', 'dom_layout_style', 'frame'],
-                  },
-                },
-                screenshotScope: {
-                  type: 'string',
-                  enum: ['viewport', 'full_page', 'region'],
-                },
-                includeAnnotationOverlays: {
-                  type: 'boolean',
-                },
-                target: {
-                  type: 'object',
-                  additionalProperties: false,
-                },
-                interactions: {
-                  type: 'array',
-                  items: {
-                    type: 'object',
-                    additionalProperties: false,
-                    required: ['action'],
-                    properties: {
-                      action: {
-                        type: 'string',
-                        enum: ['click', 'fill', 'select', 'press', 'scroll', 'waitFor'],
-                      },
-                    },
-                  },
-                },
-              },
-            },
-          },
-        ])
-
-        const resourcesList = await sendJsonRpcRequest({
-          jsonrpc: '2.0',
-          id: 3,
-          method: 'resources/list',
-        })
-        expect(resourcesList.response.status).toBe(200)
-        expect(resourcesList.payload).toMatchObject({
-          jsonrpc: '2.0',
-          id: 3,
-        })
-
-        const listedResources = (resourcesList.payload as { result: { resources: Array<Record<string, unknown>> } })
-          .result.resources
-
-        const manifestRead = await sendJsonRpcRequest({
-          jsonrpc: '2.0',
-          id: 4,
-          method: 'resources/read',
-          params: {
-            uri: 'arcade://project/manifest',
-          },
-        })
-        expect(manifestRead.response.status).toBe(200)
-        const manifest = JSON.parse(
-          (
-            manifestRead.payload as {
-              result: { contents: Array<{ text: string }> }
-            }
-          ).result.contents[0].text
-        ) as {
-          activePageId: string
-          pages: Array<{ id: string }>
-        }
-
-        const capabilitiesRead = await sendJsonRpcRequest({
-          jsonrpc: '2.0',
-          id: 5,
-          method: 'resources/read',
-          params: {
-            uri: 'arcade://desktop/capabilities',
-          },
-        })
-        expect(capabilitiesRead.response.status).toBe(200)
-        const capabilities = JSON.parse(
-          (
-            capabilitiesRead.payload as {
-              result: { contents: Array<{ text: string }> }
-            }
-          ).result.contents[0].text
-        ) as {
-          endpoint: string
-          toolNames: string[]
-        }
-        expect(capabilities.endpoint).toBe(desktopMcpUrl)
-        expect(capabilities.toolNames).toEqual(expectedSdkReadOnlyToolNames)
-
-        const readResourceSuccess = await sendJsonRpcRequest({
-          jsonrpc: '2.0',
-          id: 6,
-          method: 'tools/call',
-          params: {
-            name: 'read_resource',
-            arguments: {
-              uri: 'arcade://desktop/start-here',
-            },
-          },
-        })
-        expect(readResourceSuccess.response.status).toBe(200)
-        expect(readResourceSuccess.payload).toMatchObject({
-          jsonrpc: '2.0',
-          id: 6,
-          result: {
-            structuredContent: {
-              ok: true,
-              uri: 'arcade://desktop/start-here',
-            },
-          },
-        })
-
-        const listAnnotationsSuccess = await sendJsonRpcRequest({
-          jsonrpc: '2.0',
-          id: 7,
-          method: 'tools/call',
-          params: {
-            name: 'list_annotations',
-            arguments: {},
-          },
-        })
-        expect(listAnnotationsSuccess.response.status).toBe(200)
-        expect(listAnnotationsSuccess.payload).toMatchObject({
-          jsonrpc: '2.0',
-          id: 7,
-          result: {
-            structuredContent: {
-              ok: true,
-              scope: 'page',
-              status: 'open',
-              resourceUri: `arcade://project/pages/${manifest.activePageId}/annotations`,
-            },
-          },
-        })
-
-        const readResourceDomainError = await sendJsonRpcRequest({
-          jsonrpc: '2.0',
-          id: 8,
-          method: 'tools/call',
-          params: {
-            name: 'read_resource',
-            arguments: {
-              uri: 'arcade://desktop/not-a-resource',
-            },
-          },
-        })
-        expect(readResourceDomainError.response.status).toBe(200)
-        expect(readResourceDomainError.payload).toMatchObject({
-          jsonrpc: '2.0',
-          id: 8,
-          result: {
-            isError: true,
-            structuredContent: {
-              code: 'resource-not-found',
-              toolName: 'read_resource',
-              resourceUri: 'arcade://desktop/not-a-resource',
-            },
-          },
-        })
-
-        const invalidCaptureArguments = await sendJsonRpcRequest({
-          jsonrpc: '2.0',
-          id: 9,
-          method: 'tools/call',
-          params: {
-            name: 'capture_preview_evidence',
-            arguments: {
-              interactions: [
-                {
-                  action: 'waitFor',
-                  text: 'Loaded',
-                  renderIdle: true,
-                },
-              ],
-            },
-          },
-        })
-        expect(invalidCaptureArguments.response.status).toBe(200)
-        expect(invalidCaptureArguments.payload).toMatchObject({
-          jsonrpc: '2.0',
-          id: 9,
-          result: {
-            isError: true,
-            content: [
-              {
-                type: 'text',
-                text: expect.stringContaining(
-                  'capture_preview_evidence interactions[0] waitFor steps require exactly one of text, target, or renderIdle.'
-                ),
-              },
-            ],
-          },
-        })
-
-        expect(listedResources.map((resource) => resource.uri)).toEqual(
-          expect.arrayContaining([
-            'arcade://desktop/start-here',
-            'arcade://desktop/capabilities',
-            'arcade://project/manifest',
-          ])
-        )
-        return
-      }
-
+      expect((initialize.payload as { result: { protocolVersion: string } }).result.protocolVersion).toBe(
+        '2025-06-18'
+      )
       expect(initialize.payload).toMatchObject({
         jsonrpc: '2.0',
         id: 1,
         result: {
-          protocolVersion: '2024-11-05',
+          protocolVersion: '2025-06-18',
           capabilities: {
-            tools: {},
-            resources: {},
+            tools: {
+              listChanged: false,
+            },
+            resources: {
+              subscribe: false,
+              listChanged: false,
+            },
           },
           serverInfo: {
             name: 'aksel-arcade',
             version: expect.any(String),
           },
+          instructions: expect.stringContaining('arcade://desktop/start-here'),
         },
       })
       for (const line of expectedInstructionLines) {
@@ -1089,18 +678,17 @@ test.describe('Issue #343 Desktop MCP contract baseline', () => {
         method: 'tools/list',
       })
       expect(toolsList.response.status).toBe(200)
-      const listedTools = (toolsList.payload as { result: { tools: Array<Record<string, unknown>> } }).result
-        .tools
+      const listedTools = (toolsList.payload as { result: { tools: Array<Record<string, unknown>> } }).result.tools
       expect(listedTools.map((tool) => tool.name)).toEqual(expectedToolNames)
       expect(
         listedTools.map((tool) => ({
           name: tool.name,
-          inputSchema: tool.inputSchema,
+          inputSchema: stripSchemaMetadata(tool.inputSchema),
         }))
-      ).toEqual(
-        expectedToolDefinitions.map((toolDefinition) => ({
-          name: toolDefinition.name,
-          inputSchema: toolDefinition.inputSchema,
+      ).toMatchObject(
+        expectedToolDefinitions.map(({ name, inputSchema }) => ({
+          name,
+          inputSchema: stripSchemaMetadata(inputSchema),
         }))
       )
 
@@ -1187,13 +775,9 @@ test.describe('Issue #343 Desktop MCP contract baseline', () => {
           hooks: { uri: 'arcade://project/source/global/hooks' },
         },
       })
-      expect(
-        listedResources.map((resource) => resource.uri)
-      ).toEqual(
+      expect(listedResources.map((resource) => resource.uri)).toEqual(
         expect.arrayContaining([
-          ...manifest.pages.flatMap((entry) => [
-            `arcade://project/pages/${entry.id}/annotations`,
-          ]),
+          ...manifest.pages.flatMap((entry) => [`arcade://project/pages/${entry.id}/annotations`]),
         ])
       )
 
@@ -1356,15 +940,50 @@ test.describe('Issue #343 Desktop MCP contract baseline', () => {
         ).result.structuredContent.message
       ).toContain('arcade://desktop/not-a-resource')
 
+      const invalidCaptureArguments = await sendJsonRpcRequest({
+        jsonrpc: '2.0',
+        id: 10,
+        method: 'tools/call',
+        params: {
+          name: 'capture_preview_evidence',
+          arguments: {
+            interactions: [
+              {
+                action: 'waitFor',
+                text: 'Loaded',
+                renderIdle: true,
+              },
+            ],
+          },
+        },
+      })
+      expect(invalidCaptureArguments.response.status).toBe(200)
+      expect(invalidCaptureArguments.payload).toMatchObject({
+        jsonrpc: '2.0',
+        id: 10,
+        result: {
+          isError: true,
+          content: [
+            {
+              type: 'text',
+              text: expect.stringContaining(
+                'capture_preview_evidence interactions[0] waitFor steps require exactly one of text, target, or renderIdle.'
+              ),
+            },
+          ],
+        },
+      })
+
       const wrongPath = await sendRequest({
         path: '/not-mcp',
         method: 'POST',
         headers: {
           'content-type': 'application/json',
+          accept: 'application/json, text/event-stream',
         },
         body: JSON.stringify({
           jsonrpc: '2.0',
-          id: 10,
+          id: 11,
           method: 'tools/list',
         }),
       })
@@ -1373,6 +992,9 @@ test.describe('Issue #343 Desktop MCP contract baseline', () => {
 
       const getRequest = await sendRequest({
         method: 'GET',
+        headers: {
+          accept: 'application/json, text/event-stream',
+        },
       })
       expect(getRequest.response.status).toBe(405)
       expect(getRequest.response.headers.get('allow')).toBe('POST')
@@ -1383,6 +1005,7 @@ test.describe('Issue #343 Desktop MCP contract baseline', () => {
       const malformedJson = await sendRequest({
         headers: {
           'content-type': 'application/json',
+          accept: 'application/json, text/event-stream',
         },
         body: '{invalid',
       })
@@ -1399,6 +1022,7 @@ test.describe('Issue #343 Desktop MCP contract baseline', () => {
       const oversizedRequest = await sendRequest({
         headers: {
           'content-type': 'application/json',
+          accept: 'application/json, text/event-stream',
         },
         body: `${'x'.repeat(1024 * 1024 + 1)}`,
       })
@@ -1415,7 +1039,7 @@ test.describe('Issue #343 Desktop MCP contract baseline', () => {
       const browserOrigin = await sendJsonRpcRequest(
         {
           jsonrpc: '2.0',
-          id: 11,
+          id: 12,
           method: 'tools/list',
         },
         {

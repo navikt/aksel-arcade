@@ -198,18 +198,7 @@ const GENERATED_SHARED_MODULE_HEADER = [
   '// Primary shared Desktop MCP contract artifact used by the SDK-backed Desktop MCP runtime.',
 ].join('\n')
 
-const GENERATED_LEGACY_MODULE_HEADER = [
-  GENERATED_FILE_HEADER,
-  '//',
-  '// Legacy CommonJS compatibility mirror for desktop/mcpServer.cjs tests and historical parity checks.',
-].join('\n')
-
 export const renderSharedMcpAkselCatalogModule = (
   catalog: McpAkselCatalog = buildMcpAkselCatalog()
 ): string =>
   `${GENERATED_SHARED_MODULE_HEADER}\n\nimport type { DesktopMcpAkselCatalogData } from './akselCatalog'\n\nexport const AKSEL_MCP_CATALOG_DATA: DesktopMcpAkselCatalogData = ${JSON.stringify(catalog, null, 2)}\n\nexport default AKSEL_MCP_CATALOG_DATA\n`
-
-export const renderLegacyMcpAkselCatalogModule = (
-  catalog: McpAkselCatalog = buildMcpAkselCatalog()
-): string =>
-  `${GENERATED_LEGACY_MODULE_HEADER}\n\nmodule.exports = ${JSON.stringify(catalog, null, 2)}\n`

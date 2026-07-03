@@ -1,3 +1,52 @@
+### 2026-07-03 - Issue #350: PR #359 review follow-ups
+
+Implemented:
+
+- Normalized the active-surface wording in the updated ADR/docs to consistently say **Desktop Arcade MCP server** where the current live surface is meant.
+- Tightened `docs/desktop-mcp-contract.md` so the acceptance checks now spell out the final HTTP-seam, Inspector, security, and smoke expectations instead of a one-line summary.
+- Simplified `tests/e2e/desktop-mcp-contract-baseline.spec.ts` to lock the final SDK-backed contract only, removing the remaining legacy bootstrap fallback that still tolerated missing `tools/list` / `resources/list`.
+
+Verification:
+
+- `npm run type-check`
+- `npm run lint`
+- `npm test -- --run`
+
+Next note:
+
+- Local validation still prints the pre-existing ESLint `.eslintignore` deprecation warning and Vitest's existing `Not implemented: navigation to another Document` message; neither came from this follow-up.
+
+### 2026-07-03 - Issue #350: Replace handwritten Desktop MCP server and validate SDK parity
+
+Implemented:
+
+- Removed the last handwritten Desktop MCP server path by deleting `desktop/mcpServer.cjs` and its legacy unit suite, leaving `desktop/main-process.ts` + `desktop/mcpSdkServer.ts` as the only active Desktop Arcade MCP server implementation.
+- Removed the now-unused CommonJS Aksel MCP catalog mirror and its generator/test plumbing, so `npm run aksel:refresh-mcp-catalog` now refreshes only the typed shared contract artifact at `src/shared/desktopMcp/akselCatalogData.generated.ts`.
+- Updated the Desktop MCP contract/ADR docs to describe the SDK-backed server as the sole implementation and to record the final spec-aligned contract shape instead of the partial rebuild state.
+- Refreshed the contract/smoke E2E expectations for the final SDK surface, including Streamable HTTP parsing, full tool registration, current capabilities payload fields, and the SDK-generated schema details that now define the public contract seam.
+
+Verification:
+
+- `npm install`
+- `npm run typecheck`
+- `npm run lint`
+- `npm test -- --run`
+- `npm run desktop:build`
+- `npm run test:e2e -- tests/e2e/desktop-mcp-sdk-bootstrap.spec.ts tests/e2e/issue-347-desktop-mcp-sdk-mutation-tools.spec.ts tests/e2e/desktop-mcp-contract-baseline.spec.ts tests/e2e/desktop-mcp-smoke.spec.ts --reporter=line`
+- Human-style/Desktop verification covered by the packaged Electron Playwright flows above:
+  - confirmed the Desktop app opens and reports the fixed local MCP endpoint as available,
+  - exercised initialize/discovery/resource/template flows against the live endpoint,
+  - applied a visible MCP source change and saw the Desktop preview update,
+  - read diagnostics and Preview evidence after the change,
+  - exercised annotation read/mutation workflows,
+  - confirmed browser-origin requests are rejected,
+  - confirmed the fixed-port unavailable state is surfaced clearly,
+  - and confirmed closing Desktop Arcade stops the local MCP endpoint.
+
+Next note:
+
+- The remaining MCP-related noise in local validation is the pre-existing ESLint `.eslintignore` deprecation warning plus the existing large-bundle Vite warnings; neither is introduced by issue `#350`.
+
 ### 2026-07-03 - Issue #348: Unify Desktop MCP IPC routing behind a typed bridge router
 
 Implemented:
