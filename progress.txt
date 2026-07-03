@@ -1,3 +1,24 @@
+### 2026-07-03 - Issue #344 follow-up: Desktop dev MCP stale-port guard
+
+Implemented:
+
+- Investigated the reported `desktop:dev` `initialize` 500 and narrowed it to a stale Electron listener still owning the fixed MCP port `3846`, not to a clean current dev boot of the SDK-backed server.
+- Added a dev-only preflight in `scripts/desktop-dev.mjs` that refuses to launch when `127.0.0.1:3846` is already occupied, with an explicit message telling the next person to stop the existing Desktop Arcade/Electron process first.
+- Added the matching script expectation in `tests/unit/desktopDevScript.test.ts`.
+- Updated `eslint.config.js` to ignore the generated `desktop/dist` bundle so running Desktop build/dev flows before `npm run lint` does not produce false lint failures from bundled output.
+
+Verification:
+
+- `npm run typecheck`
+- `npm run lint`
+- `npm test -- --run`
+- Fresh `npm run desktop:dev` + direct `initialize` POST to `http://127.0.0.1:3846/mcp` now returns `200 OK` with `text/event-stream`
+- Occupied-port probe: holding `127.0.0.1:3846` open before `npm run desktop:dev` now fails fast with the explicit stale-process guidance instead of launching into a misleading broken state
+
+Next note:
+
+- If someone reports another dev-only MCP initialize failure, first confirm whether an older Electron/Desktop Arcade process is still listening on `127.0.0.1:3846`; this follow-up specifically closes that stale-port path.
+
 ### 2026-07-03 - Issue #344: Introduce typed Desktop MCP SDK bootstrap
 
 Implemented:

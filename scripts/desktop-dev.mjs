@@ -5,6 +5,8 @@ import { execFileSync } from 'node:child_process'
 
 const DEFAULT_RENDERER_HOST = '127.0.0.1'
 const DEFAULT_RENDERER_PORT = 5173
+const DESKTOP_MCP_HOST = '127.0.0.1'
+const DESKTOP_MCP_PORT = 3846
 const RENDERER_PATH = '/aksel-arcade/'
 const RENDERER_TIMEOUT_MS = 30_000
 const MAX_PORT_ATTEMPTS = 50
@@ -55,6 +57,16 @@ const getPort = (url) => {
 
 const normalizeRendererUrl = (url) => (url.endsWith('/') ? url : `${url}/`)
 
+const assertDesktopMcpPortAvailable = async () => {
+  if (await isPortAvailable(DESKTOP_MCP_HOST, DESKTOP_MCP_PORT)) {
+    return
+  }
+
+  throw new Error(
+    `Desktop Arcade MCP port ${DESKTOP_MCP_PORT} on ${DESKTOP_MCP_HOST} is already in use. Stop the existing Desktop Arcade/Electron process before running desktop:dev again.`
+  )
+}
+
 const createRendererConfig = async () => {
   if (process.env.AKSEL_ARCADE_RENDERER_URL) {
     const url = new URL(process.env.AKSEL_ARCADE_RENDERER_URL)
@@ -92,6 +104,8 @@ const createRendererConfig = async () => {
 
 const rendererConfig = await createRendererConfig()
 const RENDERER_URL = rendererConfig.url
+
+await assertDesktopMcpPortAvailable()
 
 execFileSync(process.execPath, ['scripts/build-desktop-main.mjs'], {
   stdio: 'inherit',
