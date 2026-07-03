@@ -2,6 +2,7 @@ import { type McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import * as z from 'zod'
 import type {
   DesktopMcpApplyChangesHandler,
+  DesktopMcpApplyChangesOperation,
   DesktopMcpApplyChangesRequest,
   DesktopMcpApplyChangesResult,
 } from '../src/services/desktopMcpApplyChangesProtocol'
@@ -9,7 +10,6 @@ import type {
   DesktopMcpAnnotationMutationHandler,
   DesktopMcpAnnotationMutationRequest,
   DesktopMcpAnnotationMutationResult,
-  DesktopMcpAnnotationMutationToolName,
 } from '../src/services/desktopMcpAnnotationProtocol'
 import { createToolErrorResult, createToolSuccessResult } from './mcpSdkToolResults'
 
@@ -32,6 +32,7 @@ const ANNOTATION_MUTATION_TOOL_NAMES = [
   'reply_to_annotation',
 ] as const
 const PROJECT_PAGE_ID_PATTERN = /^page\d+$/
+type DesktopMcpApplyChangesPageTarget = { pageId: `page${string}` } | { tempPageRef: string }
 
 const APPLY_CHANGES_NEXT_STEPS = Object.freeze([
   'Read arcade://project/diagnostics to confirm the batch is healthy.',
@@ -320,10 +321,13 @@ export const registerDesktopMcpMutationTools = (
         'Acknowledge a single non-dead annotation by annotationId. Updates status, timestamps, and agent actor metadata only.',
       inputSchema: acknowledgeAnnotationInputSchema,
       outputSchema: annotationMutationOutputSchema,
-      annotations: { destructiveHint: true, idempotentHint: true },
+      annotations: { idempotentHint: true },
     },
     async ({ annotationId }) =>
-      callAnnotationMutationTool('acknowledge_annotation', { annotationId }, options.mutateAnnotation)
+      callAnnotationMutationTool(
+        { toolName: 'acknowledge_annotation', annotationId },
+        options.mutateAnnotation
+      )
   )
 
   server.registerTool(
@@ -337,8 +341,8 @@ export const registerDesktopMcpMutationTools = (
     },
     async ({ annotationId, summary }) =>
       callAnnotationMutationTool(
-        'resolve_annotation',
         {
+          toolName: 'resolve_annotation',
           annotationId,
           ...(summary !== undefined ? { summary } : {}),
         },
@@ -357,8 +361,7 @@ export const registerDesktopMcpMutationTools = (
     },
     async ({ annotationId, reason }) =>
       callAnnotationMutationTool(
-        'dismiss_annotation',
-        { annotationId, reason },
+        { toolName: 'dismiss_annotation', annotationId, reason },
         options.mutateAnnotation
       )
   )
@@ -370,12 +373,11 @@ export const registerDesktopMcpMutationTools = (
         'Append an agent thread message to a single non-dead annotation by annotationId without changing status.',
       inputSchema: replyToAnnotationInputSchema,
       outputSchema: annotationMutationOutputSchema,
-      annotations: { destructiveHint: true },
+      annotations: {},
     },
     async ({ annotationId, message }) =>
       callAnnotationMutationTool(
-        'reply_to_annotation',
-        { annotationId, message },
+        { toolName: 'reply_to_annotation', annotationId, message },
         options.mutateAnnotation
       )
   )
@@ -432,26 +434,22 @@ export const registerDesktopMcpApplyChangesTool = (
 }
 
 const callAnnotationMutationTool = async (
-  toolName: DesktopMcpAnnotationMutationToolName,
-  request: Omit<DesktopMcpAnnotationMutationRequest, 'toolName'>,
+  request: DesktopMcpAnnotationMutationRequest,
   handler: DesktopMcpAnnotationMutationHandler
 ) => {
-  const mutationResult = await handler({
-    toolName,
-    ...request,
-  } as DesktopMcpAnnotationMutationRequest)
+  const mutationResult = await handler(request)
 
   if (!isAnnotationMutationResult(mutationResult)) {
     return createToolErrorResult(
-      toolName,
+      request.toolName,
       'project-unavailable',
       'Desktop Arcade MCP annotation mutation returned an invalid renderer response.'
     )
   }
 
   return mutationResult.ok
-    ? createToolSuccessResult(mutationResult.message, mutationResult)
-    : createToolErrorResult(toolName, mutationResult.code, mutationResult.message, {
+    ? createToolSuccessResult(mutationResult.message, { ...mutationResult })
+    : createToolErrorResult(request.toolName, mutationResult.code, mutationResult.message, {
         annotationId: mutationResult.annotationId,
       })
 }
@@ -484,7 +482,7 @@ const toApplyChangesRequest = (
           type: operation.type,
           resourceUri: operation.resourceUri ?? '',
           content: operation.content ?? '',
-        }
+        } satisfies DesktopMcpApplyChangesOperation
       case 'create_page':
         return {
           type: operation.type,
@@ -492,37 +490,68 @@ const toApplyChangesRequest = (
           ...(operation.newPageRef !== undefined ? { newPageRef: operation.newPageRef } : {}),
           ...(operation.jsxCode !== undefined ? { jsxCode: operation.jsxCode } : {}),
           ...(operation.hooksCode !== undefined ? { hooksCode: operation.hooksCode } : {}),
-        }
+        } satisfies DesktopMcpApplyChangesOperation
       case 'rename_page':
         return {
           type: operation.type,
           name: operation.name ?? '',
-          ...(operation.pageId !== undefined ? { pageId: operation.pageId } : {}),
-          ...(operation.tempPageRef !== undefined ? { tempPageRef: operation.tempPageRef } : {}),
-        }
+          ...toApplyChangesPageTarget(operation),
+        } satisfies DesktopMcpApplyChangesOperation
       case 'delete_page':
       case 'set_start_page':
       case 'select_active_page':
         return {
           type: operation.type,
-          ...(operation.pageId !== undefined ? { pageId: operation.pageId } : {}),
-          ...(operation.tempPageRef !== undefined ? { tempPageRef: operation.tempPageRef } : {}),
-        }
+          ...toApplyChangesPageTarget(operation),
+        } satisfies DesktopMcpApplyChangesOperation
       case 'set_preview_context':
         return {
           type: operation.type,
           ...(operation.viewportSize !== undefined ? { viewportSize: operation.viewportSize } : {}),
           ...(operation.theme !== undefined ? { theme: operation.theme } : {}),
-        }
+        } satisfies DesktopMcpApplyChangesOperation
       case 'rename_project':
         return {
           type: operation.type,
           name: operation.name ?? '',
-        }
+        } satisfies DesktopMcpApplyChangesOperation
     }
   }),
-  ...(argumentsPayload.assertions !== undefined ? { assertions: argumentsPayload.assertions } : {}),
+  ...(argumentsPayload.assertions !== undefined
+    ? { assertions: toApplyChangesAssertions(argumentsPayload.assertions) }
+    : {}),
 })
+
+const toApplyChangesPageTarget = (
+  operation: Pick<z.infer<typeof applyChangesOperationSchema>, 'pageId' | 'tempPageRef'>
+): DesktopMcpApplyChangesPageTarget =>
+  operation.pageId !== undefined
+    ? {
+        pageId: isProjectPageId(operation.pageId)
+          ? operation.pageId
+          : (operation.pageId as `page${string}`),
+      }
+    : { tempPageRef: operation.tempPageRef ?? '' }
+
+const toApplyChangesAssertions = (
+  assertions: NonNullable<z.infer<typeof applyChangesInputSchema>['assertions']>
+): NonNullable<DesktopMcpApplyChangesRequest['assertions']> => ({
+  ...(assertions.pageCount !== undefined ? { pageCount: assertions.pageCount } : {}),
+  ...(assertions.startPage !== undefined
+    ? { startPage: toAssertionPageId(assertions.startPage) }
+    : {}),
+  ...(assertions.activePage !== undefined
+    ? { activePage: toAssertionPageId(assertions.activePage) }
+    : {}),
+  ...(assertions.forbidImports !== undefined ? { forbidImports: assertions.forbidImports } : {}),
+})
+
+const toAssertionPageId = (
+  value: string
+): NonNullable<DesktopMcpApplyChangesRequest['assertions']>['startPage'] =>
+  value === 'first' ? value : isProjectPageId(value) ? value : (value as `page${string}`)
+
+const isProjectPageId = (value: string): value is `page${string}` => PROJECT_PAGE_ID_PATTERN.test(value)
 
 const isAnnotationMutationResult = (
   value: unknown
@@ -546,10 +575,11 @@ const isAnnotationMutationResult = (
   }
 
   return (
-    (value.code === 'project-unavailable' ||
+    ((value.code === 'project-unavailable' ||
       value.code === 'annotation-not-found' ||
       value.code === 'dead-target-annotation' ||
-      value.code === 'invalid-annotation-payload') &&
+      value.code === 'invalid-annotation-payload' ||
+      value.code === 'persistence-failed')) &&
     typeof value.annotationId === 'string' &&
     value.annotationId.trim().length > 0 &&
     typeof value.message === 'string' &&

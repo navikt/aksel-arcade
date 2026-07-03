@@ -4915,3 +4915,25 @@ Verification:
 - npm test
 - npm run lint
 - npx playwright test tests/e2e/issue-347-desktop-mcp-sdk-mutation-tools.spec.ts
+### 2026-07-03 - PR #356 review/CI follow-up for issue #347
+
+Implemented:
+
+- Reproduced the failing PR #356 Validate job locally at the stricter `npm run build` seam instead of trusting the repo's current `npm run typecheck` script alone.
+- Fixed the SDK mutation-tool build/type regressions in `desktop/main-process.ts`, `desktop/mcpSdkMutationTools.ts`, `tests/e2e/issue-347-desktop-mcp-sdk-mutation-tools.spec.ts`, and `tests/unit/services/desktopMcpSdkServer.test.ts` so the PR passes the production `tsc -b` path and the live desktop mutation E2E again.
+- Updated the README Desktop MCP setup section so it no longer incorrectly says the SDK mutation tools are still unavailable.
+- Fixed a real spec gap in the renderer bridge: successful annotation mutations now persist through `saveProject(...)` before mutating live renderer state, and structured `persistence-failed` results are returned when that save step fails.
+- Tightened the mutation tool annotations so `acknowledge_annotation` and `reply_to_annotation` no longer advertise the same destructive hint as resolve/dismiss/apply flows.
+- Added coverage for the new annotation persistence failure path in the hook/unit seams.
+
+Verification:
+
+- `npm run typecheck`
+- `npm run lint`
+- `npm test`
+- `npm run build`
+- `npx playwright test tests/e2e/issue-347-desktop-mcp-sdk-mutation-tools.spec.ts`
+
+Next note:
+
+- PR #356 now includes a follow-up commit on top of the original issue #347 implementation. The important review-driven fixes were build-path typing parity, README contract accuracy, and annotation persistence failure handling.

@@ -16,6 +16,7 @@ import type {
   DesktopMcpProjectResourceReadHandler,
   DesktopMcpProjectResourceReadResult,
 } from '../../../src/services/desktopMcpProjectResourceProtocol'
+import type { ArcadeAnnotation, AnnotationStatus } from '../../../src/types/annotations'
 
 interface DesktopMcpServerState {
   serverName: string
@@ -64,6 +65,18 @@ const expectedToolNames = [
   'capture_preview_evidence',
   'apply_changes',
 ]
+
+const createMockAnnotation = (annotationId: string, status: AnnotationStatus): ArcadeAnnotation => ({
+  id: annotationId,
+  pageId: 'page01',
+  x: 12,
+  y: 24,
+  comment: `Annotation ${annotationId}`,
+  element: 'button',
+  elementPath: 'main > button:nth-of-type(1)',
+  timestamp: 1,
+  status,
+})
 
 describe('desktopMcpSdkServer', () => {
   afterEach(async () => {
@@ -791,15 +804,27 @@ describe('desktopMcpSdkServer', () => {
 
   it('routes SDK mutation tools through the injected renderer handlers', async () => {
     const mutateAnnotation = vi.fn<DesktopMcpAnnotationMutationHandler>().mockImplementation(
-      async (request) => ({
-        ok: true,
-        toolName: request.toolName,
-        annotationId: request.annotationId,
-        pageId: 'page01',
-        message: `${request.toolName} updated ${request.annotationId}.`,
-        annotation: { id: request.annotationId, status: request.toolName },
-        annotations: [{ id: request.annotationId, status: request.toolName }],
-      })
+      async (request) => {
+        const statusByToolName = {
+          acknowledge_annotation: 'acknowledged',
+          resolve_annotation: 'resolved',
+          dismiss_annotation: 'dismissed',
+          reply_to_annotation: 'pending',
+        } as const satisfies Record<
+          Parameters<DesktopMcpAnnotationMutationHandler>[0]['toolName'],
+          AnnotationStatus
+        >
+        const annotation = createMockAnnotation(request.annotationId, statusByToolName[request.toolName])
+        return {
+          ok: true,
+          toolName: request.toolName,
+          annotationId: request.annotationId,
+          pageId: 'page01',
+          message: `${request.toolName} updated ${request.annotationId}.`,
+          annotation,
+          annotations: [annotation],
+        }
+      }
     )
     const applyChanges = vi
       .fn<DesktopMcpApplyChangesHandler>()
@@ -960,6 +985,38 @@ describe('desktopMcpSdkServer', () => {
         ...argumentsPayload,
       })
     }
+
+    mutateAnnotation.mockResolvedValueOnce({
+      ok: false,
+      code: 'persistence-failed',
+      annotationId: 'ann-1',
+      message: 'Annotation save failed.',
+    })
+    const acknowledgeFailure = await postJsonRpc(url, {
+      jsonrpc: '2.0',
+      id: 212,
+      method: 'tools/call',
+      params: {
+        name: 'acknowledge_annotation',
+        arguments: {
+          annotationId: 'ann-1',
+        },
+      },
+    })
+    expect(acknowledgeFailure.status).toBe(200)
+    expect(acknowledgeFailure.payload).toMatchObject({
+      jsonrpc: '2.0',
+      id: 212,
+      result: {
+        isError: true,
+        structuredContent: {
+          code: 'persistence-failed',
+          toolName: 'acknowledge_annotation',
+          annotationId: 'ann-1',
+          message: 'Annotation save failed.',
+        },
+      },
+    })
 
     const applyChangesSuccess = await postJsonRpc(url, {
       jsonrpc: '2.0',

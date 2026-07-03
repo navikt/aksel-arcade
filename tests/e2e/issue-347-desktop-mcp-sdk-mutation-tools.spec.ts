@@ -38,6 +38,22 @@ const callTool = async (id: number, name: string, argumentsPayload: Record<strin
 const callApplyChanges = async (argumentsPayload: Record<string, unknown>) =>
   callTool(1, 'apply_changes', argumentsPayload)
 
+interface JsonRpcResourceReadPayload {
+  result: {
+    contents: Array<{
+      uri: string
+      mimeType: string
+      text: string
+    }>
+  }
+}
+
+interface JsonRpcToolPayload<TStructuredContent> {
+  result: {
+    structuredContent: TStructuredContent
+  }
+}
+
 const readMcpResource = async (id: number, uri: string) => {
   const payload = await postMcpRequest({
     jsonrpc: '2.0',
@@ -58,11 +74,7 @@ const readMcpResource = async (id: number, uri: string) => {
     },
   })
 
-  return payload.result.contents[0] as {
-    uri: string
-    mimeType: string
-    text: string
-  }
+  return (payload as unknown as JsonRpcResourceReadPayload).result.contents[0]
 }
 
 const readJsonMcpResource = async (id: number, uri: string) =>
@@ -207,10 +219,8 @@ test.describe('Issue #347 Desktop MCP SDK mutation tools', () => {
 
       const listedAnnotations = await callTool(4, 'list_annotations', { status: 'all' })
       const annotations = (
-        listedAnnotations.result.structuredContent as {
-          annotations: Array<Record<string, unknown>>
-        }
-      ).annotations
+        listedAnnotations as unknown as JsonRpcToolPayload<{ annotations: Array<Record<string, unknown>> }>
+      ).result.structuredContent.annotations
 
       const acknowledgeAnnotation = findAnnotationByComment(annotations, 'Ack me')
       const dismissAnnotation = findAnnotationByComment(annotations, 'Dismiss me')
@@ -298,10 +308,10 @@ test.describe('Issue #347 Desktop MCP SDK mutation tools', () => {
         status: 'all',
       })
       const annotationHistory = (
-        annotationsAfterMutations.result.structuredContent as {
+        annotationsAfterMutations as unknown as JsonRpcToolPayload<{
           annotations: Array<Record<string, unknown>>
-        }
-      ).annotations
+        }>
+      ).result.structuredContent.annotations
       expect(findAnnotationByComment(annotationHistory, 'Ack me').status).toBe('resolved')
       expect(findAnnotationByComment(annotationHistory, 'Dismiss me').status).toBe('dismissed')
 

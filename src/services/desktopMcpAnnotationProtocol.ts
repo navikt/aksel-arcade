@@ -53,6 +53,7 @@ export interface DesktopMcpAnnotationMutationFailure {
     | 'annotation-not-found'
     | 'dead-target-annotation'
     | 'invalid-annotation-payload'
+    | 'persistence-failed'
   annotationId: string
   message: string
 }

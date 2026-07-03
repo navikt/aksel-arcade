@@ -2,6 +2,16 @@ import { app, BrowserWindow, ipcMain, net, protocol, type IpcMainEvent } from 'e
 import path from 'node:path'
 import { pathToFileURL } from 'node:url'
 import type {
+  DesktopMcpApplyChangesFailure,
+  DesktopMcpApplyChangesRequest,
+  DesktopMcpApplyChangesResult,
+} from '../src/services/desktopMcpApplyChangesProtocol'
+import type {
+  DesktopMcpAnnotationMutationFailure,
+  DesktopMcpAnnotationMutationRequest,
+  DesktopMcpAnnotationMutationResult,
+} from '../src/services/desktopMcpAnnotationProtocol'
+import type {
   DesktopMcpPreviewCaptureFailure as PreviewCaptureFailure,
   DesktopMcpPreviewCaptureRequest,
   DesktopMcpPreviewCaptureResult,
@@ -65,58 +75,6 @@ interface ProjectResourceReadFailure {
 }
 
 type DesktopMcpProjectResourceReadResult = ProjectResourceReadSuccess | ProjectResourceReadFailure
-
-interface AnnotationMutationSuccess {
-  ok: true
-  toolName: string
-  annotationId: string
-  pageId: string
-  message: string
-  annotation: Record<string, unknown>
-  annotations: Array<Record<string, unknown>>
-}
-
-interface AnnotationMutationFailure {
-  ok: false
-  code: 'project-unavailable' | 'annotation-not-found' | 'dead-target-annotation' | 'invalid-annotation-payload'
-  annotationId: string
-  message: string
-}
-
-type DesktopMcpAnnotationMutationResult = AnnotationMutationSuccess | AnnotationMutationFailure
-
-interface ApplyChangesSuccess {
-  ok: true
-  summary: string
-  projectRevision: string
-  changedResources: string[]
-  nextRecommendedResources: string[]
-  operationResults: unknown[]
-  safeActivity: {
-    toolName: string
-    timestamp: string
-    operationTypes?: string[]
-  }
-}
-
-interface ApplyChangesFailure {
-  ok: false
-  code:
-    | 'project-unavailable'
-    | 'invalid-operation'
-    | 'stale-project-revision'
-    | 'invalid-operation-target'
-    | 'invalid-project-name'
-    | 'payload-too-large'
-    | 'persistence-failed'
-  message: string
-  manifestResourceUri?: string
-  resourceUri?: string
-  expectedProjectRevision?: string
-  currentProjectRevision?: string
-}
-
-type DesktopMcpApplyChangesResult = ApplyChangesSuccess | ApplyChangesFailure
 
 interface PendingProjectResourceRequest {
   resolve: (value: DesktopMcpProjectResourceReadResult) => void
@@ -312,9 +270,9 @@ function routeDesktopMcpProjectResourceRead({
   })
 }
 
-function routeDesktopMcpAnnotationMutation(request: {
-  annotationId: string
-}): Promise<DesktopMcpAnnotationMutationResult> {
+function routeDesktopMcpAnnotationMutation(
+  request: DesktopMcpAnnotationMutationRequest
+): Promise<DesktopMcpAnnotationMutationResult> {
   const targetWindow = getDesktopMcpProjectResourceWindow()
   if (!targetWindow) {
     return Promise.resolve(
@@ -367,7 +325,7 @@ function routeDesktopMcpAnnotationMutation(request: {
 }
 
 function routeDesktopMcpApplyChanges(
-  request: Record<string, unknown>
+  request: DesktopMcpApplyChangesRequest
 ): Promise<DesktopMcpApplyChangesResult> {
   const targetWindow = getDesktopMcpProjectResourceWindow()
   if (!targetWindow) {
@@ -635,10 +593,10 @@ const createDesktopMcpProjectResourceFailure = (
 })
 
 const createDesktopMcpAnnotationMutationFailure = (
-  code: AnnotationMutationFailure['code'],
+  code: DesktopMcpAnnotationMutationFailure['code'],
   annotationId: string,
   message: string
-): AnnotationMutationFailure => ({
+): DesktopMcpAnnotationMutationFailure => ({
   ok: false,
   code,
   annotationId,
@@ -646,10 +604,10 @@ const createDesktopMcpAnnotationMutationFailure = (
 })
 
 const createDesktopMcpApplyChangesFailure = (
-  code: ApplyChangesFailure['code'],
+  code: DesktopMcpApplyChangesFailure['code'],
   message: string,
-  extras: Partial<ApplyChangesFailure> = {}
-): ApplyChangesFailure => ({
+  extras: Partial<DesktopMcpApplyChangesFailure> = {}
+): DesktopMcpApplyChangesFailure => ({
   ok: false,
   code,
   message,
@@ -899,10 +857,11 @@ const isDesktopMcpAnnotationMutationResult = (
   }
 
   return (
-    (value.code === 'project-unavailable' ||
+    ((value.code === 'project-unavailable' ||
       value.code === 'annotation-not-found' ||
       value.code === 'dead-target-annotation' ||
-      value.code === 'invalid-annotation-payload') &&
+      value.code === 'invalid-annotation-payload' ||
+      value.code === 'persistence-failed')) &&
     typeof value.annotationId === 'string' &&
     value.annotationId.trim().length > 0 &&
     typeof value.message === 'string' &&
