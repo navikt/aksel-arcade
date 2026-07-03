@@ -26,7 +26,13 @@ Pure shared contract code may live under `src/shared/desktopMcp/`. It must not i
 
 ## Acceptance checks
 
-The contract is guarded by golden MCP tests for initialization, discovery, resources, tools, structured success/error results, HTTP security behavior, generated catalog drift, MCP Inspector compatibility, and the existing Desktop MCP smoke flow.
+The contract is guarded by:
+
+- golden MCP HTTP-seam tests for `initialize`, `tools/list`, `resources/list`, `resources/templates/list`, `resources/read`, `tools/call`, structured success/error results, and request validation failures
+- HTTP security checks for wrong-path handling, POST-only behavior, request-size limits, and browser-origin rejection
+- generated Aksel MCP catalog drift tests against the typed shared contract artifact
+- MCP Inspector parity checks covering initialize, discovery, representative resource reads, and representative tool calls
+- the integrated Desktop MCP smoke flow against the packaged Electron app, including visible source mutation and diagnostics/capture follow-up
 
 ## Intentional spec-alignment changes
 
@@ -34,3 +40,4 @@ The contract is guarded by golden MCP tests for initialization, discovery, resou
 - The endpoint advertises spec-native `resources/templates/list` templates for parameterized URI families such as page source, page annotations, Aksel component detail resources, and Preview capture resources.
 - The final public tool surface is SDK-registered: `read_resource`, `list_annotations`, `watch_annotations`, `capture_preview_evidence`, `apply_changes`, `acknowledge_annotation`, `resolve_annotation`, `dismiss_annotation`, and `reply_to_annotation`.
 - Legacy bulk annotation mutation tool names remain out of scope; the public contract uses the Arcade-native mutation tools above.
+- SDK-emitted JSON Schema metadata such as `$schema` and generated descriptions is treated as transport metadata rather than the semantic contract; golden tests compare the advertised schema shapes after stripping that metadata so intentional SDK upgrades do not create false API drift.

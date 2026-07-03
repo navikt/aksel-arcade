@@ -1,3 +1,21 @@
+### 2026-07-03 - Issue #350: PR #359 review follow-ups
+
+Implemented:
+
+- Normalized the active-surface wording in the updated ADR/docs to consistently say **Desktop Arcade MCP server** where the current live surface is meant.
+- Tightened `docs/desktop-mcp-contract.md` so the acceptance checks now spell out the final HTTP-seam, Inspector, security, and smoke expectations instead of a one-line summary.
+- Simplified `tests/e2e/desktop-mcp-contract-baseline.spec.ts` to lock the final SDK-backed contract only, removing the remaining legacy bootstrap fallback that still tolerated missing `tools/list` / `resources/list`.
+
+Verification:
+
+- `npm run type-check`
+- `npm run lint`
+- `npm test -- --run`
+
+Next note:
+
+- Local validation still prints the pre-existing ESLint `.eslintignore` deprecation warning and Vitest's existing `Not implemented: navigation to another Document` message; neither came from this follow-up.
+
 ### 2026-07-03 - Issue #350: Replace handwritten Desktop MCP server and validate SDK parity
 
 Implemented:
