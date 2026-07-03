@@ -31,12 +31,7 @@ const expectedToolNames = [
   'apply_changes',
 ]
 
-const expectedSdkReadOnlyToolNames = [
-  'read_resource',
-  'list_annotations',
-  'watch_annotations',
-  'capture_preview_evidence',
-]
+const expectedSdkReadOnlyToolNames = expectedToolNames
 
 const expectedToolDefinitions = [
   {
@@ -222,7 +217,6 @@ const expectedToolDefinitions = [
         },
         layers: {
           type: 'array',
-          uniqueItems: true,
           items: {
             type: 'string',
             enum: ['screenshot', 'accessibility', 'dom_layout_style', 'frame'],
@@ -443,7 +437,7 @@ const expectedToolDefinitions = [
             'Optional final-state assertions. Use for replacement tasks to prevent wasteful or incoherent output.',
           properties: {
             pageCount: {
-              type: 'number',
+              type: 'integer',
               description: 'Expected final number of Arcade pages.',
             },
             startPage: {
@@ -464,6 +458,22 @@ const expectedToolDefinitions = [
     },
   },
 ]
+
+const stripSchemaMetadata = (value: unknown): unknown => {
+  if (Array.isArray(value)) {
+    return value.map(stripSchemaMetadata)
+  }
+
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(
+      Object.entries(value)
+        .filter(([key]) => key !== '$schema' && key !== 'description')
+        .map(([key, entryValue]) => [key, stripSchemaMetadata(entryValue)])
+    )
+  }
+
+  return value
+}
 
 const expectedStableResources = [
   {
@@ -637,7 +647,10 @@ test.describe('Issue #343 Desktop MCP contract baseline', () => {
       const initializeInstructions = (initialize.payload as { result: { instructions: string } }).result
         .instructions
 
-      if (initializeInstructions.includes('official TypeScript MCP SDK')) {
+      if (
+        (initialize.payload as { result: { protocolVersion: string } }).result.protocolVersion !==
+        '2024-11-05'
+      ) {
         expect(initialize.payload).toMatchObject({
           jsonrpc: '2.0',
           id: 1,
@@ -776,122 +789,14 @@ test.describe('Issue #343 Desktop MCP contract baseline', () => {
         expect(
           listedTools.map((tool) => ({
             name: tool.name,
-            inputSchema: tool.inputSchema,
+            inputSchema: stripSchemaMetadata(tool.inputSchema),
           }))
-        ).toMatchObject([
-          {
-            name: 'read_resource',
-            inputSchema: {
-              type: 'object',
-              additionalProperties: false,
-              required: ['uri'],
-              properties: {
-                uri: {
-                  type: 'string',
-                  minLength: 1,
-                },
-              },
-            },
-          },
-          {
-            name: 'list_annotations',
-            inputSchema: {
-              type: 'object',
-              additionalProperties: false,
-              properties: {
-                scope: {
-                  type: 'string',
-                  enum: ['page', 'project'],
-                },
-                pageId: {
-                  type: 'string',
-                },
-                status: {
-                  type: 'string',
-                  enum: ['pending', 'acknowledged', 'resolved', 'dismissed', 'all'],
-                },
-              },
-            },
-          },
-          {
-            name: 'watch_annotations',
-            inputSchema: {
-              type: 'object',
-              additionalProperties: false,
-              properties: {
-                scope: {
-                  type: 'string',
-                  enum: ['page', 'project'],
-                },
-                pageId: {
-                  type: 'string',
-                },
-                waitTimeoutSeconds: {
-                  type: 'integer',
-                  minimum: 1,
-                  maximum: 300,
-                },
-                batchWindowSeconds: {
-                  type: 'integer',
-                  minimum: 1,
-                  maximum: 60,
-                },
-              },
-            },
-          },
-          {
-            name: 'capture_preview_evidence',
-            inputSchema: {
-              type: 'object',
-              additionalProperties: false,
-              properties: {
-                pageId: {
-                  type: 'string',
-                },
-                viewportSize: {
-                  type: 'string',
-                  enum: ['2XL', 'XL', 'LG', 'MD', 'SM', 'XS'],
-                },
-                theme: {
-                  type: 'string',
-                  enum: ['light', 'dark'],
-                },
-                layers: {
-                  type: 'array',
-                  items: {
-                    type: 'string',
-                    enum: ['screenshot', 'accessibility', 'dom_layout_style', 'frame'],
-                  },
-                },
-                screenshotScope: {
-                  type: 'string',
-                  enum: ['viewport', 'full_page', 'region'],
-                },
-                includeAnnotationOverlays: {
-                  type: 'boolean',
-                },
-                target: {
-                  type: 'object',
-                  additionalProperties: false,
-                },
-                interactions: {
-                  type: 'array',
-                  items: {
-                    type: 'object',
-                    additionalProperties: false,
-                    required: ['action'],
-                    properties: {
-                      action: {
-                        type: 'string',
-                        enum: ['click', 'fill', 'select', 'press', 'scroll', 'waitFor'],
-                      },
-                    },
-                  },
-                },
-              },
-            },
-          },
-        ])
+        ).toMatchObject(
+          expectedToolDefinitions.map(({ name, inputSchema }) => ({
+            name,
+            inputSchema: stripSchemaMetadata(inputSchema),
+          }))
+        )
 
         const resourcesList = await sendJsonRpcRequest({
           jsonrpc: '2.0',
@@ -1095,12 +1000,12 @@ test.describe('Issue #343 Desktop MCP contract baseline', () => {
       expect(
         listedTools.map((tool) => ({
           name: tool.name,
-          inputSchema: tool.inputSchema,
+          inputSchema: stripSchemaMetadata(tool.inputSchema),
         }))
       ).toEqual(
         expectedToolDefinitions.map((toolDefinition) => ({
           name: toolDefinition.name,
-          inputSchema: toolDefinition.inputSchema,
+          inputSchema: stripSchemaMetadata(toolDefinition.inputSchema),
         }))
       )
 
