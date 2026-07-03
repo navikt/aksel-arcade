@@ -1,3 +1,23 @@
+### 2026-07-03 - Issue #345 CI follow-up: fix build-only SDK resource typing regressions
+
+Implemented:
+
+- Reproduced the PR #354 Actions failure at the exact `npm run build` seam instead of relying on the already-green local `npm run typecheck` path.
+- Restored `capturePreviewEvidence` as a compatibility option on `DesktopMcpServerOptions` so the existing Desktop main-process wiring still type-checks while issue `#345` remains a resource-only SDK slice.
+- Fixed a build-only narrowing hole in `desktop/mcpSdkResources.ts` by capturing each optional template `list` callback before wrapping it in the SDK `ResourceTemplate` async list handler.
+- Fixed the invalid project-resource failure type predicate by narrowing from `unknown` through `isObjectRecord(...)` before asserting the Desktop MCP failure shape.
+
+Verification:
+
+- `npm run typecheck`
+- `npm run lint`
+- `npm test -- --run`
+- `npm run build`
+
+Next note:
+
+- This follow-up was CI-specific: local no-emit type-checking stayed green, but the production `tsc -b` build path was stricter about the SDK adapter callback and predicate shapes. If another Desktop MCP SDK slice passes `typecheck` but fails in Actions, run `npm run build` early.
+
 ### 2026-07-03 - Issue #344 review follow-up: bootstrap guidance + baseline test compatibility
 
 Implemented:

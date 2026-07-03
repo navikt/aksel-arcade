@@ -499,12 +499,13 @@ export const registerDesktopMcpResources = (
   ]
 
   for (const templateDefinition of templateDefinitions) {
+    const listResources = templateDefinition.list
     server.registerResource(
       templateDefinition.name,
       new ResourceTemplate(templateDefinition.uriTemplate, {
-        list: templateDefinition.list
+        list: listResources
           ? async () => ({
-              resources: await templateDefinition.list(),
+              resources: await listResources(),
             })
           : undefined,
       }),
@@ -1107,9 +1108,10 @@ const isDesktopMcpProjectResourceReadResult = (
 }
 
 const isDesktopMcpProjectResourceReadFailure = (
-  value: Record<string, unknown>,
+  value: unknown,
   requestedUri: string
 ): value is DesktopMcpProjectResourceReadFailure =>
+  isObjectRecord(value) &&
   typeof value.code === 'string' &&
   typeof value.message === 'string' &&
   typeof value.resourceUri === 'string' &&

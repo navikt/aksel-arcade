@@ -58,6 +58,7 @@ export interface DesktopMcpServerOptions {
   readProjectResource?: DesktopMcpProjectResourceReadHandler
   mutateAnnotation?: unknown
   applyChanges?: unknown
+  capturePreviewEvidence?: unknown
   previewCaptureTtlMs?: number
 }
 
