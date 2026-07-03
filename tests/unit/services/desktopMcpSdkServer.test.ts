@@ -1,5 +1,5 @@
 import { createServer, request, type Server } from 'node:http'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   DESKTOP_MCP_AUTH_DESCRIPTION,
   DESKTOP_MCP_PATH,
@@ -9,7 +9,11 @@ import {
   DESKTOP_MCP_TRANSPORT_LABEL,
   createDesktopMcpServer,
 } from '../../../desktop/mcpSdkServer'
-import type { DesktopMcpProjectResourceReadHandler } from '../../../src/services/desktopMcpProjectResourceProtocol'
+import type { DesktopMcpPreviewCaptureHandler } from '../../../src/services/desktopMcpPreviewCaptureProtocol'
+import type {
+  DesktopMcpProjectResourceReadHandler,
+  DesktopMcpProjectResourceReadResult,
+} from '../../../src/services/desktopMcpProjectResourceProtocol'
 
 interface DesktopMcpServerState {
   serverName: string
@@ -32,14 +36,23 @@ const occupiedServers: Server[] = []
 const createManagedServer = (options?: {
   port?: number
   readProjectResource?: DesktopMcpProjectResourceReadHandler
+  capturePreviewEvidence?: DesktopMcpPreviewCaptureHandler
 }): DesktopMcpServer => {
   const server = createDesktopMcpServer({
     port: options?.port ?? 0,
     readProjectResource: options?.readProjectResource,
+    capturePreviewEvidence: options?.capturePreviewEvidence,
   })
   activeServers.push(server)
   return server
 }
+
+const expectedReadOnlyToolNames = [
+  'read_resource',
+  'list_annotations',
+  'watch_annotations',
+  'capture_preview_evidence',
+]
 
 describe('desktopMcpSdkServer', () => {
   afterEach(async () => {
@@ -270,7 +283,7 @@ describe('desktopMcpSdkServer', () => {
       omittedFeatures: string[]
     }
     expect(capabilities.endpoint).toBe(state.url)
-    expect(capabilities.toolNames).toEqual([])
+    expect(capabilities.toolNames).toEqual(expectedReadOnlyToolNames)
     expect(capabilities.resourceTemplateUris).toEqual(
       expect.arrayContaining([
         'arcade://project/source/pages/{pageId}/jsx',
@@ -352,6 +365,417 @@ describe('desktopMcpSdkServer', () => {
         }
       ).error.message
     ).toContain('arcade://project/pages/page99/annotations')
+
+    const toolsList = await postJsonRpc(url, {
+      jsonrpc: '2.0',
+      id: 10,
+      method: 'tools/list',
+    })
+    expect(toolsList.status).toBe(200)
+    expect(
+      (
+        toolsList.payload as {
+          result: { tools: Array<{ name: string }> }
+        }
+      ).result.tools.map((tool) => tool.name)
+    ).toEqual(expectedReadOnlyToolNames)
+  })
+
+  it('bridges read_resource, list_annotations, and watch_annotations through SDK tools', async () => {
+    let pendingAnnotations: Array<Record<string, unknown>> = [
+      {
+        id: 'ann-1',
+        status: 'pending',
+        comment: 'Pending note',
+      },
+    ]
+    const readProjectResource: DesktopMcpProjectResourceReadHandler = vi.fn(
+      async ({ uri }): Promise<DesktopMcpProjectResourceReadResult> => {
+      switch (uri) {
+        case 'arcade://project/manifest':
+          return {
+            ok: true as const,
+            uri,
+            mimeType: 'application/json',
+            text: JSON.stringify({
+              activePageId: 'page01',
+              pages: [{ id: 'page01', name: 'Overview' }],
+            }),
+          }
+        case 'arcade://project/annotations':
+          return {
+            ok: true as const,
+            uri,
+            mimeType: 'application/json',
+            text: JSON.stringify({
+              counts: { open: 1, pending: 1, acknowledged: 0, resolved: 2, dismissed: 1 },
+              annotations: [
+                { id: 'ann-1', status: 'pending' },
+                { id: 'ann-2', status: 'resolved' },
+                { id: 'ann-3', status: 'dismissed' },
+              ],
+            }),
+          }
+        case 'arcade://project/pages/page01/annotations':
+          return {
+            ok: true as const,
+            uri,
+            mimeType: 'application/json',
+            text: JSON.stringify({
+              page: { id: 'page01', name: 'Overview' },
+              counts: {
+                open: pendingAnnotations.length,
+                pending: pendingAnnotations.length,
+                acknowledged: 0,
+                resolved: 0,
+                dismissed: 0,
+              },
+              annotations: pendingAnnotations,
+            }),
+          }
+        default:
+          return {
+            ok: false as const,
+            code: 'source-not-found',
+            resourceUri: uri,
+            message: `Missing ${uri}`,
+          }
+      }
+      }
+    )
+    const server = createManagedServer({ port: 0, readProjectResource })
+    const state = await server.start()
+    const url = new URL(state.url)
+
+    const readResourceResponse = await postJsonRpc(url, {
+      jsonrpc: '2.0',
+      id: 11,
+      method: 'tools/call',
+      params: {
+        name: 'read_resource',
+        arguments: {
+          uri: 'arcade://desktop/start-here',
+        },
+      },
+    })
+    expect(readResourceResponse.status).toBe(200)
+    expect(readResourceResponse.payload).toMatchObject({
+      jsonrpc: '2.0',
+      id: 11,
+      result: {
+        structuredContent: {
+          ok: true,
+          uri: 'arcade://desktop/start-here',
+          mimeType: 'text/markdown',
+          text: expect.stringContaining('# Desktop Arcade MCP start-here'),
+        },
+      },
+    })
+
+    const readResourceDomainError = await postJsonRpc(url, {
+      jsonrpc: '2.0',
+      id: 12,
+      method: 'tools/call',
+      params: {
+        name: 'read_resource',
+        arguments: {
+          uri: 'arcade://desktop/not-a-resource',
+        },
+      },
+    })
+    expect(readResourceDomainError.status).toBe(200)
+    expect(readResourceDomainError.payload).toMatchObject({
+      jsonrpc: '2.0',
+      id: 12,
+      result: {
+        isError: true,
+        structuredContent: {
+          code: 'resource-not-found',
+          toolName: 'read_resource',
+          resourceUri: 'arcade://desktop/not-a-resource',
+        },
+      },
+    })
+
+    const listAnnotationsResponse = await postJsonRpc(url, {
+      jsonrpc: '2.0',
+      id: 13,
+      method: 'tools/call',
+      params: {
+        name: 'list_annotations',
+        arguments: {},
+      },
+    })
+    expect(listAnnotationsResponse.status).toBe(200)
+    expect(listAnnotationsResponse.payload).toMatchObject({
+      jsonrpc: '2.0',
+      id: 13,
+      result: {
+        structuredContent: {
+          ok: true,
+          scope: 'page',
+          status: 'open',
+          resourceUri: 'arcade://project/pages/page01/annotations',
+          annotations: [{ id: 'ann-1', status: 'pending', comment: 'Pending note' }],
+        },
+      },
+    })
+
+    const projectAnnotationsResponse = await postJsonRpc(url, {
+      jsonrpc: '2.0',
+      id: 14,
+      method: 'tools/call',
+      params: {
+        name: 'list_annotations',
+        arguments: {
+          scope: 'project',
+          status: 'resolved',
+        },
+      },
+    })
+    expect(projectAnnotationsResponse.status).toBe(200)
+    expect(projectAnnotationsResponse.payload).toMatchObject({
+      jsonrpc: '2.0',
+      id: 14,
+      result: {
+        structuredContent: {
+          ok: true,
+          scope: 'project',
+          status: 'resolved',
+          resourceUri: 'arcade://project/annotations',
+          annotations: [{ id: 'ann-2', status: 'resolved' }],
+        },
+      },
+    })
+
+    const watchImmediateResponse = await postJsonRpc(url, {
+      jsonrpc: '2.0',
+      id: 15,
+      method: 'tools/call',
+      params: {
+        name: 'watch_annotations',
+        arguments: {
+          scope: 'page',
+          waitTimeoutSeconds: 1,
+          batchWindowSeconds: 1,
+        },
+      },
+    })
+    expect(watchImmediateResponse.status).toBe(200)
+    expect(watchImmediateResponse.payload).toMatchObject({
+      jsonrpc: '2.0',
+      id: 15,
+      result: {
+        structuredContent: {
+          ok: true,
+          scope: 'page',
+          status: 'pending',
+          timedOut: false,
+          annotations: [{ id: 'ann-1', status: 'pending', comment: 'Pending note' }],
+        },
+      },
+    })
+
+    pendingAnnotations = []
+    setTimeout(() => {
+      pendingAnnotations = [{ id: 'ann-2', status: 'pending', comment: 'Arrived later' }]
+    }, 250)
+
+    const watchDelayedResponse = await postJsonRpc(url, {
+      jsonrpc: '2.0',
+      id: 16,
+      method: 'tools/call',
+      params: {
+        name: 'watch_annotations',
+        arguments: {
+          scope: 'page',
+          waitTimeoutSeconds: 2,
+          batchWindowSeconds: 1,
+        },
+      },
+    })
+    expect(watchDelayedResponse.status).toBe(200)
+    expect(watchDelayedResponse.payload).toMatchObject({
+      jsonrpc: '2.0',
+      id: 16,
+      result: {
+        structuredContent: {
+          ok: true,
+          scope: 'page',
+          status: 'pending',
+          timedOut: false,
+          annotations: [{ id: 'ann-2', status: 'pending', comment: 'Arrived later' }],
+        },
+      },
+    })
+  })
+
+  it('routes capture_preview_evidence through the SDK tool layer and preserves expiring capture resources', async () => {
+    const capturePreviewEvidence = vi.fn<DesktopMcpPreviewCaptureHandler>().mockResolvedValue({
+      ok: true,
+      summary:
+        'Captured Details (page02) in dark MD preview with screenshot, accessibility, DOM/layout/style and frame evidence (region).',
+      captureId: 'capture-demo',
+      manifestResourceUri: 'arcade://preview/captures/capture-demo/manifest',
+      producedResources: [
+        'arcade://preview/captures/capture-demo/manifest',
+        'arcade://preview/captures/capture-demo/screenshot',
+        'arcade://preview/captures/capture-demo/accessibility',
+        'arcade://preview/captures/capture-demo/dom-layout-style',
+        'arcade://preview/captures/capture-demo/frame',
+      ],
+      page: {
+        id: 'page02',
+        name: 'Details',
+      },
+      requestedLayers: ['screenshot', 'accessibility', 'dom_layout_style', 'frame'],
+      producedLayers: ['screenshot', 'accessibility', 'dom_layout_style', 'frame'],
+      layerResources: {
+        screenshot: 'arcade://preview/captures/capture-demo/screenshot',
+        accessibility: 'arcade://preview/captures/capture-demo/accessibility',
+        dom_layout_style: 'arcade://preview/captures/capture-demo/dom-layout-style',
+        frame: 'arcade://preview/captures/capture-demo/frame',
+      },
+      resources: [
+        {
+          uri: 'arcade://preview/captures/capture-demo/manifest',
+          mimeType: 'application/json',
+          text: '{"captureId":"capture-demo"}',
+        },
+        {
+          uri: 'arcade://preview/captures/capture-demo/screenshot',
+          mimeType: 'image/svg+xml',
+          text: '<svg xmlns="http://www.w3.org/2000/svg"></svg>',
+        },
+        {
+          uri: 'arcade://preview/captures/capture-demo/accessibility',
+          mimeType: 'application/json',
+          text: '{"rootSelector":"#root","nodeCount":2,"truncated":false}',
+        },
+        {
+          uri: 'arcade://preview/captures/capture-demo/dom-layout-style',
+          mimeType: 'application/json',
+          text: '{"rootSelector":"#root","capturedElementCount":4,"truncated":false}',
+        },
+        {
+          uri: 'arcade://preview/captures/capture-demo/frame',
+          mimeType: 'application/json',
+          text: '{"page":{"id":"page02"}}',
+        },
+      ],
+      safeActivity: {
+        toolName: 'capture_preview_evidence',
+        operationTypes: ['screenshot', 'accessibility', 'dom_layout_style', 'frame'],
+        timestamp: '2026-06-16T12:30:00.000Z',
+      },
+    })
+    const server = createManagedServer({
+      port: 0,
+      readProjectResource: createStubProjectResourceReadHandler(),
+      capturePreviewEvidence,
+    })
+    const state = await server.start()
+    const url = new URL(state.url)
+
+    const toolResponse = await postJsonRpc(url, {
+      jsonrpc: '2.0',
+      id: 17,
+      method: 'tools/call',
+      params: {
+        name: 'capture_preview_evidence',
+        arguments: {
+          pageId: 'page02',
+          viewportSize: 'MD',
+          layers: ['screenshot', 'accessibility', 'dom_layout_style', 'frame'],
+          screenshotScope: 'region',
+          includeAnnotationOverlays: true,
+          target: {
+            role: 'button',
+            name: 'Continue',
+          },
+          interactions: [
+            {
+              action: 'click',
+              target: {
+                role: 'button',
+                name: 'Continue',
+              },
+            },
+          ],
+        },
+      },
+    })
+    expect(toolResponse.status).toBe(200)
+    expect(toolResponse.payload).toMatchObject({
+      jsonrpc: '2.0',
+      id: 17,
+      result: {
+        structuredContent: {
+          ok: true,
+          captureId: 'capture-demo',
+          manifestResourceUri: 'arcade://preview/captures/capture-demo/manifest',
+          layerResources: {
+            screenshot: 'arcade://preview/captures/capture-demo/screenshot',
+          },
+        },
+      },
+    })
+
+    const screenshotResponse = await postJsonRpc(url, {
+      jsonrpc: '2.0',
+      id: 18,
+      method: 'resources/read',
+      params: {
+        uri: 'arcade://preview/captures/capture-demo/screenshot',
+      },
+    })
+    expect(screenshotResponse.status).toBe(200)
+    expect(screenshotResponse.payload).toMatchObject({
+      jsonrpc: '2.0',
+      id: 18,
+      result: {
+        contents: [
+          {
+            uri: 'arcade://preview/captures/capture-demo/screenshot',
+            mimeType: 'image/svg+xml',
+          },
+        ],
+      },
+    })
+
+    const invalidArgumentsResponse = await postJsonRpc(url, {
+      jsonrpc: '2.0',
+      id: 19,
+      method: 'tools/call',
+      params: {
+        name: 'capture_preview_evidence',
+        arguments: {
+          interactions: [
+            {
+              action: 'waitFor',
+              text: 'Loaded',
+              renderIdle: true,
+            },
+          ],
+        },
+      },
+    })
+    expect(invalidArgumentsResponse.status).toBe(200)
+    expect(invalidArgumentsResponse.payload).toMatchObject({
+      jsonrpc: '2.0',
+      id: 19,
+      result: {
+        isError: true,
+        content: [
+          {
+            type: 'text',
+            text: expect.stringContaining(
+              'capture_preview_evidence interactions[0] waitFor steps require exactly one of text, target, or renderIdle.'
+            ),
+          },
+        ],
+      },
+    })
   })
 
   it('reports an explicit unavailable reason when the fixed port is already occupied', async () => {

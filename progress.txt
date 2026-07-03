@@ -1,3 +1,44 @@
+### 2026-07-03 - Issue #346: Rebuild read-only Desktop MCP tools with SDK schemas
+
+Implemented:
+
+- Read issue `#346` as the highest-priority `ready-for-agent` slice from `#346`-`#350` because it is the first unblocked read-only SDK contract rebuild after the resource slice and it unlocks later mutation/tooling work.
+- Rebuilt the SDK-backed Desktop MCP read-only tool surface in `desktop/mcpSdkReadOnlyTools.ts` with explicit Zod/Standard-Schema registration, structured success results, MCP tool annotations, and Arcade-shaped error results for:
+  - `read_resource`
+  - `list_annotations`
+  - `watch_annotations`
+  - `capture_preview_evidence`
+- Wired the rebuilt tool slice into `desktop/mcpSdkServer.ts`, including the stable-resource bridge needed for `read_resource`, the preview-capture store handoff, and updated bootstrap guidance describing the current partial-SDK surface accurately.
+- Added the exported SDK resource-read helper in `desktop/mcpSdkResources.ts` so the read-only tools can reuse the same stable/project/preview resource behavior as `resources/read`.
+- Added/updated contract coverage for the SDK read-only slice:
+  - unit coverage in `tests/unit/services/desktopMcpSdkServer.test.ts`,
+  - the issue-specific live Electron/MCP spec in `tests/e2e/issue-346-desktop-mcp-sdk-read-only-tools.spec.ts`,
+  - and the cross-version contract baseline in `tests/e2e/desktop-mcp-contract-baseline.spec.ts`.
+- Added `zod` as a direct dependency because the new Desktop MCP SDK tool module imports it directly instead of relying on the SDK's transitive install.
+- Updated `docs/desktop-mcp-contract.md` so the repo contract doc now describes the current SDK rebuild state: resources plus the four read-only tools are back, while mutation tools still follow in later slices.
+
+Verification:
+
+- `npm run typecheck`
+- `npm run lint`
+- `npm test -- --run`
+- `npm run build`
+- `npm run desktop:build`
+- `npm run test:e2e -- tests/e2e/issue-346-desktop-mcp-sdk-read-only-tools.spec.ts tests/e2e/desktop-mcp-contract-baseline.spec.ts --reporter=line`
+- Human-style/live Desktop MCP checklist via the real Electron app and live local MCP endpoint:
+  - opened Desktop Arcade and confirmed the settings panel still showed the fixed local MCP endpoint as available,
+  - called `read_resource` for `arcade://desktop/start-here` and confirmed the guidance matched the documented start-here flow,
+  - read `arcade://project/manifest` through the live endpoint and confirmed the structured project resource data remained available,
+  - exercised `list_annotations` default page scope plus explicit project scope through the SDK-backed tool surface,
+  - exercised `watch_annotations` with bounded waits and confirmed it returned a non-hanging structured result,
+  - captured Preview evidence for the active page and confirmed the returned manifest/resource links were readable,
+  - confirmed the capture flow completed through the isolated throwaway render path without breaking the visible Desktop session,
+  - sent invalid tool arguments and confirmed the rebuilt SDK surface returned a clear MCP tool error result.
+
+Next note:
+
+- The SDK-backed Desktop MCP server now restores resources plus the full read-only public tool slice. The next person should treat mutation tools (`apply_changes` and annotation mutations) as the remaining rebuild surface and keep the baseline tests in sync with SDK-generated schema details rather than handwritten schema snapshots.
+
 ### 2026-07-03 - Issue #345 CI follow-up: fix build-only SDK resource typing regressions
 
 Implemented:
