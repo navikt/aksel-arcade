@@ -62,9 +62,8 @@ export const createDesktopMcpServer = ({
   path = DESKTOP_MCP_PATH,
 }: DesktopMcpServerOptions = {}): DesktopMcpServer => {
   let activeServer: http.Server | null = null
-  let activeMcpServer: McpServer | null = null
-  let activeTransport: StreamableHTTPServerTransport | null = null
   let startOperation: Promise<DesktopMcpServerState> | null = null
+  const activeRequestSessions = new Set<DesktopMcpRequestSession>()
   let availability: DesktopMcpServerAvailability = {
     status: 'unavailable',
     reason: 'Desktop Arcade MCP has not started yet.',
@@ -110,6 +109,32 @@ export const createDesktopMcpServer = ({
       }
     )
 
+  const createRequestSession = async () => {
+    const sdkServer = buildSdkServer()
+    const transport = new StreamableHTTPServerTransport({
+      sessionIdGenerator: undefined,
+    })
+    await sdkServer.connect(transport)
+
+    let closed = false
+    const requestSession: DesktopMcpRequestSession = {
+      close: async () => {
+        if (closed) {
+          return
+        }
+
+        closed = true
+        activeRequestSessions.delete(requestSession)
+        await Promise.all([transport.close(), sdkServer.close()])
+      },
+      sdkServer,
+      transport,
+    }
+
+    activeRequestSessions.add(requestSession)
+    return requestSession
+  }
+
   const handleSdkRequest = async (request: IncomingMessage, response: ServerResponse) => {
     const requestUrl = new URL(request.url ?? '/', `http://${host}:${getPort()}`)
     if (requestUrl.pathname !== path) {
@@ -132,17 +157,6 @@ export const createDesktopMcpServer = ({
         response,
         'Desktop Arcade MCP SDK bootstrap currently supports POST JSON-RPC requests only.'
       )
-      return
-    }
-
-    const transport = activeTransport
-    if (!transport) {
-      sendJsonRpcError(response, {
-        httpStatus: 503,
-        id: null,
-        code: -32603,
-        message: 'Desktop Arcade MCP transport is unavailable.',
-      })
       return
     }
 
@@ -169,7 +183,17 @@ export const createDesktopMcpServer = ({
       return
     }
 
-    await transport.handleRequest(request, response, parsedBody)
+    const requestSession = await createRequestSession()
+    const closeRequestSession = () => {
+      response.off('close', closeRequestSession)
+      response.off('finish', closeRequestSession)
+      void requestSession.close()
+    }
+
+    response.once('close', closeRequestSession)
+    response.once('finish', closeRequestSession)
+
+    await requestSession.transport.handleRequest(request, response, parsedBody)
   }
 
   const start = async () => {
@@ -181,12 +205,6 @@ export const createDesktopMcpServer = ({
     if (startOperation) {
       return startOperation
     }
-
-    const sdkServer = buildSdkServer()
-    const transport = new StreamableHTTPServerTransport({
-      sessionIdGenerator: undefined,
-    })
-    await sdkServer.connect(transport)
 
     const nextServer = http.createServer((request, response) => {
       void handleSdkRequest(request, response).catch((error: unknown) => {
@@ -215,8 +233,6 @@ export const createDesktopMcpServer = ({
       const handleListening = () => {
         cleanupListeners()
         activeServer = nextServer
-        activeMcpServer = sdkServer
-        activeTransport = transport
         availability = { status: 'available' }
         resolve(getState())
       }
@@ -227,8 +243,6 @@ export const createDesktopMcpServer = ({
           status: 'unavailable',
           reason: formatServerErrorReason(error, { host, port }),
         }
-        void transport.close()
-        void sdkServer.close()
         void closeServer(nextServer)
         resolve(getState())
       }
@@ -244,26 +258,20 @@ export const createDesktopMcpServer = ({
   }
 
   const stop = async () => {
-    if (!activeServer && !activeMcpServer && !activeTransport) {
+    if (!activeServer && activeRequestSessions.size === 0) {
       return false
     }
 
     const serverToClose = activeServer
-    const sdkServer = activeMcpServer
-    const transport = activeTransport
 
     activeServer = null
-    activeMcpServer = null
-    activeTransport = null
     availability = {
       status: 'unavailable',
       reason: 'Desktop Arcade MCP is not available.',
     }
-
     await Promise.all([
       serverToClose ? closeServer(serverToClose) : Promise.resolve(),
-      transport ? transport.close() : Promise.resolve(),
-      sdkServer ? sdkServer.close() : Promise.resolve(),
+      ...Array.from(activeRequestSessions, (requestSession) => requestSession.close()),
     ])
 
     return true
@@ -274,6 +282,12 @@ export const createDesktopMcpServer = ({
     start,
     stop,
   }
+}
+
+interface DesktopMcpRequestSession {
+  close: () => Promise<void>
+  sdkServer: McpServer
+  transport: StreamableHTTPServerTransport
 }
 
 const sendJson = (response: ServerResponse, statusCode: number, payload: unknown) => {

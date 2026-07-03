@@ -28,8 +28,8 @@ interface DesktopMcpServer {
 const activeServers: DesktopMcpServer[] = []
 const occupiedServers: Server[] = []
 
-const createManagedServer = (): DesktopMcpServer => {
-  const server = createDesktopMcpServer({ port: 0 })
+const createManagedServer = (options?: { port?: number }): DesktopMcpServer => {
+  const server = createDesktopMcpServer({ port: options?.port ?? 0 })
   activeServers.push(server)
   return server
 }
@@ -100,17 +100,59 @@ describe('desktopMcpSdkServer', () => {
     ).not.toBe('2024-11-05')
   })
 
+  it('accepts repeated initialize requests without reusing a stateless transport', async () => {
+    const server = createManagedServer()
+    const state = await server.start()
+
+    const url = new URL(state.url)
+    const initializePayload = {
+      jsonrpc: '2.0',
+      method: 'initialize',
+      params: {
+        protocolVersion: '2025-06-18',
+        capabilities: {},
+        clientInfo: {
+          name: 'vitest',
+          version: '1.0.0',
+        },
+      },
+    }
+
+    const firstInitialize = await postJsonRpc(url, {
+      ...initializePayload,
+      id: 1,
+    })
+    const secondInitialize = await postJsonRpc(url, {
+      ...initializePayload,
+      id: 2,
+    })
+
+    expect(firstInitialize.status).toBe(200)
+    expect(firstInitialize.payload).toMatchObject({
+      jsonrpc: '2.0',
+      id: 1,
+      result: expect.any(Object),
+    })
+    expect(secondInitialize.status).toBe(200)
+    expect(secondInitialize.payload).toMatchObject({
+      jsonrpc: '2.0',
+      id: 2,
+      result: expect.any(Object),
+    })
+  })
+
   it('reports an explicit unavailable reason when the fixed port is already occupied', async () => {
-    const occupiedServer = await listenOnPort(3846)
+    const occupiedServer = await listenOnPort(0)
     occupiedServers.push(occupiedServer)
+    const occupiedAddress = occupiedServer.address()
+    const occupiedPort =
+      occupiedAddress && typeof occupiedAddress !== 'string' ? occupiedAddress.port : 0
 
-    const server = createDesktopMcpServer()
-    activeServers.push(server)
-
+    const server = createManagedServer({ port: occupiedPort })
     const state = await server.start()
     expect(state.availability).toEqual({
       status: 'unavailable',
-      reason: 'Port 3846 on 127.0.0.1 is already in use.',
+      reason: `Port ${occupiedPort} on 127.0.0.1 is already in use.`,
     })
   })
 })

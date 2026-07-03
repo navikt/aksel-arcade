@@ -1,3 +1,25 @@
+### 2026-07-03 - Issue #344 follow-up: Desktop dev repeated initialize fix
+
+Implemented:
+
+- Reproduced the remaining Desktop MCP bug at the server seam: two `initialize` POSTs against the same running SDK-backed endpoint returned `200` then `500`.
+- Traced the failure to the MCP SDK stateless transport contract: `StreamableHTTPServerTransport` with `sessionIdGenerator: undefined` cannot be reused across requests.
+- Reworked `desktop/mcpSdkServer.ts` so the Desktop bootstrap creates a fresh SDK server/transport pair per HTTP request and cleans it up when the response finishes, instead of connecting one stateless transport at process startup and reusing it forever.
+- Added a regression test in `tests/unit/services/desktopMcpSdkServer.test.ts` that exercises repeated `initialize` requests against the same running endpoint.
+- Made the occupied-port unit test use an ephemeral bound port so it still validates the explicit unavailable reason without depending on `3846` being free in the shared dev environment.
+
+Verification:
+
+- `npm test -- --run tests/unit/services/desktopMcpSdkServer.test.ts`
+- `npm run typecheck`
+- `npm run lint`
+- `npm test -- --run`
+- Direct SDK server probe: repeated `initialize` requests now return `200 text/event-stream` twice instead of `200` then `500`
+
+Next note:
+
+- If the agent still reports a Desktop dev initialize failure after this commit, restart `npm run desktop:dev` so the Electron main process picks up the new per-request transport wiring before retrying the MCP connection.
+
 ### 2026-07-03 - Issue #344 follow-up: Desktop dev MCP stale-port guard
 
 Implemented:
