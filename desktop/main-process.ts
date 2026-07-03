@@ -1,6 +1,11 @@
 import { app, BrowserWindow, ipcMain, net, protocol, type IpcMainEvent } from 'electron'
 import path from 'node:path'
 import { pathToFileURL } from 'node:url'
+import type {
+  DesktopMcpPreviewCaptureFailure as PreviewCaptureFailure,
+  DesktopMcpPreviewCaptureRequest,
+  DesktopMcpPreviewCaptureResult,
+} from '../src/services/desktopMcpPreviewCaptureProtocol'
 import { createDesktopMcpServer } from './mcpSdkServer'
 
 const SHELL_CAPABILITIES_CHANNEL = 'aksel-arcade:get-shell-capabilities'
@@ -112,50 +117,6 @@ interface ApplyChangesFailure {
 }
 
 type DesktopMcpApplyChangesResult = ApplyChangesSuccess | ApplyChangesFailure
-
-interface PreviewCaptureSuccess {
-  ok: true
-  summary: string
-  captureId: string
-  manifestResourceUri: string
-  producedResources: string[]
-  page: {
-    id: string
-    name: string
-  }
-  requestedLayers: string[]
-  producedLayers: string[]
-  layerResources: {
-    accessibility?: string
-    dom_layout_style?: string
-    frame?: string
-    screenshot?: string
-  }
-  resources: Array<{
-    uri: string
-    mimeType: string
-    text: string
-  }>
-  safeActivity: {
-    toolName: 'capture_preview_evidence'
-    timestamp: string
-    operationTypes?: string[]
-  }
-}
-
-interface PreviewCaptureFailure {
-  ok: false
-  code:
-    | 'project-unavailable'
-    | 'invalid-page-id'
-    | 'invalid-capture-target'
-    | 'render-timeout'
-    | 'render-failed'
-  message: string
-  manifestResourceUri?: string
-}
-
-type DesktopMcpPreviewCaptureResult = PreviewCaptureSuccess | PreviewCaptureFailure
 
 interface PendingProjectResourceRequest {
   resolve: (value: DesktopMcpProjectResourceReadResult) => void
@@ -456,7 +417,7 @@ function routeDesktopMcpApplyChanges(
 }
 
 function routeDesktopMcpPreviewCapture(
-  request: Record<string, unknown>
+  request: DesktopMcpPreviewCaptureRequest
 ): Promise<DesktopMcpPreviewCaptureResult> {
   const targetWindow = getDesktopMcpProjectResourceWindow()
   if (!targetWindow) {

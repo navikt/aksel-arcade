@@ -113,7 +113,25 @@ export interface DesktopMcpPreviewCaptureStore {
   read: (resourceUri: string) => DesktopMcpPreviewCaptureResource | null
 }
 
-interface DesktopMcpResourceRegistrationOptions {
+export interface DesktopMcpResourceReadSuccess {
+  ok: true
+  uri: string
+  mimeType: string
+  text: string
+}
+
+export interface DesktopMcpResourceReadFailure {
+  ok: false
+  code: string
+  message: string
+  resourceUri: string
+}
+
+export type DesktopMcpResourceReadResult =
+  | DesktopMcpResourceReadSuccess
+  | DesktopMcpResourceReadFailure
+
+export interface DesktopMcpResourceRegistrationOptions {
   host: string
   port: number
   path: string
@@ -427,6 +445,106 @@ export const createDesktopMcpPreviewCaptureStore = (
   }
 }
 
+export const readDesktopMcpResource = async (
+  uri: string,
+  {
+    previewCaptureStore,
+    readProjectResource,
+    stableResourceOptions,
+  }: {
+    previewCaptureStore: DesktopMcpPreviewCaptureStore
+    readProjectResource: DesktopMcpProjectResourceReadHandler
+    stableResourceOptions?: DesktopMcpResourceRegistrationOptions
+  }
+): Promise<DesktopMcpResourceReadResult> => {
+  if (PREVIEW_CAPTURE_RESOURCE_URI_PATTERN.test(uri)) {
+    const resource = previewCaptureStore.read(uri)
+    if (!resource) {
+      return {
+        ok: false,
+        code: 'resource-not-found',
+        resourceUri: uri,
+        message: `Desktop Arcade MCP resource "${uri}" is unavailable because the Preview capture does not exist or has expired.`,
+      }
+    }
+
+    return {
+      ok: true,
+      uri: resource.uri,
+      mimeType: resource.mimeType,
+      text: resource.text,
+    }
+  }
+
+  if (isKnownProjectResourceUri(uri)) {
+    let resourceResult: DesktopMcpProjectResourceReadResult
+    try {
+      resourceResult = await readProjectResource({ uri })
+    } catch (error) {
+      return {
+        ok: false,
+        code: 'project-unavailable',
+        resourceUri: uri,
+        message:
+          error instanceof Error
+            ? error.message
+            : `Desktop Arcade MCP resource "${uri}" is unavailable.`,
+      }
+    }
+
+    if (!isDesktopMcpProjectResourceReadResult(resourceResult, uri)) {
+      return {
+        ok: false,
+        code: 'project-unavailable',
+        resourceUri: uri,
+        message: `Desktop Arcade MCP resource "${uri}" returned an invalid project resource response.`,
+      }
+    }
+
+    if (!resourceResult.ok) {
+      return {
+        ok: false,
+        code: resourceResult.code,
+        resourceUri: resourceResult.resourceUri,
+        message: resourceResult.message,
+      }
+    }
+
+    return {
+      ok: true,
+      uri: resourceResult.uri,
+      mimeType: resourceResult.mimeType,
+      text: resourceResult.text,
+    }
+  }
+
+  if (stableResourceOptions) {
+    try {
+      const text = await readStableResourceText(uri, stableResourceOptions)
+      const mimeType = [
+        ...MCP_GUIDANCE_RESOURCE_DEFINITIONS,
+        ...ADDITIONAL_STABLE_RESOURCE_DEFINITIONS,
+      ].find((resourceDefinition) => resourceDefinition.uri === uri)?.mimeType
+
+      return {
+        ok: true,
+        uri,
+        mimeType: mimeType ?? 'text/plain',
+        text,
+      }
+    } catch {
+      // Fall through to the shared resource-not-found shape below.
+    }
+  }
+
+  return {
+    ok: false,
+    code: 'resource-not-found',
+    resourceUri: uri,
+    message: `Unknown Desktop Arcade MCP resource "${uri}".`,
+  }
+}
+
 export const registerDesktopMcpResources = (
   server: McpServer,
   options: DesktopMcpResourceRegistrationOptions
@@ -608,8 +726,11 @@ const createDesktopCapabilitiesPayload = ({
   scope: 'Active Desktop Arcade project only.',
   discoveryAdvice: {
     preferredFirstResourceUri: 'arcade://desktop/start-here',
-    preferredDiscoveryMethods: ['resources/list', 'resources/templates/list', 'resources/read'],
-    toolOnlyFallback: 'read_resource is not registered in this slice yet.',
+    preferredDiscoveryMethods: ['resources/list', 'resources/templates/list', 'resources/read', 'tools/list'],
+    toolOnlyFallback:
+      toolNames.length > 0
+        ? 'In tool-only clients, call read_resource({ uri }) for the same resources.'
+        : 'read_resource is not registered in this slice yet.',
   },
   toolNames,
   stableResourceUris,
@@ -636,8 +757,8 @@ const createDesktopCapabilitiesPayload = ({
     resourcesList: 'available',
     resourcesTemplatesList: 'available',
     resourcesRead: 'available',
-    toolsList: 'not registered in this slice',
-    toolsCall: 'not registered in this slice',
+    toolsList: toolNames.length > 0 ? 'available for registered SDK tools' : 'not registered in this slice',
+    toolsCall: toolNames.length > 0 ? 'available for registered SDK tools' : 'not registered in this slice',
   },
 })
 
@@ -647,8 +768,9 @@ const createDesktopOperatingGuide = () =>
     '',
     '- Work through `arcade://` resources and MCP tools only; do not edit repository files, package metadata, or the local filesystem.',
     '- `arcade://desktop/start-here` is the self-sufficient on-ramp and carries the default loop: read `arcade://project/manifest`, read the relevant source resources, use annotation resources when review data matters, `apply_changes` for durable edits, read `arcade://project/diagnostics`, then capture Preview evidence.',
-    '- Start with `resources/list`, `resources/templates/list`, and `resources/read`.',
+    '- Start with `resources/list`, `resources/templates/list`, `resources/read`, or `read_resource({ uri })` when your MCP host is tool-only.',
     '- `arcade://desktop/capabilities` is the shortest single place to inspect the published contract.',
+    '- Read-only MCP tools are available for resource reads, annotation discovery, pending-annotation watches, and isolated Preview evidence capture.',
     '- Durable project edits happen through `apply_changes`, not by patching files outside the active Arcade project.',
     '- Saved Preview preferences live in `arcade://project/preview-context`; capture-only overrides must not mutate them.',
     '- If a project resource returns `project-unavailable`, wait for an active Desktop Arcade window instead of falling back to repository or filesystem edits.',
@@ -1121,3 +1243,13 @@ const createResourceErrorData = (code: string, resourceUri: string) => ({
   code,
   resourceUri,
 })
+
+const isKnownProjectResourceUri = (uri: string) =>
+  uri === PROJECT_MANIFEST_URI ||
+  uri === PROJECT_ANNOTATIONS_URI ||
+  uri === PROJECT_PREVIEW_CONTEXT_URI ||
+  uri === PROJECT_DIAGNOSTICS_URI ||
+  uri === PROJECT_SOURCE_GLOBAL_JSX_URI ||
+  uri === PROJECT_SOURCE_GLOBAL_HOOKS_URI ||
+  /^arcade:\/\/project\/pages\/page\d+\/annotations$/.test(uri) ||
+  /^arcade:\/\/project\/source\/pages\/page\d+\/(jsx|hooks)$/.test(uri)
