@@ -23,7 +23,9 @@ import {
   type ShareUrlOpeningIntent,
 } from '@/types/project'
 import type { EditorState } from '@/types/editor'
+import type { ArcadeAnnotation } from '@/types/annotations'
 import type { PreviewState, SandboxConsoleMessage } from '@/types/preview'
+import { createEmptyAnnotations } from '@/services/annotations'
 import {
   createDefaultProject,
   createDefaultEditorState,
@@ -63,6 +65,7 @@ import {
   type ShareDecodeError,
 } from '@/utils/shareDecoding'
 import { appendSandboxConsoleMessage } from '@/services/previewDiagnostics'
+import { getViewportWidth } from '@/types/viewports'
 import type { DecodedWebShareProject } from '@/utils/sharePayload'
 
 interface ShareHydrationState {
@@ -75,7 +78,10 @@ interface ShareHydrationState {
   error?: ShareDecodeError
 }
 
-type ProjectUpdate = Partial<Pick<Project, 'name' | 'viewportSize' | 'panelLayout' | 'activePageId'>> & {
+type ProjectUpdate = Partial<
+  Pick<Project, 'name' | 'viewportSize' | 'panelLayout' | 'activePageId'>
+> & {
+  annotations?: ArcadeAnnotation[]
   jsxCode?: string
   hooksCode?: string
   editTarget?: SelectedEditTarget
@@ -252,6 +258,15 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   }, [shareHydration.status, shareHydration.token])
 
   const updateProject = (updates: ProjectUpdate) => {
+    if (updates.viewportSize !== undefined) {
+      const nextViewportSize = updates.viewportSize
+      setPreviewState((prev) => ({
+        ...prev,
+        currentViewport: nextViewportSize,
+        viewportWidth: getViewportWidth(nextViewportSize),
+      }))
+    }
+
     setProjectState((prev) => {
       let nextProject: Project = {
         ...prev,
@@ -272,6 +287,10 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
       if (updates.activePageId !== undefined) {
         nextProject = setActivePage(nextProject, updates.activePageId)
+      }
+
+      if (updates.annotations !== undefined) {
+        nextProject = { ...nextProject, annotations: updates.annotations }
       }
 
       if (updates.jsxCode !== undefined || updates.hooksCode !== undefined) {
@@ -411,6 +430,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
           jsx: FORM_SUMMARY_JSX_CODE,
           hooks: '',
         }),
+        annotations: createEmptyAnnotations(),
         lastModified: new Date().toISOString(),
       }))
       // Reset editor state to JSX tab
@@ -426,6 +446,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
           jsx: HOOKS_DEMO_JSX_CODE,
           hooks: HOOKS_DEMO_HOOKS_CODE,
         }),
+        annotations: createEmptyAnnotations(),
         lastModified: new Date().toISOString(),
       }))
       // Reset editor state to JSX tab

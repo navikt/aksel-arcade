@@ -1,4 +1,26 @@
+import type { ArcadeAnnotation, AnnotationRect } from '@/types/annotations'
 import type { ArcadePageId } from '@/types/project'
+import { buildAnnotationTargetResolutionRequest } from './annotationTargetRequests'
+import {
+  combineResolvedAnnotationTargets,
+  getAnnotationTargetIdentity,
+  isAnnotationTargetResolutionRequest,
+  resolveAnnotationTarget,
+  resolveAnnotationTargetAtPoint,
+  resolveAnnotationTargetGroup,
+  resolveAnnotationTargetIdentity,
+  resolveAnnotationTargetsInRect,
+} from './annotationTargets'
+import type { ResolvedAnnotationTarget } from './annotationTargets'
+import {
+  getElementAccessibleName,
+  getElementLabelText,
+  getElementRole,
+  getVisibleText,
+  hasExplicitAccessibleName,
+  isExcludedElement,
+  normalizeWhitespace,
+} from './domAccessibility'
 
 export const PREVIEW_EVIDENCE_ROOT_SELECTOR = '#root'
 export const MAX_PREVIEW_EVIDENCE_ELEMENTS = 200
@@ -13,6 +35,11 @@ const PREVIEW_INTERACTION_POLL_INTERVAL_MS = 16
 const PREVIEW_INTERACTION_SETTLE_FRAMES = 2
 const PREVIEW_INTERACTION_RENDER_IDLE_MS = 100
 const PREVIEW_INTERACTION_PRINTABLE_KEY_PATTERN = /^[^\s]$/
+const PREVIEW_EVIDENCE_ANNOTATION_MARKER_SIZE_PX = 24
+const PREVIEW_EVIDENCE_ANNOTATION_MARKER_SAFE_INSET_PX =
+  PREVIEW_EVIDENCE_ANNOTATION_MARKER_SIZE_PX / 2
+export const PREVIEW_EVIDENCE_ANNOTATION_OVERLAY_NOTE =
+  'Annotation overlays in Preview evidence are capture-only visual context. Durable annotation history remains in annotation resources.'
 const PREVIEW_INTERACTION_SUPPORTED_KEYS = new Set([
   'Enter',
   'Escape',
@@ -166,6 +193,29 @@ export interface PreviewEvidenceCaptureTarget {
   label?: string
 }
 
+export {
+  combineResolvedAnnotationTargets,
+  getAnnotationTargetIdentity,
+  isAnnotationTargetResolutionRequest,
+  resolveAnnotationTarget,
+  resolveAnnotationTargetAtPoint,
+  resolveAnnotationTargetGroup,
+  resolveAnnotationTargetIdentity,
+  resolveAnnotationTargetsInRect,
+}
+export type {
+  AnnotationTargetGroupRequest,
+  AnnotationTargetIdentityRequest,
+  AnnotationTargetPointRequest,
+  AnnotationTargetRect,
+  AnnotationTargetRectRequest,
+  AnnotationTargetResolutionRequest,
+  AnnotationTargetResolutionResult,
+  AnnotationTargetResolutionStatus,
+  ResolvedAnnotationTarget,
+} from './annotationTargets'
+export type { AnnotationTargetIdentity } from '@/types/annotations'
+
 export interface PreviewClickInteraction {
   action: 'click'
   target: PreviewEvidenceCaptureTarget
@@ -239,20 +289,19 @@ export interface PreviewEvidenceScreenshot {
   height: number
 }
 
-type LabelableElement =
-  | HTMLButtonElement
-  | HTMLInputElement
-  | HTMLMeterElement
-  | HTMLOutputElement
-  | HTMLProgressElement
-  | HTMLSelectElement
-  | HTMLTextAreaElement
-
 export interface PreviewEvidenceCaptureMetadata {
   currentPageId?: ArcadePageId | null
   screenshotScope?: PreviewEvidenceScreenshotScope
   targetDescription?: string
   interactions?: PreviewInteractionState
+  annotationOverlays?: PreviewEvidenceAnnotationOverlaySummary
+}
+
+export interface PreviewEvidenceAnnotationOverlaySummary {
+  requested: true
+  included: boolean
+  visibleAnnotationCount: number
+  note: string
 }
 
 interface PreviewEvidenceViewportFallback {
@@ -280,6 +329,17 @@ export interface PreviewEvidenceCaptureSuccess {
 export type PreviewEvidenceCaptureResult =
   | PreviewEvidenceCaptureFailure
   | PreviewEvidenceCaptureSuccess
+
+export interface PreviewEvidenceRequest {
+  layers?: PreviewEvidenceLayer[]
+  interactions?: PreviewInteractionStep[]
+  screenshotScope?: PreviewEvidenceScreenshotScope
+  target?: PreviewEvidenceCaptureTarget
+  currentPageId?: ArcadePageId | null
+  viewportFallback?: PreviewEvidenceViewportFallback
+  includeAnnotationOverlays?: boolean
+  annotations?: readonly ArcadeAnnotation[]
+}
 
 interface PreviewInteractionSequenceSuccess {
   ok: true
@@ -333,7 +393,9 @@ export const collectPreviewEvidenceFromFrame = (
   }
 }
 
-export type PreviewEvidenceRequestHandler = () => Promise<PreviewEvidenceCaptureResult>
+export type PreviewEvidenceRequestHandler = (
+  request?: PreviewEvidenceRequest
+) => Promise<PreviewEvidenceCaptureResult>
 
 const previewEvidenceRequestHandlers = new WeakMap<
   HTMLIFrameElement,
@@ -354,7 +416,8 @@ export const registerPreviewEvidenceRequestHandler = (
 }
 
 export const requestPreviewEvidenceFromFrame = (
-  iframe: HTMLIFrameElement | null
+  iframe: HTMLIFrameElement | null,
+  request?: PreviewEvidenceRequest
 ): Promise<PreviewEvidenceCaptureResult> => {
   if (!iframe) {
     return Promise.resolve(createPreviewUnavailableFailure('Preview iframe is not mounted yet.'))
@@ -368,7 +431,7 @@ export const requestPreviewEvidenceFromFrame = (
   }
 
   try {
-    return handler()
+    return handler(request)
   } catch (error) {
     return Promise.resolve(
       createPreviewUnavailableFailure(`Preview evidence request failed: ${getErrorMessage(error)}`)
@@ -434,6 +497,8 @@ export const capturePreviewEvidenceSnapshot = (
     currentPageId = null,
     interactionState,
     viewportFallback,
+    includeAnnotationOverlays = false,
+    annotations = [],
   }: {
     layers?: PreviewEvidenceLayer[]
     screenshotScope?: PreviewEvidenceScreenshotScope
@@ -441,6 +506,8 @@ export const capturePreviewEvidenceSnapshot = (
     currentPageId?: ArcadePageId | null
     interactionState?: PreviewInteractionState
     viewportFallback?: PreviewEvidenceViewportFallback
+    includeAnnotationOverlays?: boolean
+    annotations?: readonly ArcadeAnnotation[]
   } = {},
   frameWindow: Window = root.ownerDocument.defaultView ?? window
 ): PreviewEvidenceCaptureResult => {
@@ -449,8 +516,20 @@ export const capturePreviewEvidenceSnapshot = (
     const normalizedLayers = layers ? [...layers] : []
     const screenshotRequested = normalizedLayers.includes('screenshot')
     const accessibilityRequested = normalizedLayers.includes('accessibility')
+    const annotationOverlayModel = includeAnnotationOverlays
+      ? createPreviewEvidenceAnnotationOverlayModel(root, annotations, currentPageId, frameWindow)
+      : null
     const screenshot = screenshotRequested
-      ? createPreviewScreenshot(root, { screenshotScope, target, viewportFallback }, frameWindow)
+      ? createPreviewScreenshot(
+          root,
+          {
+            screenshotScope,
+            target,
+            viewportFallback,
+            annotationOverlays: annotationOverlayModel,
+          },
+          frameWindow
+        )
       : null
     const accessibility = accessibilityRequested
       ? serializePreviewAccessibility(root, frameWindow)
@@ -473,6 +552,16 @@ export const capturePreviewEvidenceSnapshot = (
         ...(screenshotRequested ? { screenshotScope } : {}),
         ...(screenshot?.targetDescription ? { targetDescription: screenshot.targetDescription } : {}),
         ...(interactionState ? { interactions: interactionState } : {}),
+        ...(annotationOverlayModel
+          ? {
+              annotationOverlays: {
+                requested: true,
+                included: screenshotRequested,
+                visibleAnnotationCount: annotationOverlayModel.visibleAnnotationCount,
+                note: PREVIEW_EVIDENCE_ANNOTATION_OVERLAY_NOTE,
+              } satisfies PreviewEvidenceAnnotationOverlaySummary,
+            }
+          : {}),
       },
     }
   } catch (error) {
@@ -664,15 +753,28 @@ const createAccessibilityNode = (
   }
 }
 
-const isExcludedElement = (element: Element): boolean => {
-  const tagName = element.tagName.toLowerCase()
-  return (
-    tagName === 'script' || tagName === 'style' || tagName === 'template' || tagName === 'noscript'
-  )
-}
-
 interface PreviewScreenshotResult extends PreviewEvidenceScreenshot {
   targetDescription?: string
+}
+
+interface PreviewEvidenceAnnotationOverlayOutline {
+  annotationId: string
+  variant: 'single' | 'selected-element' | 'multi-select'
+  box: AnnotationRect
+}
+
+interface PreviewEvidenceAnnotationOverlayMarker {
+  annotationId: string
+  variant: 'single' | 'multi-select'
+  label: number
+  x: number
+  y: number
+}
+
+interface PreviewEvidenceAnnotationOverlayModel {
+  visibleAnnotationCount: number
+  outlines: PreviewEvidenceAnnotationOverlayOutline[]
+  markers: PreviewEvidenceAnnotationOverlayMarker[]
 }
 
 interface CaptureRect {
@@ -688,10 +790,12 @@ const createPreviewScreenshot = (
     screenshotScope,
     target,
     viewportFallback,
+    annotationOverlays,
   }: {
     screenshotScope: PreviewEvidenceScreenshotScope
     target?: PreviewEvidenceCaptureTarget
     viewportFallback?: PreviewEvidenceViewportFallback
+    annotationOverlays?: PreviewEvidenceAnnotationOverlayModel | null
   },
   frameWindow: Window
 ): PreviewScreenshotResult | null => {
@@ -713,6 +817,7 @@ const createPreviewScreenshot = (
   stage.setAttribute('xmlns', 'http://www.w3.org/1999/xhtml')
   stage.style.width = `${documentWidth}px`
   stage.style.height = `${documentHeight}px`
+  stage.style.position = 'relative'
   stage.style.overflow = 'hidden'
   stage.style.boxSizing = 'border-box'
   stage.style.backgroundColor = resolvePreviewCanvasBackgroundColor(frameDocument, frameWindow)
@@ -725,6 +830,18 @@ const createPreviewScreenshot = (
   }
 
   stage.appendChild(clonedRoot)
+  const overlayLayer =
+    annotationOverlays && annotationOverlays.visibleAnnotationCount > 0
+      ? createPreviewEvidenceAnnotationOverlayLayer(
+          frameDocument,
+          frameWindow,
+          captureRegion.rect,
+          annotationOverlays
+        )
+      : null
+  if (overlayLayer) {
+    stage.appendChild(overlayLayer)
+  }
 
   const serializedStage = new XMLSerializer().serializeToString(stage)
   const width = Math.max(1, roundNumber(captureRegion.rect.width))
@@ -800,6 +917,327 @@ const resolvePreviewCaptureRegion = (
       }
     }
   }
+}
+
+const createPreviewEvidenceAnnotationOverlayModel = (
+  root: Element,
+  annotations: readonly ArcadeAnnotation[],
+  currentPageId: ArcadePageId | null,
+  frameWindow: Window
+): PreviewEvidenceAnnotationOverlayModel => {
+  if (!currentPageId) {
+    return {
+      visibleAnnotationCount: 0,
+      outlines: [],
+      markers: [],
+    }
+  }
+
+  const overlays: PreviewEvidenceAnnotationOverlayModel = {
+    visibleAnnotationCount: 0,
+    outlines: [],
+    markers: [],
+  }
+  const viewport = getEffectiveViewportSize(frameWindow)
+  const pageAnnotations = getPreviewEvidenceOverlayAnnotations(annotations, currentPageId)
+
+  pageAnnotations.forEach((annotation) => {
+    const request = buildAnnotationTargetResolutionRequest(annotation)
+    if (!request) {
+      return
+    }
+
+    const resolution = resolveAnnotationTarget(root, request, frameWindow)
+    if (resolution.status !== 'resolved' || !resolution.target) {
+      return
+    }
+
+    overlays.visibleAnnotationCount += 1
+    overlays.outlines.push(...getPreviewEvidenceAnnotationOutlines(annotation.id, resolution.target))
+    overlays.markers.push({
+      annotationId: annotation.id,
+      variant: annotation.isMultiSelect ? 'multi-select' : 'single',
+      label: overlays.visibleAnnotationCount,
+      ...getPreviewEvidenceAnnotationMarkerPoint(
+        resolution.target.snapshot,
+        annotation,
+        viewport.width
+      ),
+    })
+  })
+
+  return overlays
+}
+
+const getPreviewEvidenceOverlayAnnotations = (
+  annotations: readonly ArcadeAnnotation[],
+  pageId: ArcadePageId
+): ArcadeAnnotation[] =>
+  annotations.filter((annotation) => {
+    if (annotation.pageId !== pageId) {
+      return false
+    }
+
+    if (annotation.kind && annotation.kind !== 'feedback') {
+      return false
+    }
+
+    return (
+      annotation.status === undefined ||
+      annotation.status === 'pending' ||
+      annotation.status === 'acknowledged'
+    )
+  })
+
+const getPreviewEvidenceAnnotationOutlines = (
+  annotationId: string,
+  target: ResolvedAnnotationTarget
+): PreviewEvidenceAnnotationOverlayOutline[] => {
+  const snapshot = target.snapshot
+  const outlines: PreviewEvidenceAnnotationOverlayOutline[] = []
+
+  if (snapshot.isMultiSelect) {
+    snapshot.elementBoundingBoxes?.forEach((box) => {
+      outlines.push({
+        annotationId,
+        variant: 'selected-element',
+        box,
+      })
+    })
+    if (snapshot.boundingBox) {
+      outlines.push({
+        annotationId,
+        variant: 'multi-select',
+        box: snapshot.boundingBox,
+      })
+    }
+    return outlines
+  }
+
+  if (snapshot.boundingBox) {
+    outlines.push({
+      annotationId,
+      variant: 'single',
+      box: snapshot.boundingBox,
+    })
+  }
+
+  return outlines
+}
+
+const getPreviewEvidenceAnnotationMarkerPoint = (
+  snapshot: ResolvedAnnotationTarget['snapshot'],
+  annotation: ArcadeAnnotation,
+  viewportWidth: number
+): { x: number; y: number } => {
+  const box = snapshot.boundingBox
+  const clickX = snapshot.x
+  const clickY = snapshot.y
+  const markerOffsetX = annotation.clickOffsetX ?? snapshot.clickOffsetX
+  const markerOffsetY = annotation.clickOffsetY ?? snapshot.clickOffsetY
+
+  const x =
+    box && typeof markerOffsetX === 'number' && Number.isFinite(markerOffsetX)
+      ? box.x + markerOffsetX
+      : typeof clickX === 'number' && Number.isFinite(clickX)
+        ? (clickX / 100) * Math.max(1, viewportWidth)
+        : box && Number.isFinite(box.x)
+          ? box.x + box.width
+          : 0
+  const y =
+    box && typeof markerOffsetY === 'number' && Number.isFinite(markerOffsetY)
+      ? box.y + markerOffsetY
+      : typeof clickY === 'number' && Number.isFinite(clickY)
+        ? clickY
+        : box && Number.isFinite(box.y)
+          ? box.y
+          : 0
+
+  return {
+    x: roundNumber(x),
+    y: roundNumber(y),
+  }
+}
+
+const createPreviewEvidenceAnnotationOverlayLayer = (
+  frameDocument: Document,
+  frameWindow: Window,
+  captureRect: CaptureRect,
+  annotationOverlays: PreviewEvidenceAnnotationOverlayModel
+): HTMLDivElement => {
+  const layer = frameDocument.createElement('div')
+  layer.style.position = 'absolute'
+  layer.style.inset = '0'
+  layer.style.pointerEvents = 'none'
+  layer.style.zIndex = '2'
+
+  const colors = getPreviewEvidenceAnnotationColors(frameWindow)
+  annotationOverlays.outlines.forEach((outline) => {
+    const element = frameDocument.createElement('div')
+    element.setAttribute('data-preview-evidence-annotation-overlay', 'outline')
+    element.setAttribute('data-preview-evidence-annotation-id', outline.annotationId)
+    element.setAttribute('data-preview-evidence-annotation-variant', outline.variant)
+    element.style.position = 'absolute'
+    element.style.boxSizing = 'border-box'
+    element.style.left = `${roundNumber(outline.box.x)}px`
+    element.style.top = `${roundNumber(outline.box.y)}px`
+    element.style.width = `${roundNumber(outline.box.width)}px`
+    element.style.height = `${roundNumber(outline.box.height)}px`
+    element.style.borderStyle = 'solid'
+    element.style.borderWidth = '2px'
+    element.style.borderRadius = colors.mediumRadius
+
+    if (outline.variant === 'selected-element') {
+      element.style.borderColor = colors.successBorder
+      element.style.backgroundColor = colors.successFill
+    } else {
+      element.style.borderColor = colors.accentBorder
+      element.style.backgroundColor =
+        outline.variant === 'multi-select' ? colors.multiSelectAccentFill : colors.accentFill
+    }
+
+    layer.appendChild(element)
+  })
+
+  annotationOverlays.markers.forEach((marker) => {
+    const element = frameDocument.createElement('div')
+    element.setAttribute('data-preview-evidence-annotation-overlay', 'marker')
+    element.setAttribute('data-preview-evidence-annotation-id', marker.annotationId)
+    element.setAttribute('data-preview-evidence-annotation-variant', marker.variant)
+    element.style.position = 'absolute'
+    element.style.display = 'grid'
+    element.style.placeItems = 'center'
+    element.style.width = `${PREVIEW_EVIDENCE_ANNOTATION_MARKER_SIZE_PX}px`
+    element.style.height = `${PREVIEW_EVIDENCE_ANNOTATION_MARKER_SIZE_PX}px`
+    element.style.transform = 'translate(-50%, -50%)'
+    element.style.boxSizing = 'border-box'
+    element.style.fontSize = '12px'
+    element.style.fontWeight = '600'
+    element.style.lineHeight = '1'
+
+    const clampedX = clampNumber(
+      marker.x - captureRect.x,
+      PREVIEW_EVIDENCE_ANNOTATION_MARKER_SAFE_INSET_PX,
+      Math.max(
+        PREVIEW_EVIDENCE_ANNOTATION_MARKER_SAFE_INSET_PX,
+        captureRect.width - PREVIEW_EVIDENCE_ANNOTATION_MARKER_SAFE_INSET_PX
+      )
+    )
+    const clampedY = clampNumber(
+      marker.y - captureRect.y,
+      PREVIEW_EVIDENCE_ANNOTATION_MARKER_SAFE_INSET_PX,
+      Math.max(
+        PREVIEW_EVIDENCE_ANNOTATION_MARKER_SAFE_INSET_PX,
+        captureRect.height - PREVIEW_EVIDENCE_ANNOTATION_MARKER_SAFE_INSET_PX
+      )
+    )
+    element.style.left = `${roundNumber(captureRect.x + clampedX)}px`
+    element.style.top = `${roundNumber(captureRect.y + clampedY)}px`
+
+    if (marker.variant === 'multi-select') {
+      element.style.border = `2px solid ${colors.successBorder}`
+      element.style.borderRadius = colors.mediumRadius
+      element.style.backgroundColor = colors.successMarkerBackground
+      element.style.color = colors.successMarkerText
+      element.style.width = '26px'
+      element.style.height = '26px'
+    } else {
+      element.style.border = `2px solid ${colors.accentBorder}`
+      element.style.borderRadius = colors.fullRadius
+      element.style.backgroundColor = colors.accentMarkerBackground
+      element.style.color = colors.accentMarkerText
+    }
+
+    element.textContent = String(marker.label)
+    layer.appendChild(element)
+  })
+
+  return layer
+}
+
+const getPreviewEvidenceAnnotationColors = (frameWindow: Window) => {
+  const rootStyle = frameWindow.getComputedStyle(frameWindow.document.documentElement)
+  const accentBorder = readPreviewEvidenceCssCustomProperty(
+    rootStyle,
+    '--ax-border-accent',
+    'rgb(0, 112, 243)'
+  )
+  const successBorder = readPreviewEvidenceCssCustomProperty(
+    rootStyle,
+    '--ax-border-success',
+    'rgb(0, 158, 96)'
+  )
+
+  return {
+    accentBorder,
+    accentFill: withPreviewEvidenceColorAlpha(accentBorder, 0.18),
+    multiSelectAccentFill: withPreviewEvidenceColorAlpha(accentBorder, 0.12),
+    successBorder,
+    successFill: withPreviewEvidenceColorAlpha(successBorder, 0.14),
+    accentMarkerBackground: readPreviewEvidenceCssCustomProperty(
+      rootStyle,
+      '--ax-bg-accent-strong',
+      accentBorder
+    ),
+    accentMarkerText: readPreviewEvidenceCssCustomProperty(
+      rootStyle,
+      '--ax-text-accent-contrast',
+      '#ffffff'
+    ),
+    successMarkerBackground: readPreviewEvidenceCssCustomProperty(
+      rootStyle,
+      '--ax-bg-success-strong',
+      successBorder
+    ),
+    successMarkerText: readPreviewEvidenceCssCustomProperty(
+      rootStyle,
+      '--ax-text-success-contrast',
+      '#ffffff'
+    ),
+    mediumRadius: readPreviewEvidenceCssCustomProperty(rootStyle, '--ax-radius-8', '8px'),
+    fullRadius: readPreviewEvidenceCssCustomProperty(rootStyle, '--ax-radius-full', '999px'),
+  }
+}
+
+const readPreviewEvidenceCssCustomProperty = (
+  style: CSSStyleDeclaration,
+  property: string,
+  fallback: string
+): string => {
+  const value = style.getPropertyValue(property).trim()
+  return value.length > 0 ? value : fallback
+}
+
+const clampNumber = (value: number, min: number, max: number): number =>
+  Math.min(Math.max(value, min), max)
+
+const withPreviewEvidenceColorAlpha = (color: string, alpha: number): string => {
+  const trimmed = color.trim()
+  const hexMatch = trimmed.match(/^#([0-9a-f]{3}|[0-9a-f]{6})$/i)
+  if (hexMatch) {
+    const hex = hexMatch[1]
+    const normalized =
+      hex.length === 3
+        ? hex
+            .split('')
+            .map((character) => character + character)
+            .join('')
+        : hex
+    const red = Number.parseInt(normalized.slice(0, 2), 16)
+    const green = Number.parseInt(normalized.slice(2, 4), 16)
+    const blue = Number.parseInt(normalized.slice(4, 6), 16)
+    return `rgba(${red}, ${green}, ${blue}, ${alpha})`
+  }
+
+  const rgbMatch = trimmed.match(
+    /^rgba?\(\s*(\d{1,3})(?:\s*,\s*|\s+)(\d{1,3})(?:\s*,\s*|\s+)(\d{1,3})(?:\s*[,/]\s*[\d.]+)?\s*\)$/i
+  )
+  if (rgbMatch) {
+    const [, red, green, blue] = rgbMatch
+    return `rgba(${red}, ${green}, ${blue}, ${alpha})`
+  }
+
+  return trimmed
 }
 
 const getCaptureDocumentWidth = (
@@ -1172,7 +1610,7 @@ const executePreviewWaitForInteraction = async (
     const normalizedText = normalizeComparableText(step.text)
     const startedAt = Date.now()
     while (Date.now() - startedAt < timeoutMs) {
-      if (normalizeComparableText(getElementVisibleText(root)).includes(normalizedText)) {
+      if (normalizeComparableText(getVisibleText(root)).includes(normalizedText)) {
         return `text="${step.text}"`
       }
       await waitForPreviewInteractionTick(frameWindow)
@@ -1705,7 +2143,7 @@ const matchesPreviewCaptureTargetCandidate = (
 
   if (
     normalizedText &&
-    !normalizeComparableText(getElementVisibleText(candidate)).includes(normalizedText)
+    !normalizeComparableText(getVisibleText(candidate)).includes(normalizedText)
   ) {
     return false
   }
@@ -1743,193 +2181,6 @@ const describePreviewCaptureTargetMatcher = (target: PreviewEvidenceCaptureTarge
   ].filter(Boolean)
 
   return parts.length > 0 ? `${parts.join('+')} target` : 'target'
-}
-
-const getElementRole = (element: Element): string => {
-  const explicitRole = element.getAttribute('role')
-  if (explicitRole) {
-    return explicitRole.toLowerCase()
-  }
-
-  const tagName = element.tagName.toLowerCase()
-  if (tagName === 'button') return 'button'
-  if (tagName === 'a' && element.hasAttribute('href')) return 'link'
-  if (tagName === 'textarea') return 'textbox'
-  if (tagName === 'select') return 'combobox'
-  if (tagName === 'option') return 'option'
-  if (tagName === 'img') return 'img'
-  if (/^h[1-6]$/.test(tagName)) return 'heading'
-  if (tagName !== 'input') return tagName
-
-  const input = element as HTMLInputElement
-  switch (input.type) {
-    case 'checkbox':
-      return 'checkbox'
-    case 'radio':
-      return 'radio'
-    case 'range':
-      return 'slider'
-    case 'button':
-    case 'submit':
-    case 'reset':
-      return 'button'
-    default:
-      return 'textbox'
-  }
-}
-
-const getElementAccessibleName = (element: Element): string => {
-  const ariaLabel = element.getAttribute('aria-label')
-  if (ariaLabel) {
-    return normalizeWhitespace(ariaLabel)
-  }
-
-  const labelledBy = element.getAttribute('aria-labelledby')
-  if (labelledBy) {
-    const text = labelledBy
-      .split(/\s+/)
-      .map((id) => {
-        const referencedElement = element.ownerDocument.getElementById(id)
-        return referencedElement ? getElementVisibleText(referencedElement) : ''
-      })
-      .join(' ')
-    if (text.trim()) {
-      return normalizeWhitespace(text)
-    }
-  }
-
-  const altText = getElementAltText(element)
-  if (altText) {
-    return altText
-  }
-
-  const labelText = getElementLabelText(element)
-  if (labelText) {
-    return labelText
-  }
-
-  const title = element.getAttribute('title')
-  if (title) {
-    return normalizeWhitespace(title)
-  }
-
-  if (element instanceof HTMLInputElement && inputUsesValueAsAccessibleName(element) && element.value) {
-    return normalizeWhitespace(element.value)
-  }
-
-  return elementUsesContentAsAccessibleName(element) ? getElementVisibleText(element) : ''
-}
-
-const hasExplicitAccessibleName = (element: Element): boolean =>
-  element.hasAttribute('aria-label') ||
-  element.hasAttribute('aria-labelledby') ||
-  getElementAltText(element).length > 0 ||
-  element.hasAttribute('title') ||
-  getElementLabelText(element).length > 0 ||
-  (element instanceof HTMLInputElement &&
-    inputUsesValueAsAccessibleName(element) &&
-    normalizeWhitespace(element.value).length > 0)
-
-const getElementLabelText = (element: Element): string => {
-  if (!(element instanceof HTMLElement)) {
-    return ''
-  }
-
-  if (!isLabelableElement(element)) {
-    return ''
-  }
-
-  const labels = Array.from(element.labels ?? [])
-  if (labels.length > 0) {
-    return normalizeWhitespace(labels.map((label) => getElementVisibleText(label)).join(' '))
-  }
-
-  if (element.id) {
-    const label = Array.from(element.ownerDocument.querySelectorAll('label[for]')).find(
-      (candidate) => candidate.getAttribute('for') === element.id
-    )
-    if (label) {
-      return getElementVisibleText(label)
-    }
-  }
-
-  const wrappingLabel = element.closest('label')
-  return wrappingLabel ? getElementVisibleText(wrappingLabel) : ''
-}
-
-const getElementVisibleText = (element: Element): string =>
-  normalizeWhitespace(getSanitizedSubtreeText(element))
-
-const getSanitizedSubtreeText = (node: Node): string => {
-  if (node.nodeType === Node.TEXT_NODE) {
-    return node.textContent ?? ''
-  }
-
-  if (node.nodeType === Node.ELEMENT_NODE) {
-    const element = node as Element
-    if (
-      isExcludedElement(element) ||
-      element.getAttribute('aria-hidden') === 'true' ||
-      element.hasAttribute('hidden')
-    ) {
-      return ''
-    }
-  }
-
-  return Array.from(node.childNodes)
-    .map((child) => getSanitizedSubtreeText(child))
-    .join(' ')
-}
-
-const getElementAltText = (element: Element): string => {
-  if (element instanceof HTMLImageElement) {
-    return normalizeWhitespace(element.getAttribute('alt') ?? '')
-  }
-
-  if (element instanceof HTMLInputElement && element.type === 'image') {
-    return normalizeWhitespace(element.getAttribute('alt') ?? '')
-  }
-
-  return ''
-}
-
-const inputUsesValueAsAccessibleName = (input: HTMLInputElement): boolean =>
-  input.type === 'button' || input.type === 'submit' || input.type === 'reset'
-
-const elementUsesContentAsAccessibleName = (element: Element): boolean => {
-  const explicitRole = element.getAttribute('role')?.trim().toLowerCase()
-  if (explicitRole) {
-    return (
-      explicitRole === 'button' ||
-      explicitRole === 'cell' ||
-      explicitRole === 'checkbox' ||
-      explicitRole === 'columnheader' ||
-      explicitRole === 'gridcell' ||
-      explicitRole === 'heading' ||
-      explicitRole === 'link' ||
-      explicitRole === 'menuitem' ||
-      explicitRole === 'menuitemcheckbox' ||
-      explicitRole === 'menuitemradio' ||
-      explicitRole === 'option' ||
-      explicitRole === 'radio' ||
-      explicitRole === 'rowheader' ||
-      explicitRole === 'switch' ||
-      explicitRole === 'tab' ||
-      explicitRole === 'tooltip' ||
-      explicitRole === 'treeitem'
-    )
-  }
-
-  const tagName = element.tagName.toLowerCase()
-  if (/^h[1-6]$/.test(tagName)) {
-    return true
-  }
-
-  if (tagName === 'button' || tagName === 'option' || tagName === 'summary') {
-    return true
-  }
-
-  return tagName === 'a' && element.hasAttribute('href')
 }
 
 const normalizeComparableText = (value: string | undefined): string =>
@@ -2139,19 +2390,6 @@ const removeUndefinedAccessibilityStates = (
     Object.entries(states).filter(([, value]) => value !== undefined)
   ) as PreviewEvidenceAccessibilityState
 
-const isLabelableElement = (element: HTMLElement): element is LabelableElement => {
-  const tagName = element.tagName.toLowerCase()
-  return (
-    tagName === 'button' ||
-    tagName === 'input' ||
-    tagName === 'meter' ||
-    tagName === 'output' ||
-    tagName === 'progress' ||
-    tagName === 'select' ||
-    tagName === 'textarea'
-  )
-}
-
 const getAllowedAttributes = (element: Element): Record<string, string> | undefined => {
   const attributes = Array.from(element.attributes)
     .filter((attribute) => isAllowedAttributeName(attribute.name))
@@ -2278,8 +2516,6 @@ const removeEmptyStyleValues = (
   Object.fromEntries(
     Object.entries(style).filter(([, value]) => Boolean(value))
   ) as PreviewEvidenceComputedStyle
-
-const normalizeWhitespace = (value: string): string => value.replace(/\s+/g, ' ').trim()
 
 const isAccessibilityHidden = (element: Element, frameWindow: Window): boolean => {
   if (element.getAttribute('aria-hidden') === 'true' || element.hasAttribute('hidden')) {

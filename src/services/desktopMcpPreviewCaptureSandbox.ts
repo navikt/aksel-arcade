@@ -1,3 +1,4 @@
+import type { ArcadeAnnotation } from '@/types/annotations'
 import type { ArcadePageId, ThemeMode } from '@/types/project'
 import type { MainToSandboxMessage, SandboxToMainMessage } from '@/types/messages'
 import {
@@ -16,9 +17,14 @@ import type {
   PreviewInteractionStep,
   PreviewEvidenceScreenshotScope,
 } from './previewEvidence'
+import {
+  validateSandboxReadyMessage,
+  validateSandboxToMainMessage,
+} from '@/utils/security'
 
 const SANDBOX_IFRAME_SRC =
   import.meta.env.MODE === 'test' ? 'about:blank' : `${import.meta.env.BASE_URL}sandbox.html`
+const getSandboxIframeHref = (src: string) => new URL(src, window.location.href).href
 
 interface CapturePreviewInSandboxOptions {
   transpiledCode: string
@@ -31,6 +37,8 @@ interface CapturePreviewInSandboxOptions {
   interactions: PreviewInteractionStep[]
   screenshotScope: PreviewEvidenceScreenshotScope
   target?: PreviewEvidenceCaptureTarget
+  includeAnnotationOverlays?: boolean
+  annotations?: readonly ArcadeAnnotation[]
   timeoutMs?: number
 }
 
@@ -47,6 +55,8 @@ export const capturePreviewInIsolatedSandbox = async ({
   interactions,
   screenshotScope,
   target,
+  includeAnnotationOverlays = false,
+  annotations = [],
   timeoutMs = DESKTOP_MCP_PREVIEW_CAPTURE_TIMEOUT_MS,
 }: CapturePreviewInSandboxOptions): Promise<DesktopMcpSandboxCaptureResult> => {
   if (typeof document === 'undefined' || typeof window === 'undefined' || !document.body) {
@@ -124,6 +134,12 @@ export const capturePreviewInIsolatedSandbox = async ({
           viewportHeight,
           ...(target ? { target } : {}),
           expectedPageId: pageId,
+          ...(includeAnnotationOverlays
+            ? {
+                includeAnnotationOverlays: true,
+                annotations: annotations.map((annotation) => ({ ...annotation })),
+              }
+            : {}),
         },
       }
       port.postMessage(message)
@@ -214,14 +230,20 @@ export const capturePreviewInIsolatedSandbox = async ({
         return
       }
 
-      if (event.data?.type !== 'SANDBOX_READY') {
+      if (
+        !validateSandboxReadyMessage(event.data) ||
+        event.data.payload.href !== getSandboxIframeHref(SANDBOX_IFRAME_SRC)
+      ) {
         return
       }
 
       const channel = new MessageChannel()
       port = channel.port1
-      port.onmessage = (messageEvent) =>
-        handleSandboxMessage(messageEvent.data as SandboxToMainMessage)
+      port.onmessage = (messageEvent) => {
+        if (validateSandboxToMainMessage(messageEvent.data)) {
+          handleSandboxMessage(messageEvent.data as SandboxToMainMessage)
+        }
+      }
       port.start()
       iframe.contentWindow?.postMessage({ type: 'CONNECT_SANDBOX' }, '*', [channel.port2])
     }

@@ -24,14 +24,785 @@ var previewEvidenceUtils = (() => {
     MAX_PREVIEW_INTERACTION_STEPS: () => MAX_PREVIEW_INTERACTION_STEPS,
     MAX_PREVIEW_INTERACTION_TOTAL_TIME_MS: () => MAX_PREVIEW_INTERACTION_TOTAL_TIME_MS,
     MAX_PREVIEW_INTERACTION_WAIT_TIMEOUT_MS: () => MAX_PREVIEW_INTERACTION_WAIT_TIMEOUT_MS,
+    PREVIEW_EVIDENCE_ANNOTATION_OVERLAY_NOTE: () => PREVIEW_EVIDENCE_ANNOTATION_OVERLAY_NOTE,
     PREVIEW_EVIDENCE_ROOT_SELECTOR: () => PREVIEW_EVIDENCE_ROOT_SELECTOR,
     capturePreviewEvidenceSnapshot: () => capturePreviewEvidenceSnapshot,
     collectPreviewEvidenceFromFrame: () => collectPreviewEvidenceFromFrame,
+    combineResolvedAnnotationTargets: () => combineResolvedAnnotationTargets,
+    getAnnotationTargetIdentity: () => getAnnotationTargetIdentity,
+    isAnnotationTargetResolutionRequest: () => isAnnotationTargetResolutionRequest,
     registerPreviewEvidenceRequestHandler: () => registerPreviewEvidenceRequestHandler,
     requestPreviewEvidenceFromFrame: () => requestPreviewEvidenceFromFrame,
+    resolveAnnotationTarget: () => resolveAnnotationTarget,
+    resolveAnnotationTargetAtPoint: () => resolveAnnotationTargetAtPoint,
+    resolveAnnotationTargetGroup: () => resolveAnnotationTargetGroup,
+    resolveAnnotationTargetIdentity: () => resolveAnnotationTargetIdentity,
+    resolveAnnotationTargetsInRect: () => resolveAnnotationTargetsInRect,
     runPreviewInteractionSequence: () => runPreviewInteractionSequence,
     serializePreviewEvidence: () => serializePreviewEvidence
   });
+
+  // src/services/domAccessibility.ts
+  var normalizeWhitespace = (value) => value.replace(/\s+/g, " ").trim();
+  var isExcludedElement = (element) => {
+    const tagName = element.tagName.toLowerCase();
+    return tagName === "script" || tagName === "style" || tagName === "template" || tagName === "noscript" || tagName === "html" || tagName === "body";
+  };
+  var getVisibleText = (element) => normalizeWhitespace(getSanitizedSubtreeText(element));
+  var getElementRole = (element, { ignorePresentationalRole = false, treatSummaryAsButton = false } = {}) => {
+    const explicitRole = element.getAttribute("role")?.trim().toLowerCase();
+    if (explicitRole) {
+      if (ignorePresentationalRole && (explicitRole === "none" || explicitRole === "presentation")) {
+        return "";
+      }
+      return explicitRole;
+    }
+    const tagName = element.tagName.toLowerCase();
+    if (tagName === "button") return "button";
+    if (tagName === "a" && element.hasAttribute("href")) return "link";
+    if (tagName === "textarea") return "textbox";
+    if (tagName === "select") return "combobox";
+    if (tagName === "option") return "option";
+    if (tagName === "img") return "img";
+    if (tagName === "summary" && treatSummaryAsButton) return "button";
+    if (/^h[1-6]$/.test(tagName)) return "heading";
+    if (tagName !== "input") return tagName;
+    const input = element;
+    switch (input.type) {
+      case "checkbox":
+        return "checkbox";
+      case "radio":
+        return "radio";
+      case "range":
+        return "slider";
+      case "button":
+      case "submit":
+      case "reset":
+        return "button";
+      default:
+        return "textbox";
+    }
+  };
+  var getElementAccessibleName = (element, { includeImplicitLinkText = true } = {}) => {
+    const ariaLabel = element.getAttribute("aria-label");
+    if (ariaLabel) {
+      return normalizeWhitespace(ariaLabel);
+    }
+    const labelledBy = element.getAttribute("aria-labelledby");
+    if (labelledBy) {
+      const text = labelledBy.split(/\s+/).map((id) => {
+        const referencedElement = element.ownerDocument.getElementById(id);
+        return referencedElement ? getVisibleText(referencedElement) : "";
+      }).join(" ");
+      if (text.trim()) {
+        return normalizeWhitespace(text);
+      }
+    }
+    const altText = getElementAltText(element);
+    if (altText) {
+      return altText;
+    }
+    const labelText = getElementLabelText(element);
+    if (labelText) {
+      return labelText;
+    }
+    const title = element.getAttribute("title");
+    if (title) {
+      return normalizeWhitespace(title);
+    }
+    if (element instanceof HTMLInputElement && inputUsesValueAsAccessibleName(element) && element.value) {
+      return normalizeWhitespace(element.value);
+    }
+    return elementUsesContentAsAccessibleName(element, { includeImplicitLinkText }) ? getVisibleText(element) : "";
+  };
+  var hasExplicitAccessibleName = (element) => element.hasAttribute("aria-label") || element.hasAttribute("aria-labelledby") || getElementAltText(element).length > 0 || element.hasAttribute("title") || getElementLabelText(element).length > 0 || element instanceof HTMLInputElement && inputUsesValueAsAccessibleName(element) && normalizeWhitespace(element.value).length > 0;
+  var getElementLabelText = (element) => {
+    if (!(element instanceof HTMLElement) || !isLabelableElement(element)) {
+      return "";
+    }
+    const labels = Array.from(element.labels ?? []);
+    if (labels.length > 0) {
+      return normalizeWhitespace(labels.map((label) => getVisibleText(label)).join(" "));
+    }
+    if (element.id) {
+      const label = Array.from(element.ownerDocument.querySelectorAll("label[for]")).find(
+        (candidate) => candidate.getAttribute("for") === element.id
+      );
+      if (label) {
+        return getVisibleText(label);
+      }
+    }
+    const wrappingLabel = element.closest("label");
+    return wrappingLabel ? getVisibleText(wrappingLabel) : "";
+  };
+  var getSanitizedSubtreeText = (node) => {
+    if (node.nodeType === Node.TEXT_NODE) {
+      return node.textContent ?? "";
+    }
+    if (node.nodeType === Node.ELEMENT_NODE) {
+      const element = node;
+      if (isExcludedElement(element) || element.getAttribute("aria-hidden") === "true" || element.hasAttribute("hidden")) {
+        return "";
+      }
+    }
+    return Array.from(node.childNodes).map((child) => getSanitizedSubtreeText(child)).join(" ");
+  };
+  var getElementAltText = (element) => {
+    if (element instanceof HTMLImageElement) {
+      return normalizeWhitespace(element.getAttribute("alt") ?? "");
+    }
+    if (element instanceof HTMLInputElement && element.type === "image") {
+      return normalizeWhitespace(element.getAttribute("alt") ?? "");
+    }
+    return "";
+  };
+  var inputUsesValueAsAccessibleName = (input) => input.type === "button" || input.type === "submit" || input.type === "reset";
+  var elementUsesContentAsAccessibleName = (element, { includeImplicitLinkText }) => {
+    const explicitRole = element.getAttribute("role")?.trim().toLowerCase();
+    if (explicitRole) {
+      return explicitRole === "button" || explicitRole === "cell" || explicitRole === "checkbox" || explicitRole === "columnheader" || explicitRole === "gridcell" || explicitRole === "heading" || explicitRole === "link" || explicitRole === "menuitem" || explicitRole === "menuitemcheckbox" || explicitRole === "menuitemradio" || explicitRole === "option" || explicitRole === "radio" || explicitRole === "rowheader" || explicitRole === "switch" || explicitRole === "tab" || explicitRole === "tooltip" || explicitRole === "treeitem";
+    }
+    const tagName = element.tagName.toLowerCase();
+    if (/^h[1-6]$/.test(tagName)) {
+      return true;
+    }
+    if (tagName === "button" || tagName === "option" || tagName === "summary") {
+      return true;
+    }
+    return Boolean(includeImplicitLinkText) && tagName === "a" && element.hasAttribute("href");
+  };
+  var isLabelableElement = (element) => {
+    const tagName = element.tagName.toLowerCase();
+    return tagName === "button" || tagName === "input" || tagName === "meter" || tagName === "output" || tagName === "progress" || tagName === "select" || tagName === "textarea";
+  };
+
+  // src/services/annotationTargets.ts
+  var isAnnotationTargetResolutionRequest = (value) => {
+    if (!isRecord(value) || typeof value.mode !== "string") {
+      return false;
+    }
+    switch (value.mode) {
+      case "point":
+        return isFiniteNumber(value.x) && isFiniteNumber(value.y) && optionalString(value.selectedText);
+      case "rect":
+        return isAnnotationTargetRect(value.rect);
+      case "identity":
+        return isAnnotationTargetIdentity(value.identity);
+      case "group":
+        return Array.isArray(value.identities) && value.identities.every(isAnnotationTargetIdentity);
+      default:
+        return false;
+    }
+  };
+  var INTERACTIVE_TARGET_SELECTOR = [
+    "button",
+    "a[href]",
+    "input",
+    "textarea",
+    "select",
+    "option",
+    "label",
+    "summary",
+    '[role="button"]',
+    '[role="link"]',
+    '[role="checkbox"]',
+    '[role="radio"]',
+    '[role="switch"]',
+    '[role="tab"]',
+    '[role="menuitem"]',
+    "[onclick]"
+  ].join(",");
+  var COMPONENT_INTERNAL_TARGET_SELECTOR = [
+    ".aksel-inline-message__icon",
+    ".aksel-inline-message__icon *"
+  ].join(",");
+  var MAX_TEXT_LENGTH = 500;
+  var resolveAnnotationTarget = (root, request, frameWindow = root.ownerDocument.defaultView ?? window) => {
+    switch (request.mode) {
+      case "point":
+        return resolveAnnotationTargetAtPoint(root, request, frameWindow);
+      case "rect":
+        return resolveAnnotationTargetsInRect(root, request.rect, frameWindow);
+      case "identity":
+        return resolveAnnotationTargetIdentity(root, request.identity, frameWindow);
+      case "group":
+        return resolveAnnotationTargetGroup(root, request.identities, frameWindow);
+    }
+  };
+  var resolveAnnotationTargetAtPoint = (root, request, frameWindow = root.ownerDocument.defaultView ?? window) => {
+    const selectionTarget = resolveSelectedTextTarget(root, request.selectedText, frameWindow);
+    if (selectionTarget) {
+      return createResolvedResult(root, selectionTarget.element, frameWindow, {
+        x: request.x,
+        y: request.y,
+        selectedText: selectionTarget.selectedText
+      });
+    }
+    const rawElement = deepElementFromPoint(root, request.x, request.y);
+    const element = rawElement ? normalizeAnnotationElement(root, rawElement, frameWindow) : null;
+    if (!element) {
+      return {
+        status: "no-target",
+        reason: "no-match",
+        matchCount: 0
+      };
+    }
+    return createResolvedResult(root, element, frameWindow, {
+      x: request.x,
+      y: request.y,
+      selectedText: request.selectedText
+    });
+  };
+  var resolveAnnotationTargetsInRect = (root, rect, frameWindow = root.ownerDocument.defaultView ?? window) => {
+    const normalizedRect = normalizeSelectionRect(rect);
+    if (!normalizedRect || normalizedRect.width === 0 || normalizedRect.height === 0) {
+      return {
+        status: "no-target",
+        reason: "empty-selection",
+        matchCount: 0
+      };
+    }
+    const matchingElements = filterContainedElements(
+      getAnnotatableCandidates(root, frameWindow).filter((element) => {
+        const elementRect = element.getBoundingClientRect();
+        return hasUsableGeometry(elementRect) && rectsIntersect(elementRect, normalizedRect) && !isPreviewChromeElement(element);
+      })
+    );
+    if (matchingElements.length === 0) {
+      return {
+        status: "no-target",
+        reason: "empty-selection",
+        matchCount: 0
+      };
+    }
+    if (matchingElements.length === 1) {
+      return createResolvedResult(root, matchingElements[0], frameWindow, {
+        x: normalizedRect.x + normalizedRect.width,
+        y: normalizedRect.y + normalizedRect.height
+      });
+    }
+    return combineResolvedAnnotationTargets(
+      matchingElements.map(
+        (element) => createResolvedTarget(root, element, frameWindow, {
+          x: normalizedRect.x + normalizedRect.width,
+          y: normalizedRect.y + normalizedRect.height,
+          isMultiSelect: true
+        })
+      )
+    );
+  };
+  var resolveAnnotationTargetIdentity = (root, identity, frameWindow = root.ownerDocument.defaultView ?? window) => {
+    const pathMatch = queryFullPath(root, identity.fullPath);
+    if (pathMatch && isAnnotatableElement(pathMatch, frameWindow) && getAnnotationTargetIdentity(root, pathMatch, frameWindow).signature === identity.signature) {
+      const target2 = createResolvedTarget(root, pathMatch, frameWindow);
+      return {
+        status: target2.visibility === "visible" ? "resolved" : "hidden",
+        target: target2,
+        matchCount: 1
+      };
+    }
+    const matches = getAnnotatableCandidates(root, frameWindow).filter(
+      (candidate) => getAnnotationTargetIdentity(root, candidate, frameWindow).signature === identity.signature
+    );
+    if (matches.length === 0) {
+      return {
+        status: "dead",
+        reason: "no-match",
+        matchCount: 0
+      };
+    }
+    if (matches.length > 1) {
+      return {
+        status: "dead",
+        reason: "ambiguous-match",
+        matchCount: matches.length
+      };
+    }
+    const target = createResolvedTarget(root, matches[0], frameWindow);
+    return {
+      status: target.visibility === "visible" ? "resolved" : "hidden",
+      target,
+      matchCount: 1
+    };
+  };
+  var resolveAnnotationTargetGroup = (root, identities, frameWindow = root.ownerDocument.defaultView ?? window) => {
+    if (identities.length === 0) {
+      return {
+        status: "no-target",
+        reason: "empty-selection",
+        matchCount: 0
+      };
+    }
+    const resolvedTargets = [];
+    for (const identity of identities) {
+      const result = resolveAnnotationTargetIdentity(root, identity, frameWindow);
+      if (!result.target || result.status !== "resolved" && result.status !== "hidden") {
+        return {
+          status: "dead",
+          reason: "partial-group",
+          matchCount: resolvedTargets.length
+        };
+      }
+      resolvedTargets.push(result.target);
+    }
+    return combineResolvedAnnotationTargets(resolvedTargets);
+  };
+  var combineResolvedAnnotationTargets = (targets) => {
+    if (targets.length === 0) {
+      return {
+        status: "no-target",
+        reason: "empty-selection",
+        matchCount: 0
+      };
+    }
+    if (targets.length === 1) {
+      const [target] = targets;
+      return {
+        status: target.visibility === "visible" ? "resolved" : "hidden",
+        target,
+        targets: [target],
+        matchCount: 1
+      };
+    }
+    const visibleTargets = targets.filter((target) => target.visibility === "visible");
+    const boxes = visibleTargets.map((target) => target.snapshot.boundingBox).filter((box) => Boolean(box));
+    const unionBox = unionRects(boxes);
+    const primaryTarget = targets[0];
+    return {
+      status: visibleTargets.length > 0 ? "resolved" : "hidden",
+      targets: targets.map((target) => ({
+        ...target,
+        identity: { ...target.identity },
+        snapshot: {
+          ...target.snapshot,
+          ...target.snapshot.boundingBox ? { boundingBox: { ...target.snapshot.boundingBox } } : {}
+        }
+      })),
+      target: {
+        ...primaryTarget,
+        identity: { ...primaryTarget.identity },
+        snapshot: {
+          ...primaryTarget.snapshot,
+          element: targets.map((target) => target.snapshot.element).join(", "),
+          elementPath: targets.map((target) => target.identity.elementPath).join(" | "),
+          fullPath: targets.map((target) => target.identity.fullPath).join(" | "),
+          targetIdentities: targets.map((target) => ({ ...target.identity })),
+          isMultiSelect: true,
+          ...unionBox ? { boundingBox: unionBox } : {},
+          elementBoundingBoxes: boxes
+        }
+      },
+      matchCount: targets.length
+    };
+  };
+  var getAnnotationTargetIdentity = (root, element, frameWindow = root.ownerDocument.defaultView ?? window) => {
+    const tagName = element.tagName.toLowerCase();
+    const role = getElementRole2(element);
+    const accessibleName = getElementAccessibleName2(element);
+    const text = getVisibleText(element);
+    const cssClasses = getElementClasses(element);
+    const elementPath = getReadableElementPath(root, element);
+    const fullPath = getFullElementPath(root, element);
+    const signature = createAnnotationTargetIdentitySignature({
+      tagName,
+      role,
+      accessibleName,
+      text,
+      cssClasses
+    });
+    void frameWindow;
+    return {
+      signature,
+      tagName,
+      ...role ? { role } : {},
+      ...accessibleName ? { accessibleName } : {},
+      ...text ? { text: truncateText(text, MAX_TEXT_LENGTH) } : {},
+      ...cssClasses ? { cssClasses } : {},
+      elementPath,
+      fullPath
+    };
+  };
+  var createResolvedResult = (root, element, frameWindow, options = {}) => {
+    const target = createResolvedTarget(root, element, frameWindow, options);
+    return {
+      status: target.visibility === "visible" ? "resolved" : "hidden",
+      target,
+      matchCount: 1
+    };
+  };
+  var createResolvedTarget = (root, element, frameWindow, options = {}) => {
+    const identity = getAnnotationTargetIdentity(root, element, frameWindow);
+    const rect = element.getBoundingClientRect();
+    const isFixed = frameWindow.getComputedStyle(element).position === "fixed";
+    const pageX = typeof options.x === "number" ? options.x : rect.left + rect.width / 2;
+    const pageY = typeof options.y === "number" ? options.y : rect.top + rect.height / 2;
+    const snapshot = {
+      x: frameWindow.innerWidth > 0 ? pageX / frameWindow.innerWidth * 100 : pageX,
+      y: isFixed ? pageY : pageY + frameWindow.scrollY,
+      element: describeElement(element),
+      elementPath: identity.elementPath,
+      targetIdentities: [{ ...identity }],
+      clickOffsetX: pageX - rect.left,
+      clickOffsetY: pageY - rect.top,
+      boundingBox: {
+        x: rect.left,
+        y: isFixed ? rect.top : rect.top + frameWindow.scrollY,
+        width: rect.width,
+        height: rect.height
+      },
+      nearbyText: getNearbyText(element),
+      cssClasses: identity.cssClasses,
+      computedStyles: getComputedStyleSummary(element, frameWindow),
+      fullPath: identity.fullPath,
+      accessibility: getAccessibilitySummary(element),
+      isFixed,
+      ...options.isMultiSelect ? { isMultiSelect: true } : {},
+      ...options.selectedText ? { selectedText: truncateText(options.selectedText, MAX_TEXT_LENGTH) } : {}
+    };
+    return {
+      identity,
+      snapshot,
+      visibility: isElementVisibleInViewport(element, frameWindow) ? "visible" : "hidden"
+    };
+  };
+  var createAnnotationTargetIdentitySignature = ({
+    tagName,
+    role,
+    accessibleName,
+    text,
+    cssClasses
+  }) => stableStringify({
+    tagName,
+    role,
+    accessibleName: normalizeComparableText(accessibleName),
+    text: normalizeComparableText(text),
+    cssClasses: normalizeComparableText(cssClasses)
+  });
+  var deepElementFromPoint = (root, x, y) => {
+    if (typeof root.ownerDocument.elementFromPoint !== "function") {
+      return null;
+    }
+    let element = root.ownerDocument.elementFromPoint(x, y);
+    while (element?.shadowRoot) {
+      const nested = element.shadowRoot.elementFromPoint(x, y);
+      if (!nested || nested === element) {
+        break;
+      }
+      element = nested;
+    }
+    return element && root.contains(element) ? element : null;
+  };
+  var normalizeAnnotationElement = (root, element, frameWindow) => {
+    if (isExcludedElement(element) || isPreviewChromeElement(element)) {
+      return null;
+    }
+    const componentRoot = getComponentRootForInternalElement(element, root);
+    if (componentRoot && isAnnotatableElement(componentRoot, frameWindow)) {
+      return componentRoot;
+    }
+    const interactive = closestWithinRoot(element, root, INTERACTIVE_TARGET_SELECTOR);
+    if (interactive && isAnnotatableElement(interactive, frameWindow)) {
+      return interactive;
+    }
+    let current = element;
+    while (current && current !== root && current !== root.ownerDocument.body) {
+      if (isAnnotatableElement(current, frameWindow)) {
+        return current;
+      }
+      current = current.parentElement;
+    }
+    return isAnnotatableElement(root, frameWindow) ? root : null;
+  };
+  var getComponentRootForInternalElement = (element, root) => {
+    const inlineMessageInternal = closestWithinRoot(element, root, COMPONENT_INTERNAL_TARGET_SELECTOR);
+    return inlineMessageInternal ? closestWithinRoot(inlineMessageInternal, root, ".aksel-inline-message") : null;
+  };
+  var getAnnotatableCandidates = (root, frameWindow) => [root, ...Array.from(root.querySelectorAll("*"))].filter((candidate) => root.contains(candidate)).map((candidate) => normalizeAnnotationElement(root, candidate, frameWindow)).filter((candidate) => Boolean(candidate)).filter((candidate, index, candidates) => candidates.indexOf(candidate) === index);
+  var filterContainedElements = (elements) => elements.filter(
+    (element) => !elements.some((otherElement) => otherElement !== element && element.contains(otherElement))
+  );
+  var isAnnotatableElement = (element, frameWindow) => {
+    if (isExcludedElement(element) || isPreviewChromeElement(element)) {
+      return false;
+    }
+    const tagName = element.tagName.toLowerCase();
+    if (tagName === "html" || tagName === "body") {
+      return false;
+    }
+    const style = frameWindow.getComputedStyle(element);
+    return style.display !== "none" && style.display !== "contents" && style.visibility !== "hidden" && style.visibility !== "collapse";
+  };
+  var isPreviewChromeElement = (element) => Boolean(
+    element.closest(
+      "[data-annotation-marker], [data-annotation-popup], [data-feedback-toolbar], [data-inspect-overlay]"
+    )
+  );
+  var resolveSelectedTextTarget = (root, explicitSelectedText, frameWindow) => {
+    const selection = frameWindow.getSelection?.();
+    const selectedText = truncateText(
+      normalizeWhitespace(explicitSelectedText ?? selection?.toString() ?? ""),
+      MAX_TEXT_LENGTH
+    );
+    if (!selectedText || !selection || selection.rangeCount === 0) {
+      return null;
+    }
+    const range = selection.getRangeAt(0);
+    const commonAncestor = range.commonAncestorContainer.nodeType === Node.ELEMENT_NODE ? range.commonAncestorContainer : range.commonAncestorContainer.parentElement;
+    const element = commonAncestor ? normalizeAnnotationElement(root, commonAncestor, frameWindow) : null;
+    return element ? { element, selectedText } : null;
+  };
+  var queryFullPath = (root, fullPath) => {
+    if (!fullPath) {
+      return null;
+    }
+    try {
+      return fullPath === ":scope" ? root : root.querySelector(fullPath);
+    } catch (error) {
+      if (error instanceof DOMException) {
+        console.warn("Invalid annotation target selector path:", {
+          fullPath,
+          message: error.message
+        });
+        return null;
+      }
+      throw error;
+    }
+  };
+  var getReadableElementPath = (root, element, maxDepth = 4) => {
+    const parts = [];
+    let current = element;
+    let depth = 0;
+    while (current && current !== root && depth < maxDepth) {
+      parts.unshift(getReadableElementIdentifier(current));
+      current = current.parentElement;
+      depth += 1;
+    }
+    return parts.join(" > ") || getReadableElementIdentifier(element);
+  };
+  var getReadableElementIdentifier = (element) => {
+    const tagName = element.tagName.toLowerCase();
+    const name = getElementAccessibleName2(element) || getVisibleText(element);
+    if (name) {
+      return `${tagName} "${truncateText(name, 35)}"`;
+    }
+    const classes = getTargetClassNames(element).slice(0, 1);
+    return classes.length > 0 ? `${tagName}.${classes[0]}` : tagName;
+  };
+  var getFullElementPath = (root, element) => {
+    if (element === root) {
+      return ":scope";
+    }
+    const parts = [];
+    let current = element;
+    while (current && current !== root) {
+      const tagName = current.tagName.toLowerCase();
+      const siblings = current.parentElement ? Array.from(current.parentElement.children).filter(
+        (sibling) => sibling.tagName.toLowerCase() === tagName
+      ) : [];
+      const index = Math.max(1, siblings.indexOf(current) + 1);
+      parts.unshift(`${tagName}:nth-of-type(${index})`);
+      current = current.parentElement;
+    }
+    return parts.join(" > ");
+  };
+  var describeElement = (element) => {
+    const role = getElementRole2(element);
+    const name = getElementAccessibleName2(element) || getVisibleText(element);
+    if (role && name) {
+      return `${role} "${truncateText(name, 40)}"`;
+    }
+    if (name) {
+      return `${element.tagName.toLowerCase()} "${truncateText(name, 40)}"`;
+    }
+    return role || element.tagName.toLowerCase();
+  };
+  var getElementRole2 = (element) => getElementRole(element, {
+    ignorePresentationalRole: true,
+    treatSummaryAsButton: true
+  });
+  var getElementAccessibleName2 = (element) => getElementAccessibleName(element, {
+    includeImplicitLinkText: false
+  });
+  var getNearbyText = (element) => {
+    const texts = [
+      element.previousElementSibling ? getVisibleText(element.previousElementSibling) : "",
+      getVisibleText(element),
+      element.nextElementSibling ? getVisibleText(element.nextElementSibling) : ""
+    ].map((text) => truncateText(text, 80)).filter(Boolean);
+    return texts.join(" ");
+  };
+  var getElementClasses = (element) => {
+    const classes = getTargetClassNames(element);
+    return classes.length > 0 ? classes.join(" ") : void 0;
+  };
+  var getTargetClassNames = (element) => Array.from(element.classList ?? []).filter((className) => className.length > 1 && !/^[a-z]{1,2}$/.test(className)).slice(0, 12);
+  var getComputedStyleSummary = (element, frameWindow) => {
+    const style = frameWindow.getComputedStyle(element);
+    const entries = [
+      ["display", style.display],
+      ["position", style.position],
+      ["color", style.color],
+      ["backgroundColor", style.backgroundColor],
+      ["fontSize", style.fontSize],
+      ["fontWeight", style.fontWeight]
+    ].filter(([, value]) => value);
+    return entries.map(([key, value]) => `${key}: ${value}`).join("; ");
+  };
+  var getAccessibilitySummary = (element) => {
+    const role = getElementRole2(element);
+    const name = getElementAccessibleName2(element);
+    if (!role && !name) {
+      return void 0;
+    }
+    return [role ? `role=${role}` : null, name ? `name="${name}"` : null].filter(Boolean).join(" ");
+  };
+  var closestWithinRoot = (element, root, selector) => {
+    const closest = element.closest(selector);
+    return closest && root.contains(closest) ? closest : null;
+  };
+  var isElementVisibleInViewport = (element, frameWindow) => {
+    const style = frameWindow.getComputedStyle(element);
+    if (style.display === "none" || style.visibility === "hidden" || style.visibility === "collapse") {
+      return false;
+    }
+    const rect = element.getBoundingClientRect();
+    return hasUsableGeometry(rect) && rect.right > 0 && rect.bottom > 0 && rect.left < frameWindow.innerWidth && rect.top < frameWindow.innerHeight;
+  };
+  var normalizeSelectionRect = (rect) => {
+    const left = Math.min(rect.x, rect.x + rect.width);
+    const top = Math.min(rect.y, rect.y + rect.height);
+    const width = Math.abs(rect.width);
+    const height = Math.abs(rect.height);
+    if (!Number.isFinite(left) || !Number.isFinite(top) || !Number.isFinite(width) || !Number.isFinite(height)) {
+      return null;
+    }
+    return {
+      x: left,
+      y: top,
+      width,
+      height
+    };
+  };
+  var rectsIntersect = (left, right) => left.left < right.x + right.width && left.right > right.x && left.top < right.y + right.height && left.bottom > right.y;
+  var hasUsableGeometry = (rect) => rect.width >= 1 && rect.height >= 1;
+  var unionRects = (rects) => {
+    if (rects.length === 0) {
+      return null;
+    }
+    const bounds = rects.reduce(
+      (acc, rect) => ({
+        left: Math.min(acc.left, rect.x),
+        top: Math.min(acc.top, rect.y),
+        right: Math.max(acc.right, rect.x + rect.width),
+        bottom: Math.max(acc.bottom, rect.y + rect.height)
+      }),
+      {
+        left: Infinity,
+        top: Infinity,
+        right: -Infinity,
+        bottom: -Infinity
+      }
+    );
+    return {
+      x: bounds.left,
+      y: bounds.top,
+      width: bounds.right - bounds.left,
+      height: bounds.bottom - bounds.top
+    };
+  };
+  var normalizeComparableText = (value) => normalizeWhitespace(value ?? "").toLowerCase();
+  var truncateText = (value, maxLength) => value.length > maxLength ? value.slice(0, maxLength) : value;
+  var stableStringify = (value) => JSON.stringify(
+    Object.keys(value).sort().reduce((acc, key) => {
+      const item = value[key];
+      if (item) {
+        acc[key] = item;
+      }
+      return acc;
+    }, {})
+  );
+  var isAnnotationTargetRect = (value) => isRecord(value) && isFiniteNumber(value.x) && isFiniteNumber(value.y) && isFiniteNumber(value.width) && isFiniteNumber(value.height);
+  var isAnnotationTargetIdentity = (value) => isRecord(value) && typeof value.signature === "string" && typeof value.tagName === "string" && typeof value.elementPath === "string" && typeof value.fullPath === "string" && optionalString(value.role) && optionalString(value.accessibleName) && optionalString(value.text) && optionalString(value.cssClasses);
+  var optionalString = (value) => value === void 0 || typeof value === "string";
+  var isRecord = (value) => value !== null && typeof value === "object" && !Array.isArray(value);
+  var isFiniteNumber = (value) => typeof value === "number" && Number.isFinite(value);
+
+  // src/services/annotationTargetRequests.ts
+  var extractQuotedText = (value) => {
+    if (!value) {
+      return void 0;
+    }
+    const match = value.match(/"([^"]+)"/);
+    return match?.[1]?.trim() || void 0;
+  };
+  var extractAccessibilityField = (accessibility, key) => {
+    if (!accessibility) {
+      return void 0;
+    }
+    if (key === "role") {
+      return accessibility.match(/role=([^\s]+)/)?.[1];
+    }
+    return accessibility.match(/name="([^"]+)"/)?.[1];
+  };
+  var inferTagName = (annotation) => {
+    const [fromElement] = annotation.element.trim().split(/\s+/, 1);
+    if (fromElement) {
+      return fromElement.toLowerCase().replace(/[^a-z0-9-]/g, "") || void 0;
+    }
+    const [fromPath] = annotation.elementPath.trim().split(/[\s>.#:]/, 1);
+    return fromPath?.toLowerCase() || void 0;
+  };
+  var createLegacyTargetIdentity = (annotation) => {
+    const tagName = inferTagName(annotation);
+    if (!tagName) {
+      return null;
+    }
+    const role = extractAccessibilityField(annotation.accessibility, "role");
+    const accessibleName = extractAccessibilityField(annotation.accessibility, "name") ?? extractQuotedText(annotation.element);
+    const text = annotation.selectedText ?? annotation.nearbyText ?? extractQuotedText(annotation.element);
+    const cssClasses = annotation.cssClasses;
+    return {
+      signature: createAnnotationTargetIdentitySignature({
+        tagName,
+        role,
+        accessibleName,
+        text,
+        cssClasses
+      }),
+      tagName,
+      ...role ? { role } : {},
+      ...accessibleName ? { accessibleName } : {},
+      ...text ? { text } : {},
+      ...cssClasses ? { cssClasses } : {},
+      elementPath: annotation.elementPath,
+      fullPath: annotation.fullPath ?? ""
+    };
+  };
+  var getStoredAnnotationTargetIdentities = (annotation) => {
+    if (annotation.targetIdentities && annotation.targetIdentities.length > 0) {
+      return annotation.targetIdentities.map((identity) => ({ ...identity }));
+    }
+    const legacyIdentity = createLegacyTargetIdentity(annotation);
+    return legacyIdentity ? [legacyIdentity] : [];
+  };
+  var buildAnnotationTargetResolutionRequest = (annotation) => {
+    const identities = getStoredAnnotationTargetIdentities(annotation);
+    if (identities.length === 0) {
+      return null;
+    }
+    if (identities.length === 1) {
+      return {
+        mode: "identity",
+        identity: identities[0]
+      };
+    }
+    return {
+      mode: "group",
+      identities
+    };
+  };
+
+  // src/services/previewEvidence.ts
   var PREVIEW_EVIDENCE_ROOT_SELECTOR = "#root";
   var MAX_PREVIEW_EVIDENCE_ELEMENTS = 200;
   var MAX_PREVIEW_INTERACTION_STEPS = 10;
@@ -45,6 +816,9 @@ var previewEvidenceUtils = (() => {
   var PREVIEW_INTERACTION_SETTLE_FRAMES = 2;
   var PREVIEW_INTERACTION_RENDER_IDLE_MS = 100;
   var PREVIEW_INTERACTION_PRINTABLE_KEY_PATTERN = /^[^\s]$/;
+  var PREVIEW_EVIDENCE_ANNOTATION_MARKER_SIZE_PX = 24;
+  var PREVIEW_EVIDENCE_ANNOTATION_MARKER_SAFE_INSET_PX = PREVIEW_EVIDENCE_ANNOTATION_MARKER_SIZE_PX / 2;
+  var PREVIEW_EVIDENCE_ANNOTATION_OVERLAY_NOTE = "Annotation overlays in Preview evidence are capture-only visual context. Durable annotation history remains in annotation resources.";
   var PREVIEW_INTERACTION_SUPPORTED_KEYS = /* @__PURE__ */ new Set([
     "Enter",
     "Escape",
@@ -97,7 +871,7 @@ var previewEvidenceUtils = (() => {
       }
     };
   };
-  var requestPreviewEvidenceFromFrame = (iframe) => {
+  var requestPreviewEvidenceFromFrame = (iframe, request) => {
     if (!iframe) {
       return Promise.resolve(createPreviewUnavailableFailure("Preview iframe is not mounted yet."));
     }
@@ -108,7 +882,7 @@ var previewEvidenceUtils = (() => {
       );
     }
     try {
-      return handler();
+      return handler(request);
     } catch (error) {
       return Promise.resolve(
         createPreviewUnavailableFailure(`Preview evidence request failed: ${getErrorMessage(error)}`)
@@ -158,14 +932,26 @@ var previewEvidenceUtils = (() => {
     target,
     currentPageId = null,
     interactionState,
-    viewportFallback
+    viewportFallback,
+    includeAnnotationOverlays = false,
+    annotations = []
   } = {}, frameWindow = root.ownerDocument.defaultView ?? window) => {
     try {
       const evidence = serializePreviewEvidence(root, frameWindow, viewportFallback);
       const normalizedLayers = layers ? [...layers] : [];
       const screenshotRequested = normalizedLayers.includes("screenshot");
       const accessibilityRequested = normalizedLayers.includes("accessibility");
-      const screenshot = screenshotRequested ? createPreviewScreenshot(root, { screenshotScope, target, viewportFallback }, frameWindow) : null;
+      const annotationOverlayModel = includeAnnotationOverlays ? createPreviewEvidenceAnnotationOverlayModel(root, annotations, currentPageId, frameWindow) : null;
+      const screenshot = screenshotRequested ? createPreviewScreenshot(
+        root,
+        {
+          screenshotScope,
+          target,
+          viewportFallback,
+          annotationOverlays: annotationOverlayModel
+        },
+        frameWindow
+      ) : null;
       const accessibility = accessibilityRequested ? serializePreviewAccessibility(root, frameWindow) : null;
       if (screenshotRequested && !screenshot) {
         return createPreviewCaptureFailure(
@@ -182,7 +968,15 @@ var previewEvidenceUtils = (() => {
           currentPageId,
           ...screenshotRequested ? { screenshotScope } : {},
           ...screenshot?.targetDescription ? { targetDescription: screenshot.targetDescription } : {},
-          ...interactionState ? { interactions: interactionState } : {}
+          ...interactionState ? { interactions: interactionState } : {},
+          ...annotationOverlayModel ? {
+            annotationOverlays: {
+              requested: true,
+              included: screenshotRequested,
+              visibleAnnotationCount: annotationOverlayModel.visibleAnnotationCount,
+              note: PREVIEW_EVIDENCE_ANNOTATION_OVERLAY_NOTE
+            }
+          } : {}
         }
       };
     } catch (error) {
@@ -331,14 +1125,11 @@ var previewEvidenceUtils = (() => {
       ...states ? { states } : {}
     };
   };
-  var isExcludedElement = (element) => {
-    const tagName = element.tagName.toLowerCase();
-    return tagName === "script" || tagName === "style" || tagName === "template" || tagName === "noscript";
-  };
   var createPreviewScreenshot = (root, {
     screenshotScope,
     target,
-    viewportFallback
+    viewportFallback,
+    annotationOverlays
   }, frameWindow) => {
     const captureRegion = resolvePreviewCaptureRegion(
       root,
@@ -357,6 +1148,7 @@ var previewEvidenceUtils = (() => {
     stage.setAttribute("xmlns", "http://www.w3.org/1999/xhtml");
     stage.style.width = `${documentWidth}px`;
     stage.style.height = `${documentHeight}px`;
+    stage.style.position = "relative";
     stage.style.overflow = "hidden";
     stage.style.boxSizing = "border-box";
     stage.style.backgroundColor = resolvePreviewCanvasBackgroundColor(frameDocument, frameWindow);
@@ -367,6 +1159,15 @@ var previewEvidenceUtils = (() => {
       return null;
     }
     stage.appendChild(clonedRoot);
+    const overlayLayer = annotationOverlays && annotationOverlays.visibleAnnotationCount > 0 ? createPreviewEvidenceAnnotationOverlayLayer(
+      frameDocument,
+      frameWindow,
+      captureRegion.rect,
+      annotationOverlays
+    ) : null;
+    if (overlayLayer) {
+      stage.appendChild(overlayLayer);
+    }
     const serializedStage = new XMLSerializer().serializeToString(stage);
     const width = Math.max(1, roundNumber(captureRegion.rect.width));
     const height = Math.max(1, roundNumber(captureRegion.rect.height));
@@ -427,6 +1228,244 @@ var previewEvidenceUtils = (() => {
         };
       }
     }
+  };
+  var createPreviewEvidenceAnnotationOverlayModel = (root, annotations, currentPageId, frameWindow) => {
+    if (!currentPageId) {
+      return {
+        visibleAnnotationCount: 0,
+        outlines: [],
+        markers: []
+      };
+    }
+    const overlays = {
+      visibleAnnotationCount: 0,
+      outlines: [],
+      markers: []
+    };
+    const viewport = getEffectiveViewportSize(frameWindow);
+    const pageAnnotations = getPreviewEvidenceOverlayAnnotations(annotations, currentPageId);
+    pageAnnotations.forEach((annotation) => {
+      const request = buildAnnotationTargetResolutionRequest(annotation);
+      if (!request) {
+        return;
+      }
+      const resolution = resolveAnnotationTarget(root, request, frameWindow);
+      if (resolution.status !== "resolved" || !resolution.target) {
+        return;
+      }
+      overlays.visibleAnnotationCount += 1;
+      overlays.outlines.push(...getPreviewEvidenceAnnotationOutlines(annotation.id, resolution.target));
+      overlays.markers.push({
+        annotationId: annotation.id,
+        variant: annotation.isMultiSelect ? "multi-select" : "single",
+        label: overlays.visibleAnnotationCount,
+        ...getPreviewEvidenceAnnotationMarkerPoint(
+          resolution.target.snapshot,
+          annotation,
+          viewport.width
+        )
+      });
+    });
+    return overlays;
+  };
+  var getPreviewEvidenceOverlayAnnotations = (annotations, pageId) => annotations.filter((annotation) => {
+    if (annotation.pageId !== pageId) {
+      return false;
+    }
+    if (annotation.kind && annotation.kind !== "feedback") {
+      return false;
+    }
+    return annotation.status === void 0 || annotation.status === "pending" || annotation.status === "acknowledged";
+  });
+  var getPreviewEvidenceAnnotationOutlines = (annotationId, target) => {
+    const snapshot = target.snapshot;
+    const outlines = [];
+    if (snapshot.isMultiSelect) {
+      snapshot.elementBoundingBoxes?.forEach((box) => {
+        outlines.push({
+          annotationId,
+          variant: "selected-element",
+          box
+        });
+      });
+      if (snapshot.boundingBox) {
+        outlines.push({
+          annotationId,
+          variant: "multi-select",
+          box: snapshot.boundingBox
+        });
+      }
+      return outlines;
+    }
+    if (snapshot.boundingBox) {
+      outlines.push({
+        annotationId,
+        variant: "single",
+        box: snapshot.boundingBox
+      });
+    }
+    return outlines;
+  };
+  var getPreviewEvidenceAnnotationMarkerPoint = (snapshot, annotation, viewportWidth) => {
+    const box = snapshot.boundingBox;
+    const clickX = snapshot.x;
+    const clickY = snapshot.y;
+    const markerOffsetX = annotation.clickOffsetX ?? snapshot.clickOffsetX;
+    const markerOffsetY = annotation.clickOffsetY ?? snapshot.clickOffsetY;
+    const x = box && typeof markerOffsetX === "number" && Number.isFinite(markerOffsetX) ? box.x + markerOffsetX : typeof clickX === "number" && Number.isFinite(clickX) ? clickX / 100 * Math.max(1, viewportWidth) : box && Number.isFinite(box.x) ? box.x + box.width : 0;
+    const y = box && typeof markerOffsetY === "number" && Number.isFinite(markerOffsetY) ? box.y + markerOffsetY : typeof clickY === "number" && Number.isFinite(clickY) ? clickY : box && Number.isFinite(box.y) ? box.y : 0;
+    return {
+      x: roundNumber(x),
+      y: roundNumber(y)
+    };
+  };
+  var createPreviewEvidenceAnnotationOverlayLayer = (frameDocument, frameWindow, captureRect, annotationOverlays) => {
+    const layer = frameDocument.createElement("div");
+    layer.style.position = "absolute";
+    layer.style.inset = "0";
+    layer.style.pointerEvents = "none";
+    layer.style.zIndex = "2";
+    const colors = getPreviewEvidenceAnnotationColors(frameWindow);
+    annotationOverlays.outlines.forEach((outline) => {
+      const element = frameDocument.createElement("div");
+      element.setAttribute("data-preview-evidence-annotation-overlay", "outline");
+      element.setAttribute("data-preview-evidence-annotation-id", outline.annotationId);
+      element.setAttribute("data-preview-evidence-annotation-variant", outline.variant);
+      element.style.position = "absolute";
+      element.style.boxSizing = "border-box";
+      element.style.left = `${roundNumber(outline.box.x)}px`;
+      element.style.top = `${roundNumber(outline.box.y)}px`;
+      element.style.width = `${roundNumber(outline.box.width)}px`;
+      element.style.height = `${roundNumber(outline.box.height)}px`;
+      element.style.borderStyle = "solid";
+      element.style.borderWidth = "2px";
+      element.style.borderRadius = colors.mediumRadius;
+      if (outline.variant === "selected-element") {
+        element.style.borderColor = colors.successBorder;
+        element.style.backgroundColor = colors.successFill;
+      } else {
+        element.style.borderColor = colors.accentBorder;
+        element.style.backgroundColor = outline.variant === "multi-select" ? colors.multiSelectAccentFill : colors.accentFill;
+      }
+      layer.appendChild(element);
+    });
+    annotationOverlays.markers.forEach((marker) => {
+      const element = frameDocument.createElement("div");
+      element.setAttribute("data-preview-evidence-annotation-overlay", "marker");
+      element.setAttribute("data-preview-evidence-annotation-id", marker.annotationId);
+      element.setAttribute("data-preview-evidence-annotation-variant", marker.variant);
+      element.style.position = "absolute";
+      element.style.display = "grid";
+      element.style.placeItems = "center";
+      element.style.width = `${PREVIEW_EVIDENCE_ANNOTATION_MARKER_SIZE_PX}px`;
+      element.style.height = `${PREVIEW_EVIDENCE_ANNOTATION_MARKER_SIZE_PX}px`;
+      element.style.transform = "translate(-50%, -50%)";
+      element.style.boxSizing = "border-box";
+      element.style.fontSize = "12px";
+      element.style.fontWeight = "600";
+      element.style.lineHeight = "1";
+      const clampedX = clampNumber(
+        marker.x - captureRect.x,
+        PREVIEW_EVIDENCE_ANNOTATION_MARKER_SAFE_INSET_PX,
+        Math.max(
+          PREVIEW_EVIDENCE_ANNOTATION_MARKER_SAFE_INSET_PX,
+          captureRect.width - PREVIEW_EVIDENCE_ANNOTATION_MARKER_SAFE_INSET_PX
+        )
+      );
+      const clampedY = clampNumber(
+        marker.y - captureRect.y,
+        PREVIEW_EVIDENCE_ANNOTATION_MARKER_SAFE_INSET_PX,
+        Math.max(
+          PREVIEW_EVIDENCE_ANNOTATION_MARKER_SAFE_INSET_PX,
+          captureRect.height - PREVIEW_EVIDENCE_ANNOTATION_MARKER_SAFE_INSET_PX
+        )
+      );
+      element.style.left = `${roundNumber(captureRect.x + clampedX)}px`;
+      element.style.top = `${roundNumber(captureRect.y + clampedY)}px`;
+      if (marker.variant === "multi-select") {
+        element.style.border = `2px solid ${colors.successBorder}`;
+        element.style.borderRadius = colors.mediumRadius;
+        element.style.backgroundColor = colors.successMarkerBackground;
+        element.style.color = colors.successMarkerText;
+        element.style.width = "26px";
+        element.style.height = "26px";
+      } else {
+        element.style.border = `2px solid ${colors.accentBorder}`;
+        element.style.borderRadius = colors.fullRadius;
+        element.style.backgroundColor = colors.accentMarkerBackground;
+        element.style.color = colors.accentMarkerText;
+      }
+      element.textContent = String(marker.label);
+      layer.appendChild(element);
+    });
+    return layer;
+  };
+  var getPreviewEvidenceAnnotationColors = (frameWindow) => {
+    const rootStyle = frameWindow.getComputedStyle(frameWindow.document.documentElement);
+    const accentBorder = readPreviewEvidenceCssCustomProperty(
+      rootStyle,
+      "--ax-border-accent",
+      "rgb(0, 112, 243)"
+    );
+    const successBorder = readPreviewEvidenceCssCustomProperty(
+      rootStyle,
+      "--ax-border-success",
+      "rgb(0, 158, 96)"
+    );
+    return {
+      accentBorder,
+      accentFill: withPreviewEvidenceColorAlpha(accentBorder, 0.18),
+      multiSelectAccentFill: withPreviewEvidenceColorAlpha(accentBorder, 0.12),
+      successBorder,
+      successFill: withPreviewEvidenceColorAlpha(successBorder, 0.14),
+      accentMarkerBackground: readPreviewEvidenceCssCustomProperty(
+        rootStyle,
+        "--ax-bg-accent-strong",
+        accentBorder
+      ),
+      accentMarkerText: readPreviewEvidenceCssCustomProperty(
+        rootStyle,
+        "--ax-text-accent-contrast",
+        "#ffffff"
+      ),
+      successMarkerBackground: readPreviewEvidenceCssCustomProperty(
+        rootStyle,
+        "--ax-bg-success-strong",
+        successBorder
+      ),
+      successMarkerText: readPreviewEvidenceCssCustomProperty(
+        rootStyle,
+        "--ax-text-success-contrast",
+        "#ffffff"
+      ),
+      mediumRadius: readPreviewEvidenceCssCustomProperty(rootStyle, "--ax-radius-8", "8px"),
+      fullRadius: readPreviewEvidenceCssCustomProperty(rootStyle, "--ax-radius-full", "999px")
+    };
+  };
+  var readPreviewEvidenceCssCustomProperty = (style, property, fallback) => {
+    const value = style.getPropertyValue(property).trim();
+    return value.length > 0 ? value : fallback;
+  };
+  var clampNumber = (value, min, max) => Math.min(Math.max(value, min), max);
+  var withPreviewEvidenceColorAlpha = (color, alpha) => {
+    const trimmed = color.trim();
+    const hexMatch = trimmed.match(/^#([0-9a-f]{3}|[0-9a-f]{6})$/i);
+    if (hexMatch) {
+      const hex = hexMatch[1];
+      const normalized = hex.length === 3 ? hex.split("").map((character) => character + character).join("") : hex;
+      const red = Number.parseInt(normalized.slice(0, 2), 16);
+      const green = Number.parseInt(normalized.slice(2, 4), 16);
+      const blue = Number.parseInt(normalized.slice(4, 6), 16);
+      return `rgba(${red}, ${green}, ${blue}, ${alpha})`;
+    }
+    const rgbMatch = trimmed.match(
+      /^rgba?\(\s*(\d{1,3})(?:\s*,\s*|\s+)(\d{1,3})(?:\s*,\s*|\s+)(\d{1,3})(?:\s*[,/]\s*[\d.]+)?\s*\)$/i
+    );
+    if (rgbMatch) {
+      const [, red, green, blue] = rgbMatch;
+      return `rgba(${red}, ${green}, ${blue}, ${alpha})`;
+    }
+    return trimmed;
   };
   var getCaptureDocumentWidth = (root, frameWindow, viewportFallback) => {
     const document = root.ownerDocument;
@@ -544,9 +1583,9 @@ var previewEvidenceUtils = (() => {
     }
     const candidates = [root, ...Array.from(root.querySelectorAll("*"))];
     const normalizedRole = target.role?.toLowerCase();
-    const normalizedName = normalizeComparableText(target.name);
-    const normalizedText = normalizeComparableText(target.text);
-    const normalizedLabel = normalizeComparableText(target.label);
+    const normalizedName = normalizeComparableText2(target.name);
+    const normalizedText = normalizeComparableText2(target.text);
+    const normalizedLabel = normalizeComparableText2(target.label);
     const matchingCandidates = candidates.filter(
       (candidate) => matchesPreviewCaptureTargetCandidate(candidate, {
         normalizedRole,
@@ -688,10 +1727,10 @@ var previewEvidenceUtils = (() => {
       return "renderIdle";
     }
     if (typeof step.text === "string") {
-      const normalizedText = normalizeComparableText(step.text);
+      const normalizedText = normalizeComparableText2(step.text);
       const startedAt2 = Date.now();
       while (Date.now() - startedAt2 < timeoutMs) {
-        if (normalizeComparableText(getElementVisibleText(root)).includes(normalizedText)) {
+        if (normalizeComparableText2(getVisibleText(root)).includes(normalizedText)) {
           return `text="${step.text}"`;
         }
         await waitForPreviewInteractionTick(frameWindow);
@@ -743,9 +1782,9 @@ var previewEvidenceUtils = (() => {
     }
     const candidates = [root, ...Array.from(root.querySelectorAll("*"))];
     const normalizedRole = target.role?.toLowerCase();
-    const normalizedName = normalizeComparableText(target.name);
-    const normalizedText = normalizeComparableText(target.text);
-    const normalizedLabel = normalizeComparableText(target.label);
+    const normalizedName = normalizeComparableText2(target.name);
+    const normalizedText = normalizeComparableText2(target.text);
+    const normalizedLabel = normalizeComparableText2(target.label);
     const matchingCandidates = candidates.filter(
       (candidate) => matchesPreviewCaptureTargetCandidate(candidate, {
         normalizedRole,
@@ -1064,13 +2103,13 @@ var previewEvidenceUtils = (() => {
     if (normalizedRole && getElementRole(candidate) !== normalizedRole) {
       return false;
     }
-    if (normalizedName && !normalizeComparableText(getElementAccessibleName(candidate)).includes(normalizedName)) {
+    if (normalizedName && !normalizeComparableText2(getElementAccessibleName(candidate)).includes(normalizedName)) {
       return false;
     }
-    if (normalizedText && !normalizeComparableText(getElementVisibleText(candidate)).includes(normalizedText)) {
+    if (normalizedText && !normalizeComparableText2(getVisibleText(candidate)).includes(normalizedText)) {
       return false;
     }
-    if (normalizedLabel && !normalizeComparableText(getElementLabelText(candidate)).includes(normalizedLabel)) {
+    if (normalizedLabel && !normalizeComparableText2(getElementLabelText(candidate)).includes(normalizedLabel)) {
       return false;
     }
     return true;
@@ -1093,129 +2132,7 @@ var previewEvidenceUtils = (() => {
     ].filter(Boolean);
     return parts.length > 0 ? `${parts.join("+")} target` : "target";
   };
-  var getElementRole = (element) => {
-    const explicitRole = element.getAttribute("role");
-    if (explicitRole) {
-      return explicitRole.toLowerCase();
-    }
-    const tagName = element.tagName.toLowerCase();
-    if (tagName === "button") return "button";
-    if (tagName === "a" && element.hasAttribute("href")) return "link";
-    if (tagName === "textarea") return "textbox";
-    if (tagName === "select") return "combobox";
-    if (tagName === "option") return "option";
-    if (tagName === "img") return "img";
-    if (/^h[1-6]$/.test(tagName)) return "heading";
-    if (tagName !== "input") return tagName;
-    const input = element;
-    switch (input.type) {
-      case "checkbox":
-        return "checkbox";
-      case "radio":
-        return "radio";
-      case "range":
-        return "slider";
-      case "button":
-      case "submit":
-      case "reset":
-        return "button";
-      default:
-        return "textbox";
-    }
-  };
-  var getElementAccessibleName = (element) => {
-    const ariaLabel = element.getAttribute("aria-label");
-    if (ariaLabel) {
-      return normalizeWhitespace(ariaLabel);
-    }
-    const labelledBy = element.getAttribute("aria-labelledby");
-    if (labelledBy) {
-      const text = labelledBy.split(/\s+/).map((id) => {
-        const referencedElement = element.ownerDocument.getElementById(id);
-        return referencedElement ? getElementVisibleText(referencedElement) : "";
-      }).join(" ");
-      if (text.trim()) {
-        return normalizeWhitespace(text);
-      }
-    }
-    const altText = getElementAltText(element);
-    if (altText) {
-      return altText;
-    }
-    const labelText = getElementLabelText(element);
-    if (labelText) {
-      return labelText;
-    }
-    const title = element.getAttribute("title");
-    if (title) {
-      return normalizeWhitespace(title);
-    }
-    if (element instanceof HTMLInputElement && inputUsesValueAsAccessibleName(element) && element.value) {
-      return normalizeWhitespace(element.value);
-    }
-    return elementUsesContentAsAccessibleName(element) ? getElementVisibleText(element) : "";
-  };
-  var hasExplicitAccessibleName = (element) => element.hasAttribute("aria-label") || element.hasAttribute("aria-labelledby") || getElementAltText(element).length > 0 || element.hasAttribute("title") || getElementLabelText(element).length > 0 || element instanceof HTMLInputElement && inputUsesValueAsAccessibleName(element) && normalizeWhitespace(element.value).length > 0;
-  var getElementLabelText = (element) => {
-    if (!(element instanceof HTMLElement)) {
-      return "";
-    }
-    if (!isLabelableElement(element)) {
-      return "";
-    }
-    const labels = Array.from(element.labels ?? []);
-    if (labels.length > 0) {
-      return normalizeWhitespace(labels.map((label) => getElementVisibleText(label)).join(" "));
-    }
-    if (element.id) {
-      const label = Array.from(element.ownerDocument.querySelectorAll("label[for]")).find(
-        (candidate) => candidate.getAttribute("for") === element.id
-      );
-      if (label) {
-        return getElementVisibleText(label);
-      }
-    }
-    const wrappingLabel = element.closest("label");
-    return wrappingLabel ? getElementVisibleText(wrappingLabel) : "";
-  };
-  var getElementVisibleText = (element) => normalizeWhitespace(getSanitizedSubtreeText(element));
-  var getSanitizedSubtreeText = (node) => {
-    if (node.nodeType === Node.TEXT_NODE) {
-      return node.textContent ?? "";
-    }
-    if (node.nodeType === Node.ELEMENT_NODE) {
-      const element = node;
-      if (isExcludedElement(element) || element.getAttribute("aria-hidden") === "true" || element.hasAttribute("hidden")) {
-        return "";
-      }
-    }
-    return Array.from(node.childNodes).map((child) => getSanitizedSubtreeText(child)).join(" ");
-  };
-  var getElementAltText = (element) => {
-    if (element instanceof HTMLImageElement) {
-      return normalizeWhitespace(element.getAttribute("alt") ?? "");
-    }
-    if (element instanceof HTMLInputElement && element.type === "image") {
-      return normalizeWhitespace(element.getAttribute("alt") ?? "");
-    }
-    return "";
-  };
-  var inputUsesValueAsAccessibleName = (input) => input.type === "button" || input.type === "submit" || input.type === "reset";
-  var elementUsesContentAsAccessibleName = (element) => {
-    const explicitRole = element.getAttribute("role")?.trim().toLowerCase();
-    if (explicitRole) {
-      return explicitRole === "button" || explicitRole === "cell" || explicitRole === "checkbox" || explicitRole === "columnheader" || explicitRole === "gridcell" || explicitRole === "heading" || explicitRole === "link" || explicitRole === "menuitem" || explicitRole === "menuitemcheckbox" || explicitRole === "menuitemradio" || explicitRole === "option" || explicitRole === "radio" || explicitRole === "rowheader" || explicitRole === "switch" || explicitRole === "tab" || explicitRole === "tooltip" || explicitRole === "treeitem";
-    }
-    const tagName = element.tagName.toLowerCase();
-    if (/^h[1-6]$/.test(tagName)) {
-      return true;
-    }
-    if (tagName === "button" || tagName === "option" || tagName === "summary") {
-      return true;
-    }
-    return tagName === "a" && element.hasAttribute("href");
-  };
-  var normalizeComparableText = (value) => normalizeWhitespace(value ?? "").toLowerCase();
+  var normalizeComparableText2 = (value) => normalizeWhitespace(value ?? "").toLowerCase();
   var getElementAccessibilityRole = (element, explicitlyNamed) => {
     const explicitRole = element.getAttribute("role")?.trim().toLowerCase();
     if (explicitRole) {
@@ -1374,10 +2291,6 @@ var previewEvidenceUtils = (() => {
   var removeUndefinedAccessibilityStates = (states) => Object.fromEntries(
     Object.entries(states).filter(([, value]) => value !== void 0)
   );
-  var isLabelableElement = (element) => {
-    const tagName = element.tagName.toLowerCase();
-    return tagName === "button" || tagName === "input" || tagName === "meter" || tagName === "output" || tagName === "progress" || tagName === "select" || tagName === "textarea";
-  };
   var getAllowedAttributes = (element) => {
     const attributes = Array.from(element.attributes).filter((attribute) => isAllowedAttributeName(attribute.name)).sort((left, right) => left.name.localeCompare(right.name)).map((attribute) => [
       attribute.name,
@@ -1465,7 +2378,6 @@ var previewEvidenceUtils = (() => {
   var removeEmptyStyleValues = (style) => Object.fromEntries(
     Object.entries(style).filter(([, value]) => Boolean(value))
   );
-  var normalizeWhitespace = (value) => value.replace(/\s+/g, " ").trim();
   var isAccessibilityHidden = (element, frameWindow) => {
     if (element.getAttribute("aria-hidden") === "true" || element.hasAttribute("hidden")) {
       return true;
@@ -1520,7 +2432,7 @@ var previewEvidenceUtils = (() => {
     }
   };
   var isTransparentColor = (value) => {
-    const normalized = normalizeComparableText(value);
+    const normalized = normalizeComparableText2(value);
     return normalized.length === 0 || normalized === "transparent" || /^rgba\(\s*\d+\s*,\s*\d+\s*,\s*\d+\s*,\s*0(?:\.0+)?\s*\)$/.test(normalized);
   };
   var truncateEvidenceValue = (value, maxLength) => value.length > maxLength ? `${value.slice(0, maxLength)}...` : value;

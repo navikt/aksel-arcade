@@ -5,7 +5,7 @@ Aksel Arcade is a playground for creating Aksel-based React prototypes with live
 ## Language
 
 **Arcade project**:
-A shell-neutral user-owned prototype in Aksel Arcade, including its editable source and preview preferences.
+A shell-neutral user-owned prototype in Aksel Arcade, including its editable source, page-scoped annotations, and preview preferences.
 _Avoid_: File, document, artifact
 
 **Arcade project source**:
@@ -15,6 +15,42 @@ _Avoid_: Files, filesystem, project code
 **Arcade page**:
 A named, independently rendered screen within an **Arcade project source**, identified by a stable page id that is never renumbered or reused. Each page holds its own JSX and Hooks.
 _Avoid_: File, route, tab, document, screen mock
+
+**Annotation**:
+A durable note in an **Arcade project** that is scoped to exactly one **Arcade page** and attached to one or more preview elements on that page. It is review information for other users and **External agents**, survives page renaming through the stable page id, and is deleted when its page is deleted; it is not a **Workspace preference**, **Preview evidence**, or separate Desktop-only session.
+_Avoid_: Feedback, comment, marker, inspection result
+
+**Open annotation**:
+An **Annotation** that still needs attention, including pending annotations, acknowledged annotations, and legacy annotations with no status, as long as its **Annotation target** can be resolved in the current preview. Resolved, dismissed, or dead-target annotations remain in project data for history, but they are not counted in the active page badge, shown as normal markers, or returned as agent work.
+_Avoid_: Stored annotation, unresolved marker, active comment
+
+**Annotation thread**:
+The conversation attached to an **Annotation** after the original note is created, containing follow-up messages from humans or **External agents**. In v0.3.0, status and thread changes are agent/MCP-facing workflow data; agents may add thread replies and update annotation status, but they do not rewrite the original human-authored annotation note or target.
+_Avoid_: Annotation text, chat session, agent change
+
+**Annotation mode**:
+A temporary preview interaction state where the active page's **Annotations** are visible and a user can create or edit annotations on preview elements. It intercepts preview interactions, is mutually exclusive with Inspect mode, and turning it off hides annotation UI without deleting annotations.
+_Avoid_: Feedback mode, review mode, agent mode
+
+**Annotation target**:
+The concrete user-perceived preview DOM element, or group of preview DOM elements, that an **Annotation** is attached to on an **Arcade page**. Any rendered user-authored preview element can be a target, including generic/custom `div` and `span` elements, layout wrappers, and Aksel component roots; only non-preview chrome and non-rendered implementation nodes such as `script`, `style`, `template`, `html`, `body`, `display: none`, `display: contents`, or hidden elements are excluded. Targets are resolved identity-first and marker geometry second: a target can remain valid even when currently hidden by viewport or layout, while saved coordinates and geometry are compatibility and diagnostic data, not a substitute anchor for normal marker placement.
+_Avoid_: CSS selector, marker position, inspection target
+
+**Dead annotation target**:
+An **Annotation target** that cannot be reconnected unambiguously to a live preview element or complete element group in the current render. The annotation remains in project data for history, but humans and **External agents** ignore it while the target is dead: it is not counted, shown in normal **Annotation mode**, or returned as agent work; if the complete target becomes resolvable again in a later render, the annotation becomes usable again.
+_Avoid_: Stale marker, broken marker, deleted element, missing annotation
+
+**Hidden annotation target**:
+An **Annotation target** that can be resolved by identity in the current preview but is not visible in the selected viewport or layout state. The annotation still counts as open and remains visible to **External agents**; for element groups, normal **Annotation mode** may show the visible subset as long as the complete group still resolves.
+_Avoid_: Dead annotation target, hidden marker, unresolved annotation
+
+**Clear annotations**:
+A page-scoped destructive action that removes every **Annotation** record for the active **Arcade page**, including open annotations, resolved or dismissed history, and annotations whose target is currently dead.
+_Avoid_: Clear visible markers, reset project, dismiss annotations
+
+**Context replacement**:
+An explicit action that replaces the prototype context being reviewed, such as Reset editor, loading a built-in template or demo, applying a **Web share URL**, importing an **Arcade project package**, or a future replace-project flow. It resets the entire **Arcade project** annotation set rather than preserving old review information across the new context.
+_Avoid_: Ordinary source edit, annotation clear, page navigation
 
 **Global config**:
 The permanent, non-navigable part of an **Arcade project source** whose JSX (shared component definitions) and Hooks (shared logic) are in scope for every **Arcade page**. It is never renamed, deleted, or used as a **start page**.
@@ -53,11 +89,11 @@ A local product-surface preference for arranging Arcade itself around an **Arcad
 _Avoid_: Preview preference, project content
 
 **Arcade project package**:
-A shell-neutral portable share artifact named with the `.akselarcade` extension that contains only the importable **Arcade project** data needed for import, export, or desktop file opening: name, **Arcade project source**, and viewport **Preview preference**. Importing one creates a new local **Arcade project** identity rather than preserving the source project instance; it excludes AI metadata, setup instructions, explanatory text, documentation links, production-import guidance, diagnostics, preview evidence, and **Workspace preferences**.
+A shell-neutral portable share artifact named with the `.akselarcade` extension that contains only the importable **Arcade project** data needed for import, export, or desktop file opening: name, **Arcade project source**, **Annotations**, and viewport **Preview preference**. Importing one creates a new local **Arcade project** identity rather than preserving the source project instance; it excludes AI metadata, setup instructions, explanatory text, documentation links, production-import guidance, diagnostics, preview evidence, and **Workspace preferences**.
 _Avoid_: Arcade project, save file, document, AI export bundle
 
 **Web share URL**:
-A Web Arcade link that carries the portable **Arcade project** data needed to load a shared prototype — **Arcade project source** and shareable **Preview preferences** — and may also carry share-opening intent such as **Preview fullscreen**. Opening one creates a fresh local **Arcade project** identity without preserving sender identity, timestamps, diagnostics, preview evidence, or durable **Workspace preferences**.
+A Web Arcade link that carries the portable **Arcade project** data needed to load a shared prototype — **Arcade project source**, complete **Annotations** when they fit the URL payload boundary, and shareable **Preview preferences** — and may also carry share-opening intent such as **Preview fullscreen**. Opening one creates a fresh local **Arcade project** identity without preserving sender identity, timestamps, diagnostics, preview evidence, or durable **Workspace preferences**.
 _Avoid_: Project code URL, save file, telemetry bundle
 
 **Web Arcade URL**:
@@ -69,11 +105,11 @@ The browser-hosted product surface for working with **Arcade projects**.
 _Avoid_: Browser-only Arcade, original Arcade
 
 **Web Arcade working copy**:
-A tab-scoped editing instance of an **Arcade project** in **Web Arcade**, including its name, **Arcade project source**, **Preview preferences**, and **Workspace preferences**. It survives reloads in its own tab, and duplicating the tab forks the visible work into an independent working copy; a new tab opened through a **Web Arcade URL** starts as a new default working copy. Autosave belongs to the working copy, not to a browser-wide last project, and closed working copies are not a durable project library.
+A tab-scoped editing instance of an **Arcade project** in **Web Arcade**, including its name, **Arcade project source**, **Annotations**, **Preview preferences**, and **Workspace preferences**. It survives reloads in its own tab, and duplicating the tab forks the visible work into an independent working copy; a new tab opened through a **Web Arcade URL** starts as a new default working copy. Autosave belongs to the working copy, not to a browser-wide last project, and closed working copies are not a durable project library.
 _Avoid_: Synchronized tab, shared browser project
 
 **Reset editor**:
-A Web Arcade action that replaces only the current **Web Arcade working copy** with the default Untitled Project.
+A Web Arcade action that replaces only the current **Web Arcade working copy** with the default Untitled Project, including clearing any **Annotations** in that working copy.
 _Avoid_: Clear storage, reload
 
 **Desktop Arcade**:
@@ -136,9 +172,13 @@ _Avoid_: Chat, bot session, automation session
 The pre-MCP in-app on/off consent toggle. Desktop Arcade MCP v1 does not use a separate Agent access switch; consent happens in the MCP client configuration instead.
 _Avoid_: Local server, transport, pairing token, Share URL
 
-**Agent bridge**:
-The Desktop Arcade local MCP server surface that lets an **External agent** read **Arcade-scoped state** and submit **Agent changes** for the active **Arcade project** through narrow resources and tools.
-_Avoid_: Provider integration, backend API, browser extension
+**Agent bridge** _(legacy, superseded)_:
+The pre-MCP local agent surface. Desktop Arcade MCP v1 uses the **Desktop Arcade MCP server** instead.
+_Avoid_: Desktop Arcade MCP server, provider integration, backend API, browser extension
+
+**Desktop Arcade MCP server**:
+The local MCP server surface in **Desktop Arcade** that lets an **External agent** read **Arcade-scoped state** and submit **Agent changes** for the active **Arcade project** through narrow resources and tools.
+_Avoid_: Agent bridge, provider integration, backend API, browser extension
 
 **Agent transport** _(legacy, superseded)_:
 The pre-MCP same-device pairing transport. Desktop Arcade MCP v1 uses the fixed local MCP endpoint instead of the old random loopback pairing transport.
@@ -161,7 +201,7 @@ The old short-lived pairing secret. Desktop Arcade MCP v1 requires no token or a
 _Avoid_: API key, installation token, persistent trust
 
 **External agent**:
-A user-directed AI agent outside Desktop Arcade that works on an active **Arcade project** through the **Agent bridge**.
+A user-directed AI agent outside Desktop Arcade that works on an active **Arcade project** through the **Desktop Arcade MCP server**.
 _Avoid_: In-app chat, provider integration, browser automation
 
 **Copilot agent surface**:
@@ -213,14 +253,14 @@ A code autocomplete suggestion for a general renderable Aksel choice, including 
 _Avoid_: Compound subcomponent suggestion, prop suggestion
 
 **Agent change**:
-An agent-authored change applied to one or more parts of the active **Arcade project** through the Desktop Arcade local MCP bridge — the **Global config** code, an individual **Arcade page**'s code, or the project's page set itself (adding, renaming, or removing an **Arcade page**, or changing the **Start page**). The app assigns page ids; an agent never chooses them.
+An agent-authored change applied to one or more parts of the active **Arcade project** through the **Desktop Arcade MCP server** — the **Global config** code, an individual **Arcade page**'s code, or the project's page set itself (adding, renaming, or removing an **Arcade page**, or changing the **Start page**). The app assigns page ids; an agent never chooses them.
 _Avoid_: Proposed change, patch, command, cursor edit
 
 ## Example dialogue
 
 Developer: "The human added Desktop Arcade as an MCP server in the external agent client."
 
-Domain expert: "Good. The local MCP bridge now targets this active Arcade project. Desktop Arcade v1 does not need a separate Agent access toggle or pairing handoff."
+Domain expert: "Good. The Desktop Arcade MCP server now targets this active Arcade project. Desktop Arcade v1 does not need a separate Agent access toggle or pairing handoff."
 
 Developer: "The agent applied a batch change to the Arcade project through `apply_changes`."
 
@@ -312,7 +352,7 @@ Domain expert: "The Web share URL should carry the full Arcade project source pl
 
 Developer: "An agent wants to add a page to a one-page Arcade project."
 
-Domain expert: "The local MCP bridge always works against the full pages-based Arcade project source, even when there is only one Arcade page. The agent can call the page lifecycle operations directly; the app still assigns the stable page id."
+Domain expert: "The Desktop Arcade MCP server always works against the full pages-based Arcade project source, even when there is only one Arcade page. The agent can call the page lifecycle operations directly; the app still assigns the stable page id."
 
 Developer: "The agent needs to add a page and link to it."
 

@@ -13,6 +13,46 @@ async function replaceEditorText(page: Page, text: string) {
   await page.keyboard.insertText(text)
 }
 
+async function expectResponsiveGridColumns(page: Page, expectedColumns: 1 | 2) {
+  const positions = await page
+    .frameLocator('[data-testid="preview-iframe"]')
+    .locator('[data-testid^="responsive-cell-"]')
+    .evaluateAll((elements) =>
+      elements.slice(0, 2).map((element) => {
+        const rect = element.getBoundingClientRect()
+        return { left: rect.left, top: rect.top }
+      })
+    )
+
+  expect(positions).toHaveLength(2)
+
+  if (expectedColumns === 1) {
+    expect(positions[1]!.top).toBeGreaterThan(positions[0]!.top + 1)
+    return
+  }
+
+  expect(Math.abs(positions[1]!.top - positions[0]!.top)).toBeLessThanOrEqual(1)
+  expect(positions[1]!.left).toBeGreaterThan(positions[0]!.left + 1)
+}
+
+async function readPreviewViewportMetrics(page: Page) {
+  return page.evaluate(() => {
+    const stage = document.querySelector<HTMLElement>('[data-testid="preview-viewport-stage"]')
+    const shell = document.querySelector<HTMLElement>('[data-testid="preview-viewport-shell"]')
+    const iframe = document.querySelector<HTMLIFrameElement>('[data-testid="preview-iframe"]')
+
+    if (!stage || !shell || !iframe) {
+      throw new Error('Preview viewport elements were not rendered.')
+    }
+
+    return {
+      stageWidth: Math.round(stage.getBoundingClientRect().width),
+      shellWidth: Math.round(shell.getBoundingClientRect().width),
+      iframeTransform: getComputedStyle(iframe).transform,
+    }
+  })
+}
+
 async function expectPreviewSurfaceFlush(page: Page) {
   const geometry = await page.evaluate(() => {
     const previewSurface = document.querySelector<HTMLElement>('[data-name="Preview"]')
@@ -92,7 +132,9 @@ test.describe('Desktop renderer protocol preview', () => {
 
       const previewBackgrounds = await page.evaluate(() => {
         const defaultProbe = document.createElement('div')
+        const sunkenProbe = document.createElement('div')
         defaultProbe.style.background = 'var(--ax-bg-default)'
+        sunkenProbe.style.background = 'var(--ax-bg-sunken)'
         const previewSurface = document.querySelector<HTMLElement>('[data-name="Preview"]')
         const livePreview = document.querySelector<HTMLElement>('[data-testid="live-preview"]')
 
@@ -101,17 +143,21 @@ test.describe('Desktop renderer protocol preview', () => {
         }
 
         previewSurface.append(defaultProbe)
+        previewSurface.append(sunkenProbe)
         const expected = getComputedStyle(defaultProbe).backgroundColor
+        const expectedSunken = getComputedStyle(sunkenProbe).backgroundColor
         defaultProbe.remove()
+        sunkenProbe.remove()
 
         return {
           expected,
+          expectedSunken,
           surface: getComputedStyle(previewSurface).backgroundColor,
           livePreview: getComputedStyle(livePreview).backgroundColor,
         }
       })
       expect(previewBackgrounds.surface).toBe(previewBackgrounds.expected)
-      expect(previewBackgrounds.livePreview).toBe(previewBackgrounds.expected)
+      expect(previewBackgrounds.livePreview).toBe(previewBackgrounds.expectedSunken)
 
       const sandboxBackground = await iframe.locator('html').evaluate((html) => {
         const defaultProbe = document.createElement('div')
@@ -144,6 +190,42 @@ test.describe('Desktop renderer protocol preview', () => {
       await expect(autocomplete).toContainText('small')
       await expect(autocomplete).not.toContainText('medium')
       await expect(autocomplete).not.toContainText('xsmall')
+
+      await replaceEditorText(
+        page,
+        `export default function App() {
+  return (
+    <HGrid data-testid="responsive-grid" gap="space-0" columns={{ xs: 1, sm: 2 }}>
+      <Box data-testid="responsive-cell-1" height="40px" background="accent-moderate" />
+      <Box data-testid="responsive-cell-2" height="40px" background="accent-moderate" />
+      <Box data-testid="responsive-cell-3" height="40px" background="accent-moderate" />
+      <Box data-testid="responsive-cell-4" height="40px" background="accent-moderate" />
+    </HGrid>
+  )
+}`
+      )
+
+      await expect(iframe.getByTestId('responsive-grid')).toBeVisible({ timeout: 10_000 })
+
+      await page.getByLabel('Mobile Small (320px)').click()
+      await expect
+        .poll(async () => iframe.locator('body').evaluate(() => window.innerWidth))
+        .toBe(320)
+      await expectResponsiveGridColumns(page, 1)
+
+      await page.getByLabel('Mobile Large (480px)').click()
+      await expect
+        .poll(async () => iframe.locator('body').evaluate(() => window.innerWidth))
+        .toBe(480)
+      await expectResponsiveGridColumns(page, 2)
+
+      await page.getByLabel('Tablet Landscape (1024px)').click()
+      const wideViewportMetrics = await readPreviewViewportMetrics(page)
+      await expect
+        .poll(async () => iframe.locator('body').evaluate(() => window.innerWidth))
+        .toBe(wideViewportMetrics.stageWidth)
+      expect(wideViewportMetrics.shellWidth).toBe(wideViewportMetrics.stageWidth)
+      expect(wideViewportMetrics.iframeTransform).toBe('none')
     } finally {
       await app?.close()
     }

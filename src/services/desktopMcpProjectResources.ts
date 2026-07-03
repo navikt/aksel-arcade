@@ -1,7 +1,14 @@
+import type { ArcadeAnnotation } from '@/types/annotations'
 import type { ThemeMode, ArcadePageId, ArcadeSourceFile, Project } from '@/types/project'
 import type { CompileError, PreviewStatus, RuntimeError } from '@/types/preview'
 import type { PreviewDiagnostics } from '@/services/previewDiagnostics'
 import { getArcadeRuntimeDiagnosticHint } from '@/services/runtimeDiagnosticHints'
+import {
+  countOpenAnnotationsByPage,
+  countPendingAnnotationsByPage,
+  filterAnnotations,
+} from '@/services/annotations'
+import type { DesktopMcpAnnotationVisibility } from '@/services/desktopMcpAnnotations'
 import {
   DESKTOP_MCP_PROJECT_DIAGNOSTICS_URI,
   DESKTOP_MCP_PROJECT_MANIFEST_URI,
@@ -42,13 +49,17 @@ export {
 } from '@/services/desktopMcpProjectSourceUris'
 
 const COMPILE_ERROR_SOURCE_LABEL_PATTERN = /^(global config|page\d+)\s+(JSX|Hooks):/i
+export const DESKTOP_MCP_PROJECT_ANNOTATIONS_URI = 'arcade://project/annotations'
 const SOURCE_FILE_MIME_TYPE = 'text/plain'
 const JSON_MIME_TYPE = 'application/json'
 const MAX_DIAGNOSTIC_DETAILS_LENGTH = 1_000
 const MAX_DIAGNOSTIC_SNIPPET_LENGTH = 200
+const PROJECT_PAGE_ANNOTATIONS_URI_PATTERN = /^arcade:\/\/project\/pages\/(page\d+)\/annotations$/
 
 type DesktopMcpProjectResourceKind =
   | 'manifest'
+  | 'project-annotations'
+  | 'page-annotations'
   | 'preview-context'
   | 'diagnostics'
   | 'global-source'
@@ -58,6 +69,16 @@ interface DesktopMcpProjectResourceContext {
   project: Project
   theme: ThemeMode
   diagnostics: PreviewDiagnostics
+}
+
+export interface DesktopMcpProjectResourceOptions {
+  resolvePageAnnotationVisibilities?: (
+    pageId: ArcadePageId,
+    annotations: readonly ArcadeAnnotation[]
+  ) =>
+    | Promise<ReadonlyMap<string, DesktopMcpAnnotationVisibility> | Record<string, DesktopMcpAnnotationVisibility>>
+    | ReadonlyMap<string, DesktopMcpAnnotationVisibility>
+    | Record<string, DesktopMcpAnnotationVisibility>
 }
 
 interface DesktopMcpProjectSourceResourceSummary {
@@ -89,6 +110,10 @@ interface DesktopMcpProjectManifestSection {
 export interface DesktopMcpProjectManifestPage extends DesktopMcpProjectManifestSection {
   id: ArcadePageId
   name: string
+  annotationCounts: {
+    open: number
+    pending: number
+  }
 }
 
 export interface DesktopMcpProjectManifest {
@@ -131,6 +156,32 @@ export interface DesktopMcpProjectDiagnosticsResource {
   issues: DesktopMcpProjectDiagnosticIssue[]
 }
 
+export interface DesktopMcpProjectAnnotationRecord extends ArcadeAnnotation {
+  pageName: string
+  targetVisibility: Exclude<DesktopMcpAnnotationVisibility, 'dead'>
+}
+
+export interface DesktopMcpProjectAnnotationsResource {
+  projectRevision: string
+  scope: 'project' | 'page'
+  page?: {
+    id: ArcadePageId
+    name: string
+    isActive: boolean
+  }
+  counts: {
+    total: number
+    open: number
+    pending: number
+    acknowledged: number
+    resolved: number
+    dismissed: number
+    visible: number
+    hidden: number
+  }
+  annotations: DesktopMcpProjectAnnotationRecord[]
+}
+
 interface ParsedDesktopMcpProjectResourceUri {
   kind: DesktopMcpProjectResourceKind
   uri: string
@@ -142,6 +193,13 @@ interface PageReferenceSet {
   pageReferences: DesktopMcpProjectReferenceEntry[]
   stalePageReferences: DesktopMcpProjectReferenceEntry[]
 }
+
+type AnnotationVisibilityById = ReadonlyMap<string, DesktopMcpAnnotationVisibility>
+
+const EMPTY_ANNOTATION_VISIBILITY: AnnotationVisibilityById = new Map()
+
+export const createDesktopMcpProjectPageAnnotationsUri = (pageId: ArcadePageId): string =>
+  `arcade://project/pages/${pageId}/annotations`
 
 export const createDesktopMcpProjectRevision = ({
   project,
@@ -169,13 +227,23 @@ export const createDesktopMcpProjectRevision = ({
   return `rev-${(hash >>> 0).toString(16).padStart(8, '0')}`
 }
 
-export const createDesktopMcpProjectManifest = ({
+export const createDesktopMcpProjectManifest = async (
+  {
   project,
   theme,
-}: Pick<DesktopMcpProjectResourceContext, 'project' | 'theme'>): DesktopMcpProjectManifest => {
+  }: Pick<DesktopMcpProjectResourceContext, 'project' | 'theme'>,
+  options: DesktopMcpProjectResourceOptions = {}
+): Promise<DesktopMcpProjectManifest> => {
   const validPageIds = project.source.pages.map((page) => page.id)
   const startPage = getStartPage(project)
   const activePage = getActivePage(project)
+  const annotationVisibilityByPage = await resolveAnnotationVisibilityByPage(project, options)
+  const openAnnotationCounts = countOpenAnnotationsByPage(project.annotations, {
+    isDeadTarget: (annotation) => isDeadTarget(annotation, annotationVisibilityByPage),
+  })
+  const pendingAnnotationCounts = countPendingAnnotationsByPage(project.annotations, {
+    isDeadTarget: (annotation) => isDeadTarget(annotation, annotationVisibilityByPage),
+  })
 
   const globalConfig: DesktopMcpProjectManifestSection = {
     source: {
@@ -197,6 +265,10 @@ export const createDesktopMcpProjectManifest = ({
   const pages = project.source.pages.map<DesktopMcpProjectManifestPage>((page) => ({
     id: page.id,
     name: page.name,
+    annotationCounts: {
+      open: openAnnotationCounts.get(page.id) ?? 0,
+      pending: pendingAnnotationCounts.get(page.id) ?? 0,
+    },
     source: {
       jsx: createSourceResourceSummary(
         page.source.jsx,
@@ -254,10 +326,11 @@ export const createDesktopMcpProjectDiagnostics = ({
   }
 }
 
-export const readDesktopMcpProjectResource = (
+export const readDesktopMcpProjectResource = async (
   request: DesktopMcpProjectResourceReadRequest,
-  context: DesktopMcpProjectResourceContext
-): DesktopMcpProjectResourceReadResult => {
+  context: DesktopMcpProjectResourceContext,
+  options: DesktopMcpProjectResourceOptions = {}
+): Promise<DesktopMcpProjectResourceReadResult> => {
   const parsedUri = parseDesktopMcpProjectResourceUri(request.uri)
   if (!parsedUri) {
     return createResourceFailure(
@@ -269,7 +342,30 @@ export const readDesktopMcpProjectResource = (
 
   switch (parsedUri.kind) {
     case 'manifest':
-      return createResourceSuccess(parsedUri.uri, JSON_MIME_TYPE, createDesktopMcpProjectManifest(context))
+      return createResourceSuccess(
+        parsedUri.uri,
+        JSON_MIME_TYPE,
+        await createDesktopMcpProjectManifest(context, options)
+      )
+    case 'project-annotations':
+      return createResourceSuccess(
+        parsedUri.uri,
+        JSON_MIME_TYPE,
+        await createDesktopMcpProjectAnnotationsResource(context, options)
+      )
+    case 'page-annotations':
+      if (!getPageById(context.project.source, parsedUri.pageId!)) {
+        return createResourceFailure(
+          'source-not-found',
+          parsedUri.uri,
+          `Arcade page "${parsedUri.pageId}" was not found for Desktop MCP resource "${parsedUri.uri}".`
+        )
+      }
+      return createResourceSuccess(
+        parsedUri.uri,
+        JSON_MIME_TYPE,
+        await createDesktopMcpProjectAnnotationsResource(context, options, parsedUri.pageId)
+      )
     case 'preview-context':
       return createResourceSuccess(
         parsedUri.uri,
@@ -302,6 +398,10 @@ const parseDesktopMcpProjectResourceUri = (
     return { kind: 'manifest', uri }
   }
 
+  if (uri === DESKTOP_MCP_PROJECT_ANNOTATIONS_URI) {
+    return { kind: 'project-annotations', uri }
+  }
+
   if (uri === DESKTOP_MCP_PROJECT_PREVIEW_CONTEXT_URI) {
     return { kind: 'preview-context', uri }
   }
@@ -318,6 +418,15 @@ const parseDesktopMcpProjectResourceUri = (
     return { kind: 'global-source', uri, sourceKind: 'hooks' }
   }
 
+  const pageAnnotationsMatch = uri.match(PROJECT_PAGE_ANNOTATIONS_URI_PATTERN)
+  if (pageAnnotationsMatch && isArcadePageId(pageAnnotationsMatch[1])) {
+    return {
+      kind: 'page-annotations',
+      uri,
+      pageId: pageAnnotationsMatch[1],
+    }
+  }
+
   const parsedSourceUri = parseDesktopMcpProjectSourceUri(uri)
   if (!parsedSourceUri || parsedSourceUri.target.type !== 'page') {
     return null
@@ -330,6 +439,165 @@ const parseDesktopMcpProjectResourceUri = (
     sourceKind: parsedSourceUri.sourceKind,
   }
 }
+
+const createDesktopMcpProjectAnnotationsResource = async (
+  context: DesktopMcpProjectResourceContext,
+  options: DesktopMcpProjectResourceOptions,
+  pageId?: ArcadePageId
+): Promise<DesktopMcpProjectAnnotationsResource> => {
+  const pageNameById = new Map(context.project.source.pages.map((page) => [page.id, page.name] as const))
+  const annotationVisibilityByPage = await resolveAnnotationVisibilityByPage(context.project, options, pageId)
+  const filteredAnnotations = filterAnnotations(context.project.annotations, {
+    ...(pageId ? { pageId } : {}),
+    status: 'all',
+    isDeadTarget: (annotation) => isDeadTarget(annotation, annotationVisibilityByPage),
+  }).map((annotation) =>
+    createDesktopMcpProjectAnnotationRecord(annotation, pageNameById, annotationVisibilityByPage)
+  )
+
+  const page =
+    pageId && pageNameById.has(pageId)
+      ? {
+          id: pageId,
+          name: pageNameById.get(pageId)!,
+          isActive: context.project.activePageId === pageId,
+        }
+      : undefined
+
+  return {
+    projectRevision: createDesktopMcpProjectRevision(context),
+    scope: page ? 'page' : 'project',
+    ...(page ? { page } : {}),
+    counts: createAnnotationCounts(filteredAnnotations),
+    annotations: filteredAnnotations.sort(sortProjectAnnotations),
+  }
+}
+
+const resolveAnnotationVisibilityByPage = async (
+  project: Project,
+  options: DesktopMcpProjectResourceOptions,
+  onlyPageId?: ArcadePageId
+): Promise<ReadonlyMap<ArcadePageId, AnnotationVisibilityById>> => {
+  const resolver = options.resolvePageAnnotationVisibilities
+  const pages = onlyPageId ? project.source.pages.filter((page) => page.id === onlyPageId) : project.source.pages
+  const visibilityByPage = new Map<ArcadePageId, AnnotationVisibilityById>()
+
+  for (const page of pages) {
+    const pageAnnotations = project.annotations.filter(
+      (annotation) => annotation.pageId === page.id && getAnnotationKind(annotation) === 'feedback'
+    )
+    if (!resolver || pageAnnotations.length === 0) {
+      visibilityByPage.set(page.id, EMPTY_ANNOTATION_VISIBILITY)
+      continue
+    }
+
+    const resolved = await resolver(page.id, pageAnnotations)
+    visibilityByPage.set(page.id, normalizeAnnotationVisibilityMap(resolved))
+  }
+
+  return visibilityByPage
+}
+
+const normalizeAnnotationVisibilityMap = (
+  value: ReadonlyMap<string, DesktopMcpAnnotationVisibility> | Record<string, DesktopMcpAnnotationVisibility>
+): AnnotationVisibilityById =>
+  value instanceof Map ? value : new Map(Object.entries(value))
+
+const getAnnotationKind = (annotation: ArcadeAnnotation): ArcadeAnnotation['kind'] =>
+  annotation.kind ?? 'feedback'
+
+const isDeadTarget = (
+  annotation: ArcadeAnnotation,
+  annotationVisibilityByPage: ReadonlyMap<ArcadePageId, AnnotationVisibilityById>
+): boolean => annotationVisibilityByPage.get(annotation.pageId)?.get(annotation.id) === 'dead'
+
+const getAnnotationVisibility = (
+  annotation: ArcadeAnnotation,
+  annotationVisibilityByPage: ReadonlyMap<ArcadePageId, AnnotationVisibilityById>
+): Exclude<DesktopMcpAnnotationVisibility, 'dead'> =>
+  annotationVisibilityByPage.get(annotation.pageId)?.get(annotation.id) === 'hidden'
+    ? 'hidden'
+    : 'visible'
+
+const createDesktopMcpProjectAnnotationRecord = (
+  annotation: ArcadeAnnotation,
+  pageNameById: ReadonlyMap<ArcadePageId, string>,
+  annotationVisibilityByPage: ReadonlyMap<ArcadePageId, AnnotationVisibilityById>
+): DesktopMcpProjectAnnotationRecord => ({
+  ...cloneAnnotationRecord(annotation),
+  pageName: pageNameById.get(annotation.pageId) ?? annotation.pageId,
+  targetVisibility: getAnnotationVisibility(annotation, annotationVisibilityByPage),
+})
+
+const cloneAnnotationRecord = (annotation: ArcadeAnnotation): ArcadeAnnotation => ({
+  ...annotation,
+  ...(annotation.targetIdentities
+    ? { targetIdentities: annotation.targetIdentities.map((identity) => ({ ...identity })) }
+    : {}),
+  ...(annotation.boundingBox ? { boundingBox: { ...annotation.boundingBox } } : {}),
+  ...(annotation.elementBoundingBoxes
+    ? { elementBoundingBoxes: annotation.elementBoundingBoxes.map((box) => ({ ...box })) }
+    : {}),
+  ...(annotation.placement ? { placement: { ...annotation.placement } } : {}),
+  ...(annotation.rearrange
+    ? {
+        rearrange: {
+          ...annotation.rearrange,
+          originalRect: { ...annotation.rearrange.originalRect },
+          currentRect: { ...annotation.rearrange.currentRect },
+        },
+      }
+    : {}),
+  ...(annotation.thread ? { thread: annotation.thread.map((message) => ({ ...message })) } : {}),
+})
+
+const createAnnotationCounts = (annotations: readonly DesktopMcpProjectAnnotationRecord[]) => {
+  const counts = {
+    total: annotations.length,
+    open: 0,
+    pending: 0,
+    acknowledged: 0,
+    resolved: 0,
+    dismissed: 0,
+    visible: 0,
+    hidden: 0,
+  }
+
+  for (const annotation of annotations) {
+    switch (annotation.status ?? 'pending') {
+      case 'pending':
+        counts.pending += 1
+        counts.open += 1
+        break
+      case 'acknowledged':
+        counts.acknowledged += 1
+        counts.open += 1
+        break
+      case 'resolved':
+        counts.resolved += 1
+        break
+      case 'dismissed':
+        counts.dismissed += 1
+        break
+    }
+
+    if (annotation.targetVisibility === 'hidden') {
+      counts.hidden += 1
+    } else {
+      counts.visible += 1
+    }
+  }
+
+  return counts
+}
+
+const sortProjectAnnotations = (
+  left: DesktopMcpProjectAnnotationRecord,
+  right: DesktopMcpProjectAnnotationRecord
+): number =>
+  left.pageId.localeCompare(right.pageId) ||
+  left.timestamp - right.timestamp ||
+  left.id.localeCompare(right.id)
 
 const createSourceResourceSummary = (
   content: string,

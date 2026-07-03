@@ -50,6 +50,7 @@ interface PagePanelProps {
   activePageId: ArcadePageId
   startPageId: ArcadePageId
   pages: ArcadePage[]
+  annotationRecordCounts: Partial<Record<ArcadePageId, number>>
   brokenNavigationPageIds: ArcadePageId[]
   deletePageImpacts: Partial<Record<ArcadePageId, DeletePageImpact>>
   errorPageIds: ArcadePageId[]
@@ -66,6 +67,7 @@ export const PagePanel = ({
   activePageId,
   startPageId,
   pages,
+  annotationRecordCounts,
   brokenNavigationPageIds,
   deletePageImpacts,
   errorPageIds,
@@ -90,6 +92,9 @@ export const PagePanel = ({
   const deletePageImpact = deletePageCandidate
     ? (deletePageImpacts[deletePageCandidate.id] ?? EMPTY_DELETE_PAGE_IMPACT)
     : EMPTY_DELETE_PAGE_IMPACT
+  const deletePageAnnotationRecordCount = deletePageCandidate
+    ? (annotationRecordCounts[deletePageCandidate.id] ?? 0)
+    : 0
 
   useEffect(() => {
     if (renamingPageId && !pages.some((page) => page.id === renamingPageId)) {
@@ -408,6 +413,16 @@ export const PagePanel = ({
               ) : (
                 <BodyShort size="small">
                   No existing page navigation references currently point to this page.
+                </BodyShort>
+              )}
+              {deletePageAnnotationRecordCount > 0 && (
+                <BodyShort size="small">
+                  Deleting this page will also delete{' '}
+                  <strong>
+                    {deletePageAnnotationRecordCount} annotation record
+                    {deletePageAnnotationRecordCount === 1 ? '' : 's'}
+                  </strong>{' '}
+                  attached to it.
                 </BodyShort>
               )}
             </VStack>

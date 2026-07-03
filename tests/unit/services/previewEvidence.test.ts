@@ -1,9 +1,12 @@
 import { afterEach, describe, expect, it } from 'vitest'
+import type { ArcadeAnnotation, AnnotationRect } from '@/types/annotations'
 import {
   MAX_PREVIEW_EVIDENCE_ELEMENTS,
+  PREVIEW_EVIDENCE_ANNOTATION_OVERLAY_NOTE,
   capturePreviewEvidenceSnapshot,
   serializePreviewEvidence,
 } from '@/services/previewEvidence'
+import { getAnnotationTargetIdentity } from '@/services/annotationTargets'
 
 const originalWindowMetricDescriptors = {
   innerWidth: Object.getOwnPropertyDescriptor(window, 'innerWidth'),
@@ -158,6 +161,9 @@ describe('preview evidence', () => {
       },
       window
     )
+    if (!result.ok) {
+      throw new Error(JSON.stringify(result))
+    }
 
     expect(result).toMatchObject({
       ok: true,
@@ -197,6 +203,212 @@ describe('preview evidence', () => {
     }
 
     expect(result.screenshot.text).toMatch(/background-color:\s*rgb\(250,\s*251,\s*252\)/)
+  })
+
+  it('keeps requested annotation overlays empty when no visible annotations exist', () => {
+    const { root } = renderPreviewFixture()
+
+    const result = capturePreviewEvidenceSnapshot(
+      root,
+      {
+        layers: ['screenshot'],
+        includeAnnotationOverlays: true,
+        annotations: [],
+        currentPageId: 'page01',
+      },
+      window
+    )
+    if (!result.ok) {
+      throw new Error(result.error.message)
+    }
+
+    expect(result).toMatchObject({
+      ok: true,
+      captureMeta: {
+        annotationOverlays: {
+          requested: true,
+          included: true,
+          visibleAnnotationCount: 0,
+          note: PREVIEW_EVIDENCE_ANNOTATION_OVERLAY_NOTE,
+        },
+      },
+    })
+    if (!result.ok || !result.screenshot) {
+      throw new Error('Expected screenshot capture with overlay metadata to succeed.')
+    }
+
+    expect(result.screenshot.text).not.toContain('data-preview-evidence-annotation-overlay')
+  })
+
+  it('renders a visible annotation marker and outline only in screenshot evidence when requested', () => {
+    const { root, button } = renderPreviewFixture()
+    const annotation = createStoredAnnotationFromElement(root, button, {
+      id: 'annotation-visible',
+      pageId: 'page01',
+      comment: 'Focus the primary CTA',
+    })
+
+    const result = capturePreviewEvidenceSnapshot(
+      root,
+      {
+        layers: ['screenshot', 'dom_layout_style'],
+        includeAnnotationOverlays: true,
+        annotations: [annotation],
+        currentPageId: 'page01',
+      },
+      window
+    )
+    if (!result.ok) {
+      throw new Error(result.error.message)
+    }
+
+    expect(result).toMatchObject({
+      ok: true,
+      captureMeta: {
+        annotationOverlays: {
+          requested: true,
+          included: true,
+          visibleAnnotationCount: 1,
+          note: PREVIEW_EVIDENCE_ANNOTATION_OVERLAY_NOTE,
+        },
+      },
+    })
+    if (!result.ok || !result.screenshot) {
+      throw new Error('Expected annotation overlay screenshot capture to succeed.')
+    }
+
+    expect(result.screenshot.text).toContain('data-preview-evidence-annotation-overlay="marker"')
+    expect(result.screenshot.text).toContain('data-preview-evidence-annotation-overlay="outline"')
+    expect(result.screenshot.text).toContain('data-preview-evidence-annotation-id="annotation-visible"')
+    expect(JSON.stringify(result.evidence)).not.toContain('data-preview-evidence-annotation-overlay')
+  })
+
+  it('renders grouped overlay shapes for visible multi-element annotations', () => {
+    document.body.innerHTML = `
+      <div id="root">
+        <section>
+          <button>Approve</button>
+          <button>Reject</button>
+        </section>
+      </div>
+    `
+    Object.defineProperties(window, {
+      innerWidth: { configurable: true, value: 1024 },
+      innerHeight: { configurable: true, value: 768 },
+    })
+
+    const root = document.getElementById('root')
+    const buttons = Array.from(document.querySelectorAll('button'))
+    if (!root || buttons.length !== 2) {
+      throw new Error('Expected multi-select fixture buttons to exist.')
+    }
+
+    mockRect(root, { x: 0, y: 0, width: 260, height: 80 })
+    mockRect(buttons[0], { x: 10, y: 10, width: 100, height: 40 })
+    mockRect(buttons[1], { x: 130, y: 10, width: 100, height: 40 })
+
+    const annotation = createStoredMultiSelectAnnotation(root, buttons, {
+      id: 'annotation-multi',
+      pageId: 'page01',
+    })
+    const result = capturePreviewEvidenceSnapshot(
+      root,
+      {
+        layers: ['screenshot'],
+        includeAnnotationOverlays: true,
+        annotations: [annotation],
+        currentPageId: 'page01',
+      },
+      window
+    )
+    if (!result.ok) {
+      throw new Error(result.error.message)
+    }
+    if (!result.screenshot) {
+      throw new Error('Expected grouped annotation overlay screenshot capture to succeed.')
+    }
+
+    expect(result.captureMeta?.annotationOverlays?.visibleAnnotationCount).toBe(1)
+    expect(
+      result.screenshot.text.match(/data-preview-evidence-annotation-overlay="outline"/g) ?? []
+    ).toHaveLength(3)
+    expect(result.screenshot.text).toContain(
+      'data-preview-evidence-annotation-variant="selected-element"'
+    )
+    expect(result.screenshot.text).toContain('data-preview-evidence-annotation-variant="multi-select"')
+  })
+
+  it('excludes hidden and dead targets from capture overlays while leaving annotations durable', () => {
+    document.body.innerHTML = `
+      <div id="root">
+        <button>Visible</button>
+        <button>Hidden</button>
+      </div>
+    `
+    Object.defineProperties(window, {
+      innerWidth: { configurable: true, value: 800 },
+      innerHeight: { configurable: true, value: 600 },
+    })
+
+    const root = document.getElementById('root')
+    const buttons = Array.from(document.querySelectorAll('button'))
+    if (!root || buttons.length !== 2) {
+      throw new Error('Expected visibility fixture buttons to exist.')
+    }
+
+    mockRect(root, { x: 0, y: 0, width: 220, height: 980 })
+    mockRect(buttons[0], { x: 10, y: 12, width: 100, height: 32 })
+    mockRect(buttons[1], { x: 10, y: 900, width: 100, height: 32 })
+
+    const hiddenAnnotation = createStoredAnnotationFromElement(root, buttons[1], {
+      id: 'annotation-hidden',
+      pageId: 'page01',
+    })
+    const deadAnnotation = {
+      ...createStoredAnnotationFromElement(root, buttons[0], {
+        id: 'annotation-dead',
+        pageId: 'page01',
+      }),
+      targetIdentities: [
+        {
+          ...createStoredAnnotationFromElement(root, buttons[0], {
+            id: 'temp',
+            pageId: 'page01',
+          }).targetIdentities![0],
+          signature: 'ghost-signature',
+          accessibleName: 'Ghost target',
+          text: 'Ghost target',
+          elementPath: 'button "Ghost target"',
+          fullPath: ':scope > button:nth-of-type(99)',
+        },
+      ],
+      element: 'button "Ghost target"',
+      elementPath: 'button "Ghost target"',
+      fullPath: ':scope > button:nth-of-type(99)',
+    } satisfies ArcadeAnnotation
+
+    const result = capturePreviewEvidenceSnapshot(
+      root,
+      {
+        layers: ['screenshot'],
+        includeAnnotationOverlays: true,
+        annotations: [hiddenAnnotation, deadAnnotation],
+        currentPageId: 'page01',
+      },
+      window
+    )
+    if (!result.ok || !result.screenshot) {
+      throw new Error('Expected hidden/dead overlay capture to succeed.')
+    }
+
+    expect(result.captureMeta?.annotationOverlays).toEqual({
+      requested: true,
+      included: true,
+      visibleAnnotationCount: 0,
+      note: PREVIEW_EVIDENCE_ANNOTATION_OVERLAY_NOTE,
+    })
+    expect(result.screenshot.text).not.toContain('annotation-hidden')
+    expect(result.screenshot.text).not.toContain('annotation-dead')
   })
 
   it('prefers the most specific matching element for region text targets', () => {
@@ -484,4 +696,95 @@ const restoreWindowMetric = (key: keyof typeof originalWindowMetricDescriptors) 
   }
 
   delete window[key]
+}
+
+const createStoredAnnotationFromElement = (
+  root: Element,
+  element: Element,
+  overrides: Partial<ArcadeAnnotation> & { id: string; pageId: string }
+): ArcadeAnnotation => {
+  const { id, pageId, ...restOverrides } = overrides
+  const identity = getAnnotationTargetIdentity(root, element, window)
+  const rect = element.getBoundingClientRect()
+  const boundingBox = {
+    x: rect.x,
+    y: rect.y,
+    width: rect.width,
+    height: rect.height,
+  }
+  const labelText = identity.accessibleName ?? identity.text ?? ''
+
+  return {
+    id,
+    pageId,
+    x: rect.x,
+    y: rect.y,
+    comment: overrides.comment ?? 'Needs attention',
+    element: labelText ? `${identity.tagName} "${labelText}"` : identity.tagName,
+    elementPath: identity.elementPath,
+    timestamp: overrides.timestamp ?? 1,
+    targetIdentities: [identity],
+    boundingBox,
+    cssClasses: identity.cssClasses,
+    fullPath: identity.fullPath,
+    accessibility: identity.role
+      ? identity.accessibleName
+        ? `role=${identity.role} name="${identity.accessibleName}"`
+        : `role=${identity.role}`
+      : undefined,
+    clickOffsetX: rect.width / 2,
+    clickOffsetY: rect.height / 2,
+    ...restOverrides,
+  }
+}
+
+const createStoredMultiSelectAnnotation = (
+  root: Element,
+  elements: Element[],
+  overrides: Partial<ArcadeAnnotation> & { id: string; pageId: string }
+): ArcadeAnnotation => {
+  const { id, pageId, ...restOverrides } = overrides
+  const targetIdentities = elements.map((element) => getAnnotationTargetIdentity(root, element, window))
+  const elementBoundingBoxes = elements.map((element) => {
+    const rect = element.getBoundingClientRect()
+    return {
+      x: rect.x,
+      y: rect.y,
+      width: rect.width,
+      height: rect.height,
+    }
+  })
+  const boundingBox = mergeAnnotationRects(elementBoundingBoxes)
+
+  return {
+    id,
+    pageId,
+    x: boundingBox.x,
+    y: boundingBox.y,
+    comment: overrides.comment ?? 'Review this group',
+    element: `${elements.length} selected elements`,
+    elementPath: targetIdentities[0]?.elementPath ?? 'group',
+    timestamp: overrides.timestamp ?? 1,
+    targetIdentities,
+    boundingBox,
+    elementBoundingBoxes,
+    isMultiSelect: true,
+    clickOffsetX: boundingBox.width / 2,
+    clickOffsetY: boundingBox.height / 2,
+    ...restOverrides,
+  }
+}
+
+const mergeAnnotationRects = (rects: AnnotationRect[]): AnnotationRect => {
+  const left = Math.min(...rects.map((rect) => rect.x))
+  const top = Math.min(...rects.map((rect) => rect.y))
+  const right = Math.max(...rects.map((rect) => rect.x + rect.width))
+  const bottom = Math.max(...rects.map((rect) => rect.y + rect.height))
+
+  return {
+    x: left,
+    y: top,
+    width: right - left,
+    height: bottom - top,
+  }
 }

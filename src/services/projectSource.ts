@@ -7,6 +7,7 @@ import type {
   ProjectSource,
   SelectedEditTarget,
 } from '@/types/project'
+import { clearPageAnnotations } from '@/services/annotations'
 
 export const FIRST_PAGE_ID = 'page01' as const
 export const FIRST_PAGE_NAME = 'Page 1' as const
@@ -46,9 +47,14 @@ export const cloneProjectSource = (source: ProjectSource): ProjectSource => ({
   nextPageNumber: source.nextPageNumber,
 })
 
-export const createSinglePageProjectSource = (jsxCode: string, hooksCode: string): ProjectSource => ({
+export const createSinglePageProjectSource = (
+  jsxCode: string,
+  hooksCode: string
+): ProjectSource => ({
   globalConfig: createArcadeSourceFile(),
-  pages: [createArcadePage(FIRST_PAGE_ID, FIRST_PAGE_NAME, createArcadeSourceFile(jsxCode, hooksCode))],
+  pages: [
+    createArcadePage(FIRST_PAGE_ID, FIRST_PAGE_NAME, createArcadeSourceFile(jsxCode, hooksCode)),
+  ],
   startPageId: FIRST_PAGE_ID,
   nextPageNumber: 2,
 })
@@ -242,6 +248,7 @@ export const deletePage = (project: Project, pageId: ArcadePageId): Project => {
       startPageId,
     },
     activePageId,
+    annotations: clearPageAnnotations(project.annotations, pageId),
   })
 }
 
@@ -278,7 +285,10 @@ export const normalizeProjectSelection = (project: Project): Project => {
     Number.isInteger(project.source.nextPageNumber) && project.source.nextPageNumber > 1
       ? project.source.nextPageNumber
       : getHighestPageNumber(project.source.pages) + 1
-  const nextPageNumber = Math.max(currentNextPageNumber, getHighestPageNumber(project.source.pages) + 1)
+  const nextPageNumber = Math.max(
+    currentNextPageNumber,
+    getHighestPageNumber(project.source.pages) + 1
+  )
 
   if (
     startPageId === project.source.startPageId &&

@@ -19,6 +19,7 @@ import { fromBase64Url } from '@/utils/base64'
 import { createDefaultProject } from '@/utils/projectDefaults'
 import { createShareSnapshot, SNAPSHOT_FILE_IDS } from '@/services/storage'
 import { createSinglePageProjectSource, getStartPageSource } from '@/services/projectSource'
+import type { ArcadeAnnotation } from '@/types/annotations'
 
 const snapshotFixture: ProjectSnapshot = {
   version: '1.0.0',
@@ -51,6 +52,7 @@ const createNonShareableStateFixture = (): {
   snapshot: ProjectSnapshot
   expectedPayload: {
     project: {
+      annotations: ArcadeAnnotation[]
       name: string
       source: Project['source']
       preview: {
@@ -72,6 +74,30 @@ const createNonShareableStateFixture = (): {
     'export default function App() { return <div>Shareable JSX</div> }',
     'export function useShareableHook() { return "Shareable Hooks" }'
   )
+  project.annotations = [
+    {
+      id: '33333333-3333-4333-8333-333333333333',
+      pageId: 'page01',
+      x: 12,
+      y: 18,
+      comment: 'Persist this annotation in the share payload',
+      element: 'Alert',
+      elementPath: 'main > div',
+      timestamp: 1720000000000,
+      kind: 'feedback',
+      status: 'acknowledged',
+      thread: [
+        {
+          id: '22222222-2222-4222-8222-222222222222',
+          role: 'agent',
+          content: 'Acknowledged for follow-up.',
+          timestamp: 1720000005000,
+        },
+      ],
+      createdAt: '2026-07-01T08:00:00.000Z',
+      updatedAt: '2026-07-01T08:05:00.000Z',
+    },
+  ]
   const source = getStartPageSource(project)
 
   const snapshot = createShareSnapshot(project, {
@@ -119,6 +145,7 @@ const createNonShareableStateFixture = (): {
     snapshot,
     expectedPayload: {
       project: {
+        annotations: project.annotations,
         name: project.name,
         source: project.source,
         preview: {
@@ -148,7 +175,6 @@ const createNonShareableStateFixture = (): {
       'autosave',
       'linting',
       'showLineNumbers',
-      'updatedAt',
       String(snapshot.updatedAt),
       'zoom',
       '0.42',
@@ -217,7 +243,12 @@ describe('shareEncoding utilities', () => {
 
     expect(payload).toEqual(expectedPayload)
     expect(Object.keys(payload).sort()).toEqual(['project', 'theme'])
-    expect(Object.keys(payload.project).sort()).toEqual(['name', 'preview', 'source'])
+    expect(Object.keys(payload.project).sort()).toEqual([
+      'annotations',
+      'name',
+      'preview',
+      'source',
+    ])
     expect(Object.keys(payload.project.preview).sort()).toEqual(['viewport'])
     for (const snippet of excludedSnippets) {
       expect(serialized).not.toContain(snippet)
@@ -243,7 +274,13 @@ describe('shareEncoding utilities', () => {
   it('generates shorter full-project Web share URLs than equivalent legacy v2 full-snapshot URLs', async () => {
     const representativeProjects = [
       { project: createDefaultProject(), previewTheme: 'dark' as const },
-      { project: createNonShareableStateFixture().project, previewTheme: 'light' as const },
+      {
+        project: {
+          ...createNonShareableStateFixture().project,
+          annotations: [],
+        },
+        previewTheme: 'light' as const,
+      },
     ]
 
     for (const { project, previewTheme } of representativeProjects) {

@@ -1,30 +1,32 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { parseArgs } from 'node:util'
-import { renderMcpAkselCatalogModule } from './lib/akselMcpCatalog'
+import { renderSharedMcpAkselCatalogModule } from './lib/akselMcpCatalog'
+
+const DEFAULT_SHARED_OUTPUT_PATH = 'src/shared/desktopMcp/akselCatalogData.generated.ts'
 
 async function main() {
   const { values } = parseArgs({
     args: process.argv.slice(2),
     options: {
       write: {
-        type: 'string',
+        type: 'boolean',
       },
     },
     strict: true,
     allowPositionals: false,
   })
 
-  const source = renderMcpAkselCatalogModule()
-
+  const sharedSource = renderSharedMcpAkselCatalogModule()
   if (values.write) {
-    const filePath = path.resolve(values.write)
-    fs.writeFileSync(filePath, source, 'utf8')
-    process.stdout.write(`Refreshed ${filePath}\n`)
+    const sharedPath = path.resolve(DEFAULT_SHARED_OUTPUT_PATH)
+    fs.mkdirSync(path.dirname(sharedPath), { recursive: true })
+    fs.writeFileSync(sharedPath, sharedSource, 'utf8')
+    process.stdout.write(`Refreshed ${sharedPath}\n`)
     return
   }
 
-  process.stdout.write(source)
+  process.stdout.write(sharedSource)
 }
 
 main().catch((error) => {

@@ -1,8 +1,9 @@
 import { useCallback, useContext, useEffect, useRef, useState } from 'react'
-import { Alert, BodyShort, Box, Button, Detail, VStack } from '@navikt/ds-react'
-import { ExpandIcon, ShrinkIcon } from '@navikt/aksel-icons'
+import { Alert, BodyShort, Box, Button, Detail, Dialog, VStack } from '@navikt/ds-react'
+import { ChatElipsisIcon, ExpandIcon, ShrinkIcon, TrashIcon } from '@navikt/aksel-icons'
 import { SharePopoverButton } from '@/components/Share/SharePopoverButton'
 import { AppContext } from '@/hooks/useProject'
+import { clearPageAnnotations, countOpenAnnotationsByPage } from '@/services/annotations'
 import { transpileProjectSource } from '@/services/transpiler'
 import { resolveSelectedEditTarget } from '@/services/projectSource'
 import { WEB_ARCADE_CAPABILITIES, type ShellCapabilities } from '@/services/shellCapabilities'
@@ -44,6 +45,11 @@ export const PreviewPane = ({
   const [compileError, setCompileError] = useState<CompileError | null>(null)
   const [runtimeError, setRuntimeError] = useState<RuntimeError | null>(null)
   const [isInspectMode, setIsInspectMode] = useState(false)
+  const [isAnnotationMode, setIsAnnotationMode] = useState(false)
+  const [isClearAnnotationsDialogOpen, setIsClearAnnotationsDialogOpen] = useState(false)
+  const [activePageResolvedOpenAnnotationCount, setActivePageResolvedOpenAnnotationCount] = useState<
+    number | null
+  >(null)
   const debounceTimerRef = useRef<number | undefined>(undefined)
   const pendingCompileErrorRef = useRef<CompileError | null>(null)
   const isCodeEditorFocusedRef = useRef(editorState.isCodeEditorFocused)
@@ -249,7 +255,27 @@ export const PreviewPane = ({
   }
 
   const handleInspectToggle = (enabled: boolean) => {
+    if (enabled) {
+      setIsAnnotationMode(false)
+    }
     setIsInspectMode(enabled)
+  }
+
+  const handleAnnotationToggle = () => {
+    setIsAnnotationMode((current) => {
+      const nextMode = !current
+      if (nextMode) {
+        setIsInspectMode(false)
+      }
+      return nextMode
+    })
+  }
+
+  const handleClearAnnotationsConfirm = () => {
+    updateProject({
+      annotations: clearPageAnnotations(project.annotations, project.activePageId),
+    })
+    setIsClearAnnotationsDialogOpen(false)
   }
 
   const exitPreviewFullscreen = useCallback(() => {
@@ -273,7 +299,7 @@ export const PreviewPane = ({
 
   const handlePreviewPaneKeyDown = useCallback(
     (event: React.KeyboardEvent<HTMLElement>) => {
-      if (!previewFullscreen || event.key !== 'Escape' || event.defaultPrevented) {
+      if (event.key !== 'Escape' || event.defaultPrevented) {
         return
       }
 
@@ -284,10 +310,20 @@ export const PreviewPane = ({
         return
       }
 
+      if (isAnnotationMode) {
+        event.preventDefault()
+        setIsAnnotationMode(false)
+        return
+      }
+
+      if (!previewFullscreen) {
+        return
+      }
+
       event.preventDefault()
       exitPreviewFullscreen()
     },
-    [exitPreviewFullscreen, previewFullscreen]
+    [exitPreviewFullscreen, isAnnotationMode, previewFullscreen]
   )
 
   useEffect(() => {
@@ -304,9 +340,28 @@ export const PreviewPane = ({
     fullscreenToggleRef.current?.focus()
   }, [previewFullscreen])
 
+  useEffect(() => {
+    setActivePageResolvedOpenAnnotationCount(null)
+  }, [project.activePageId, project.annotations, project.id, project.source])
+
   const fullscreenToggleLabel = previewFullscreen
     ? 'Exit preview fullscreen'
     : 'Enter preview fullscreen'
+  const activePageOpenAnnotationCount =
+    activePageResolvedOpenAnnotationCount ??
+    countOpenAnnotationsByPage(project.annotations).get(project.activePageId) ??
+    0
+  const activePageAnnotationRecordCount = project.annotations.filter(
+    (annotation) => annotation.pageId === project.activePageId
+  ).length
+  const activePageName =
+    project.source.pages.find((page) => page.id === project.activePageId)?.name ?? project.activePageId
+  const annotationToggleLabel = isAnnotationMode
+    ? `Exit annotation mode, ${activePageOpenAnnotationCount} open annotations on this page`
+    : `Enter annotation mode, ${activePageOpenAnnotationCount} open annotations on this page`
+  const visibleAnnotationCount =
+    activePageOpenAnnotationCount > 99 ? '99+' : String(activePageOpenAnnotationCount)
+  const showAnnotationBadge = activePageOpenAnnotationCount > 0
 
   return (
     <Box
@@ -333,18 +388,60 @@ export const PreviewPane = ({
               ref={fullscreenToggleRef}
               variant="tertiary"
               data-color="neutral"
-              size="small"
+              size="xsmall"
               aria-label={fullscreenToggleLabel}
               aria-pressed={previewFullscreen}
               icon={previewFullscreen ? <ShrinkIcon aria-hidden /> : <ExpandIcon aria-hidden />}
               onClick={handlePreviewFullscreenToggle}
+              className="preview-pane__icon-button"
             />
           </div>
           <div
             className="preview-pane__header-controls-right"
             data-testid="preview-header-controls-right"
           >
-            <InspectMode onInspectToggle={handleInspectToggle} />
+            <div className="preview-pane__annotation-controls">
+              {isAnnotationMode && (
+                <Button
+                  type="button"
+                  variant="tertiary"
+                  data-color="danger"
+                  size="xsmall"
+                  aria-label="Clear all annotations on this page"
+                  icon={<TrashIcon aria-hidden />}
+                  className="preview-pane__icon-button"
+                  disabled={activePageAnnotationRecordCount === 0}
+                  onClick={() => setIsClearAnnotationsDialogOpen(true)}
+                />
+              )}
+              <div className="preview-pane__annotation-toggle-wrapper">
+                <Button
+                  type="button"
+                  variant="tertiary"
+                  data-color="neutral"
+                  size="xsmall"
+                  aria-label={annotationToggleLabel}
+                  aria-pressed={isAnnotationMode}
+                  icon={<ChatElipsisIcon aria-hidden />}
+                  onClick={handleAnnotationToggle}
+                  className={
+                    isAnnotationMode
+                      ? 'preview-pane__icon-button preview-pane__annotation-toggle preview-pane__annotation-toggle--active'
+                      : 'preview-pane__icon-button preview-pane__annotation-toggle'
+                  }
+                />
+                {showAnnotationBadge && (
+                  <span
+                    className="preview-pane__annotation-badge"
+                    data-testid="annotation-count-badge"
+                    aria-hidden="true"
+                  >
+                    <span className="preview-pane__annotation-badge-text">{visibleAnnotationCount}</span>
+                  </span>
+                )}
+              </div>
+            </div>
+            <InspectMode isInspectMode={isInspectMode} onInspectToggle={handleInspectToggle} />
             <div className="preview-pane__viewport-toggle">
               <ViewportToggle />
             </div>
@@ -407,6 +504,10 @@ export const PreviewPane = ({
           previewPageId={project.activePageId}
           viewportWidth={project.viewportSize}
           isInspectMode={isInspectMode}
+          isAnnotationMode={isAnnotationMode}
+          annotations={project.annotations}
+          onAnnotationsChange={(annotations) => updateProject({ annotations })}
+          onActivePageOpenAnnotationCountChange={setActivePageResolvedOpenAnnotationCount}
           theme={theme}
         />
 
@@ -428,6 +529,48 @@ export const PreviewPane = ({
           </Box>
         )}
       </Box>
+
+      <Dialog
+        open={isClearAnnotationsDialogOpen}
+        onOpenChange={(open) => setIsClearAnnotationsDialogOpen(open)}
+      >
+        <Dialog.Popup
+          role="alertdialog"
+          aria-label="Clear annotations"
+          closeOnOutsideClick={false}
+        >
+          <Dialog.Body>
+            <VStack gap="space-12">
+              <BodyShort>
+                Clear all annotations for <strong>{activePageName}</strong>?
+              </BodyShort>
+              <BodyShort size="small">
+                This permanently deletes{' '}
+                <strong>
+                  {activePageAnnotationRecordCount} annotation record
+                  {activePageAnnotationRecordCount === 1 ? '' : 's'}
+                </strong>{' '}
+                on this page, including open annotations, history, and dead-target records.
+              </BodyShort>
+            </VStack>
+          </Dialog.Body>
+          <Dialog.Footer>
+            <Dialog.CloseTrigger>
+              <Button type="button" variant="secondary" data-color="neutral">
+                Cancel
+              </Button>
+            </Dialog.CloseTrigger>
+            <Button
+              type="button"
+              variant="primary"
+              data-color="danger"
+              onClick={handleClearAnnotationsConfirm}
+            >
+              Clear annotations
+            </Button>
+          </Dialog.Footer>
+        </Dialog.Popup>
+      </Dialog>
     </Box>
   )
 }

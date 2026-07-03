@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   validateMainToSandboxMessage,
+  validateSandboxReadyMessage,
   validateSandboxToMainMessage,
   sanitizeProps,
 } from '@/utils/security'
@@ -83,6 +84,46 @@ describe('Security Utilities', () => {
       expect(validateMainToSandboxMessage('string')).toBe(false)
       expect(validateMainToSandboxMessage(123)).toBe(false)
       expect(validateMainToSandboxMessage([])).toBe(false)
+    })
+
+    it('should validate RESOLVE_ANNOTATION_TARGET payload shape', () => {
+      expect(
+        validateMainToSandboxMessage({
+          type: 'RESOLVE_ANNOTATION_TARGET',
+          payload: {
+            requestId: 'annotation-1',
+            request: {
+              mode: 'identity',
+              identity: {
+                signature: 'target-signature',
+                tagName: 'button',
+                elementPath: 'button "Save"',
+                fullPath: ':scope > button:nth-of-type(1)',
+              },
+            },
+          },
+        })
+      ).toBe(true)
+
+      expect(
+        validateMainToSandboxMessage({
+          type: 'RESOLVE_ANNOTATION_TARGET',
+          payload: {
+            requestId: '',
+            request: { mode: 'point', x: 12, y: 24 },
+          },
+        })
+      ).toBe(false)
+
+      expect(
+        validateMainToSandboxMessage({
+          type: 'RESOLVE_ANNOTATION_TARGET',
+          payload: {
+            requestId: 'annotation-2',
+            request: { mode: 'point', x: '12', y: 24 },
+          },
+        })
+      ).toBe(false)
     })
   })
 
@@ -175,6 +216,67 @@ describe('Security Utilities', () => {
       expect(validateSandboxToMainMessage(message)).toBe(false)
     })
 
+    it('should validate annotation target message payload shape', () => {
+      const validTarget = {
+        identity: {
+          signature: 'target-signature',
+          tagName: 'button',
+          elementPath: 'button "Save"',
+          fullPath: ':scope > button:nth-of-type(1)',
+        },
+        snapshot: {
+          x: 50,
+          y: 32,
+          element: 'button "Save"',
+          elementPath: 'button "Save"',
+          boundingBox: { x: 10, y: 20, width: 120, height: 40 },
+        },
+        visibility: 'visible',
+      }
+
+      expect(
+        validateSandboxToMainMessage({
+          type: 'ANNOTATION_TARGET_SELECTED',
+          payload: { status: 'resolved', target: validTarget, matchCount: 1 },
+        })
+      ).toBe(true)
+      expect(
+        validateSandboxToMainMessage({
+          type: 'ANNOTATION_TARGET_HOVERED',
+          payload: null,
+        })
+      ).toBe(true)
+      expect(
+        validateSandboxToMainMessage({
+          type: 'ANNOTATION_TARGET_SELECTED',
+          payload: { status: 'resolved', target: { snapshot: { x: '50' } } },
+        })
+      ).toBe(false)
+      expect(
+        validateSandboxToMainMessage({
+          type: 'ANNOTATION_TARGET_RESOLVED',
+          payload: { requestId: 'target-1', result: { status: 'not-real' } },
+        })
+      ).toBe(false)
+      expect(
+        validateSandboxToMainMessage({
+          type: 'ANNOTATION_VIEWPORT_CHANGED',
+          payload: { scrollX: 0, scrollY: 24 },
+        })
+      ).toBe(true)
+      expect(
+        validateSandboxToMainMessage({
+          type: 'ANNOTATION_VIEWPORT_CHANGED',
+        })
+      ).toBe(false)
+      expect(
+        validateSandboxToMainMessage({
+          type: 'ANNOTATION_VIEWPORT_CHANGED',
+          payload: { scrollX: '0', scrollY: 24 },
+        })
+      ).toBe(false)
+    })
+
     it('should accept valid SANDBOX_CONNECTED message', () => {
       const message = {
         type: 'SANDBOX_CONNECTED',
@@ -196,6 +298,33 @@ describe('Security Utilities', () => {
       expect(validateSandboxToMainMessage(undefined)).toBe(false)
       expect(validateSandboxToMainMessage('string')).toBe(false)
       expect(validateSandboxToMainMessage(123)).toBe(false)
+    })
+  })
+
+  describe('validateSandboxReadyMessage', () => {
+    it('accepts a valid sandbox ready handshake', () => {
+      expect(
+        validateSandboxReadyMessage({
+          type: 'SANDBOX_READY',
+          payload: {
+            href: 'http://127.0.0.1:5173/aksel-arcade/sandbox.html',
+          },
+        })
+      ).toBe(true)
+    })
+
+    it('rejects malformed sandbox ready handshakes', () => {
+      expect(validateSandboxReadyMessage(null)).toBe(false)
+      expect(validateSandboxReadyMessage({ type: 'SANDBOX_READY' })).toBe(false)
+      expect(
+        validateSandboxReadyMessage({
+          type: 'SANDBOX_READY',
+          payload: {
+            href: 123,
+          },
+        })
+      ).toBe(false)
+      expect(validateSandboxReadyMessage({ type: 'RENDER_SUCCESS' })).toBe(false)
     })
   })
 

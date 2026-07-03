@@ -1,14 +1,13 @@
 import { describe, expect, it } from 'vitest'
-import {
-  createArcadePage,
-  createArcadeSourceFile,
-} from '@/services/projectSource'
+import { createArcadePage, createArcadeSourceFile } from '@/services/projectSource'
 import type { Project } from '@/types/project'
 import type { PreviewDiagnostics } from '@/services/previewDiagnostics'
 import {
+  DESKTOP_MCP_PROJECT_ANNOTATIONS_URI,
   DESKTOP_MCP_PROJECT_DIAGNOSTICS_URI,
   DESKTOP_MCP_PROJECT_MANIFEST_URI,
   DESKTOP_MCP_PROJECT_PREVIEW_CONTEXT_URI,
+  createDesktopMcpProjectPageAnnotationsUri,
   createDesktopMcpProjectDiagnostics,
   createDesktopMcpProjectManifest,
   createDesktopMcpProjectRevision,
@@ -53,6 +52,64 @@ const createProject = (): Project => ({
     nextPageNumber: 3,
   },
   activePageId: 'page02',
+  annotations: [
+    {
+      id: 'annotation-visible-pending',
+      pageId: 'page01',
+      x: 10,
+      y: 20,
+      comment: 'Visible pending note',
+      element: 'Button',
+      elementPath: 'visible',
+      timestamp: 1,
+      kind: 'feedback',
+      status: 'pending',
+      createdAt: '2026-06-16T08:01:00.000Z',
+      updatedAt: '2026-06-16T08:01:00.000Z',
+    },
+    {
+      id: 'annotation-hidden-acknowledged',
+      pageId: 'page01',
+      x: 11,
+      y: 21,
+      comment: 'Hidden acknowledged note',
+      element: 'BodyShort',
+      elementPath: 'hidden',
+      timestamp: 2,
+      kind: 'feedback',
+      status: 'acknowledged',
+      createdAt: '2026-06-16T08:02:00.000Z',
+      updatedAt: '2026-06-16T08:02:00.000Z',
+    },
+    {
+      id: 'annotation-dead-dismissed',
+      pageId: 'page01',
+      x: 12,
+      y: 22,
+      comment: 'Dead dismissed note',
+      element: 'Link',
+      elementPath: 'dead',
+      timestamp: 3,
+      kind: 'feedback',
+      status: 'dismissed',
+      createdAt: '2026-06-16T08:03:00.000Z',
+      updatedAt: '2026-06-16T08:03:00.000Z',
+    },
+    {
+      id: 'annotation-visible-resolved',
+      pageId: 'page02',
+      x: 13,
+      y: 23,
+      comment: 'Visible resolved note',
+      element: 'Section',
+      elementPath: 'visible',
+      timestamp: 4,
+      kind: 'feedback',
+      status: 'resolved',
+      createdAt: '2026-06-16T08:04:00.000Z',
+      updatedAt: '2026-06-16T08:04:00.000Z',
+    },
+  ],
   viewportSize: 'LG',
   panelLayout: 'editor-left',
   version: '2.0.0',
@@ -80,12 +137,31 @@ const createDiagnostics = (overrides: Partial<PreviewDiagnostics> = {}): Preview
   ...overrides,
 })
 
+const resolvePageAnnotationVisibilities = async (
+  _pageId: string,
+  annotations: ReadonlyArray<{ id: string }>
+): Promise<Map<string, 'visible' | 'hidden' | 'dead'>> =>
+  new Map(
+    annotations.map((annotation) => {
+      if (annotation.id === 'annotation-hidden-acknowledged') {
+        return [annotation.id, 'hidden'] as const
+      }
+      if (annotation.id === 'annotation-dead-dismissed') {
+        return [annotation.id, 'dead'] as const
+      }
+      return [annotation.id, 'visible'] as const
+    })
+  )
+
 describe('desktopMcpProjectResources', () => {
-  it('builds a compact manifest with source links, revision metadata, and page references', () => {
-    const manifest = createDesktopMcpProjectManifest({
+  it('builds a compact manifest with source links, revision metadata, page references, and annotation counts', async () => {
+    const manifest = await createDesktopMcpProjectManifest(
+      {
       project: createProject(),
       theme: 'dark',
-    })
+      },
+      { resolvePageAnnotationVisibilities }
+    )
 
     expect(manifest.name).toBe('Desktop MCP project')
     expect(manifest.projectRevision).toMatch(/^rev-[0-9a-f]{8}$/)
@@ -126,6 +202,14 @@ describe('desktopMcpProjectResources', () => {
           column: 41,
         },
       ],
+      annotationCounts: {
+        open: 2,
+        pending: 1,
+      },
+    })
+    expect(manifest.pages[1]?.annotationCounts).toEqual({
+      open: 0,
+      pending: 0,
     })
   })
 
@@ -202,14 +286,13 @@ describe('desktopMcpProjectResources', () => {
       kind: 'runtime-error',
       message:
         'Invalid hook call. Hooks can only be called inside of the body of a function component.',
-      hint:
-        'This often means a hook is still running at module scope (for example Global config, or a bare page Hooks statement) instead of inside a page component. In Arcade, keep page state in top-level bindings in the page Hooks tab (for example `const [value, setValue] = useState(...)`), or define a custom hook function in Global config and call it from a page.',
+      hint: 'This often means a hook is still running at module scope (for example Global config, or a bare page Hooks statement) instead of inside a page component. In Arcade, keep page state in top-level bindings in the page Hooks tab (for example `const [value, setValue] = useState(...)`), or define a custom hook function in Global config and call it from a page.',
     })
     expect(runtimeIssue).not.toHaveProperty('pageId')
   })
 
-  it('surfaces sandbox render failures through arcade://project/diagnostics as structured runtime issues', () => {
-    const result = readDesktopMcpProjectResource(
+  it('surfaces sandbox render failures through arcade://project/diagnostics as structured runtime issues', async () => {
+    const result = await readDesktopMcpProjectResource(
       { uri: DESKTOP_MCP_PROJECT_DIAGNOSTICS_URI },
       {
         project: createProject(),
@@ -256,7 +339,7 @@ describe('desktopMcpProjectResources', () => {
     )
   })
 
-  it('returns preview context and pure source text for project resources', () => {
+  it('returns preview context and pure source text for project resources', async () => {
     const project = createProject()
     const context = {
       project,
@@ -264,7 +347,7 @@ describe('desktopMcpProjectResources', () => {
       diagnostics: createDiagnostics(),
     }
 
-    const previewContextResult = readDesktopMcpProjectResource(
+    const previewContextResult = await readDesktopMcpProjectResource(
       { uri: DESKTOP_MCP_PROJECT_PREVIEW_CONTEXT_URI },
       context
     )
@@ -278,7 +361,7 @@ describe('desktopMcpProjectResources', () => {
       theme: 'light',
     })
 
-    const sourceResult = readDesktopMcpProjectResource(
+    const sourceResult = await readDesktopMcpProjectResource(
       { uri: 'arcade://project/source/pages/page02/hooks' },
       context
     )
@@ -290,7 +373,7 @@ describe('desktopMcpProjectResources', () => {
     })
   })
 
-  it('returns source-not-found and invalid-resource-uri failures for unsupported project reads', () => {
+  it('returns source-not-found and invalid-resource-uri failures for unsupported project reads', async () => {
     const context = {
       project: createProject(),
       theme: 'dark' as const,
@@ -298,7 +381,7 @@ describe('desktopMcpProjectResources', () => {
     }
 
     expect(
-      readDesktopMcpProjectResource({ uri: 'arcade://project/source/pages/page99/jsx' }, context)
+      await readDesktopMcpProjectResource({ uri: 'arcade://project/source/pages/page99/jsx' }, context)
     ).toEqual({
       ok: false,
       code: 'source-not-found',
@@ -308,7 +391,7 @@ describe('desktopMcpProjectResources', () => {
     })
 
     expect(
-      readDesktopMcpProjectResource({ uri: 'arcade://project/source/pages/page02/css' }, context)
+      await readDesktopMcpProjectResource({ uri: 'arcade://project/source/pages/page02/css' }, context)
     ).toEqual({
       ok: false,
       code: 'invalid-resource-uri',
@@ -342,16 +425,17 @@ describe('desktopMcpProjectResources', () => {
     expect(renamedRevision).not.toBe(baseRevision)
   })
 
-  it('reads manifest and diagnostics through the public project resource entrypoints', () => {
+  it('reads manifest, diagnostics, and annotation resources through the public project resource entrypoints', async () => {
     const context = {
       project: createProject(),
       theme: 'dark' as const,
       diagnostics: createDiagnostics(),
     }
 
-    const manifestResult = readDesktopMcpProjectResource(
+    const manifestResult = await readDesktopMcpProjectResource(
       { uri: DESKTOP_MCP_PROJECT_MANIFEST_URI },
-      context
+      context,
+      { resolvePageAnnotationVisibilities }
     )
     expect(manifestResult.ok).toBe(true)
     if (!manifestResult.ok) {
@@ -359,7 +443,7 @@ describe('desktopMcpProjectResources', () => {
     }
     expect(JSON.parse(manifestResult.text).pages).toHaveLength(2)
 
-    const diagnosticsResult = readDesktopMcpProjectResource(
+    const diagnosticsResult = await readDesktopMcpProjectResource(
       { uri: DESKTOP_MCP_PROJECT_DIAGNOSTICS_URI },
       context
     )
@@ -368,5 +452,59 @@ describe('desktopMcpProjectResources', () => {
       throw new Error(diagnosticsResult.message)
     }
     expect(JSON.parse(diagnosticsResult.text).issues.length).toBeGreaterThanOrEqual(3)
+
+    const projectAnnotationsResult = await readDesktopMcpProjectResource(
+      { uri: DESKTOP_MCP_PROJECT_ANNOTATIONS_URI },
+      context,
+      { resolvePageAnnotationVisibilities }
+    )
+    expect(projectAnnotationsResult.ok).toBe(true)
+    if (!projectAnnotationsResult.ok) {
+      throw new Error(projectAnnotationsResult.message)
+    }
+
+    const projectAnnotations = JSON.parse(projectAnnotationsResult.text)
+    expect(projectAnnotations.counts).toMatchObject({
+      total: 3,
+      open: 2,
+      pending: 1,
+      acknowledged: 1,
+      resolved: 1,
+      dismissed: 0,
+      visible: 2,
+      hidden: 1,
+    })
+    expect(projectAnnotations.annotations.map((annotation: { id: string }) => annotation.id)).toEqual([
+      'annotation-visible-pending',
+      'annotation-hidden-acknowledged',
+      'annotation-visible-resolved',
+    ])
+
+    const pageAnnotationsResult = await readDesktopMcpProjectResource(
+      { uri: createDesktopMcpProjectPageAnnotationsUri('page01') },
+      context,
+      { resolvePageAnnotationVisibilities }
+    )
+    expect(pageAnnotationsResult.ok).toBe(true)
+    if (!pageAnnotationsResult.ok) {
+      throw new Error(pageAnnotationsResult.message)
+    }
+
+    const pageAnnotations = JSON.parse(pageAnnotationsResult.text)
+    expect(pageAnnotations.page).toEqual({
+      id: 'page01',
+      name: 'Start',
+      isActive: false,
+    })
+    expect(pageAnnotations.annotations).toEqual([
+      expect.objectContaining({
+        id: 'annotation-visible-pending',
+        targetVisibility: 'visible',
+      }),
+      expect.objectContaining({
+        id: 'annotation-hidden-acknowledged',
+        targetVisibility: 'hidden',
+      }),
+    ])
   })
 })

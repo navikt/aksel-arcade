@@ -1,4 +1,5 @@
 import type { DesktopMcpApplyChangesHandler } from './desktopMcpApplyChangesProtocol'
+import type { DesktopMcpAnnotationMutationHandler } from './desktopMcpAnnotationProtocol'
 import type { DesktopMcpPreviewCaptureHandler } from './desktopMcpPreviewCaptureProtocol'
 import type { DesktopMcpProjectResourceReadHandler } from './desktopMcpProjectResourceProtocol'
 
@@ -25,6 +26,7 @@ export interface DesktopArcadePreloadApi {
   setDesktopMcpProjectResourceReadHandler?: (
     handler: DesktopMcpProjectResourceReadHandler | null
   ) => void
+  setDesktopMcpAnnotationHandler?: (handler: DesktopMcpAnnotationMutationHandler | null) => void
   setDesktopMcpApplyChangesHandler?: (handler: DesktopMcpApplyChangesHandler | null) => void
   setDesktopMcpPreviewCaptureHandler?: (
     handler: DesktopMcpPreviewCaptureHandler | null
@@ -80,6 +82,7 @@ export const getDesktopPreloadApi = (): DesktopArcadePreloadApi | undefined => {
     typeof api.getShellCapabilities !== 'function' ||
     !hasOptionalFunction(api, 'getDesktopMcpServerState') ||
     !hasOptionalFunction(api, 'setDesktopMcpProjectResourceReadHandler') ||
+    !hasOptionalFunction(api, 'setDesktopMcpAnnotationHandler') ||
     !hasOptionalFunction(api, 'setDesktopMcpApplyChangesHandler') ||
     !hasOptionalFunction(api, 'setDesktopMcpPreviewCaptureHandler')
   ) {

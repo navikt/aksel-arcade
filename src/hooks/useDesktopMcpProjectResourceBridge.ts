@@ -16,11 +16,20 @@ import type {
   DesktopMcpApplyChangesFailure,
   DesktopMcpApplyChangesRequest,
 } from '@/services/desktopMcpApplyChangesProtocol'
+import { registerDesktopPreloadMcpAnnotationHandler } from '@/services/desktopMcpAnnotationAdapter'
+import {
+  mutateDesktopMcpAnnotation,
+} from '@/services/desktopMcpAnnotations'
+import type {
+  DesktopMcpAnnotationMutationFailure,
+  DesktopMcpAnnotationMutationHandler,
+} from '@/services/desktopMcpAnnotationProtocol'
 import {
   finalizeDesktopMcpPreviewCapture,
   prepareDesktopMcpPreviewCapture,
 } from '@/services/desktopMcpPreviewCapture'
 import { registerDesktopPreloadMcpPreviewCaptureHandler } from '@/services/desktopMcpPreviewCaptureAdapter'
+import { resolveDesktopMcpAnnotationVisibilitiesInSandbox } from '@/services/desktopMcpAnnotations'
 import { capturePreviewInIsolatedSandbox } from '@/services/desktopMcpPreviewCaptureSandbox'
 import type {
   DesktopMcpPreviewCaptureRequest,
@@ -38,7 +47,19 @@ interface UseDesktopMcpProjectResourceBridgeOptions {
   workingCopyPreferences: WebArcadeWorkingCopyPreferences
   setTheme: (theme: ThemeMode) => void
   replaceProjectState: (project: Project) => void
+  updateProject: (updates: Partial<Pick<Project, 'annotations' | 'name' | 'viewportSize' | 'panelLayout' | 'activePageId'>> & {
+    jsxCode?: string
+    hooksCode?: string
+  }) => void
   updatePreviewState: (updates: Partial<PreviewState>) => void
+}
+
+interface DesktopMcpResourceBridgeContext {
+  project: Project
+  theme: ThemeMode
+  diagnostics: ReturnType<typeof collectPreviewDiagnostics>
+  transpiledCode: string | null
+  compileError: PreviewState['compileError']
 }
 
 export const useDesktopMcpProjectResourceBridge = ({
@@ -49,9 +70,10 @@ export const useDesktopMcpProjectResourceBridge = ({
   workingCopyPreferences,
   setTheme,
   replaceProjectState,
+  updateProject,
   updatePreviewState,
 }: UseDesktopMcpProjectResourceBridgeOptions): void => {
-  const resourceContextRef = useRef({
+  const resourceContextRef = useRef<DesktopMcpResourceBridgeContext>({
     project,
     theme,
     diagnostics: collectPreviewDiagnostics(previewState),
@@ -76,9 +98,23 @@ export const useDesktopMcpProjectResourceBridge = ({
   }, [workingCopyPreferences])
 
   const handleProjectResourceRead = useCallback(
-    (request: DesktopMcpProjectResourceReadRequest) =>
-      readDesktopMcpProjectResource(request, resourceContextRef.current),
-    []
+    async (request: DesktopMcpProjectResourceReadRequest) =>
+      readDesktopMcpProjectResource(request, resourceContextRef.current, {
+        resolvePageAnnotationVisibilities: async (pageId, annotations) => {
+          const currentContext = resourceContextRef.current
+          return resolveDesktopMcpAnnotationVisibilitiesInSandbox({
+            annotations,
+            transpiledCode:
+              currentContext.compileError === null ? currentContext.transpiledCode : null,
+            pageId,
+            startPageId: currentContext.project.source.startPageId,
+            theme: currentContext.theme,
+            viewportWidth: getViewportWidth(currentContext.project.viewportSize),
+            viewportHeight: Math.max(1, previewIframeRef.current?.clientHeight ?? 900),
+          })
+        },
+      }),
+    [previewIframeRef]
   )
 
   const handleApplyChanges = useCallback(
@@ -133,6 +169,60 @@ export const useDesktopMcpProjectResourceBridge = ({
     [replaceProjectState, setTheme, updatePreviewState]
   )
 
+  const handleAnnotationMutation = useCallback<DesktopMcpAnnotationMutationHandler>(
+    async (request) => {
+      const currentContext = resourceContextRef.current
+      const annotation = currentContext.project.annotations.find(
+        (item) => item.id === request.annotationId
+      )
+      if (!annotation) {
+        return mutateDesktopMcpAnnotation(currentContext.project, request)
+      }
+
+      const visibility = await resolveDesktopMcpAnnotationVisibilitiesInSandbox({
+        annotations: [annotation],
+        transpiledCode: currentContext.compileError === null ? currentContext.transpiledCode : null,
+        pageId: annotation.pageId,
+        startPageId: currentContext.project.source.startPageId,
+        theme: currentContext.theme,
+        viewportWidth: getViewportWidth(currentContext.project.viewportSize),
+        viewportHeight: Math.max(1, previewIframeRef.current?.clientHeight ?? 900),
+      })
+
+      const result = mutateDesktopMcpAnnotation(currentContext.project, request, {
+        isDeadTarget: (item) => visibility.get(item.id) === 'dead',
+      })
+
+      if (result.ok) {
+        const nextProject = {
+          ...currentContext.project,
+          annotations: result.annotations,
+          lastModified: new Date().toISOString(),
+        }
+        const saveResult = saveProject(nextProject, {
+          preferences: workingCopyPreferencesRef.current,
+          updateLastModified: false,
+        })
+        if (!saveResult.success) {
+          return createAnnotationMutationPersistenceFailure(request.annotationId, saveResult)
+        }
+
+        if (saveResult.warning) {
+          console.warn(saveResult.warning)
+        }
+
+        resourceContextRef.current = {
+          ...currentContext,
+          project: nextProject,
+        }
+        updateProject({ annotations: result.annotations })
+      }
+
+      return result
+    },
+    [previewIframeRef, updateProject]
+  )
+
   const handleCapturePreviewEvidence = useCallback(
     async (
       request: DesktopMcpPreviewCaptureRequest
@@ -163,6 +253,8 @@ export const useDesktopMcpProjectResourceBridge = ({
         layers: prepared.requestedLayers,
         interactions: prepared.requestedInteractions,
         screenshotScope: prepared.screenshotScope,
+        includeAnnotationOverlays: prepared.includeAnnotationOverlays,
+        annotations: currentContext.project.annotations,
         ...(prepared.target ? { target: prepared.target } : {}),
       })
 
@@ -178,6 +270,8 @@ export const useDesktopMcpProjectResourceBridge = ({
   useLayoutEffect(() => {
     const unregisterProjectRead =
       registerDesktopPreloadMcpProjectResourceReadHandler(handleProjectResourceRead)
+    const unregisterAnnotationMutation =
+      registerDesktopPreloadMcpAnnotationHandler(handleAnnotationMutation)
     const unregisterApplyChanges = registerDesktopPreloadMcpApplyChangesHandler(handleApplyChanges)
     const unregisterPreviewCapture =
       registerDesktopPreloadMcpPreviewCaptureHandler(handleCapturePreviewEvidence)
@@ -185,9 +279,15 @@ export const useDesktopMcpProjectResourceBridge = ({
     return () => {
       unregisterPreviewCapture?.()
       unregisterApplyChanges?.()
+      unregisterAnnotationMutation?.()
       unregisterProjectRead?.()
     }
-  }, [handleApplyChanges, handleCapturePreviewEvidence, handleProjectResourceRead])
+  }, [
+    handleAnnotationMutation,
+    handleApplyChanges,
+    handleCapturePreviewEvidence,
+    handleProjectResourceRead,
+  ])
 }
 
 const createApplyChangesPersistenceFailure = ({
@@ -201,5 +301,20 @@ const createApplyChangesPersistenceFailure = ({
     ok: false,
     code: detail && /exceeds 5MB limit/i.test(detail) ? 'payload-too-large' : 'persistence-failed',
     message,
+  }
+}
+
+const createAnnotationMutationPersistenceFailure = (
+  annotationId: string,
+  { error }: Pick<SaveResult, 'error'>
+): DesktopMcpAnnotationMutationFailure => {
+  const baseMessage = `Desktop MCP annotation "${annotationId}" could not be persisted.`
+  const detail = error?.trim()
+
+  return {
+    ok: false,
+    code: 'persistence-failed',
+    annotationId,
+    message: detail ? `${baseMessage} ${detail}` : baseMessage,
   }
 }

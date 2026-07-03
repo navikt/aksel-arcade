@@ -1,6 +1,7 @@
 import { CURRENT_PROJECT_VERSION, type Project, type ViewportSize } from '@/types/project'
 import type { EditorState } from '@/types/editor'
 import type { PreviewState } from '@/types/preview'
+import { createEmptyAnnotations } from '@/services/annotations'
 import { generateSecureUUID } from '@/utils/crypto'
 import { FIRST_PAGE_ID, createSinglePageProjectSource } from '@/services/projectSource'
 import { getViewportWidth } from '@/types/viewports'
@@ -481,6 +482,7 @@ export const createDefaultProject = (): Project => ({
   name: 'Untitled Project',
   source: createSinglePageProjectSource(INTRO_JSX_CODE, INTRO_HOOKS_CODE),
   activePageId: FIRST_PAGE_ID,
+  annotations: createEmptyAnnotations(),
   viewportSize: 'MD',
   panelLayout: 'editor-left',
   version: CURRENT_PROJECT_VERSION,

@@ -93,8 +93,8 @@ describe('Preview fullscreen entry control', () => {
 
     expect(toggle.getAttribute('aria-pressed')).toBe('false')
     expect(screen.getByTestId('settings-preview-fullscreen').textContent).toBe('false')
-    expect(toggle.getAttribute('data-size')).toBe('small')
-    expect(inspect.getAttribute('data-size')).toBe('small')
+    expect(toggle.getAttribute('data-size')).toBe('xsmall')
+    expect(inspect.getAttribute('data-size')).toBe('xsmall')
 
     await user.click(toggle)
 
@@ -102,7 +102,7 @@ describe('Preview fullscreen entry control', () => {
     expect(screen.getByTestId('settings-preview-fullscreen').textContent).toBe('true')
     expect(document.activeElement).toBe(screen.getByRole('button', { name: /preview fullscreen/i }))
     expect(screen.getByTestId('preview-iframe')).toBe(previewIframe)
-    expect(toggle.getAttribute('data-size')).toBe('small')
+    expect(toggle.getAttribute('data-size')).toBe('xsmall')
   })
 
   it('keeps inspect and viewport state while exiting fullscreen from chrome and restores focus to the toggle', async () => {

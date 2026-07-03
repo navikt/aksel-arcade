@@ -19,6 +19,7 @@ const createTestProject = (): Project => ({
   name: 'Project source test',
   source: createSinglePageProjectSource('<Box>Page 1</Box>', 'export const usePage = () => "one"'),
   activePageId: FIRST_PAGE_ID,
+  annotations: [],
   viewportSize: 'MD',
   panelLayout: 'editor-left',
   version: CURRENT_PROJECT_VERSION,
@@ -28,7 +29,10 @@ const createTestProject = (): Project => ({
 
 describe('projectSource service', () => {
   it('creates the canonical migrated single-page source with Page 1 and empty global config', () => {
-    const source = createSinglePageProjectSource('<Box>Legacy JSX</Box>', 'export const useLegacy = () => "legacy"')
+    const source = createSinglePageProjectSource(
+      '<Box>Legacy JSX</Box>',
+      'export const useLegacy = () => "legacy"'
+    )
 
     expect(source).toEqual({
       globalConfig: { jsx: '', hooks: '' },

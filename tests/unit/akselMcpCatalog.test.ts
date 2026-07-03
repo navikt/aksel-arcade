@@ -1,18 +1,20 @@
 import fs from 'node:fs'
 import path from 'node:path'
-import { createRequire } from 'node:module'
 import { describe, expect, it } from 'vitest'
 import { getNewAuthoringPolicy } from '../../src/data/akselAuthoringPolicy'
+import { AKSEL_MCP_CATALOG_DATA } from '../../src/shared/desktopMcp/akselCatalogData.generated'
 import {
   akselComponentResourceUri,
   buildMcpAkselCatalog,
   listMcpAuthoringEntries,
-  renderMcpAkselCatalogModule,
+  renderSharedMcpAkselCatalogModule,
   resolveSnippetCode,
 } from '../../scripts/lib/akselMcpCatalog'
 
-const require = createRequire(import.meta.url)
-const generatedArtifactPath = path.resolve(process.cwd(), 'desktop/akselCatalogData.generated.cjs')
+const sharedGeneratedArtifactPath = path.resolve(
+  process.cwd(),
+  'src/shared/desktopMcp/akselCatalogData.generated.ts'
+)
 
 describe('akselMcpCatalog builder', () => {
   it('resolves editor insertion placeholders to clean, runnable code', () => {
@@ -91,11 +93,9 @@ describe('akselMcpCatalog builder', () => {
     expect(listMcpAuthoringEntries().every((entry) => entry.group !== 'icon')).toBe(true)
   })
 
-  it('keeps the committed desktop artifact in sync with the builder (no drift)', () => {
-    const fileContents = fs.readFileSync(generatedArtifactPath, 'utf8')
-    expect(fileContents).toBe(renderMcpAkselCatalogModule())
-
-    const generated = require(generatedArtifactPath)
-    expect(generated).toEqual(buildMcpAkselCatalog())
+  it('keeps the committed shared artifact in sync with the builder (no drift)', () => {
+    const sharedFileContents = fs.readFileSync(sharedGeneratedArtifactPath, 'utf8')
+    expect(sharedFileContents).toBe(renderSharedMcpAkselCatalogModule())
+    expect(AKSEL_MCP_CATALOG_DATA).toEqual(buildMcpAkselCatalog())
   })
 })

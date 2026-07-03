@@ -83,6 +83,14 @@ export const EditorPane = () => {
       ),
     [project.source]
   )
+  const annotationRecordCountsByPage = useMemo(
+    () =>
+      project.annotations.reduce<Partial<Record<ArcadePageId, number>>>((counts, annotation) => {
+        counts[annotation.pageId] = (counts[annotation.pageId] ?? 0) + 1
+        return counts
+      }, {}),
+    [project.annotations]
+  )
 
   const handleCodeChange = (newContent: string) => {
     if (currentTab === 'JSX') {
@@ -245,6 +253,7 @@ export const EditorPane = () => {
             startPageId={project.source.startPageId}
             pages={project.source.pages}
             brokenNavigationPageIds={pageReferenceAnalysis.brokenNavigationPageIds}
+            annotationRecordCounts={annotationRecordCountsByPage}
             deletePageImpacts={deletePageImpacts}
             errorPageIds={errorPageIds}
             selectedEditTarget={effectiveEditTarget}
