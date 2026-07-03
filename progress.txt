@@ -7,16 +7,24 @@ Implemented:
 - Increased the Electron main-process annotation mutation route timeout from 5s to 30s so it can outlive the renderer-side annotation target-resolution sandbox path, which may wait up to 20s before mutating.
 - Added a focused Desktop main-process regression proving an annotation mutation response that arrives after the old 5s cutoff is still accepted.
 - Updated the older Desktop MCP smoke tool-list expectation to the current 9-tool surface.
+- Fixed the follow-up mutation timeout root cause in `desktop/preload.cjs`: the annotation mutation IPC route handler was accidentally scoped inside the project-resource route handler, so annotation IPC events could not call it and Electron main waited until timeout. The handler is now top-level and covered by a preload regression.
 
 Verification:
 
 - npm run type-check
 - npm run lint
 - npm test -- --run
+- Human-style Desktop MCP smoke using Electron + real HTTP MCP calls:
+  - created pending annotations through Desktop Arcade annotation mode,
+  - called `watch_annotations` with existing pending work and with delayed pending work,
+  - called `acknowledge_annotation` and confirmed pending-only work no longer included it while open work did,
+  - called `reply_to_annotation` and confirmed thread state without status change,
+  - called `resolve_annotation` and confirmed resolved/history state,
+  - called `dismiss_annotation` with reason `no to you` and confirmed dismissed/history state,
+  - confirmed these annotation tool calls no longer timed out.
 
 Current blocker:
 
-- The user-requested live Desktop checklist is not fully complete yet because creating a new annotation during the Playwright/Desktop smoke flow is not becoming durable project/MCP state in this environment, even when the preview shows annotation-selection UI. The mutation runtime/timeout fixes are in place, but the smoke harness still needs a reliable pending-annotation creation path before the full checklist can pass end-to-end.
 - `npx playwright test tests/e2e/desktop-mcp-smoke.spec.ts` still fails on the existing post-`apply_changes` visible-preview assertion (`Smoke entry` does not render in the live iframe), even after updating the fixture to inline Arcade JSX. The Web Arcade exclusion case in that spec passes.
 
 ### 2026-07-02 - Issue #323: Persist annotations in packages and Web share URLs

@@ -44,59 +44,6 @@ const routeDesktopMcpProjectResourceRequest = async (payload) => {
     return
   }
 
-  const routeDesktopMcpAnnotationMutationRequest = async (payload) => {
-    const requestId =
-      isRecord(payload) && typeof payload.requestId === 'string' ? payload.requestId : null
-    if (!requestId) {
-      return
-    }
-
-    const request = parseDesktopMcpAnnotationMutationRequest(payload)
-    if (!request) {
-      ipcRenderer.send(ROUTE_DESKTOP_MCP_ANNOTATION_MUTATION_RESPONSE_CHANNEL, {
-        requestId,
-        response: createDesktopMcpAnnotationMutationFailure(
-          'invalid-annotation-payload',
-          getPayloadAnnotationId(payload),
-          'Desktop MCP annotation mutation request from the main process was invalid.'
-        ),
-      })
-      return
-    }
-
-    if (!desktopMcpAnnotationMutationHandler) {
-      ipcRenderer.send(ROUTE_DESKTOP_MCP_ANNOTATION_MUTATION_RESPONSE_CHANNEL, {
-        requestId,
-        response: createDesktopMcpAnnotationMutationFailure(
-          'project-unavailable',
-          request.annotationId,
-          'Desktop MCP annotation mutations are not available in the renderer yet.'
-        ),
-      })
-      return
-    }
-
-    try {
-      const response = await desktopMcpAnnotationMutationHandler(request)
-      ipcRenderer.send(ROUTE_DESKTOP_MCP_ANNOTATION_MUTATION_RESPONSE_CHANNEL, {
-        requestId,
-        response,
-      })
-    } catch (error) {
-      ipcRenderer.send(ROUTE_DESKTOP_MCP_ANNOTATION_MUTATION_RESPONSE_CHANNEL, {
-        requestId,
-        response: createDesktopMcpAnnotationMutationFailure(
-          'project-unavailable',
-          request.annotationId,
-          getRedactedAgentErrorMessage(
-            error,
-            'Desktop MCP annotation mutation failed unexpectedly in the renderer.'
-          )
-        ),
-      })
-    }
-  }
-
   const request = parseDesktopMcpProjectResourceRequest(payload)
   if (!request) {
     ipcRenderer.send(ROUTE_DESKTOP_MCP_PROJECT_RESOURCE_RESPONSE_CHANNEL, {
@@ -137,6 +84,59 @@ const routeDesktopMcpProjectResourceRequest = async (payload) => {
         getRedactedAgentErrorMessage(
           error,
           'Desktop MCP project resource read failed unexpectedly in the renderer.'
+        )
+      ),
+    })
+  }
+}
+
+const routeDesktopMcpAnnotationMutationRequest = async (payload) => {
+  const requestId =
+    isRecord(payload) && typeof payload.requestId === 'string' ? payload.requestId : null
+  if (!requestId) {
+    return
+  }
+
+  const request = parseDesktopMcpAnnotationMutationRequest(payload)
+  if (!request) {
+    ipcRenderer.send(ROUTE_DESKTOP_MCP_ANNOTATION_MUTATION_RESPONSE_CHANNEL, {
+      requestId,
+      response: createDesktopMcpAnnotationMutationFailure(
+        'invalid-annotation-payload',
+        getPayloadAnnotationId(payload),
+        'Desktop MCP annotation mutation request from the main process was invalid.'
+      ),
+    })
+    return
+  }
+
+  if (!desktopMcpAnnotationMutationHandler) {
+    ipcRenderer.send(ROUTE_DESKTOP_MCP_ANNOTATION_MUTATION_RESPONSE_CHANNEL, {
+      requestId,
+      response: createDesktopMcpAnnotationMutationFailure(
+        'project-unavailable',
+        request.annotationId,
+        'Desktop MCP annotation mutations are not available in the renderer yet.'
+      ),
+    })
+    return
+  }
+
+  try {
+    const response = await desktopMcpAnnotationMutationHandler(request)
+    ipcRenderer.send(ROUTE_DESKTOP_MCP_ANNOTATION_MUTATION_RESPONSE_CHANNEL, {
+      requestId,
+      response,
+    })
+  } catch (error) {
+    ipcRenderer.send(ROUTE_DESKTOP_MCP_ANNOTATION_MUTATION_RESPONSE_CHANNEL, {
+      requestId,
+      response: createDesktopMcpAnnotationMutationFailure(
+        'project-unavailable',
+        request.annotationId,
+        getRedactedAgentErrorMessage(
+          error,
+          'Desktop MCP annotation mutation failed unexpectedly in the renderer.'
         )
       ),
     })
