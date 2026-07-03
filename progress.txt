@@ -218,6 +218,37 @@ Verification:
   - called `reply_to_annotation` and confirmed thread state without status change,
   - called `resolve_annotation` and confirmed resolved/history state,
   - called `dismiss_annotation` with reason `no to you` and confirmed dismissed/history state,
+
+### 2026-07-03 - Issue #345: Serve Desktop MCP resources through the SDK server
+
+Implemented:
+
+- Chose issue `#345` as the highest-priority `ready-for-agent` slice from `#345`-`#350` because it is the root unblocked dependency for `#346`, `#347`, `#348`, `#349`, and ultimately `#350`.
+- Read issue `#342`, `CONTEXT.md`, ADR `0025`, and `docs/desktop-mcp-contract.md` before changing the SDK server surface.
+- Rebuilt the SDK-backed Desktop MCP resource surface in a dedicated `desktop/mcpSdkResources.ts` module instead of keeping resource logic inside the bootstrap server:
+  - re-registered stable Desktop guidance/resources (`start-here`, workflows, operating guide, authoring guide, capabilities, apply-changes reference, Aksel catalog, manifest, annotations, preview context, diagnostics, and global source resources),
+  - added spec-native `resources/templates/list` coverage for page JSX/Hooks source, page annotations, Aksel component details, and Preview capture resource families,
+  - wired `resources/read` back to the existing renderer-owned active-project reader so the MCP layer stays a thin adapter.
+- Preserved the existing Aksel MCP resource semantics on the SDK path for `arcade://aksel/catalog` and `arcade://aksel/components/{name}`, including exact matches, aliases, hidden/deprecated replacement guidance, and did-you-mean suggestions.
+- Kept Preview capture resources readable through the SDK path when capture artifacts exist, with an explicit TTL-backed in-memory store ready for later tool slices.
+- Updated the SDK bootstrap instructions/capabilities resource so they now describe the current state accurately: SDK-managed negotiation, fixed local no-auth endpoint, active-project scope, resources/templates available, and tools intentionally still absent until later slices.
+- Added focused regression coverage:
+  - `tests/unit/services/desktopMcpSdkServer.test.ts` now verifies `resources/list`, `resources/templates/list`, representative `resources/read` success paths, and invalid-resource failures on the SDK server.
+  - `tests/e2e/issue-345-desktop-mcp-sdk-resources.spec.ts` runs the issue checklist through a real Electron app + live MCP endpoint, including visual Desktop status checks and comparing the active page source resource against the visible editor content.
+- Fixed two follow-up runtime path issues discovered during the practical Desktop verification:
+  - `createRequire(import.meta.url)` broke the CJS desktop bundle, so the new resource loader now uses `createRequire(__filename)`.
+  - CJS bundle resource requires needed to work from both `desktop/` in Vitest and `desktop/dist/` in the built Electron app, so the loader now resolves runtime assets relative to either directory shape.
+
+Verification:
+
+- `npm run typecheck`
+- `npm run lint`
+- `npm test -- --run`
+- `npm run test:e2e -- tests/e2e/issue-345-desktop-mcp-sdk-resources.spec.ts`
+
+Next note:
+
+- The SDK endpoint now has the resource contract back, but `tools/list` / `tools/call` remain intentionally unregistered on this branch. The next person should pick up `#346` to restore `read_resource`, annotation read tools, and Preview capture as SDK tools while keeping the capabilities resource aligned with what is actually live.
   - confirmed these annotation tool calls no longer timed out.
 - Follow-up after PR review/CI:
   - fixed `npm run build` TypeScript failures that `npm run type-check` did not surface locally,
