@@ -15,21 +15,49 @@ const postMcpRequest = async (payload: Record<string, unknown>) => {
     method: 'POST',
     headers: {
       'content-type': 'application/json',
+      accept: 'application/json, text/event-stream',
     },
     body: JSON.stringify(payload),
   })
 
   expect(response.status).toBe(200)
-  return response.json()
+  return parseJsonOrSse(await response.text())
+}
+
+const parseJsonOrSse = (bodyText: string) => {
+  if (!bodyText.startsWith('event:')) {
+    return JSON.parse(bodyText) as Record<string, unknown>
+  }
+
+  const dataLines = bodyText
+    .split('\n')
+    .filter((line) => line.startsWith('data: '))
+    .map((line) => line.slice('data: '.length))
+
+  return JSON.parse(dataLines.join('\n')) as Record<string, unknown>
+}
+
+interface JsonRpcSuccessResult<T> {
+  jsonrpc: '2.0'
+  id: number
+  result: T
+}
+
+interface ResourceReadResultPayload {
+  contents: Array<{
+    uri: string
+    mimeType: string
+    text: string
+  }>
 }
 
 const readMcpResource = async (id: number, uri: string) => {
-  const payload = await postMcpRequest({
+  const payload = (await postMcpRequest({
     jsonrpc: '2.0',
     id,
     method: 'resources/read',
     params: { uri },
-  })
+  })) as unknown as JsonRpcSuccessResult<ResourceReadResultPayload>
 
   return payload.result.contents[0] as {
     uri: string
@@ -61,7 +89,7 @@ test.describe('Desktop MCP on-demand Aksel resources', () => {
       const page = await app.firstWindow()
       await waitForDefaultPreview(page)
 
-      const initialize = await postMcpRequest({
+      const initialize = (await postMcpRequest({
         jsonrpc: '2.0',
         id: 1,
         method: 'initialize',
@@ -70,7 +98,9 @@ test.describe('Desktop MCP on-demand Aksel resources', () => {
           capabilities: {},
           clientInfo: { name: 'e2e-client', version: '1.0.0' },
         },
-      })
+      })) as unknown as JsonRpcSuccessResult<{
+        instructions: string
+      }>
       expect(typeof initialize.result.instructions).toBe('string')
       expect(initialize.result.instructions).toContain('goToPage')
       expect(initialize.result.instructions).toContain('import-free')
@@ -156,15 +186,16 @@ test.describe('Desktop MCP on-demand Aksel resources', () => {
 
       const authoringGuide = await readMcpResource(8, 'arcade://desktop/authoring-guide')
       expect(authoringGuide.text).toContain(
-        'Read `arcade://aksel/catalog` before guessing a component name'
+        '## Getting Aksel component usage (on demand — fetch only the components you need)'
       )
+      expect(authoringGuide.text).toContain('`arcade://aksel/catalog`')
       expect(authoringGuide.text).toContain('`Alert` is deprecated')
 
       const operations = await readMcpResource(9, 'arcade://desktop/apply-changes-operations')
       expect(operations.mimeType).toBe('text/markdown')
       expect(operations.text).toContain('`create_page`')
       expect(operations.text).toContain('`replace_source`')
-      expect(operations.text).toContain('may target any matching')
+      expect(operations.text).toContain('Target the page with either `pageId` or `tempPageRef`.')
       expect(operations.text).toContain('Final-state assertions')
     } finally {
       await app.close()
