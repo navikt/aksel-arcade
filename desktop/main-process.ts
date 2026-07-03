@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, net, protocol, type IpcMainEvent } from 'electron'
+import { app, BrowserWindow, ipcMain, net, protocol } from 'electron'
 import path from 'node:path'
 import { pathToFileURL } from 'node:url'
 import type {
@@ -16,6 +16,15 @@ import type {
   DesktopMcpPreviewCaptureRequest,
   DesktopMcpPreviewCaptureResult,
 } from '../src/services/desktopMcpPreviewCaptureProtocol'
+import type {
+  DesktopMcpProjectResourceReadFailure,
+  DesktopMcpProjectResourceReadRequest,
+  DesktopMcpProjectResourceReadResult,
+} from '../src/services/desktopMcpProjectResourceProtocol'
+import {
+  createDesktopMcpBridgeRoute,
+  type DesktopMcpBridgePendingRequest,
+} from './desktopMcpBridgeRouter'
 import { createDesktopMcpServer } from './mcpSdkServer'
 
 const SHELL_CAPABILITIES_CHANNEL = 'aksel-arcade:get-shell-capabilities'
@@ -60,49 +69,21 @@ interface DesktopCapabilities {
   }
 }
 
-interface ProjectResourceReadSuccess {
-  ok: true
-  uri: string
-  mimeType: string
-  text: string
+interface PendingProjectResourceRequest
+  extends DesktopMcpBridgePendingRequest<DesktopMcpProjectResourceReadResult> {
+  request: DesktopMcpProjectResourceReadRequest
 }
 
-interface ProjectResourceReadFailure {
-  ok: false
-  code: 'project-unavailable' | 'source-not-found' | 'invalid-resource-uri'
-  resourceUri: string
-  message: string
-}
-
-type DesktopMcpProjectResourceReadResult = ProjectResourceReadSuccess | ProjectResourceReadFailure
-
-interface PendingProjectResourceRequest {
-  resolve: (value: DesktopMcpProjectResourceReadResult) => void
-  timeout: ReturnType<typeof setTimeout>
-  uri: string
-  webContentsId: number
-}
-
-interface PendingAnnotationMutationRequest {
-  resolve: (value: DesktopMcpAnnotationMutationResult) => void
-  timeout: ReturnType<typeof setTimeout>
+interface PendingAnnotationMutationRequest
+  extends DesktopMcpBridgePendingRequest<DesktopMcpAnnotationMutationResult> {
   request: {
     annotationId: string
   }
-  webContentsId: number
 }
 
-interface PendingApplyChangesRequest {
-  resolve: (value: DesktopMcpApplyChangesResult) => void
-  timeout: ReturnType<typeof setTimeout>
-  webContentsId: number
-}
+type PendingApplyChangesRequest = DesktopMcpBridgePendingRequest<DesktopMcpApplyChangesResult>
 
-interface PendingPreviewCaptureRequest {
-  resolve: (value: DesktopMcpPreviewCaptureResult) => void
-  timeout: ReturnType<typeof setTimeout>
-  webContentsId: number
-}
+type PendingPreviewCaptureRequest = DesktopMcpBridgePendingRequest<DesktopMcpPreviewCaptureResult>
 
 const desktopMcpServer = createDesktopMcpServer({
   readProjectResource: routeDesktopMcpProjectResourceRead,
@@ -111,17 +92,6 @@ const desktopMcpServer = createDesktopMcpServer({
   capturePreviewEvidence: routeDesktopMcpPreviewCapture,
 })
 let activeMainWindow: BrowserWindow | null = null
-let nextDesktopMcpProjectResourceRequestId = 0
-const pendingDesktopMcpProjectResourceRequests = new Map<string, PendingProjectResourceRequest>()
-let nextDesktopMcpAnnotationMutationRequestId = 0
-const pendingDesktopMcpAnnotationMutationRequests = new Map<
-  string,
-  PendingAnnotationMutationRequest
->()
-let nextDesktopMcpApplyChangesRequestId = 0
-const pendingDesktopMcpApplyChangesRequests = new Map<string, PendingApplyChangesRequest>()
-let nextDesktopMcpPreviewCaptureRequestId = 0
-const pendingDesktopMcpPreviewCaptureRequests = new Map<string, PendingPreviewCaptureRequest>()
 let desktopRendererProtocolRegistered = false
 let desktopMainProcessStartPromise: Promise<void> | null = null
 
@@ -157,40 +127,193 @@ const cloneDesktopCapabilities = (): DesktopCapabilities => ({
   projectPackages: { ...DESKTOP_ARCADE_CAPABILITIES.projectPackages },
 })
 
+const desktopMcpProjectResourceRoute = createDesktopMcpBridgeRoute<
+  DesktopMcpProjectResourceReadRequest,
+  DesktopMcpProjectResourceReadResult,
+  PendingProjectResourceRequest
+>({
+  requestChannel: ROUTE_DESKTOP_MCP_PROJECT_RESOURCE_REQUEST_CHANNEL,
+  responseChannel: ROUTE_DESKTOP_MCP_PROJECT_RESOURCE_RESPONSE_CHANNEL,
+  requestIdPrefix: 'desktop-mcp-project-resource',
+  timeoutMs: DESKTOP_MCP_PROJECT_RESOURCE_ROUTE_TIMEOUT_MS,
+  getTargetWindow: getDesktopMcpActiveWindow,
+  buildRequestPayload: (requestId, request) => ({ requestId, ...request }),
+  createPendingRequest: (request, resolve, timeout, webContentsId) => ({
+    request,
+    resolve,
+    timeout,
+    webContentsId,
+  }),
+  createNoTargetWindowResult: ({ uri }) =>
+    createDesktopMcpProjectResourceFailure(
+      'project-unavailable',
+      uri,
+      'Desktop Arcade project resources are unavailable because no renderer window is available.'
+    ),
+  createTimeoutResult: ({ request }) =>
+    createDesktopMcpProjectResourceFailure(
+      'project-unavailable',
+      request.uri,
+      'Desktop Arcade project resources are unavailable because the renderer did not respond in time.'
+    ),
+  createSendFailureResult: ({ request }) =>
+    createDesktopMcpProjectResourceFailure(
+      'project-unavailable',
+      request.uri,
+      'Desktop Arcade project resources are unavailable because the renderer window is no longer reachable.'
+    ),
+  createInvalidResponseResult: ({ request }) =>
+    createDesktopMcpProjectResourceFailure(
+      'project-unavailable',
+      request.uri,
+      'Desktop Arcade project resources are unavailable because the renderer returned an invalid response.'
+    ),
+  isResult: (value, pendingRequest) => isDesktopMcpProjectResourceReadResult(value, pendingRequest.request.uri),
+})
+
+const desktopMcpAnnotationMutationRoute = createDesktopMcpBridgeRoute<
+  DesktopMcpAnnotationMutationRequest,
+  DesktopMcpAnnotationMutationResult,
+  PendingAnnotationMutationRequest
+>({
+  requestChannel: ROUTE_DESKTOP_MCP_ANNOTATION_MUTATION_REQUEST_CHANNEL,
+  responseChannel: ROUTE_DESKTOP_MCP_ANNOTATION_MUTATION_RESPONSE_CHANNEL,
+  requestIdPrefix: 'desktop-mcp-annotation-mutation',
+  timeoutMs: DESKTOP_MCP_ANNOTATION_MUTATION_ROUTE_TIMEOUT_MS,
+  getTargetWindow: getDesktopMcpActiveWindow,
+  buildRequestPayload: (requestId, request) => ({ requestId, ...request }),
+  createPendingRequest: (request, resolve, timeout, webContentsId) => ({
+    request: { annotationId: request.annotationId },
+    resolve,
+    timeout,
+    webContentsId,
+  }),
+  createNoTargetWindowResult: (request) =>
+    createDesktopMcpAnnotationMutationFailure(
+      'project-unavailable',
+      request.annotationId,
+      'Desktop Arcade annotation mutations are unavailable because no renderer window is available.'
+    ),
+  createTimeoutResult: ({ request }) =>
+    createDesktopMcpAnnotationMutationFailure(
+      'project-unavailable',
+      request.annotationId,
+      'Desktop Arcade annotation mutation timed out before the renderer responded.'
+    ),
+  createSendFailureResult: ({ request }) =>
+    createDesktopMcpAnnotationMutationFailure(
+      'project-unavailable',
+      request.annotationId,
+      'Desktop Arcade annotation mutations are unavailable because the renderer window is no longer reachable.'
+    ),
+  createInvalidResponseResult: ({ request }) =>
+    createDesktopMcpAnnotationMutationFailure(
+      'project-unavailable',
+      request.annotationId,
+      'Desktop Arcade annotation mutations are unavailable because the renderer returned an invalid response.'
+    ),
+  isResult: (value) => isDesktopMcpAnnotationMutationResult(value),
+})
+
+const desktopMcpApplyChangesRoute = createDesktopMcpBridgeRoute<
+  DesktopMcpApplyChangesRequest,
+  DesktopMcpApplyChangesResult,
+  PendingApplyChangesRequest
+>({
+  requestChannel: ROUTE_DESKTOP_MCP_APPLY_CHANGES_REQUEST_CHANNEL,
+  responseChannel: ROUTE_DESKTOP_MCP_APPLY_CHANGES_RESPONSE_CHANNEL,
+  requestIdPrefix: 'desktop-mcp-apply-changes',
+  timeoutMs: DESKTOP_MCP_APPLY_CHANGES_ROUTE_TIMEOUT_MS,
+  getTargetWindow: getDesktopMcpActiveWindow,
+  buildRequestPayload: (requestId, request) => ({ requestId, ...request }),
+  createPendingRequest: (_request, resolve, timeout, webContentsId) => ({
+    resolve,
+    timeout,
+    webContentsId,
+  }),
+  createNoTargetWindowResult: () =>
+    createDesktopMcpApplyChangesFailure(
+      'project-unavailable',
+      'Desktop Arcade MCP apply_changes is unavailable because no renderer window is available.'
+    ),
+  createTimeoutResult: () =>
+    createDesktopMcpApplyChangesFailure(
+      'project-unavailable',
+      'Desktop Arcade MCP apply_changes timed out before the renderer responded.'
+    ),
+  createSendFailureResult: () =>
+    createDesktopMcpApplyChangesFailure(
+      'project-unavailable',
+      'Desktop Arcade MCP apply_changes is unavailable because the renderer window is no longer reachable.'
+    ),
+  createInvalidResponseResult: () =>
+    createDesktopMcpApplyChangesFailure(
+      'project-unavailable',
+      'Desktop Arcade MCP apply_changes is unavailable because the renderer returned an invalid response.'
+    ),
+  isResult: (value) => isDesktopMcpApplyChangesResult(value),
+})
+
+const desktopMcpPreviewCaptureRoute = createDesktopMcpBridgeRoute<
+  DesktopMcpPreviewCaptureRequest,
+  DesktopMcpPreviewCaptureResult,
+  PendingPreviewCaptureRequest
+>({
+  requestChannel: ROUTE_DESKTOP_MCP_PREVIEW_CAPTURE_REQUEST_CHANNEL,
+  responseChannel: ROUTE_DESKTOP_MCP_PREVIEW_CAPTURE_RESPONSE_CHANNEL,
+  requestIdPrefix: 'desktop-mcp-preview-capture',
+  timeoutMs: DESKTOP_MCP_PREVIEW_CAPTURE_ROUTE_TIMEOUT_MS,
+  getTargetWindow: getDesktopMcpActiveWindow,
+  buildRequestPayload: (requestId, request) => ({ requestId, ...request }),
+  createPendingRequest: (_request, resolve, timeout, webContentsId) => ({
+    resolve,
+    timeout,
+    webContentsId,
+  }),
+  createNoTargetWindowResult: () =>
+    createDesktopMcpPreviewCaptureFailure(
+      'project-unavailable',
+      'Desktop Arcade MCP capture_preview_evidence is unavailable because no renderer window is available.'
+    ),
+  createTimeoutResult: () =>
+    createDesktopMcpPreviewCaptureFailure(
+      'render-timeout',
+      'Desktop Arcade MCP capture_preview_evidence timed out before the renderer responded.'
+    ),
+  createSendFailureResult: () =>
+    createDesktopMcpPreviewCaptureFailure(
+      'project-unavailable',
+      'Desktop Arcade MCP capture_preview_evidence is unavailable because the renderer window is no longer reachable.'
+    ),
+  createInvalidResponseResult: () =>
+    createDesktopMcpPreviewCaptureFailure(
+      'project-unavailable',
+      'Desktop Arcade MCP capture_preview_evidence is unavailable because the renderer returned an invalid response.'
+    ),
+  isResult: (value) => isDesktopMcpPreviewCaptureResult(value),
+})
+
+const desktopMcpBridgeRoutes = [
+  desktopMcpProjectResourceRoute,
+  desktopMcpAnnotationMutationRoute,
+  desktopMcpApplyChangesRoute,
+  desktopMcpPreviewCaptureRoute,
+] as const
+
 const registerDesktopIpc = () => {
   ipcMain.handle(SHELL_CAPABILITIES_CHANNEL, () => cloneDesktopCapabilities())
   ipcMain.handle(GET_DESKTOP_MCP_SERVER_STATE_CHANNEL, () => desktopMcpServer.getState())
-  ipcMain.on(
-    ROUTE_DESKTOP_MCP_PROJECT_RESOURCE_RESPONSE_CHANNEL,
-    handleDesktopMcpProjectResourceResponse
-  )
-  ipcMain.on(
-    ROUTE_DESKTOP_MCP_ANNOTATION_MUTATION_RESPONSE_CHANNEL,
-    handleDesktopMcpAnnotationMutationResponse
-  )
-  ipcMain.on(ROUTE_DESKTOP_MCP_APPLY_CHANGES_RESPONSE_CHANNEL, handleDesktopMcpApplyChangesResponse)
-  ipcMain.on(
-    ROUTE_DESKTOP_MCP_PREVIEW_CAPTURE_RESPONSE_CHANNEL,
-    handleDesktopMcpPreviewCaptureResponse
-  )
+  for (const route of desktopMcpBridgeRoutes) {
+    ipcMain.on(route.responseChannel, route.handleResponse)
+  }
 }
 
 const removeDesktopIpc = () => {
   ipcMain.removeHandler(SHELL_CAPABILITIES_CHANNEL)
   ipcMain.removeHandler(GET_DESKTOP_MCP_SERVER_STATE_CHANNEL)
-  ipcMain.off(
-    ROUTE_DESKTOP_MCP_PROJECT_RESOURCE_RESPONSE_CHANNEL,
-    handleDesktopMcpProjectResourceResponse
-  )
-  ipcMain.off(
-    ROUTE_DESKTOP_MCP_ANNOTATION_MUTATION_RESPONSE_CHANNEL,
-    handleDesktopMcpAnnotationMutationResponse
-  )
-  ipcMain.off(ROUTE_DESKTOP_MCP_APPLY_CHANGES_RESPONSE_CHANNEL, handleDesktopMcpApplyChangesResponse)
-  ipcMain.off(
-    ROUTE_DESKTOP_MCP_PREVIEW_CAPTURE_RESPONSE_CHANNEL,
-    handleDesktopMcpPreviewCaptureResponse
-  )
+  for (const route of desktopMcpBridgeRoutes) {
+    ipcMain.off(route.responseChannel, route.handleResponse)
+  }
 }
 
 const registerDesktopRendererProtocol = () => {
@@ -219,321 +342,28 @@ function routeDesktopMcpProjectResourceRead({
 }: {
   uri: string
 }): Promise<DesktopMcpProjectResourceReadResult> {
-  const targetWindow = getDesktopMcpProjectResourceWindow()
-  if (!targetWindow) {
-    return Promise.resolve(
-      createDesktopMcpProjectResourceFailure(
-        'project-unavailable',
-        uri,
-        'Desktop Arcade project resources are unavailable because no renderer window is available.'
-      )
-    )
-  }
-
-  const requestId = `desktop-mcp-project-resource-${++nextDesktopMcpProjectResourceRequestId}`
-
-  return new Promise((resolve) => {
-    const timeout = setTimeout(() => {
-      pendingDesktopMcpProjectResourceRequests.delete(requestId)
-      resolve(
-        createDesktopMcpProjectResourceFailure(
-          'project-unavailable',
-          uri,
-          'Desktop Arcade project resources are unavailable because the renderer did not respond in time.'
-        )
-      )
-    }, DESKTOP_MCP_PROJECT_RESOURCE_ROUTE_TIMEOUT_MS)
-
-    pendingDesktopMcpProjectResourceRequests.set(requestId, {
-      resolve,
-      timeout,
-      uri,
-      webContentsId: targetWindow.webContents.id,
-    })
-
-    try {
-      targetWindow.webContents.send(ROUTE_DESKTOP_MCP_PROJECT_RESOURCE_REQUEST_CHANNEL, {
-        requestId,
-        uri,
-      })
-    } catch {
-      pendingDesktopMcpProjectResourceRequests.delete(requestId)
-      clearTimeout(timeout)
-      resolve(
-        createDesktopMcpProjectResourceFailure(
-          'project-unavailable',
-          uri,
-          'Desktop Arcade project resources are unavailable because the renderer window is no longer reachable.'
-        )
-      )
-    }
-  })
+  return desktopMcpProjectResourceRoute.route({ uri })
 }
 
 function routeDesktopMcpAnnotationMutation(
   request: DesktopMcpAnnotationMutationRequest
 ): Promise<DesktopMcpAnnotationMutationResult> {
-  const targetWindow = getDesktopMcpProjectResourceWindow()
-  if (!targetWindow) {
-    return Promise.resolve(
-      createDesktopMcpAnnotationMutationFailure(
-        'project-unavailable',
-        request.annotationId,
-        'Desktop Arcade annotation mutations are unavailable because no renderer window is available.'
-      )
-    )
-  }
-
-  const requestId = `desktop-mcp-annotation-mutation-${++nextDesktopMcpAnnotationMutationRequestId}`
-
-  return new Promise((resolve) => {
-    const timeout = setTimeout(() => {
-      pendingDesktopMcpAnnotationMutationRequests.delete(requestId)
-      resolve(
-        createDesktopMcpAnnotationMutationFailure(
-          'project-unavailable',
-          request.annotationId,
-          'Desktop Arcade annotation mutation timed out before the renderer responded.'
-        )
-      )
-    }, DESKTOP_MCP_ANNOTATION_MUTATION_ROUTE_TIMEOUT_MS)
-
-    pendingDesktopMcpAnnotationMutationRequests.set(requestId, {
-      resolve,
-      timeout,
-      request,
-      webContentsId: targetWindow.webContents.id,
-    })
-
-    try {
-      targetWindow.webContents.send(ROUTE_DESKTOP_MCP_ANNOTATION_MUTATION_REQUEST_CHANNEL, {
-        requestId,
-        ...request,
-      })
-    } catch {
-      pendingDesktopMcpAnnotationMutationRequests.delete(requestId)
-      clearTimeout(timeout)
-      resolve(
-        createDesktopMcpAnnotationMutationFailure(
-          'project-unavailable',
-          request.annotationId,
-          'Desktop Arcade annotation mutations are unavailable because the renderer window is no longer reachable.'
-        )
-      )
-    }
-  })
+  return desktopMcpAnnotationMutationRoute.route(request)
 }
 
 function routeDesktopMcpApplyChanges(
   request: DesktopMcpApplyChangesRequest
 ): Promise<DesktopMcpApplyChangesResult> {
-  const targetWindow = getDesktopMcpProjectResourceWindow()
-  if (!targetWindow) {
-    return Promise.resolve(
-      createDesktopMcpApplyChangesFailure(
-        'project-unavailable',
-        'Desktop Arcade MCP apply_changes is unavailable because no renderer window is available.'
-      )
-    )
-  }
-
-  const requestId = `desktop-mcp-apply-changes-${++nextDesktopMcpApplyChangesRequestId}`
-
-  return new Promise((resolve) => {
-    const timeout = setTimeout(() => {
-      pendingDesktopMcpApplyChangesRequests.delete(requestId)
-      resolve(
-        createDesktopMcpApplyChangesFailure(
-          'project-unavailable',
-          'Desktop Arcade MCP apply_changes timed out before the renderer responded.'
-        )
-      )
-    }, DESKTOP_MCP_APPLY_CHANGES_ROUTE_TIMEOUT_MS)
-
-    pendingDesktopMcpApplyChangesRequests.set(requestId, {
-      resolve,
-      timeout,
-      webContentsId: targetWindow.webContents.id,
-    })
-
-    try {
-      targetWindow.webContents.send(ROUTE_DESKTOP_MCP_APPLY_CHANGES_REQUEST_CHANNEL, {
-        requestId,
-        ...request,
-      })
-    } catch {
-      pendingDesktopMcpApplyChangesRequests.delete(requestId)
-      clearTimeout(timeout)
-      resolve(
-        createDesktopMcpApplyChangesFailure(
-          'project-unavailable',
-          'Desktop Arcade MCP apply_changes is unavailable because the renderer window is no longer reachable.'
-        )
-      )
-    }
-  })
+  return desktopMcpApplyChangesRoute.route(request)
 }
 
 function routeDesktopMcpPreviewCapture(
   request: DesktopMcpPreviewCaptureRequest
 ): Promise<DesktopMcpPreviewCaptureResult> {
-  const targetWindow = getDesktopMcpProjectResourceWindow()
-  if (!targetWindow) {
-    return Promise.resolve(
-      createDesktopMcpPreviewCaptureFailure(
-        'project-unavailable',
-        'Desktop Arcade MCP capture_preview_evidence is unavailable because no renderer window is available.'
-      )
-    )
-  }
-
-  const requestId = `desktop-mcp-preview-capture-${++nextDesktopMcpPreviewCaptureRequestId}`
-
-  return new Promise((resolve) => {
-    const timeout = setTimeout(() => {
-      pendingDesktopMcpPreviewCaptureRequests.delete(requestId)
-      resolve(
-        createDesktopMcpPreviewCaptureFailure(
-          'render-timeout',
-          'Desktop Arcade MCP capture_preview_evidence timed out before the renderer responded.'
-        )
-      )
-    }, DESKTOP_MCP_PREVIEW_CAPTURE_ROUTE_TIMEOUT_MS)
-
-    pendingDesktopMcpPreviewCaptureRequests.set(requestId, {
-      resolve,
-      timeout,
-      webContentsId: targetWindow.webContents.id,
-    })
-
-    try {
-      targetWindow.webContents.send(ROUTE_DESKTOP_MCP_PREVIEW_CAPTURE_REQUEST_CHANNEL, {
-        requestId,
-        ...request,
-      })
-    } catch {
-      pendingDesktopMcpPreviewCaptureRequests.delete(requestId)
-      clearTimeout(timeout)
-      resolve(
-        createDesktopMcpPreviewCaptureFailure(
-          'project-unavailable',
-          'Desktop Arcade MCP capture_preview_evidence is unavailable because the renderer window is no longer reachable.'
-        )
-      )
-    }
-  })
+  return desktopMcpPreviewCaptureRoute.route(request)
 }
 
-function handleDesktopMcpProjectResourceResponse(
-  event: IpcMainEvent,
-  payload: unknown
-): void {
-  if (!isRecord(payload) || typeof payload.requestId !== 'string') {
-    return
-  }
-
-  const pendingRequest = pendingDesktopMcpProjectResourceRequests.get(payload.requestId)
-  if (!pendingRequest || pendingRequest.webContentsId !== event.sender.id) {
-    return
-  }
-
-  pendingDesktopMcpProjectResourceRequests.delete(payload.requestId)
-  clearTimeout(pendingRequest.timeout)
-
-  if (!isDesktopMcpProjectResourceReadResult(payload.response, pendingRequest.uri)) {
-    pendingRequest.resolve(
-      createDesktopMcpProjectResourceFailure(
-        'project-unavailable',
-        pendingRequest.uri,
-        'Desktop Arcade project resources are unavailable because the renderer returned an invalid response.'
-      )
-    )
-    return
-  }
-
-  pendingRequest.resolve(payload.response)
-}
-
-function handleDesktopMcpAnnotationMutationResponse(event: IpcMainEvent, payload: unknown): void {
-  if (!isRecord(payload) || typeof payload.requestId !== 'string') {
-    return
-  }
-
-  const pendingRequest = pendingDesktopMcpAnnotationMutationRequests.get(payload.requestId)
-  if (!pendingRequest || pendingRequest.webContentsId !== event.sender.id) {
-    return
-  }
-
-  pendingDesktopMcpAnnotationMutationRequests.delete(payload.requestId)
-  clearTimeout(pendingRequest.timeout)
-
-  if (!isDesktopMcpAnnotationMutationResult(payload.response)) {
-    pendingRequest.resolve(
-      createDesktopMcpAnnotationMutationFailure(
-        'project-unavailable',
-        pendingRequest.request.annotationId,
-        'Desktop Arcade annotation mutations are unavailable because the renderer returned an invalid response.'
-      )
-    )
-    return
-  }
-
-  pendingRequest.resolve(payload.response)
-}
-
-function handleDesktopMcpApplyChangesResponse(event: IpcMainEvent, payload: unknown): void {
-  if (!isRecord(payload) || typeof payload.requestId !== 'string') {
-    return
-  }
-
-  const pendingRequest = pendingDesktopMcpApplyChangesRequests.get(payload.requestId)
-  if (!pendingRequest || pendingRequest.webContentsId !== event.sender.id) {
-    return
-  }
-
-  pendingDesktopMcpApplyChangesRequests.delete(payload.requestId)
-  clearTimeout(pendingRequest.timeout)
-
-  if (!isDesktopMcpApplyChangesResult(payload.response)) {
-    pendingRequest.resolve(
-      createDesktopMcpApplyChangesFailure(
-        'project-unavailable',
-        'Desktop Arcade MCP apply_changes is unavailable because the renderer returned an invalid response.'
-      )
-    )
-    return
-  }
-
-  pendingRequest.resolve(payload.response)
-}
-
-function handleDesktopMcpPreviewCaptureResponse(event: IpcMainEvent, payload: unknown): void {
-  if (!isRecord(payload) || typeof payload.requestId !== 'string') {
-    return
-  }
-
-  const pendingRequest = pendingDesktopMcpPreviewCaptureRequests.get(payload.requestId)
-  if (!pendingRequest || pendingRequest.webContentsId !== event.sender.id) {
-    return
-  }
-
-  pendingDesktopMcpPreviewCaptureRequests.delete(payload.requestId)
-  clearTimeout(pendingRequest.timeout)
-
-  if (!isDesktopMcpPreviewCaptureResult(payload.response)) {
-    pendingRequest.resolve(
-      createDesktopMcpPreviewCaptureFailure(
-        'project-unavailable',
-        'Desktop Arcade MCP capture_preview_evidence is unavailable because the renderer returned an invalid response.'
-      )
-    )
-    return
-  }
-
-  pendingRequest.resolve(payload.response)
-}
-
-const getDesktopMcpProjectResourceWindow = (): BrowserWindow | null => {
+function getDesktopMcpActiveWindow(): BrowserWindow | null {
   if (activeMainWindow && !activeMainWindow.isDestroyed()) {
     return activeMainWindow
   }
@@ -541,51 +371,11 @@ const getDesktopMcpProjectResourceWindow = (): BrowserWindow | null => {
   return BrowserWindow.getAllWindows().find((browserWindow) => !browserWindow.isDestroyed()) ?? null
 }
 
-const resolvePendingDesktopMcpProjectResourceRequests = (
-  responseFactory: (pendingRequest: PendingProjectResourceRequest) => DesktopMcpProjectResourceReadResult
-) => {
-  for (const [requestId, pendingRequest] of pendingDesktopMcpProjectResourceRequests) {
-    pendingDesktopMcpProjectResourceRequests.delete(requestId)
-    clearTimeout(pendingRequest.timeout)
-    pendingRequest.resolve(responseFactory(pendingRequest))
-  }
-}
-
-const resolvePendingDesktopMcpAnnotationMutationRequests = (
-  responseFactory: (pendingRequest: PendingAnnotationMutationRequest) => DesktopMcpAnnotationMutationResult
-) => {
-  for (const [requestId, pendingRequest] of pendingDesktopMcpAnnotationMutationRequests) {
-    pendingDesktopMcpAnnotationMutationRequests.delete(requestId)
-    clearTimeout(pendingRequest.timeout)
-    pendingRequest.resolve(responseFactory(pendingRequest))
-  }
-}
-
-const resolvePendingDesktopMcpApplyChangesRequests = (
-  responseFactory: (pendingRequest: PendingApplyChangesRequest) => DesktopMcpApplyChangesResult
-) => {
-  for (const [requestId, pendingRequest] of pendingDesktopMcpApplyChangesRequests) {
-    pendingDesktopMcpApplyChangesRequests.delete(requestId)
-    clearTimeout(pendingRequest.timeout)
-    pendingRequest.resolve(responseFactory(pendingRequest))
-  }
-}
-
-const resolvePendingDesktopMcpPreviewCaptureRequests = (
-  responseFactory: (pendingRequest: PendingPreviewCaptureRequest) => DesktopMcpPreviewCaptureResult
-) => {
-  for (const [requestId, pendingRequest] of pendingDesktopMcpPreviewCaptureRequests) {
-    pendingDesktopMcpPreviewCaptureRequests.delete(requestId)
-    clearTimeout(pendingRequest.timeout)
-    pendingRequest.resolve(responseFactory(pendingRequest))
-  }
-}
-
 const createDesktopMcpProjectResourceFailure = (
-  code: ProjectResourceReadFailure['code'],
+  code: DesktopMcpProjectResourceReadFailure['code'],
   resourceUri: string,
   message: string
-): ProjectResourceReadFailure => ({
+): DesktopMcpProjectResourceReadFailure => ({
   ok: false,
   code,
   resourceUri,
@@ -700,27 +490,27 @@ const createWindow = async () => {
       activeMainWindow = null
     }
 
-    resolvePendingDesktopMcpProjectResourceRequests((pendingRequest) =>
+    desktopMcpProjectResourceRoute.resolvePending((pendingRequest) =>
       createDesktopMcpProjectResourceFailure(
         'project-unavailable',
-        pendingRequest.uri,
+        pendingRequest.request.uri,
         'Desktop Arcade project resources are unavailable because the renderer window closed.'
       )
     )
-    resolvePendingDesktopMcpAnnotationMutationRequests((pendingRequest) =>
+    desktopMcpAnnotationMutationRoute.resolvePending((pendingRequest) =>
       createDesktopMcpAnnotationMutationFailure(
         'project-unavailable',
         pendingRequest.request.annotationId,
         'Desktop Arcade annotation mutations are unavailable because the renderer window closed.'
       )
     )
-    resolvePendingDesktopMcpApplyChangesRequests(() =>
+    desktopMcpApplyChangesRoute.resolvePending(() =>
       createDesktopMcpApplyChangesFailure(
         'project-unavailable',
         'Desktop Arcade MCP apply_changes is unavailable because the renderer window closed.'
       )
     )
-    resolvePendingDesktopMcpPreviewCaptureRequests(() =>
+    desktopMcpPreviewCaptureRoute.resolvePending(() =>
       createDesktopMcpPreviewCaptureFailure(
         'project-unavailable',
         'Desktop Arcade MCP capture_preview_evidence is unavailable because the renderer window closed.'
@@ -757,27 +547,27 @@ export const startDesktopMainProcess = async () => {
 
   app.on('will-quit', () => {
     void desktopMcpServer.stop()
-    resolvePendingDesktopMcpProjectResourceRequests((pendingRequest) =>
+    desktopMcpProjectResourceRoute.resolvePending((pendingRequest) =>
       createDesktopMcpProjectResourceFailure(
         'project-unavailable',
-        pendingRequest.uri,
+        pendingRequest.request.uri,
         'Desktop Arcade project resources are unavailable because the renderer is shutting down.'
       )
     )
-    resolvePendingDesktopMcpAnnotationMutationRequests((pendingRequest) =>
+    desktopMcpAnnotationMutationRoute.resolvePending((pendingRequest) =>
       createDesktopMcpAnnotationMutationFailure(
         'project-unavailable',
         pendingRequest.request.annotationId,
         'Desktop Arcade annotation mutations are unavailable because the renderer is shutting down.'
       )
     )
-    resolvePendingDesktopMcpApplyChangesRequests(() =>
+    desktopMcpApplyChangesRoute.resolvePending(() =>
       createDesktopMcpApplyChangesFailure(
         'project-unavailable',
         'Desktop Arcade MCP apply_changes is unavailable because the renderer is shutting down.'
       )
     )
-    resolvePendingDesktopMcpPreviewCaptureRequests(() =>
+    desktopMcpPreviewCaptureRoute.resolvePending(() =>
       createDesktopMcpPreviewCaptureFailure(
         'project-unavailable',
         'Desktop Arcade MCP capture_preview_evidence is unavailable because the renderer is shutting down.'

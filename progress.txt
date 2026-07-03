@@ -1,3 +1,34 @@
+### 2026-07-03 - Issue #348: Unify Desktop MCP IPC routing behind a typed bridge router
+
+Implemented:
+
+- Read issue `#342`, `CONTEXT.md`, ADR `0025`, and PRD `0029`, then chose `#348` as the highest-priority `ready-for-agent` slice from `#348`-`#350` because it is the central active-project bridge seam that unblocks the final parity work in `#350`, while `#349` is a narrower catalog move.
+- Added `desktop/desktopMcpBridgeRouter.ts`, a single typed main-process bridge router that owns request ids, pending request tracking, sender/webContents validation, per-route timeouts, invalid-response handling, and bulk resolution on window close/shutdown.
+- Rewired `desktop/main-process.ts` so project-resource reads, annotation mutations, `apply_changes`, and Preview capture all route through that one typed bridge seam while preserving their route-specific timeout and failure behavior.
+- Simplified `desktop/preload.cjs` from four near-duplicate request handlers into one route table + dispatcher, keeping the same renderer-owned handlers and error messages while making the request/response path consistent end to end.
+- Added focused router seam coverage in `tests/unit/desktopMcpBridgeRouter.test.ts` for explicit unavailable renderer results, successful routing, sender mismatch handling, invalid renderer responses, and timeout behavior.
+
+Verification:
+
+- `npm install`
+- `npm run typecheck`
+- `npm run lint`
+- `npm test -- --run`
+- `npm run desktop:build`
+- `npm run test:e2e -- tests/e2e/issue-346-desktop-mcp-sdk-read-only-tools.spec.ts tests/e2e/issue-347-desktop-mcp-sdk-mutation-tools.spec.ts --reporter=line`
+- `npm run test:e2e -- tests/e2e/desktop-packaged-preview.spec.ts --reporter=line`
+- Human-style/Desktop verification covered by the live Electron Playwright flows above:
+  - confirmed the Desktop MCP endpoint stayed available against the visible Desktop Arcade project,
+  - read `arcade://project/manifest`,
+  - applied visible project changes through MCP and saw the rendered Desktop preview update,
+  - captured Preview evidence through MCP,
+  - exercised annotation mutation workflows on the live project,
+  - and confirmed normal human editor/preview interaction still worked in the packaged Desktop app.
+
+Next note:
+
+- `tests/e2e/desktop-mcp-smoke.spec.ts` currently still posts MCP requests without the SDK-required `Accept: application/json, text/event-stream` header, so it returns `406` even though the issue-specific Desktop MCP flows above pass. If someone reuses that broad smoke spec for future MCP work, update its request helper first.
+
 ### 2026-07-03 - Issue #346: Rebuild read-only Desktop MCP tools with SDK schemas
 
 Implemented:
