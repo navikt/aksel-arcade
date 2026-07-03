@@ -25,3 +25,10 @@ Pure shared contract code may live under `src/shared/desktopMcp/`. It must not i
 ## Acceptance checks
 
 The contract is guarded by golden MCP tests for initialization, discovery, resources, tools, structured success/error results, HTTP security behavior, generated catalog drift, MCP Inspector compatibility, and the existing Desktop MCP smoke flow.
+
+## SDK rebuild candidates
+
+The current handwritten server is the baseline that issue #343 locks down, but these current behaviors are expected candidates for intentional spec-alignment changes during the SDK rebuild from issue #342:
+
+- `initialize` always returns the fixed protocol version string `2024-11-05`; the SDK rebuild should replace this with proper MCP version negotiation against the client.
+- The current server publishes concrete resources through `resources/list` and `resources/read`, but it does not yet advertise spec-native resource templates for parameterized URI families such as page source, page annotations, Aksel component detail resources, or Preview capture resources.

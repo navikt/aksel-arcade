@@ -1,3 +1,46 @@
+### 2026-07-03 - Issue #343: Lock Desktop MCP public contract baseline
+
+Implemented:
+
+- Read issue `#342`, selected `#343` as the highest-priority `ready-for-agent` slice from `#343`-`#350`, and used `CONTEXT.md`, ADR `0017`, ADR `0018`, ADR `0025`, and `docs/desktop-mcp-contract.md` to confirm it is the contract-safety-net/tracer issue every later SDK-rebuild slice depends on.
+- Added `tests/e2e/desktop-mcp-contract-baseline.spec.ts`, a contract-seam Playwright/Electron test that locks the current Desktop MCP baseline at the HTTP boundary instead of against server internals.
+- The new baseline covers:
+  - `initialize` protocol version, capabilities, server info, and Desktop Arcade instructions,
+  - exact `tools/list` names and input schemas for the published Desktop MCP tools,
+  - stable `resources/list` entries plus manifest-derived page annotation resources,
+  - representative `resources/read` payloads for `arcade://desktop/start-here`, `arcade://desktop/capabilities`, and `arcade://project/manifest`,
+  - representative `tools/call` success and domain-error shapes through both `read_resource` and `list_annotations`,
+  - HTTP boundary behavior for the fixed `/mcp` path, unsupported methods, malformed JSON, oversized bodies, and browser `Origin` rejection.
+- Documented the known SDK-rebuild/spec-alignment candidates directly in `docs/desktop-mcp-contract.md`: fixed `initialize` protocol-version behavior today and the missing spec-native resource-template advertisement for parameterized URI families.
+- Re-ran the existing Desktop MCP smoke flow to confirm the new baseline coverage does not break the integrated happy path.
+
+Verification:
+
+- `npm run typecheck`
+- `npm run lint`
+- `npm test -- --run`
+- `npm run test:e2e -- tests/e2e/desktop-mcp-contract-baseline.spec.ts tests/e2e/desktop-mcp-smoke.spec.ts --reporter=line`
+- Human-style Desktop MCP checklist probe against a fresh Electron app + live local MCP endpoint:
+  - opened Desktop Arcade settings and confirmed the MCP section exposed the fixed local endpoint,
+  - called `initialize` and confirmed Desktop Arcade instructions were returned,
+  - confirmed the published tool list still included the existing Desktop MCP tools,
+  - confirmed the resource list still included the stable guidance/project resources,
+  - read `arcade://desktop/start-here` and confirmed the guidance stayed usable,
+  - read `arcade://project/manifest` and confirmed it described the active Arcade project,
+  - called `read_resource` against the manifest and confirmed the structured success result,
+  - sent a browser-like `Origin` header and confirmed the local endpoint rejected it.
+
+Next note:
+
+- Issue `#343` now locks the pre-SDK handwritten Desktop MCP contract in one place; the documented candidates in `docs/desktop-mcp-contract.md` are the places to revisit first when `#344`-`#350` intentionally move behavior toward SDK/spec-native semantics.
+
+Review follow-up before merge:
+
+- Moved this `#343` note to the top of `progress.txt` after PR review because the first version had been inserted into the middle of the older `2026-05-23 - Issue #6` note, which made that historical handoff harder to follow.
+- Relaxed the contract baseline assertions so they keep checking public MCP contract shape without snapshotting exact guidance prose or the current placeholder server version string.
+- Expanded the baseline test to read `arcade://desktop/capabilities` directly and to exercise a representative non-resource `tools/call` success shape through `list_annotations`.
+- Re-ran the full validation set plus the Desktop MCP smoke and the live human-checklist probe before merge.
+
 ### 2026-07-03 - Issue #326: Include annotation overlays in Preview evidence captures
 
 Implemented:
