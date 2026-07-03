@@ -1,3 +1,41 @@
+### 2026-07-03 - Issue #344: Introduce typed Desktop MCP SDK bootstrap
+
+Implemented:
+
+- Read issue `#344` as the highest-priority `ready-for-agent` slice from `#344`-`#350` because it is the root blocker for the rest of the SDK rebuild chain, then used issue `#342`, `CONTEXT.md`, ADRs `0017`, `0018`, and `0025`, plus `docs/desktop-mcp-contract.md`, to keep the bootstrap aligned with the documented Desktop MCP contract boundary.
+- Added an exact runtime dependency on `@modelcontextprotocol/sdk@1.29.0`.
+- Introduced the first dedicated Desktop main/MCP TypeScript build path:
+  - new `desktop/main.ts` entry,
+  - new `desktop/main-process.ts` runtime,
+  - new `desktop/mcpSdkServer.ts` SDK-backed server,
+  - new `scripts/build-desktop-main.mjs` esbuild step,
+  - `desktop/main.cjs` reduced to the packaging bootstrap that loads the compiled bundle.
+- Kept the fixed Desktop MCP setup contract intact in the app shell: same `http://127.0.0.1:3846/mcp` endpoint, same no-auth status text, same explicit unavailable reason when the fixed port is already occupied, and endpoint shutdown when Desktop Arcade quits.
+- Switched initialize/lifecycle handling to the official MCP SDK with SDK-managed protocol negotiation while intentionally leaving tool/resource re-registration for follow-up issues.
+- Documented the temporary issue `#344` contract gaps in `docs/desktop-mcp-contract.md` so later slices have one explicit place to remove as tools/resources/templates come back.
+- Added focused coverage for the new bootstrap path:
+  - `tests/unit/services/desktopMcpSdkServer.test.ts` for fixed config, SDK initialize negotiation, and port-conflict unavailable state,
+  - `tests/unit/desktopMain.test.ts` rewritten for the TypeScript main-process entry,
+  - `tests/e2e/desktop-mcp-sdk-bootstrap.spec.ts` for the issue checklist and visual Desktop verification.
+
+Verification:
+
+- `npm run typecheck`
+- `npm run lint`
+- `npm test -- --run`
+- `npm run desktop:build`
+- `npm run test:e2e -- tests/e2e/desktop-mcp-sdk-bootstrap.spec.ts --reporter=line`
+- Human-style/visual Desktop checklist via the real Electron app and the new Playwright bootstrap flow:
+  - launched Desktop Arcade and confirmed the app opened normally,
+  - opened Desktop settings and confirmed the MCP section still showed the fixed local endpoint,
+  - initialized the endpoint successfully through the SDK-backed server with no auth header,
+  - confirmed the app shows a clear unavailable status when port `3846` is already occupied,
+  - closed Desktop Arcade and confirmed the local MCP endpoint stops responding.
+
+Next note:
+
+- Issue `#344` only establishes the SDK-backed endpoint, initialize negotiation, and Desktop availability plumbing. The next person should expect `tools/resources/templates` to be intentionally absent until `#345` and later slices re-register the actual Desktop Arcade contract on top of this SDK bootstrap.
+
 ### 2026-07-03 - Issue #343: Lock Desktop MCP public contract baseline
 
 Implemented:

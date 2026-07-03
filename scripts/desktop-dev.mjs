@@ -1,6 +1,7 @@
 import http from 'node:http'
 import net from 'node:net'
 import { spawn } from 'node:child_process'
+import { execFileSync } from 'node:child_process'
 
 const DEFAULT_RENDERER_HOST = '127.0.0.1'
 const DEFAULT_RENDERER_PORT = 5173
@@ -91,6 +92,10 @@ const createRendererConfig = async () => {
 
 const rendererConfig = await createRendererConfig()
 const RENDERER_URL = rendererConfig.url
+
+execFileSync(process.execPath, ['scripts/build-desktop-main.mjs'], {
+  stdio: 'inherit',
+})
 
 const children = new Set()
 

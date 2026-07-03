@@ -32,3 +32,13 @@ The current handwritten server is the baseline that issue #343 locks down, but t
 
 - `initialize` always returns the fixed protocol version string `2024-11-05`; the SDK rebuild should replace this with proper MCP version negotiation against the client.
 - The current server publishes concrete resources through `resources/list` and `resources/read`, but it does not yet advertise spec-native resource templates for parameterized URI families such as page source, page annotations, Aksel component detail resources, or Preview capture resources.
+
+## Issue #344 temporary bootstrap gaps
+
+The issue #344 SDK bootstrap intentionally proves only the fixed endpoint, local/no-auth setup, Desktop availability wiring, and SDK-managed initialize/version-negotiation path.
+
+Until issues #345-#350 land, expect these temporary gaps on the SDK-backed endpoint:
+
+- No Desktop Arcade tools are registered yet, so `tools/list` is expected to return `Method not found`.
+- No Desktop Arcade resources or resource templates are registered yet, so `resources/list`, `resources/read`, and `resources/templates/list` are expected to remain unavailable.
+- The baseline contract suite from issue #343 remains the reference for the handwritten pre-rebuild surface, while the issue #344 bootstrap checks call out the temporary empty tool/resource discovery surface explicitly.

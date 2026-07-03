@@ -1,12 +1,4 @@
-import { readFileSync } from 'node:fs'
-import { createRequire } from 'node:module'
-import { resolve } from 'node:path'
-import { runInNewContext } from 'node:vm'
 import { describe, expect, it, vi } from 'vitest'
-
-const require = createRequire(import.meta.url)
-const desktopMainPath = resolve(process.cwd(), 'desktop/main.cjs')
-const desktopDir = resolve(process.cwd(), 'desktop')
 
 interface RunDesktopMainOptions {
   isPackaged: boolean
@@ -18,15 +10,11 @@ interface MockDesktopMcpServerOptions {
 }
 
 const runDesktopMain = async ({ isPackaged, env = {} }: RunDesktopMainOptions) => {
-  const source = readFileSync(desktopMainPath, 'utf8')
+  vi.resetModules()
+
   const loadedUrls: string[] = []
   const ipcListeners = new Map<string, (...args: unknown[]) => void>()
   let desktopMcpServerOptions: MockDesktopMcpServerOptions | null = null
-  let resolveRendererLoad: (() => void) | null = null
-  const rendererLoaded = new Promise<void>((resolveLoaded) => {
-    resolveRendererLoad = resolveLoaded
-  })
-
   const browserWindows: MockBrowserWindow[] = []
 
   class MockBrowserWindow {
@@ -43,7 +31,6 @@ const runDesktopMain = async ({ isPackaged, env = {} }: RunDesktopMainOptions) =
     isDestroyed = vi.fn(() => false)
     loadURL = vi.fn((url: string) => {
       loadedUrls.push(url)
-      resolveRendererLoad?.()
       return Promise.resolve()
     })
 
@@ -82,64 +69,35 @@ const runDesktopMain = async ({ isPackaged, env = {} }: RunDesktopMainOptions) =
       url: 'http://127.0.0.1:3846/mcp',
       requiresAuth: false,
       authDescription: 'No token/header required.',
-      availability: { status: 'available' },
+      availability: { status: 'available' as const },
     })),
     start: vi.fn(() => Promise.resolve()),
     stop: vi.fn(() => Promise.resolve(true)),
   }
-  const processMock = {
-    env: { ...process.env, ...env },
-    platform: process.platform,
-    once: vi.fn(),
-    exitCode: 0,
-  }
 
-  runInNewContext(
-    source,
-    {
-      require: (request: string) => {
-        if (request === 'electron') {
-          return { app, BrowserWindow: MockBrowserWindow, ipcMain, net, protocol }
-        }
-        if (request === './mcpServer.cjs') {
-          return {
-            createDesktopMcpServer: (options: MockDesktopMcpServerOptions) => {
-              desktopMcpServerOptions = options
-              return desktopMcpServer
-            },
-          }
-        }
-        return require(request)
-      },
-      module: { exports: {} },
-      exports: {},
-      __dirname: desktopDir,
-      __filename: desktopMainPath,
-      process: processMock,
-      console,
-      URL,
-      Response,
-      setTimeout,
-      clearTimeout,
+  vi.stubEnv('AKSEL_ARCADE_RENDERER_URL', env.AKSEL_ARCADE_RENDERER_URL)
+
+  vi.doMock('electron', () => ({
+    app,
+    BrowserWindow: MockBrowserWindow,
+    ipcMain,
+    net,
+    protocol,
+  }))
+
+  vi.doMock('../../desktop/mcpSdkServer', () => ({
+    createDesktopMcpServer: (options: MockDesktopMcpServerOptions) => {
+      desktopMcpServerOptions = options
+      return desktopMcpServer
     },
-    { filename: desktopMainPath }
-  )
+  }))
 
-  await Promise.race([
-    rendererLoaded,
-    new Promise((_resolve, reject) =>
-      setTimeout(() => reject(new Error('Desktop renderer did not load.')), 1_000)
-    ),
-  ])
+  const { startDesktopMainProcess } = await import('../../desktop/main-process')
+  await startDesktopMainProcess()
 
-  const result: {
-    app: typeof app
-    browserWindows: MockBrowserWindow[]
-    desktopMcpServerOptions: MockDesktopMcpServerOptions | null
-    ipcListeners: Map<string, (...args: unknown[]) => void>
-    loadedUrls: string[]
-    protocol: typeof protocol
-  } = {
+  vi.unstubAllEnvs()
+
+  return {
     app,
     browserWindows,
     desktopMcpServerOptions,
@@ -147,7 +105,6 @@ const runDesktopMain = async ({ isPackaged, env = {} }: RunDesktopMainOptions) =
     loadedUrls,
     protocol,
   }
-  return result
 }
 
 describe('desktop main process', () => {
@@ -180,17 +137,12 @@ describe('desktop main process', () => {
       const { browserWindows, desktopMcpServerOptions, ipcListeners } = await runDesktopMain({
         isPackaged: true,
       })
-      if (!desktopMcpServerOptions) {
-        throw new Error('Expected Desktop MCP server options to be registered')
-      }
 
-      const maybeMutateAnnotation: MockDesktopMcpServerOptions['mutateAnnotation'] =
-        desktopMcpServerOptions.mutateAnnotation
-      if (typeof maybeMutateAnnotation !== 'function') {
+      if (!desktopMcpServerOptions?.mutateAnnotation) {
         throw new Error('Expected Desktop MCP annotation mutator to be registered')
       }
 
-      const mutationPromise = maybeMutateAnnotation({
+      const mutationPromise = desktopMcpServerOptions.mutateAnnotation({
         toolName: 'acknowledge_annotation',
         annotationId: 'ann-1',
       })
