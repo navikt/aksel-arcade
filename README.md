@@ -31,7 +31,7 @@ Perfect for:
 
 ### 👁️ Live Preview
 - **Instant updates**: See your UI render as you type (250ms debounce)
-- **Responsive testing**: Toggle between 6 viewport sizes (XS 320px → 2XL 1440px), clamped to the available preview pane width when the pane is narrower than the selected breakpoint
+- **Responsive testing**: Toggle between 6 viewport sizes (XS 320px → 2XL 1440px)
 - **Light/dark themes**: Preview components with current Aksel styling
 - **Error overlay**: Friendly error messages when something goes wrong
 
@@ -221,7 +221,7 @@ Desktop Arcade exposes a local MCP server only in the desktop shell. Web Arcade 
 | URL | `http://127.0.0.1:3846/mcp` |
 | Auth | No token/header required. |
 
-Desktop MCP v1 publishes four tools — `read_resource`, `list_annotations`, `capture_preview_evidence`, and `apply_changes` — plus `arcade://desktop/*`, `arcade://aksel/*`, `arcade://project/*`, dynamic page annotation resources at `arcade://project/pages/{pageId}/annotations`, and capture-produced `arcade://preview/captures/*` resources. Read resources through MCP `resources/list`/`resources/read`; tool-only hosts can call `read_resource({ uri })` for the same content. Arcade source is virtual `arcade://...` content, not repository or filesystem files.
+Desktop MCP v1 publishes nine tools — `read_resource`, `list_annotations`, `watch_annotations`, `acknowledge_annotation`, `resolve_annotation`, `dismiss_annotation`, `reply_to_annotation`, `capture_preview_evidence`, and `apply_changes` — plus `arcade://desktop/*`, `arcade://aksel/*`, `arcade://project/*`, dynamic page annotation resources at `arcade://project/pages/{pageId}/annotations`, and capture-produced `arcade://preview/captures/*` resources. Read resources through MCP `resources/list`/`resources/read`; tool-only hosts can call `read_resource({ uri })` for the same content. Arcade source is virtual `arcade://...` content, not repository-backed source content.
 
 On connect, the server returns self-teaching `initialize.result.instructions` pointing agents to `arcade://desktop/start-here`, the import-free sandbox, `goToPage` navigation, app-assigned page ids with `{{pageRef:name}}`, and the apply→diagnostics→capture loop. Replacement and page-flow guidance is split into `arcade://desktop/workflows/replace-project` and `arcade://desktop/workflows/multi-page-navigation`. Per-component Aksel usage is pulled on demand — never preloaded — through `arcade://aksel/catalog` (a version-matched index) and one `arcade://aksel/components/{name}` snippet resource at a time.
 
@@ -230,7 +230,7 @@ For the full smoke checklist, use an MCP client that exposes `resources/list` an
 1. Start Desktop Arcade with a multi-page Arcade project.
 2. Add the MCP server to your client with the exact settings above.
 3. Verify `initialize` returns `instructions` that mention `goToPage`, the import-free sandbox, and `arcade://desktop/start-here`.
-4. Verify `tools/list` returns `read_resource`, `list_annotations`, `capture_preview_evidence`, and `apply_changes`.
+4. Verify `tools/list` returns the nine tools listed above.
 5. Verify `resources/list` and `resources/read` can read `arcade://desktop/start-here`, `arcade://desktop/workflows/replace-project`, `arcade://desktop/workflows/multi-page-navigation`, `arcade://desktop/operating-guide`, `arcade://desktop/authoring-guide`, `arcade://desktop/capabilities`, `arcade://desktop/apply-changes-operations`, `arcade://aksel/catalog`, `arcade://project/manifest`, `arcade://project/annotations`, `arcade://project/preview-context`, and `arcade://project/diagnostics`, plus one page annotation resource such as `arcade://project/pages/{pageId}/annotations`.
 6. Read `arcade://aksel/catalog`, then read one `arcade://aksel/components/{name}` resource and confirm its snippet is import-free and version-matched.
 7. Read `arcade://project/manifest`, follow the source resource URIs it returns, and confirm the source matches the open Arcade project.

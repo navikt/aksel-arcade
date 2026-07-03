@@ -19,6 +19,12 @@ const VALID_THEMES = ['light', 'dark']
 const VALID_PREVIEW_CAPTURE_LAYERS = ['screenshot', 'accessibility', 'dom_layout_style', 'frame']
 const VALID_PREVIEW_SCREENSHOT_SCOPES = ['viewport', 'full_page', 'region']
 const VALID_PREVIEW_INTERACTION_ACTIONS = ['click', 'fill', 'select', 'press', 'scroll', 'waitFor']
+const VALID_ANNOTATION_MUTATION_TOOL_NAMES = [
+  'acknowledge_annotation',
+  'resolve_annotation',
+  'dismiss_annotation',
+  'reply_to_annotation',
+]
 const MAX_PREVIEW_INTERACTION_STEPS = 10
 const MAX_PREVIEW_INTERACTION_TOTAL_TIME_MS = 10_000
 const MAX_PREVIEW_INTERACTION_WAIT_TIMEOUT_MS = 5_000
@@ -386,7 +392,7 @@ const MCP_TOOL_DEFINITIONS = Object.freeze([
   Object.freeze({
     name: 'list_annotations',
     description:
-      'List non-dead feedback annotations for the active Arcade page by default. Supports explicit page or whole-project scope plus status filters for open, pending, acknowledged, resolved, dismissed, or all.',
+      'List non-dead annotations for the active Arcade page by default. Supports explicit page or whole-project scope plus status filters for open, pending, acknowledged, resolved, dismissed, or all.',
     inputSchema: Object.freeze({
       type: 'object',
       additionalProperties: false,
@@ -405,6 +411,122 @@ const MCP_TOOL_DEFINITIONS = Object.freeze([
           enum: LIST_ANNOTATIONS_STATUSES,
           description:
             'Optional status filter. Defaults to "open" (pending + acknowledged). Use "all" for full non-dead history.',
+        }),
+      }),
+    }),
+  }),
+  Object.freeze({
+    name: 'watch_annotations',
+    description:
+      'Watch for pending annotations on the active Arcade page by default. Supports explicit page or whole-project scope, returns existing pending annotations immediately, waits for the first pending annotation for up to 120 seconds by default, then batches for 10 seconds after the first hit. Maximum wait is 300 seconds and maximum batch window is 60 seconds.',
+    inputSchema: Object.freeze({
+      type: 'object',
+      additionalProperties: false,
+      properties: Object.freeze({
+        scope: Object.freeze({
+          type: 'string',
+          enum: ['page', 'project'],
+          description: 'Optional annotation scope. Defaults to the active Arcade page.',
+        }),
+        pageId: Object.freeze({
+          type: 'string',
+          description: 'Optional Arcade page id. Omit to use the active page when scope is "page".',
+        }),
+        waitTimeoutSeconds: Object.freeze({
+          type: 'integer',
+          minimum: 1,
+          maximum: 300,
+          description:
+            'Optional upper bound, in seconds, for waiting for the first pending annotation. Defaults to 120 seconds.',
+        }),
+        batchWindowSeconds: Object.freeze({
+          type: 'integer',
+          minimum: 1,
+          maximum: 60,
+          description:
+            'Optional batching window, in seconds, after the first pending annotation appears. Defaults to 10 seconds.',
+        }),
+      }),
+    }),
+  }),
+  Object.freeze({
+    name: 'acknowledge_annotation',
+    description:
+      'Acknowledge a single non-dead annotation by annotationId. Updates status, timestamps, and agent actor metadata only.',
+    inputSchema: Object.freeze({
+      type: 'object',
+      additionalProperties: false,
+      required: Object.freeze(['annotationId']),
+      properties: Object.freeze({
+        annotationId: Object.freeze({
+          type: 'string',
+          minLength: 1,
+          description: 'Globally unique annotation id.',
+        }),
+      }),
+    }),
+  }),
+  Object.freeze({
+    name: 'resolve_annotation',
+    description:
+      'Resolve a single non-dead annotation by annotationId. Updates status, timestamps, and agent metadata, and may append an optional summary thread message.',
+    inputSchema: Object.freeze({
+      type: 'object',
+      additionalProperties: false,
+      required: Object.freeze(['annotationId']),
+      properties: Object.freeze({
+        annotationId: Object.freeze({
+          type: 'string',
+          minLength: 1,
+          description: 'Globally unique annotation id.',
+        }),
+        summary: Object.freeze({
+          type: 'string',
+          description: 'Optional summary thread message to append before resolving.',
+        }),
+      }),
+    }),
+  }),
+  Object.freeze({
+    name: 'dismiss_annotation',
+    description:
+      'Dismiss a single non-dead annotation by annotationId. Updates status, timestamps, and agent metadata and requires a reason thread message.',
+    inputSchema: Object.freeze({
+      type: 'object',
+      additionalProperties: false,
+      required: Object.freeze(['annotationId', 'reason']),
+      properties: Object.freeze({
+        annotationId: Object.freeze({
+          type: 'string',
+          minLength: 1,
+          description: 'Globally unique annotation id.',
+        }),
+        reason: Object.freeze({
+          type: 'string',
+          minLength: 1,
+          description: 'Reason thread message to append before dismissing.',
+        }),
+      }),
+    }),
+  }),
+  Object.freeze({
+    name: 'reply_to_annotation',
+    description:
+      'Append an agent thread message to a single non-dead annotation by annotationId without changing status.',
+    inputSchema: Object.freeze({
+      type: 'object',
+      additionalProperties: false,
+      required: Object.freeze(['annotationId', 'message']),
+      properties: Object.freeze({
+        annotationId: Object.freeze({
+          type: 'string',
+          minLength: 1,
+          description: 'Globally unique annotation id.',
+        }),
+        message: Object.freeze({
+          type: 'string',
+          minLength: 1,
+          description: 'Agent reply text to append to the annotation thread.',
         }),
       }),
     }),
@@ -707,7 +829,7 @@ const MCP_STABLE_RESOURCE_DEFINITIONS = Object.freeze([
     uri: PROJECT_ANNOTATIONS_RESOURCE_URI,
     name: 'Active Arcade project annotations',
     description:
-      'Project-wide non-dead feedback annotations, including resolved and dismissed history plus per-status counts.',
+      'Project-wide non-dead annotations, including resolved and dismissed history plus per-status counts.',
     mimeType: 'application/json',
   }),
   Object.freeze({
@@ -726,6 +848,11 @@ const MCP_STABLE_RESOURCE_DEFINITIONS = Object.freeze([
 
 const TOOL_EXECUTION_STATUS = Object.freeze({
   list_annotations: 'available when an active project reader is connected',
+  watch_annotations: 'available when an active project reader is connected',
+  acknowledge_annotation: 'available when an active project writer is connected',
+  resolve_annotation: 'available when an active project writer is connected',
+  dismiss_annotation: 'available when an active project writer is connected',
+  reply_to_annotation: 'available when an active project writer is connected',
   capture_preview_evidence: 'available when an active preview capture bridge is connected',
   apply_changes: 'available when an active project writer is connected',
 })
@@ -768,6 +895,7 @@ const createDesktopMcpServer = ({
   port = DESKTOP_MCP_PORT,
   path = DESKTOP_MCP_PATH,
   readProjectResource = createProjectUnavailableResourceResult,
+  mutateAnnotation = createProjectUnavailableAnnotationMutationResult,
   applyChanges = createProjectUnavailableApplyChangesResult,
   capturePreviewEvidence = createProjectUnavailableCapturePreviewResult,
   previewCaptureTtlMs = DEFAULT_PREVIEW_CAPTURE_TTL_MS,
@@ -817,6 +945,7 @@ const createDesktopMcpServer = ({
         port: getPort(),
         previewCaptureStore,
         readProjectResource,
+        mutateAnnotation: async (requestPayload) => mutateAnnotation(requestPayload),
         applyChanges: async (requestPayload) => {
           return applyChanges(requestPayload)
         },
@@ -925,7 +1054,16 @@ const validateApplyChangesPageTarget = (operation, index, operationType, extraAl
 const handleDesktopMcpRequest = (
   request,
   response,
-  { host, path, port, previewCaptureStore, readProjectResource, applyChanges, capturePreviewEvidence }
+  {
+    host,
+    path,
+    port,
+    previewCaptureStore,
+    readProjectResource,
+    mutateAnnotation,
+    applyChanges,
+    capturePreviewEvidence,
+  }
 ) => {
   const requestUrl = new URL(request.url ?? '/', `http://${host}:${port}`)
   if (requestUrl.pathname !== path) {
@@ -954,6 +1092,7 @@ const handleDesktopMcpRequest = (
   void routeDesktopMcpRequest(request, response, {
     previewCaptureStore,
     readProjectResource,
+    mutateAnnotation,
     applyChanges,
     capturePreviewEvidence,
   }).catch((error) => {
@@ -1012,7 +1151,7 @@ const sendNoContent = (response, statusCode = 204) => {
 const routeDesktopMcpRequest = async (
   request,
   response,
-  { previewCaptureStore, readProjectResource, applyChanges, capturePreviewEvidence }
+  { previewCaptureStore, readProjectResource, mutateAnnotation, applyChanges, capturePreviewEvidence }
 ) => {
   let bodyText
   try {
@@ -1057,6 +1196,7 @@ const routeDesktopMcpRequest = async (
   await routeDesktopMcpJsonRpcRequest(payload, response, {
     previewCaptureStore,
     readProjectResource,
+    mutateAnnotation,
     applyChanges,
     capturePreviewEvidence,
   })
@@ -1065,7 +1205,7 @@ const routeDesktopMcpRequest = async (
 const routeDesktopMcpJsonRpcRequest = async (
   payload,
   response,
-  { previewCaptureStore, readProjectResource, applyChanges, capturePreviewEvidence }
+  { previewCaptureStore, readProjectResource, mutateAnnotation, applyChanges, capturePreviewEvidence }
 ) => {
   switch (payload.method) {
     case 'initialize':
@@ -1085,6 +1225,7 @@ const routeDesktopMcpJsonRpcRequest = async (
         applyChanges,
         capturePreviewEvidence,
         previewCaptureStore,
+        mutateAnnotation,
         readProjectResource,
       })
       return
@@ -1211,7 +1352,7 @@ const routeResourcesListRequest = async (payload, response, { readProjectResourc
 const routeToolsCallRequest = async (
   payload,
   response,
-  { applyChanges, capturePreviewEvidence, previewCaptureStore, readProjectResource }
+  { applyChanges, capturePreviewEvidence, previewCaptureStore, readProjectResource, mutateAnnotation }
 ) => {
   if (!isJsonRpcResponseId(payload.id)) {
     sendJsonRpcError(response, {
@@ -1343,6 +1484,68 @@ const routeToolsCallRequest = async (
       return
     }
 
+    if (toolDefinition.name === 'watch_annotations') {
+      const watchAnnotationsResult = await watchAnnotations(argumentsPayload, { readProjectResource })
+      sendJson(response, 200, {
+        jsonrpc: '2.0',
+        id: payload.id,
+        result: watchAnnotationsResult.ok
+          ? createToolExecutionSuccessResult(
+              watchAnnotationsResult.timedOut
+                ? 'No pending annotations appeared before the watch timed out.'
+                : `Watched ${watchAnnotationsResult.annotations.length} annotations from ${watchAnnotationsResult.resourceUri}.`,
+              watchAnnotationsResult
+            )
+          : createToolExecutionErrorResult(
+              toolDefinition.name,
+              watchAnnotationsResult.code,
+              watchAnnotationsResult.message,
+              {
+                ...(watchAnnotationsResult.resourceUri !== undefined
+                  ? { resourceUri: watchAnnotationsResult.resourceUri }
+                  : {}),
+                ...(watchAnnotationsResult.manifestResourceUri !== undefined
+                  ? { manifestResourceUri: watchAnnotationsResult.manifestResourceUri }
+                  : {}),
+              }
+            ),
+      })
+      return
+    }
+
+    if (
+      toolDefinition.name === 'acknowledge_annotation' ||
+      toolDefinition.name === 'resolve_annotation' ||
+      toolDefinition.name === 'dismiss_annotation' ||
+      toolDefinition.name === 'reply_to_annotation'
+    ) {
+      const mutationResult = await mutateAnnotation({
+        toolName: toolDefinition.name,
+        ...argumentsPayload,
+      })
+      sendJson(response, 200, {
+        jsonrpc: '2.0',
+        id: payload.id,
+        result: isDesktopMcpAnnotationMutationResult(mutationResult)
+          ? mutationResult.ok
+            ? createToolExecutionSuccessResult(mutationResult.message, mutationResult)
+            : createToolExecutionErrorResult(
+                toolDefinition.name,
+                mutationResult.code,
+                mutationResult.message,
+                {
+                  annotationId: mutationResult.annotationId,
+                }
+              )
+          : createToolExecutionErrorResult(
+              toolDefinition.name,
+              'project-unavailable',
+              'Desktop Arcade MCP annotation mutation returned an invalid renderer response.'
+            ),
+      })
+      return
+    }
+
     if (toolDefinition.name === 'capture_preview_evidence') {
       const captureResult = await capturePreviewEvidence(argumentsPayload)
       if (!isCapturePreviewResult(captureResult)) {
@@ -1432,6 +1635,10 @@ const routeToolsCallRequest = async (
     const unexpectedMessage =
       toolDefinition.name === 'list_annotations'
         ? 'Desktop Arcade MCP list_annotations failed unexpectedly.'
+        : toolDefinition.name === 'watch_annotations'
+        ? 'Desktop Arcade MCP watch_annotations failed unexpectedly.'
+        : VALID_ANNOTATION_MUTATION_TOOL_NAMES.includes(toolDefinition.name)
+        ? `Desktop Arcade MCP ${toolDefinition.name} failed unexpectedly.`
         : toolDefinition.name === 'capture_preview_evidence'
         ? 'Desktop Arcade MCP capture_preview_evidence failed unexpectedly.'
         : 'Desktop Arcade MCP apply_changes failed unexpectedly.'
@@ -1566,7 +1773,7 @@ const listDynamicProjectResources = async (readProjectResource) => {
       Object.freeze({
         uri: `arcade://project/pages/${page.id}/annotations`,
         name: `Arcade page annotations: ${page.name}`,
-        description: `Non-dead feedback annotations for Arcade page ${page.name} (${page.id}).`,
+        description: `Non-dead annotations for Arcade page ${page.name} (${page.id}).`,
         mimeType: 'application/json',
       })
     )
@@ -1673,6 +1880,86 @@ const listAnnotations = async (argumentsPayload, { readProjectResource }) => {
   }
 }
 
+const watchAnnotations = async (argumentsPayload, { readProjectResource }) => {
+  const scope = argumentsPayload.scope ?? 'page'
+  const waitTimeoutSeconds = argumentsPayload.waitTimeoutSeconds ?? 120
+  const batchWindowSeconds = argumentsPayload.batchWindowSeconds ?? 10
+  const resourceArguments = {
+    scope,
+    ...(argumentsPayload.pageId !== undefined ? { pageId: argumentsPayload.pageId } : {}),
+    status: 'pending',
+  }
+  const firstSnapshot = await listAnnotations(resourceArguments, { readProjectResource })
+  if (!firstSnapshot.ok) {
+    return firstSnapshot
+  }
+
+  if (firstSnapshot.annotations.length > 0) {
+    return {
+      ...firstSnapshot,
+      timedOut: false,
+    }
+  }
+
+  const observedAnnotations = new Map()
+  let currentSnapshot = firstSnapshot
+  const deadline = Date.now() + waitTimeoutSeconds * 1000
+
+  while (Date.now() < deadline) {
+    await sleep(Math.min(250, Math.max(50, deadline - Date.now())))
+    currentSnapshot = await listAnnotations(resourceArguments, { readProjectResource })
+    if (!currentSnapshot.ok) {
+      return currentSnapshot
+    }
+
+    if (currentSnapshot.annotations.length === 0) {
+      continue
+    }
+
+    for (const annotation of currentSnapshot.annotations) {
+      observedAnnotations.set(annotation.id, annotation)
+    }
+
+    const batchDeadline = Date.now() + batchWindowSeconds * 1000
+    while (Date.now() < batchDeadline) {
+      await sleep(Math.min(250, Math.max(50, batchDeadline - Date.now())))
+      const batchSnapshot = await listAnnotations(resourceArguments, { readProjectResource })
+      if (!batchSnapshot.ok) {
+        return batchSnapshot
+      }
+
+      for (const annotation of batchSnapshot.annotations) {
+        observedAnnotations.set(annotation.id, annotation)
+      }
+    }
+
+    const finalAnnotations = Array.from(observedAnnotations.values())
+    return {
+      ...currentSnapshot,
+      annotations: finalAnnotations,
+      counts: {
+        ...(currentSnapshot.counts ?? {}),
+        matching: finalAnnotations.length,
+      },
+      timedOut: false,
+      waitTimeoutSeconds,
+      batchWindowSeconds,
+    }
+  }
+
+  return {
+    ...currentSnapshot,
+    timedOut: true,
+    waitTimeoutSeconds,
+    batchWindowSeconds,
+    annotations: [],
+    counts: {
+      ...(currentSnapshot.counts ?? {}),
+      matching: 0,
+    },
+  }
+}
+
 const readProjectJsonResource = async (readProjectResource, resourceUri) => {
   let resourceResult
   try {
@@ -1719,6 +2006,8 @@ const readProjectJsonResource = async (readProjectResource, resourceUri) => {
     }
   }
 }
+
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
 
 const filterListedAnnotations = (annotations, status) => {
   if (!Array.isArray(annotations)) {
@@ -1853,6 +2142,16 @@ const validateToolArguments = (toolName, argumentsPayload) => {
       return validateReadResourceArguments(argumentsPayload)
     case 'list_annotations':
       return validateListAnnotationsArguments(argumentsPayload)
+    case 'watch_annotations':
+      return validateWatchAnnotationsArguments(argumentsPayload)
+    case 'acknowledge_annotation':
+      return validateAcknowledgeAnnotationArguments(argumentsPayload)
+    case 'resolve_annotation':
+      return validateResolveAnnotationArguments(argumentsPayload)
+    case 'dismiss_annotation':
+      return validateDismissAnnotationArguments(argumentsPayload)
+    case 'reply_to_annotation':
+      return validateReplyToAnnotationArguments(argumentsPayload)
     case 'capture_preview_evidence':
       return validateCapturePreviewEvidenceArguments(argumentsPayload)
     case 'apply_changes':
@@ -1910,6 +2209,106 @@ const validateListAnnotationsArguments = (argumentsPayload) => {
 
   return null
 }
+
+const validateWatchAnnotationsArguments = (argumentsPayload) => {
+  const extraKeys = getUnexpectedKeys(argumentsPayload, ['scope', 'pageId', 'waitTimeoutSeconds', 'batchWindowSeconds'])
+  if (extraKeys.length > 0) {
+    return `watch_annotations arguments contain unsupported fields: ${extraKeys.join(', ')}.`
+  }
+
+  if (
+    'scope' in argumentsPayload &&
+    (typeof argumentsPayload.scope !== 'string' ||
+      !['page', 'project'].includes(argumentsPayload.scope))
+  ) {
+    return 'watch_annotations scope must be "page" or "project" when provided.'
+  }
+
+  if (
+    'pageId' in argumentsPayload &&
+    (typeof argumentsPayload.pageId !== 'string' || !/^page\d+$/.test(argumentsPayload.pageId))
+  ) {
+    return 'watch_annotations pageId must be an Arcade page id like "page01" when provided.'
+  }
+
+  if (
+    'waitTimeoutSeconds' in argumentsPayload &&
+    (!Number.isInteger(argumentsPayload.waitTimeoutSeconds) ||
+      argumentsPayload.waitTimeoutSeconds < 1 ||
+      argumentsPayload.waitTimeoutSeconds > 300)
+  ) {
+    return 'watch_annotations waitTimeoutSeconds must be an integer between 1 and 300 when provided.'
+  }
+
+  if (
+    'batchWindowSeconds' in argumentsPayload &&
+    (!Number.isInteger(argumentsPayload.batchWindowSeconds) ||
+      argumentsPayload.batchWindowSeconds < 1 ||
+      argumentsPayload.batchWindowSeconds > 60)
+  ) {
+    return 'watch_annotations batchWindowSeconds must be an integer between 1 and 60 when provided.'
+  }
+
+  if (argumentsPayload.scope === 'project' && argumentsPayload.pageId !== undefined) {
+    return 'watch_annotations pageId may be provided only when scope is "page".'
+  }
+
+  return null
+}
+
+const validateAnnotationMutationArguments = (argumentsPayload, toolName, allowedFields, requiredField) => {
+  const extraKeys = getUnexpectedKeys(argumentsPayload, allowedFields)
+  if (extraKeys.length > 0) {
+    return `${toolName} arguments contain unsupported fields: ${extraKeys.join(', ')}.`
+  }
+
+  if (
+    typeof argumentsPayload.annotationId !== 'string' ||
+    argumentsPayload.annotationId.trim().length === 0
+  ) {
+    return `${toolName} annotationId must be a non-empty string.`
+  }
+
+  if (requiredField === 'message') {
+    if (
+      typeof argumentsPayload.message !== 'string' ||
+      argumentsPayload.message.trim().length === 0
+    ) {
+      return 'reply_to_annotation message must be a non-empty string.'
+    }
+  }
+
+  if (requiredField === 'reason') {
+    if (
+      typeof argumentsPayload.reason !== 'string' ||
+      argumentsPayload.reason.trim().length === 0
+    ) {
+      return 'dismiss_annotation reason must be a non-empty string.'
+    }
+  }
+
+  if (
+    requiredField === 'summary' &&
+    'summary' in argumentsPayload &&
+    typeof argumentsPayload.summary !== 'string'
+  ) {
+    return 'resolve_annotation summary must be a string when provided.'
+  }
+
+  return null
+}
+
+const validateAcknowledgeAnnotationArguments = (argumentsPayload) =>
+  validateAnnotationMutationArguments(argumentsPayload, 'acknowledge_annotation', ['annotationId'], null)
+
+const validateResolveAnnotationArguments = (argumentsPayload) =>
+  validateAnnotationMutationArguments(argumentsPayload, 'resolve_annotation', ['annotationId', 'summary'], 'summary')
+
+const validateDismissAnnotationArguments = (argumentsPayload) =>
+  validateAnnotationMutationArguments(argumentsPayload, 'dismiss_annotation', ['annotationId', 'reason'], 'reason')
+
+const validateReplyToAnnotationArguments = (argumentsPayload) =>
+  validateAnnotationMutationArguments(argumentsPayload, 'reply_to_annotation', ['annotationId', 'message'], 'message')
 
 const validateCapturePreviewEvidenceArguments = (argumentsPayload) => {
   const extraKeys = getUnexpectedKeys(argumentsPayload, [
@@ -2511,11 +2910,11 @@ const createDesktopStableResourceText = (uri) => {
         '# Desktop Arcade MCP operating guide',
         '',
         '- Work through `arcade://` resources and MCP tools only; do not edit repository files, package metadata, or the local filesystem.',
-        '- `arcade://desktop/start-here` is the self-sufficient on-ramp and carries the default loop: read `arcade://project/manifest`, read the relevant source resources, use `list_annotations` / annotation resources when review data matters, `apply_changes` for durable edits, read `arcade://project/diagnostics`, then capture Preview evidence. This guide only adds the finer operating details below.',
+        '- `arcade://desktop/start-here` is the self-sufficient on-ramp and carries the default loop: read `arcade://project/manifest`, read the relevant source resources, use `list_annotations` / annotation resources / annotation mutation tools when review data matters, `apply_changes` for durable edits, read `arcade://project/diagnostics`, then capture Preview evidence. This guide only adds the finer operating details below.',
         '- Start with `tools/list`, `resources/list`, and `resources/read`; tool-only clients can call `read_resource({ uri })` for the same resources.',
         '- `arcade://desktop/capabilities` is the shortest single place to inspect the published contract.',
         '- Durable project edits happen through `apply_changes`, not by patching files outside the active Arcade project.',
-        '- `list_annotations` defaults to open annotations on the active page. Read `arcade://project/annotations` for project-wide non-dead history, or `arcade://project/pages/{pageId}/annotations` for one page.',
+        '- `list_annotations` defaults to open annotations on the active page. Read `arcade://project/annotations` for project-wide non-dead history, or `arcade://project/pages/{pageId}/annotations` for one page. Use `watch_annotations` for pending-only long-polling and `acknowledge_annotation` / `resolve_annotation` / `dismiss_annotation` / `reply_to_annotation` to mutate annotation status or thread state.',
         '- Use `create_page.newPageRef`, later lifecycle `tempPageRef` targets, and `{{pageRef:name}}` placeholders when one batch must create a page and link to it.',
         '- If the human asks to replace content, read `arcade://desktop/workflows/replace-project` and use `apply_changes.assertions` to keep the final shape scoped.',
         '- `capture_preview_evidence({ pageId })` is the normal autonomous inspection path for pages and targeted visual states.',
@@ -2760,7 +3159,7 @@ const createDesktopStableResourceText = (uri) => {
           toolName: 'list_annotations',
           defaultStatus: DEFAULT_LIST_ANNOTATIONS_STATUS,
           supportedStatuses: LIST_ANNOTATIONS_STATUSES,
-          note: 'Annotation resources return non-dead feedback annotations. Hidden-but-resolved targets stay visible to MCP and still count as work.',
+          note: 'Annotation resources return non-dead annotations. Hidden-but-resolved targets stay visible to MCP and still count as work.',
         },
         akselSnippetResources: {
           akselVersion: AKSEL_CATALOG_DATA.akselVersion,
@@ -2827,6 +3226,14 @@ const createProjectUnavailableApplyChangesResult = async () => ({
   code: 'project-unavailable',
   message:
     'Desktop Arcade MCP apply_changes is unavailable because no active project writer is connected.',
+})
+
+const createProjectUnavailableAnnotationMutationResult = async ({ annotationId }) => ({
+  ok: false,
+  code: 'project-unavailable',
+  annotationId,
+  message:
+    'Desktop Arcade MCP annotation mutations are unavailable because no active project writer is connected.',
 })
 
 const createProjectUnavailableCapturePreviewResult = async () => ({
@@ -3109,6 +3516,38 @@ const isApplyChangesResult = (value) =>
         typeof value.expectedProjectRevision === 'string') &&
       (value.currentProjectRevision === undefined ||
         typeof value.currentProjectRevision === 'string'))
+
+const isDesktopMcpAnnotationMutationResult = (value) => {
+  if (!isPlainObject(value) || typeof value.ok !== 'boolean') {
+    return false
+  }
+
+  if (value.ok) {
+    return (
+      typeof value.toolName === 'string' &&
+      value.toolName.trim().length > 0 &&
+      typeof value.annotationId === 'string' &&
+      value.annotationId.trim().length > 0 &&
+      typeof value.pageId === 'string' &&
+      value.pageId.trim().length > 0 &&
+      typeof value.message === 'string' &&
+      value.message.trim().length > 0 &&
+      isPlainObject(value.annotation) &&
+      Array.isArray(value.annotations)
+    )
+  }
+
+  return (
+    (value.code === 'project-unavailable' ||
+      value.code === 'annotation-not-found' ||
+      value.code === 'dead-target-annotation' ||
+      value.code === 'invalid-annotation-payload') &&
+    typeof value.annotationId === 'string' &&
+    value.annotationId.trim().length > 0 &&
+    typeof value.message === 'string' &&
+    value.message.trim().length > 0
+  )
+}
 
 const isApplyChangesPostChangeSummary = (value) =>
   isPlainObject(value) &&

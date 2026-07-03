@@ -13,9 +13,15 @@ interface RunDesktopMainOptions {
   env?: Record<string, string | undefined>
 }
 
+interface MockDesktopMcpServerOptions {
+  mutateAnnotation?: (request: Record<string, unknown>) => Promise<unknown> | unknown
+}
+
 const runDesktopMain = async ({ isPackaged, env = {} }: RunDesktopMainOptions) => {
   const source = readFileSync(desktopMainPath, 'utf8')
   const loadedUrls: string[] = []
+  const ipcListeners = new Map<string, (...args: unknown[]) => void>()
+  let desktopMcpServerOptions: MockDesktopMcpServerOptions | null = null
   let resolveRendererLoad: (() => void) | null = null
   const rendererLoaded = new Promise<void>((resolveLoaded) => {
     resolveRendererLoad = resolveLoaded
@@ -57,7 +63,9 @@ const runDesktopMain = async ({ isPackaged, env = {} }: RunDesktopMainOptions) =
   const ipcMain = {
     handle: vi.fn(),
     removeHandler: vi.fn(),
-    on: vi.fn(),
+    on: vi.fn((channel: string, handler: (...args: unknown[]) => void) => {
+      ipcListeners.set(channel, handler)
+    }),
     off: vi.fn(),
   }
   const net = {
@@ -95,7 +103,10 @@ const runDesktopMain = async ({ isPackaged, env = {} }: RunDesktopMainOptions) =
         }
         if (request === './mcpServer.cjs') {
           return {
-            createDesktopMcpServer: () => desktopMcpServer,
+            createDesktopMcpServer: (options: MockDesktopMcpServerOptions) => {
+              desktopMcpServerOptions = options
+              return desktopMcpServer
+            },
           }
         }
         return require(request)
@@ -121,11 +132,22 @@ const runDesktopMain = async ({ isPackaged, env = {} }: RunDesktopMainOptions) =
     ),
   ])
 
-  return {
+  const result: {
+    app: typeof app
+    browserWindows: MockBrowserWindow[]
+    desktopMcpServerOptions: MockDesktopMcpServerOptions | null
+    ipcListeners: Map<string, (...args: unknown[]) => void>
+    loadedUrls: string[]
+    protocol: typeof protocol
+  } = {
     app,
+    browserWindows,
+    desktopMcpServerOptions,
+    ipcListeners,
     loadedUrls,
     protocol,
   }
+  return result
 }
 
 describe('desktop main process', () => {
@@ -150,5 +172,65 @@ describe('desktop main process', () => {
       },
     ])
     expect(protocol.handle).toHaveBeenCalledWith('aksel-arcade', expect.any(Function))
+  })
+
+  it('lets annotation mutations wait for the renderer target-resolution path', async () => {
+    vi.useFakeTimers()
+    try {
+      const { browserWindows, desktopMcpServerOptions, ipcListeners } = await runDesktopMain({
+        isPackaged: true,
+      })
+      if (!desktopMcpServerOptions) {
+        throw new Error('Expected Desktop MCP server options to be registered')
+      }
+
+      const maybeMutateAnnotation: MockDesktopMcpServerOptions['mutateAnnotation'] =
+        desktopMcpServerOptions.mutateAnnotation
+      if (typeof maybeMutateAnnotation !== 'function') {
+        throw new Error('Expected Desktop MCP annotation mutator to be registered')
+      }
+
+      const mutationPromise = maybeMutateAnnotation({
+        toolName: 'acknowledge_annotation',
+        annotationId: 'ann-1',
+      })
+
+      const routeRequest = browserWindows[0].webContents.send.mock.calls.find(
+        ([channel]) => channel === 'aksel-arcade:route-desktop-mcp-annotation-mutation-request'
+      )
+      expect(routeRequest).toBeTruthy()
+
+      await vi.advanceTimersByTimeAsync(6_000)
+
+      const responseHandler = ipcListeners.get(
+        'aksel-arcade:route-desktop-mcp-annotation-mutation-response'
+      )
+      if (!responseHandler) {
+        throw new Error('Expected Desktop MCP annotation response handler to be registered')
+      }
+
+      responseHandler(
+        { sender: { id: browserWindows[0].webContents.id } },
+        {
+          requestId: routeRequest![1].requestId,
+          response: {
+            ok: true,
+            toolName: 'acknowledge_annotation',
+            annotationId: 'ann-1',
+            pageId: 'page01',
+            message: 'Acknowledged annotation ann-1.',
+            annotation: { id: 'ann-1', status: 'acknowledged' },
+            annotations: [{ id: 'ann-1', status: 'acknowledged' }],
+          },
+        }
+      )
+
+      await expect(mutationPromise).resolves.toMatchObject({
+        ok: true,
+        annotationId: 'ann-1',
+      })
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })

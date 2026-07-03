@@ -36,11 +36,13 @@ const HookHarness = ({
   theme = 'dark',
   setTheme = vi.fn(),
   replaceProjectState = vi.fn(),
+  updateProject = vi.fn(),
   updatePreviewState = vi.fn(),
 }: {
   theme?: 'dark' | 'light'
   setTheme?: (theme: 'dark' | 'light') => void
   replaceProjectState?: (project: ReturnType<typeof createDefaultProject>) => void
+  updateProject?: (updates: Record<string, unknown>) => void
   updatePreviewState?: (updates: Record<string, unknown>) => void
 }) => {
   const project = createDefaultProject()
@@ -58,6 +60,7 @@ const HookHarness = ({
     },
     setTheme,
     replaceProjectState,
+    updateProject,
     updatePreviewState,
   })
 
@@ -79,12 +82,14 @@ describe('useDesktopMcpProjectResourceBridge', () => {
 
     const setTheme = vi.fn()
     const replaceProjectState = vi.fn()
+    const updateProject = vi.fn()
     const updatePreviewState = vi.fn()
 
     render(
       <HookHarness
         setTheme={setTheme}
         replaceProjectState={replaceProjectState}
+        updateProject={updateProject}
         updatePreviewState={updatePreviewState}
       />
     )
@@ -103,6 +108,7 @@ describe('useDesktopMcpProjectResourceBridge', () => {
     })
     expect(replaceProjectState).not.toHaveBeenCalled()
     expect(setTheme).not.toHaveBeenCalled()
+    expect(updateProject).not.toHaveBeenCalled()
     expect(updatePreviewState).not.toHaveBeenCalled()
   })
 

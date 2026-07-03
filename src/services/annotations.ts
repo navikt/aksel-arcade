@@ -206,7 +206,11 @@ export const setAnnotationStatus = (
   annotations: readonly ArcadeAnnotation[],
   annotationId: string,
   status: AnnotationStatus,
-  options?: { nowIso?: string; resolvedBy?: AnnotationAuthorRole }
+  options?: {
+    nowIso?: string
+    acknowledgedBy?: AnnotationAuthorRole
+    resolvedBy?: AnnotationAuthorRole
+  }
 ): ArcadeAnnotation[] =>
   updateAnnotation(annotations, annotationId, (annotation) => {
     const nowIso = options?.nowIso ?? new Date().toISOString()
@@ -214,6 +218,7 @@ export const setAnnotationStatus = (
       ...annotation,
       status,
       updatedAt: nowIso,
+      ...(status === 'acknowledged' ? { acknowledgedBy: options?.acknowledgedBy } : {}),
       ...(status === 'resolved' || status === 'dismissed'
         ? { resolvedAt: nowIso, resolvedBy: options?.resolvedBy }
         : {}),

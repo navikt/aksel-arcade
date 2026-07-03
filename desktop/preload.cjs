@@ -6,6 +6,10 @@ const ROUTE_DESKTOP_MCP_PROJECT_RESOURCE_REQUEST_CHANNEL =
   'aksel-arcade:route-desktop-mcp-project-resource-request'
 const ROUTE_DESKTOP_MCP_PROJECT_RESOURCE_RESPONSE_CHANNEL =
   'aksel-arcade:route-desktop-mcp-project-resource-response'
+const ROUTE_DESKTOP_MCP_ANNOTATION_MUTATION_REQUEST_CHANNEL =
+  'aksel-arcade:route-desktop-mcp-annotation-mutation-request'
+const ROUTE_DESKTOP_MCP_ANNOTATION_MUTATION_RESPONSE_CHANNEL =
+  'aksel-arcade:route-desktop-mcp-annotation-mutation-response'
 const ROUTE_DESKTOP_MCP_APPLY_CHANGES_REQUEST_CHANNEL =
   'aksel-arcade:route-desktop-mcp-apply-changes-request'
 const ROUTE_DESKTOP_MCP_APPLY_CHANGES_RESPONSE_CHANNEL =
@@ -16,11 +20,15 @@ const ROUTE_DESKTOP_MCP_PREVIEW_CAPTURE_RESPONSE_CHANNEL =
   'aksel-arcade:route-desktop-mcp-preview-capture-response'
 
 let desktopMcpProjectResourceReadHandler = null
+let desktopMcpAnnotationMutationHandler = null
 let desktopMcpApplyChangesHandler = null
 let desktopMcpPreviewCaptureHandler = null
 
 ipcRenderer.on(ROUTE_DESKTOP_MCP_PROJECT_RESOURCE_REQUEST_CHANNEL, (_event, payload) => {
   void routeDesktopMcpProjectResourceRequest(payload)
+})
+ipcRenderer.on(ROUTE_DESKTOP_MCP_ANNOTATION_MUTATION_REQUEST_CHANNEL, (_event, payload) => {
+  void routeDesktopMcpAnnotationMutationRequest(payload)
 })
 ipcRenderer.on(ROUTE_DESKTOP_MCP_APPLY_CHANGES_REQUEST_CHANNEL, (_event, payload) => {
   void routeDesktopMcpApplyChangesRequest(payload)
@@ -76,6 +84,59 @@ const routeDesktopMcpProjectResourceRequest = async (payload) => {
         getRedactedAgentErrorMessage(
           error,
           'Desktop MCP project resource read failed unexpectedly in the renderer.'
+        )
+      ),
+    })
+  }
+}
+
+const routeDesktopMcpAnnotationMutationRequest = async (payload) => {
+  const requestId =
+    isRecord(payload) && typeof payload.requestId === 'string' ? payload.requestId : null
+  if (!requestId) {
+    return
+  }
+
+  const request = parseDesktopMcpAnnotationMutationRequest(payload)
+  if (!request) {
+    ipcRenderer.send(ROUTE_DESKTOP_MCP_ANNOTATION_MUTATION_RESPONSE_CHANNEL, {
+      requestId,
+      response: createDesktopMcpAnnotationMutationFailure(
+        'invalid-annotation-payload',
+        getPayloadAnnotationId(payload),
+        'Desktop MCP annotation mutation request from the main process was invalid.'
+      ),
+    })
+    return
+  }
+
+  if (!desktopMcpAnnotationMutationHandler) {
+    ipcRenderer.send(ROUTE_DESKTOP_MCP_ANNOTATION_MUTATION_RESPONSE_CHANNEL, {
+      requestId,
+      response: createDesktopMcpAnnotationMutationFailure(
+        'project-unavailable',
+        request.annotationId,
+        'Desktop MCP annotation mutations are not available in the renderer yet.'
+      ),
+    })
+    return
+  }
+
+  try {
+    const response = await desktopMcpAnnotationMutationHandler(request)
+    ipcRenderer.send(ROUTE_DESKTOP_MCP_ANNOTATION_MUTATION_RESPONSE_CHANNEL, {
+      requestId,
+      response,
+    })
+  } catch (error) {
+    ipcRenderer.send(ROUTE_DESKTOP_MCP_ANNOTATION_MUTATION_RESPONSE_CHANNEL, {
+      requestId,
+      response: createDesktopMcpAnnotationMutationFailure(
+        'project-unavailable',
+        request.annotationId,
+        getRedactedAgentErrorMessage(
+          error,
+          'Desktop MCP annotation mutation failed unexpectedly in the renderer.'
         )
       ),
     })
@@ -195,6 +256,12 @@ contextBridge.exposeInMainWorld(
       }
       desktopMcpProjectResourceReadHandler = handler
     },
+    setDesktopMcpAnnotationHandler: (handler) => {
+      if (handler !== null && typeof handler !== 'function') {
+        throw new Error('Desktop MCP annotation mutation handler must be a function or null.')
+      }
+      desktopMcpAnnotationMutationHandler = handler
+    },
     setDesktopMcpApplyChangesHandler: (handler) => {
       if (handler !== null && typeof handler !== 'function') {
         throw new Error('Desktop MCP apply_changes handler must be a function or null.')
@@ -228,6 +295,35 @@ const parseDesktopMcpProjectResourceRequest = (payload) => {
 
 const getPayloadResourceUri = (payload) =>
   isRecord(payload) && typeof payload.uri === 'string' ? payload.uri : ''
+
+const parseDesktopMcpAnnotationMutationRequest = (payload) => {
+  if (
+    !isRecord(payload) ||
+    typeof payload.toolName !== 'string' ||
+    typeof payload.annotationId !== 'string' ||
+    payload.annotationId.trim().length === 0
+  ) {
+    return null
+  }
+
+  return {
+    toolName: payload.toolName,
+    annotationId: payload.annotationId,
+    ...(typeof payload.message === 'string' ? { message: payload.message } : {}),
+    ...(typeof payload.reason === 'string' ? { reason: payload.reason } : {}),
+    ...(typeof payload.summary === 'string' ? { summary: payload.summary } : {}),
+  }
+}
+
+const getPayloadAnnotationId = (payload) =>
+  isRecord(payload) && typeof payload.annotationId === 'string' ? payload.annotationId : ''
+
+const createDesktopMcpAnnotationMutationFailure = (code, annotationId, message) => ({
+  ok: false,
+  code,
+  annotationId,
+  message,
+})
 
 const parseDesktopMcpApplyChangesRequest = (payload) => {
   if (

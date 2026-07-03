@@ -1,3 +1,41 @@
+### 2026-07-02 - Issue #325 follow-up: Desktop MCP annotation mutation runtime fix
+
+Implemented:
+
+- Fixed the reported `isDesktopMcpAnnotationMutationResult is not defined` runtime regression in the Desktop MCP request path by restoring the validator in `desktop/mcpServer.cjs`.
+- Lifted the same annotation-mutation validator to top-level scope in `desktop/main.cjs` so the Electron main-process response bridge no longer references a function hidden inside another validator.
+- Increased the Electron main-process annotation mutation route timeout from 5s to 30s so it can outlive the renderer-side annotation target-resolution sandbox path, which may wait up to 20s before mutating.
+- Added a focused Desktop main-process regression proving an annotation mutation response that arrives after the old 5s cutoff is still accepted.
+- Updated the older Desktop MCP smoke tool-list expectation to the current 9-tool surface.
+- Fixed the follow-up mutation timeout root cause in `desktop/preload.cjs`: the annotation mutation IPC route handler was accidentally scoped inside the project-resource route handler, so annotation IPC events could not call it and Electron main waited until timeout. The handler is now top-level and covered by a preload regression.
+
+Verification:
+
+- npm run type-check
+- npm run lint
+- npm test -- --run
+- Human-style Desktop MCP smoke using Electron + real HTTP MCP calls:
+  - created pending annotations through Desktop Arcade annotation mode,
+  - called `watch_annotations` with existing pending work and with delayed pending work,
+  - called `acknowledge_annotation` and confirmed pending-only work no longer included it while open work did,
+  - called `reply_to_annotation` and confirmed thread state without status change,
+  - called `resolve_annotation` and confirmed resolved/history state,
+  - called `dismiss_annotation` with reason `no to you` and confirmed dismissed/history state,
+  - confirmed these annotation tool calls no longer timed out.
+- Follow-up after PR review/CI:
+  - fixed `npm run build` TypeScript failures that `npm run type-check` did not surface locally,
+  - corrected `AnnotationAuthorRole` to import from `@/types/annotations`,
+  - updated Desktop MCP test harness typings for `mutateAnnotation` and `updateProject`,
+  - aligned the annotation mutation unit test import with `desktopMcpAnnotationProtocol`,
+  - reran `npm run test:e2e -- tests/e2e/desktop-mcp-smoke.spec.ts --reporter=line` and the Desktop MCP smoke now passes, including the previous `Smoke entry` apply-changes assertion,
+  - fixed `acknowledge_annotation` to record agent actor metadata via `acknowledgedBy: 'agent'`,
+  - added explicit `watch_annotations` timeout and recovered-pending unit coverage,
+  - removed the unrelated README breakpoint-clamping wording from this PR and tightened MCP wording to match `CONTEXT.md`.
+
+Current blocker:
+
+- None for issue #325. The previously noted Desktop MCP smoke failure no longer reproduces.
+
 ### 2026-07-02 - Issue #323: Persist annotations in packages and Web share URLs
 
 Implemented:
@@ -4568,3 +4606,5 @@ Verification:
 - npm run type-check
 - npm run lint
 - CI=1 npm test -- --run
+
+- Implemented Desktop MCP annotation mutations/watch plumbing for issue #325: added `acknowledge_annotation`, `resolve_annotation`, `dismiss_annotation`, `reply_to_annotation`, and `watch_annotations` to the MCP server, bridged mutation handling through the Desktop renderer, and updated guidance text/tests.
