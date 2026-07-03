@@ -3517,6 +3517,38 @@ const isApplyChangesResult = (value) =>
       (value.currentProjectRevision === undefined ||
         typeof value.currentProjectRevision === 'string'))
 
+const isDesktopMcpAnnotationMutationResult = (value) => {
+  if (!isPlainObject(value) || typeof value.ok !== 'boolean') {
+    return false
+  }
+
+  if (value.ok) {
+    return (
+      typeof value.toolName === 'string' &&
+      value.toolName.trim().length > 0 &&
+      typeof value.annotationId === 'string' &&
+      value.annotationId.trim().length > 0 &&
+      typeof value.pageId === 'string' &&
+      value.pageId.trim().length > 0 &&
+      typeof value.message === 'string' &&
+      value.message.trim().length > 0 &&
+      isPlainObject(value.annotation) &&
+      Array.isArray(value.annotations)
+    )
+  }
+
+  return (
+    (value.code === 'project-unavailable' ||
+      value.code === 'annotation-not-found' ||
+      value.code === 'dead-target-annotation' ||
+      value.code === 'invalid-annotation-payload') &&
+    typeof value.annotationId === 'string' &&
+    value.annotationId.trim().length > 0 &&
+    typeof value.message === 'string' &&
+    value.message.trim().length > 0
+  )
+}
+
 const isApplyChangesPostChangeSummary = (value) =>
   isPlainObject(value) &&
   Number.isInteger(value.pageCount) &&

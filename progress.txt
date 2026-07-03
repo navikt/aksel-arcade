@@ -1,3 +1,24 @@
+### 2026-07-02 - Issue #325 follow-up: Desktop MCP annotation mutation runtime fix
+
+Implemented:
+
+- Fixed the reported `isDesktopMcpAnnotationMutationResult is not defined` runtime regression in the Desktop MCP request path by restoring the validator in `desktop/mcpServer.cjs`.
+- Lifted the same annotation-mutation validator to top-level scope in `desktop/main.cjs` so the Electron main-process response bridge no longer references a function hidden inside another validator.
+- Increased the Electron main-process annotation mutation route timeout from 5s to 30s so it can outlive the renderer-side annotation target-resolution sandbox path, which may wait up to 20s before mutating.
+- Added a focused Desktop main-process regression proving an annotation mutation response that arrives after the old 5s cutoff is still accepted.
+- Updated the older Desktop MCP smoke tool-list expectation to the current 9-tool surface.
+
+Verification:
+
+- npm run type-check
+- npm run lint
+- npm test -- --run
+
+Current blocker:
+
+- The user-requested live Desktop checklist is not fully complete yet because creating a new annotation during the Playwright/Desktop smoke flow is not becoming durable project/MCP state in this environment, even when the preview shows annotation-selection UI. The mutation runtime/timeout fixes are in place, but the smoke harness still needs a reliable pending-annotation creation path before the full checklist can pass end-to-end.
+- `npx playwright test tests/e2e/desktop-mcp-smoke.spec.ts` still fails on the existing post-`apply_changes` visible-preview assertion (`Smoke entry` does not render in the live iframe), even after updating the fixture to inline Arcade JSX. The Web Arcade exclusion case in that spec passes.
+
 ### 2026-07-02 - Issue #323: Persist annotations in packages and Web share URLs
 
 Implemented:

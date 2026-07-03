@@ -5,6 +5,17 @@ import { _electron as electron, type ElectronApplication } from 'playwright'
 const npmCommand = process.platform === 'win32' ? 'npm.cmd' : 'npm'
 const desktopRendererUrl = 'aksel-arcade://app/index.html'
 const desktopMcpUrl = 'http://127.0.0.1:3846/mcp'
+const desktopMcpToolNames = [
+  'read_resource',
+  'list_annotations',
+  'watch_annotations',
+  'acknowledge_annotation',
+  'resolve_annotation',
+  'dismiss_annotation',
+  'reply_to_annotation',
+  'capture_preview_evidence',
+  'apply_changes',
+]
 
 const stableResourceUris = [
   'arcade://desktop/start-here',
@@ -130,7 +141,7 @@ test.describe('Desktop MCP v1 smoke flow', () => {
     execFileSync(npmCommand, ['run', 'desktop:build'], { stdio: 'inherit' })
   })
 
-  test('verifies the full Desktop MCP happy path without widening the v1 surface', async () => {
+  test('verifies the full Desktop MCP happy path without widening the intended surface', async () => {
     test.setTimeout(180_000)
 
     const app: ElectronApplication = await electron.launch({
@@ -146,12 +157,9 @@ test.describe('Desktop MCP v1 smoke flow', () => {
       await waitForDefaultPreview(page)
 
       const toolsPayload = await listTools()
-      expect(toolsPayload.result.tools.map((tool: { name: string }) => tool.name)).toEqual([
-        'read_resource',
-        'list_annotations',
-        'capture_preview_evidence',
-        'apply_changes',
-      ])
+      expect(toolsPayload.result.tools.map((tool: { name: string }) => tool.name)).toEqual(
+        desktopMcpToolNames
+      )
 
       const resourcesPayload = await listResources()
       const listedResourceUris = resourcesPayload.result.resources.map(
@@ -179,12 +187,7 @@ test.describe('Desktop MCP v1 smoke flow', () => {
         requiresAuth: false,
         authDescription: 'No token/header required.',
       })
-      expect(capabilities.toolNames).toEqual([
-        'read_resource',
-        'list_annotations',
-        'capture_preview_evidence',
-        'apply_changes',
-      ])
+      expect(capabilities.toolNames).toEqual(desktopMcpToolNames)
       expect(capabilities.stableResourceUris).toEqual(stableResourceUris)
       expect(capabilities.v1Omissions).toContain('No Web Arcade MCP endpoint.')
 
@@ -246,14 +249,10 @@ test.describe('Desktop MCP v1 smoke flow', () => {
             {
               type: 'create_page',
               newPageRef: 'details',
-              jsxCode: `export default function DetailsPage() {
-  return (
-    <main>
-      <h1>Details page</h1>
-      <p>Smoke path ready</p>
-    </main>
-  )
-}`,
+              jsxCode: `<main>
+  <h1>Details page</h1>
+  <p>Smoke path ready</p>
+</main>`,
             },
             {
               type: 'rename_page',
@@ -263,15 +262,11 @@ test.describe('Desktop MCP v1 smoke flow', () => {
             {
               type: 'replace_source',
               resourceUri: entryPageJsxUri,
-              content: `export default function ActivePage() {
-  return (
-    <main>
-      <h1>Smoke entry</h1>
-      <p>Desktop MCP updated the visible page.</p>
-      <Button onClick={() => goToPage("{{pageRef:details}}")}>Open details page</Button>
-    </main>
-  )
-}`,
+              content: `<main>
+  <h1>Smoke entry</h1>
+  <p>Desktop MCP updated the visible page.</p>
+  <Button onClick={() => goToPage("{{pageRef:details}}")}>Open details page</Button>
+</main>`,
             },
           ],
         })

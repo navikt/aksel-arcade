@@ -28,7 +28,7 @@ const DESKTOP_RENDERER_HOST = 'app'
 const DESKTOP_RENDERER_ORIGIN = `${DESKTOP_RENDERER_PROTOCOL}://${DESKTOP_RENDERER_HOST}`
 const DESKTOP_RENDERER_URL = `${DESKTOP_RENDERER_ORIGIN}/index.html`
 const DESKTOP_MCP_PROJECT_RESOURCE_ROUTE_TIMEOUT_MS = 5000
-const DESKTOP_MCP_ANNOTATION_MUTATION_ROUTE_TIMEOUT_MS = 5000
+const DESKTOP_MCP_ANNOTATION_MUTATION_ROUTE_TIMEOUT_MS = 30000
 const DESKTOP_MCP_APPLY_CHANGES_ROUTE_TIMEOUT_MS = 5000
 const DESKTOP_MCP_PREVIEW_CAPTURE_ROUTE_TIMEOUT_MS = 30000
 const desktopMcpServer = createDesktopMcpServer({
@@ -707,42 +707,42 @@ const isDesktopMcpProjectResourceReadResult = (value, expectedUri) => {
     )
   }
 
-  const isDesktopMcpAnnotationMutationResult = (value) => {
-    if (!isRecord(value) || typeof value.ok !== 'boolean') {
-      return false
-    }
-
-    if (value.ok) {
-      return (
-        typeof value.toolName === 'string' &&
-        typeof value.annotationId === 'string' &&
-        value.annotationId.trim().length > 0 &&
-        typeof value.pageId === 'string' &&
-        value.pageId.trim().length > 0 &&
-        typeof value.message === 'string' &&
-        value.message.trim().length > 0 &&
-        isRecord(value.annotation) &&
-        Array.isArray(value.annotations)
-      )
-    }
-
-    return (
-      (value.code === 'project-unavailable' ||
-        value.code === 'annotation-not-found' ||
-        value.code === 'dead-target-annotation' ||
-        value.code === 'invalid-annotation-payload') &&
-      typeof value.annotationId === 'string' &&
-      value.annotationId.trim().length > 0 &&
-      typeof value.message === 'string' &&
-      value.message.trim().length > 0
-    )
-  }
-
   return (
     value.resourceUri === expectedUri &&
     (value.code === 'project-unavailable' ||
       value.code === 'source-not-found' ||
       value.code === 'invalid-resource-uri') &&
+    typeof value.message === 'string' &&
+    value.message.trim().length > 0
+  )
+}
+
+const isDesktopMcpAnnotationMutationResult = (value) => {
+  if (!isRecord(value) || typeof value.ok !== 'boolean') {
+    return false
+  }
+
+  if (value.ok) {
+    return (
+      typeof value.toolName === 'string' &&
+      typeof value.annotationId === 'string' &&
+      value.annotationId.trim().length > 0 &&
+      typeof value.pageId === 'string' &&
+      value.pageId.trim().length > 0 &&
+      typeof value.message === 'string' &&
+      value.message.trim().length > 0 &&
+      isRecord(value.annotation) &&
+      Array.isArray(value.annotations)
+    )
+  }
+
+  return (
+    (value.code === 'project-unavailable' ||
+      value.code === 'annotation-not-found' ||
+      value.code === 'dead-target-annotation' ||
+      value.code === 'invalid-annotation-payload') &&
+    typeof value.annotationId === 'string' &&
+    value.annotationId.trim().length > 0 &&
     typeof value.message === 'string' &&
     value.message.trim().length > 0
   )
