@@ -668,8 +668,10 @@ const createDesktopCapabilitiesPayload = ({
     preferredDiscoveryMethods: ['resources/list', 'resources/templates/list', 'resources/read', 'tools/list'],
     toolOnlyFallback:
       toolNames.length > 0
-        ? 'In tool-only clients, call read_resource({ uri }) for the same resources.'
+        ? 'In tool-only clients, call read_resource({ uri }) for general resources and read_source({ uri }) for editable source URIs.'
         : 'read_resource is not registered in this slice yet.',
+    sourceReadAdvice:
+      'For editable source URIs from arcade://project/manifest, prefer read_source({ uri, offset, limit }) over read_resource/resources/read when the source may be large. apply_changes replace_source still requires full replacement content.',
   },
   toolNames,
   stableResourceUris,
@@ -687,6 +689,8 @@ const createDesktopCapabilitiesPayload = ({
   interactionWaitModes: ['text', 'target', 'renderIdle'],
   limits: {
     requestBodyBytes: MAX_MCP_BODY_BYTES,
+    sourceReadDefaultChars: 8_000,
+    sourceReadMaxChars: 20_000,
     previewInteractionSteps: MAX_PREVIEW_INTERACTION_STEPS,
     previewInteractionTotalTimeMs: MAX_PREVIEW_INTERACTION_TOTAL_TIME_MS,
     previewInteractionWaitTimeoutMs: MAX_PREVIEW_INTERACTION_WAIT_TIMEOUT_MS,

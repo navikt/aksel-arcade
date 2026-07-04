@@ -38,6 +38,6 @@ The contract is guarded by:
 
 - `initialize` now uses SDK-managed protocol negotiation instead of returning the previously fixed `2024-11-05` protocol version.
 - The endpoint advertises spec-native `resources/templates/list` templates for parameterized URI families such as page source, page annotations, Aksel component detail resources, and Preview capture resources.
-- The final public tool surface is SDK-registered: `read_resource`, `list_annotations`, `watch_annotations`, `capture_preview_evidence`, `apply_changes`, `acknowledge_annotation`, `resolve_annotation`, `dismiss_annotation`, and `reply_to_annotation`.
+- The final public tool surface is SDK-registered: `read_resource`, `read_source`, `list_annotations`, `watch_annotations`, `capture_preview_evidence`, `apply_changes`, `acknowledge_annotation`, `resolve_annotation`, `dismiss_annotation`, and `reply_to_annotation`.
 - Legacy bulk annotation mutation tool names remain out of scope; the public contract uses the Arcade-native mutation tools above.
 - SDK-emitted JSON Schema metadata such as `$schema` and generated descriptions is treated as transport metadata rather than the semantic contract; golden tests compare the advertised schema shapes after stripping that metadata so intentional SDK upgrades do not create false API drift.

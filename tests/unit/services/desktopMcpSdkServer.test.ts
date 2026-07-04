@@ -56,6 +56,7 @@ const createManagedServer = (options?: {
 
 const expectedToolNames = [
   'read_resource',
+  'read_source',
   'list_annotations',
   'watch_annotations',
   'acknowledge_annotation',
@@ -423,8 +424,24 @@ describe('desktopMcpSdkServer', () => {
             mimeType: 'application/json',
             text: JSON.stringify({
               activePageId: 'page01',
-              pages: [{ id: 'page01', name: 'Overview' }],
+              pages: [
+                {
+                  id: 'page01',
+                  name: 'Overview',
+                  source: {
+                    jsx: { uri: 'arcade://project/source/pages/page01/jsx' },
+                    hooks: { uri: 'arcade://project/source/pages/page01/hooks' },
+                  },
+                },
+              ],
             }),
+          }
+        case 'arcade://project/source/pages/page01/jsx':
+          return {
+            ok: true as const,
+            uri,
+            mimeType: 'text/plain',
+            text: '0123456789abcdefghijklmnopqrstuvwxyz',
           }
         case 'arcade://project/annotations':
           return {
@@ -517,6 +534,135 @@ describe('desktopMcpSdkServer', () => {
           code: 'resource-not-found',
           toolName: 'read_resource',
           resourceUri: 'arcade://desktop/not-a-resource',
+        },
+      },
+    })
+
+    const readSourceFirstChunk = await postJsonRpc(url, {
+      jsonrpc: '2.0',
+      id: 20,
+      method: 'tools/call',
+      params: {
+        name: 'read_source',
+        arguments: {
+          uri: 'arcade://project/source/pages/page01/jsx',
+          limit: 10,
+        },
+      },
+    })
+    expect(readSourceFirstChunk.status).toBe(200)
+    expect(readSourceFirstChunk.payload).toMatchObject({
+      jsonrpc: '2.0',
+      id: 20,
+      result: {
+        content: [
+          {
+            type: 'text',
+            text: 'Read 10 of 36 characters from arcade://project/source/pages/page01/jsx.',
+          },
+        ],
+        structuredContent: {
+          ok: true,
+          uri: 'arcade://project/source/pages/page01/jsx',
+          mimeType: 'text/plain',
+          text: '0123456789',
+          offset: 0,
+          limit: 10,
+          totalLength: 36,
+          nextOffset: 10,
+        },
+      },
+    })
+
+    const readSourceNextChunk = await postJsonRpc(url, {
+      jsonrpc: '2.0',
+      id: 21,
+      method: 'tools/call',
+      params: {
+        name: 'read_source',
+        arguments: {
+          uri: 'arcade://project/source/pages/page01/jsx',
+          offset: 10,
+          limit: 40,
+        },
+      },
+    })
+    expect(readSourceNextChunk.status).toBe(200)
+    expect(readSourceNextChunk.payload).toMatchObject({
+      jsonrpc: '2.0',
+      id: 21,
+      result: {
+        structuredContent: {
+          ok: true,
+          text: 'abcdefghijklmnopqrstuvwxyz',
+          offset: 10,
+          limit: 40,
+          totalLength: 36,
+        },
+      },
+    })
+    expect(
+      (
+        readSourceNextChunk.payload as {
+          result: { structuredContent: { nextOffset?: number } }
+        }
+      ).result.structuredContent.nextOffset
+    ).toBeUndefined()
+
+    const readSourceWholeSmallSource = await postJsonRpc(url, {
+      jsonrpc: '2.0',
+      id: 23,
+      method: 'tools/call',
+      params: {
+        name: 'read_source',
+        arguments: {
+          uri: 'arcade://project/source/pages/page01/jsx',
+        },
+      },
+    })
+    expect(readSourceWholeSmallSource.status).toBe(200)
+    expect(readSourceWholeSmallSource.payload).toMatchObject({
+      jsonrpc: '2.0',
+      id: 23,
+      result: {
+        structuredContent: {
+          ok: true,
+          text: '0123456789abcdefghijklmnopqrstuvwxyz',
+          offset: 0,
+          limit: 8000,
+          totalLength: 36,
+        },
+      },
+    })
+    expect(
+      (
+        readSourceWholeSmallSource.payload as {
+          result: { structuredContent: { nextOffset?: number } }
+        }
+      ).result.structuredContent.nextOffset
+    ).toBeUndefined()
+
+    const readSourceInvalidUri = await postJsonRpc(url, {
+      jsonrpc: '2.0',
+      id: 24,
+      method: 'tools/call',
+      params: {
+        name: 'read_source',
+        arguments: {
+          uri: 'arcade://desktop/start-here',
+        },
+      },
+    })
+    expect(readSourceInvalidUri.status).toBe(200)
+    expect(readSourceInvalidUri.payload).toMatchObject({
+      jsonrpc: '2.0',
+      id: 24,
+      result: {
+        isError: true,
+        structuredContent: {
+          code: 'invalid-resource-uri',
+          toolName: 'read_source',
+          resourceUri: 'arcade://desktop/start-here',
         },
       },
     })
