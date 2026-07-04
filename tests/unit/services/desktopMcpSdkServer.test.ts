@@ -609,9 +609,42 @@ describe('desktopMcpSdkServer', () => {
       ).result.structuredContent.nextOffset
     ).toBeUndefined()
 
+    const readSourceWholeSmallSource = await postJsonRpc(url, {
+      jsonrpc: '2.0',
+      id: 23,
+      method: 'tools/call',
+      params: {
+        name: 'read_source',
+        arguments: {
+          uri: 'arcade://project/source/pages/page01/jsx',
+        },
+      },
+    })
+    expect(readSourceWholeSmallSource.status).toBe(200)
+    expect(readSourceWholeSmallSource.payload).toMatchObject({
+      jsonrpc: '2.0',
+      id: 23,
+      result: {
+        structuredContent: {
+          ok: true,
+          text: '0123456789abcdefghijklmnopqrstuvwxyz',
+          offset: 0,
+          limit: 8000,
+          totalLength: 36,
+        },
+      },
+    })
+    expect(
+      (
+        readSourceWholeSmallSource.payload as {
+          result: { structuredContent: { nextOffset?: number } }
+        }
+      ).result.structuredContent.nextOffset
+    ).toBeUndefined()
+
     const readSourceInvalidUri = await postJsonRpc(url, {
       jsonrpc: '2.0',
-      id: 22,
+      id: 24,
       method: 'tools/call',
       params: {
         name: 'read_source',
@@ -623,7 +656,7 @@ describe('desktopMcpSdkServer', () => {
     expect(readSourceInvalidUri.status).toBe(200)
     expect(readSourceInvalidUri.payload).toMatchObject({
       jsonrpc: '2.0',
-      id: 22,
+      id: 24,
       result: {
         isError: true,
         structuredContent: {
