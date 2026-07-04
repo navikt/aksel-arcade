@@ -8,7 +8,7 @@ const desktopMcpUrl = 'http://127.0.0.1:3846/mcp'
 const desktopMcpPath = '/mcp'
 const expectedInstructionLines = [
   'Desktop Arcade is a live sandbox for prototyping any UI with the Aksel design system. Build whatever the task needs — it is not limited to any one kind of screen.',
-  'Start by reading arcade://desktop/start-here — it is self-sufficient: one read plus arcade://project/manifest is enough to author. If your MCP host exposes only tools, call read_resource({ uri: "arcade://desktop/start-here" }).',
+  'Start by reading arcade://desktop/start-here — it is self-sufficient: one read plus arcade://project/manifest is enough to author. If your MCP host exposes only tools, call read_resource({ uri: "arcade://desktop/start-here" }). For editable source URIs from the manifest, prefer read_source so large source can be paged safely.',
   'Source is import-free: React, Aksel components, Aksel icons, and hooks are injected globals — never add import statements.',
   'Each Arcade page (and Global config) has two source tabs: jsx and hooks. The jsx source is inlined into return ( … ), so it must be a single JSX element/expression and must never be wrapped in { … }; put page-level top-level hook bindings such as const [value, setValue] = useState(...) in the page Hooks tab, and treat Global config hooks as module scope where you define shared custom hooks, helpers, constants, and components and never call hooks at the top level.',
   'Use real Aksel components and props; do not hand-roll raw HTML or guess prop names. If an Aksel component resource resolves to a replacement payload, follow the sanctioned replacement instead of authoring the hidden/deprecated component. Per-component usage and runnable, version-matched snippets are available on demand — do not load them until you reach for a given component.',
@@ -21,6 +21,7 @@ const expectedInstructionLines = [
 
 const expectedToolNames = [
   'read_resource',
+  'read_source',
   'list_annotations',
   'watch_annotations',
   'acknowledge_annotation',
@@ -45,6 +46,34 @@ const expectedToolDefinitions = [
           type: 'string',
           minLength: 1,
           description: 'Resource URI to read, e.g. arcade://desktop/start-here.',
+        },
+      },
+    },
+  },
+  {
+    name: 'read_source',
+    description:
+      'Read editable Arcade project source with pagination. Prefer this over read_resource/resources/read for source URIs from arcade://project/manifest, especially large JSX or Hooks files.',
+    inputSchema: {
+      type: 'object',
+      additionalProperties: false,
+      required: ['uri'],
+      properties: {
+        uri: {
+          type: 'string',
+          minLength: 1,
+          description: 'Editable source URI from arcade://project/manifest.',
+        },
+        offset: {
+          type: 'integer',
+          minimum: 0,
+          description: 'Zero-based character offset to start reading from. Defaults to 0.',
+        },
+        limit: {
+          type: 'integer',
+          minimum: 1,
+          maximum: 20000,
+          description: 'Maximum characters to return. Defaults to 8000.',
         },
       },
     },

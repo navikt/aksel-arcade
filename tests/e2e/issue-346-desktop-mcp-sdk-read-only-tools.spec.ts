@@ -80,6 +80,7 @@ test.describe('Issue #346 Desktop MCP SDK read-only tools', () => {
       ).toEqual(
         expect.arrayContaining([
           'read_resource',
+          'read_source',
           'list_annotations',
           'watch_annotations',
           'capture_preview_evidence',
