@@ -37,7 +37,7 @@ export const DESKTOP_MCP_AUTH_DESCRIPTION = 'No token/header required.'
 const MAX_MCP_BODY_BYTES = 1024 * 1024
 const DESKTOP_MCP_BOOTSTRAP_INSTRUCTIONS = [
   'Desktop Arcade is a live sandbox for prototyping any UI with the Aksel design system. Build whatever the task needs — it is not limited to any one kind of screen.',
-  'Start by reading arcade://desktop/start-here — it is self-sufficient: one read plus arcade://project/manifest is enough to author. If your MCP host exposes only tools, call read_resource({ uri: "arcade://desktop/start-here" }).',
+  'Start by reading arcade://desktop/start-here — it is self-sufficient: one read plus arcade://project/manifest is enough to author. If your MCP host exposes only tools, call read_resource({ uri: "arcade://desktop/start-here" }). For editable source URIs from the manifest, prefer read_source so large source can be paged safely.',
   'Source is import-free: React, Aksel components, Aksel icons, and hooks are injected globals — never add import statements.',
   'Each Arcade page (and Global config) has two source tabs: jsx and hooks. The jsx source is inlined into return ( … ), so it must be a single JSX element/expression and must never be wrapped in { … }; put page-level top-level hook bindings such as const [value, setValue] = useState(...) in the page Hooks tab, and treat Global config hooks as module scope where you define shared custom hooks, helpers, constants, and components and never call hooks at the top level.',
   'Use real Aksel components and props; do not hand-roll raw HTML or guess prop names. If an Aksel component resource resolves to a replacement payload, follow the sanctioned replacement instead of authoring the hidden/deprecated component. Per-component usage and runnable, version-matched snippets are available on demand — do not load them until you reach for a given component.',
@@ -52,11 +52,12 @@ const DESKTOP_MCP_TOOL_NAMES = [
   DESKTOP_MCP_READ_ONLY_TOOL_NAMES[0],
   DESKTOP_MCP_READ_ONLY_TOOL_NAMES[1],
   DESKTOP_MCP_READ_ONLY_TOOL_NAMES[2],
+  DESKTOP_MCP_READ_ONLY_TOOL_NAMES[3],
   DESKTOP_MCP_MUTATION_TOOL_NAMES[0],
   DESKTOP_MCP_MUTATION_TOOL_NAMES[1],
   DESKTOP_MCP_MUTATION_TOOL_NAMES[2],
   DESKTOP_MCP_MUTATION_TOOL_NAMES[3],
-  DESKTOP_MCP_READ_ONLY_TOOL_NAMES[3],
+  DESKTOP_MCP_READ_ONLY_TOOL_NAMES[4],
   DESKTOP_MCP_MUTATION_TOOL_NAMES[4],
 ] as const
 
@@ -296,7 +297,7 @@ export const createDesktopMcpServer = ({
     if (request.method !== 'POST') {
       sendMethodNotAllowed(
         response,
-        'Desktop Arcade MCP SDK bootstrap currently supports POST JSON-RPC requests only.'
+        'Desktop Arcade MCP v1 supports POST JSON-RPC requests only and does not support GET or SSE streams.'
       )
       return
     }
@@ -317,7 +318,7 @@ export const createDesktopMcpServer = ({
             ? -32000
             : -32700,
         message:
-          error instanceof Error
+          error instanceof Error && error.message.includes('1MB limit')
             ? error.message
             : 'Desktop Arcade MCP request body must be valid JSON.',
       })
