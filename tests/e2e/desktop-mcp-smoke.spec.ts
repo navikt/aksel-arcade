@@ -7,6 +7,7 @@ const desktopRendererUrl = 'aksel-arcade://app/index.html'
 const desktopMcpUrl = 'http://127.0.0.1:3846/mcp'
 const desktopMcpToolNames = [
   'read_resource',
+  'read_source',
   'list_annotations',
   'watch_annotations',
   'acknowledge_annotation',

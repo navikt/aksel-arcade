@@ -68,10 +68,15 @@ const LIST_ANNOTATIONS_STATUSES = [
 const PROJECT_MANIFEST_URI = 'arcade://project/manifest'
 const PROJECT_ANNOTATIONS_URI = 'arcade://project/annotations'
 const MAX_PREVIEW_INTERACTION_WAIT_TIMEOUT_MS = 5_000
+const DEFAULT_SOURCE_READ_LIMIT = 8_000
+const MAX_SOURCE_READ_LIMIT = 20_000
 const PROJECT_PAGE_ID_PATTERN = /^page\d+$/
+const PROJECT_SOURCE_URI_PATTERN =
+  /^arcade:\/\/project\/source\/(?:(global)\/(jsx|hooks)|pages\/(page\d+)\/(jsx|hooks))$/
 
 export const DESKTOP_MCP_READ_ONLY_TOOL_NAMES = [
   'read_resource',
+  'read_source',
   'list_annotations',
   'watch_annotations',
   'capture_preview_evidence',
@@ -158,6 +163,29 @@ const interactionStepSchema = z
 const readResourceInputSchema = z
   .object({
     uri: z.string().trim().min(1).describe('Resource URI to read, e.g. arcade://desktop/start-here.'),
+  })
+  .strict()
+
+const readSourceInputSchema = z
+  .object({
+    uri: z
+      .string()
+      .trim()
+      .min(1)
+      .describe('Editable source URI from arcade://project/manifest.'),
+    offset: z
+      .number()
+      .int()
+      .min(0)
+      .optional()
+      .describe('Zero-based character offset to start reading from. Defaults to 0.'),
+    limit: z
+      .number()
+      .int()
+      .min(1)
+      .max(MAX_SOURCE_READ_LIMIT)
+      .optional()
+      .describe(`Maximum characters to return. Defaults to ${DEFAULT_SOURCE_READ_LIMIT}.`),
   })
   .strict()
 
@@ -319,6 +347,17 @@ const readResourceOutputSchema = z.object({
   text: z.string(),
 })
 
+const readSourceOutputSchema = z.object({
+  ok: z.literal(true),
+  uri: z.string(),
+  mimeType: z.string(),
+  text: z.string(),
+  offset: z.number().int().min(0),
+  limit: z.number().int().min(1),
+  totalLength: z.number().int().min(0),
+  nextOffset: z.number().int().min(0).optional(),
+})
+
 const listAnnotationsOutputSchema = z.object({
   ok: z.literal(true),
   scope: z.enum(['page', 'project']),
@@ -394,6 +433,71 @@ export const registerDesktopMcpReadOnlyTools = (
         : createToolErrorResult('read_resource', resourceResult.code, resourceResult.message, {
             resourceUri: resourceResult.resourceUri,
           })
+    }
+  )
+
+  server.registerTool(
+    'read_source',
+    {
+      description:
+        'Read editable Arcade project source with pagination. Prefer this over read_resource/resources/read for source URIs from arcade://project/manifest, especially large JSX or Hooks files.',
+      inputSchema: readSourceInputSchema,
+      outputSchema: readSourceOutputSchema,
+      annotations: { readOnlyHint: true, idempotentHint: true },
+    },
+    async ({ uri, offset = 0, limit = DEFAULT_SOURCE_READ_LIMIT }) => {
+      if (!PROJECT_SOURCE_URI_PATTERN.test(uri)) {
+        return createToolErrorResult(
+          'read_source',
+          'invalid-resource-uri',
+          'read_source uri must be an editable Arcade source URI from the project manifest.',
+          { resourceUri: uri }
+        )
+      }
+
+      let resourceResult: DesktopMcpProjectResourceReadResult
+      try {
+        resourceResult = await options.readProjectResource({ uri })
+      } catch (error) {
+        return createToolErrorResult(
+          'read_source',
+          'project-unavailable',
+          error instanceof Error
+            ? error.message
+            : `Desktop Arcade source "${uri}" is unavailable.`,
+          { resourceUri: uri }
+        )
+      }
+
+      if (!resourceResult.ok) {
+        return createToolErrorResult('read_source', resourceResult.code, resourceResult.message, {
+          resourceUri: resourceResult.resourceUri,
+        })
+      }
+
+      const totalLength = resourceResult.text.length
+      const text = resourceResult.text.slice(offset, offset + limit)
+      const endOffset = offset + text.length
+      const nextOffset = endOffset < totalLength ? endOffset : undefined
+
+      return {
+        content: [
+          {
+            type: 'text' as const,
+            text: `Read ${text.length} of ${totalLength} characters from ${uri}.`,
+          },
+        ],
+        structuredContent: {
+          ok: true,
+          uri: resourceResult.uri,
+          mimeType: resourceResult.mimeType,
+          text,
+          offset,
+          limit,
+          totalLength,
+          ...(nextOffset !== undefined ? { nextOffset } : {}),
+        },
+      }
     }
   )
 

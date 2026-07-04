@@ -121,6 +121,13 @@ test.describe('Issue #279 MCP hardening', () => {
       })
       expect(toolsListPayload.result.tools.map((tool: { name: string }) => tool.name)).toEqual([
         'read_resource',
+        'read_source',
+        'list_annotations',
+        'watch_annotations',
+        'acknowledge_annotation',
+        'resolve_annotation',
+        'dismiss_annotation',
+        'reply_to_annotation',
         'capture_preview_evidence',
         'apply_changes',
       ])
